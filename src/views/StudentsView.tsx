@@ -1,0 +1,654 @@
+import React, { useState } from 'react';
+import { 
+  Users, 
+  Plus, 
+  Upload, 
+  Search, 
+  Trash2, 
+  Edit2, 
+  FileText, 
+  AlertCircle, 
+  CheckCircle,
+  FileCode,
+  Eye,
+  School
+} from 'lucide-react';
+import { Student, ClassRoom } from '../types';
+import { dataService } from '../services/dataService';
+
+interface StudentsViewProps {
+  students: Student[];
+  classes: ClassRoom[];
+  selectedClassId?: string;
+  onRefresh: () => void;
+  onViewStudentSheet: (studentId: string) => void;
+}
+
+export const StudentsView: React.FC<StudentsViewProps> = ({
+  students,
+  classes,
+  selectedClassId: initialClassFilter,
+  onRefresh,
+  onViewStudentSheet
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [classFilter, setClassFilter] = useState(initialClassFilter || '');
+  
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Single Form State
+  const [formFirstName, setFormFirstName] = useState('');
+  const [formLastName, setFormLastName] = useState('');
+  const [formStudentNumber, setFormStudentNumber] = useState('');
+  const [formClassId, setFormClassId] = useState(classes[0]?.id || '');
+
+  // Import State
+  const [importType, setImportType] = useState<'csv' | 'json'>('csv');
+  const [importText, setImportText] = useState('');
+  const [importTargetClass, setImportTargetClass] = useState(classes[0]?.id || '');
+  const [importPreview, setImportPreview] = useState<Array<Record<string, any>> | null>(null);
+  const [importSummary, setImportSummary] = useState<any>(null);
+  const [importParseError, setImportParseError] = useState<string | null>(null);
+
+  // Filtered Students
+  const filteredStudents = students.filter(s => {
+    const matchesClass = !classFilter || s.class_id === classFilter;
+    const matchesSearch = !searchTerm || 
+      s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.student_number && s.student_number.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesClass && matchesSearch;
+  });
+
+  const handleOpenAdd = () => {
+    setEditingStudent(null);
+    setFormFirstName('');
+    setFormLastName('');
+    setFormStudentNumber('');
+    setFormClassId(classFilter || classes[0]?.id || '');
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEdit = (student: Student) => {
+    setEditingStudent(student);
+    setFormFirstName(student.first_name);
+    setFormLastName(student.last_name);
+    setFormStudentNumber(student.student_number || '');
+    setFormClassId(student.class_id);
+    setIsAddModalOpen(true);
+  };
+
+  const handleSaveStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formFirstName.trim() || !formLastName.trim() || !formClassId) return;
+
+    if (editingStudent) {
+      dataService.updateStudent(editingStudent.id, {
+        first_name: formFirstName.trim(),
+        last_name: formLastName.trim(),
+        student_number: formStudentNumber.trim() || null,
+        class_id: formClassId
+      });
+    } else {
+      dataService.createStudent(
+        formFirstName.trim(),
+        formLastName.trim(),
+        formClassId,
+        formStudentNumber.trim() || undefined
+      );
+    }
+
+    setIsAddModalOpen(false);
+    onRefresh();
+  };
+
+  const handleDeleteStudent = (id: string) => {
+    dataService.deleteStudent(id);
+    setConfirmDeleteId(null);
+    onRefresh();
+  };
+
+  // CSV / JSON parsing for preview
+  const handleParseImport = () => {
+    setImportSummary(null);
+    setImportParseError(null);
+    if (!importText.trim()) return;
+
+    if (importType === 'csv') {
+      const lines = importText.trim().split('\n');
+      if (lines.length < 2) {
+        setImportParseError('Le CSV doit contenir au moins une ligne d\'en-tête et une ligne de données.');
+        return;
+      }
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const parsed: Array<Record<string, any>> = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const values = lines[i].split(',').map(v => v.trim());
+        const row: Record<string, any> = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] || '';
+        });
+        parsed.push(row);
+      }
+      setImportPreview(parsed);
+    } else {
+      try {
+        const parsed = JSON.parse(importText);
+        if (!Array.isArray(parsed)) {
+          setImportParseError('Le JSON doit être une liste (array) d\'élèves.');
+          return;
+        }
+        setImportPreview(parsed);
+      } catch (err) {
+        setImportParseError('Format JSON invalide : ' + (err as Error).message);
+      }
+    }
+  };
+
+  const handleExecuteImport = () => {
+    if (!importPreview) return;
+    const res = dataService.importStudents(importPreview, importTargetClass);
+    setImportSummary(res);
+    onRefresh();
+  };
+
+  const sampleCsv = `nom,prenom,classe\nRakoto,Jean,A1\nRabe,Marie,A1\nRasoa,Paul,A1`;
+  const sampleJson = `[\n  {\n    "nom": "Rakoto",\n    "prenom": "Jean",\n    "classe": "A1"\n  },\n  {\n    "nom": "Rabe",\n    "prenom": "Marie",\n    "classe": "A1"\n  }\n]`;
+
+  return (
+    <div className="space-y-4 sm:space-y-6 max-w-6xl mx-auto">
+      {/* Title & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div>
+          <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Annuaire des Élèves
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500">
+            {students.length} élève(s) enregistrés dans vos classes d'italien.
+          </p>
+        </div>
+        <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 self-stretch sm:self-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setImportText(sampleCsv);
+              setImportPreview(null);
+              setImportSummary(null);
+              setIsImportModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-lg shadow-2xs transition-colors min-h-[44px]"
+          >
+            <Upload className="w-4 h-4 text-slate-500" />
+            <span>Importer CSV / JSON</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-2xs transition-colors min-h-[44px]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter un élève</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Rechercher élève ou identifiant..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[40px]"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs text-slate-500 whitespace-nowrap hidden xs:inline">Classe :</span>
+          <select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[40px]"
+          >
+            <option value="">Toutes les classes</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Mobile Card List (< sm) */}
+      <div className="block sm:hidden space-y-2.5">
+        {filteredStudents.length > 0 ? (
+          filteredStudents.map((s) => (
+            <div
+              key={s.id}
+              className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs space-y-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-semibold text-slate-900 text-base">
+                    {s.first_name} {s.last_name}
+                  </h4>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs font-medium text-amber-900 bg-amber-50 px-2 py-0.5 rounded">
+                      {s.class_name}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      {s.student_number || 'Sans matricule'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(s)}
+                    className="p-2 text-slate-400 hover:text-slate-700 active:bg-slate-100 rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
+                    title="Modifier"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(s.id)}
+                    className="p-2 text-slate-400 hover:text-rose-600 active:bg-rose-50 rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">
+                  Créé le {new Date(s.created_at).toLocaleDateString('fr-FR')}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => onViewStudentSheet(s.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 rounded-md transition-colors min-h-[36px]"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Fiche & Notes</span>
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="p-8 text-center text-slate-400 text-xs bg-white rounded-lg border border-slate-200">
+            Aucun élève ne correspond à vos critères de recherche.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View (>= sm) */}
+      <div className="hidden sm:block bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-600">
+                <th className="py-3 px-4">Élève</th>
+                <th className="py-3 px-4">Identifiant</th>
+                <th className="py-3 px-4">Classe</th>
+                <th className="py-3 px-4 text-center">Historique</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStudents.length > 0 ? (
+                filteredStudents.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-900">
+                        {s.first_name} {s.last_name}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Ajouté le {new Date(s.created_at).toLocaleDateString('fr-FR')}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs text-slate-600">
+                      {s.student_number || '—'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                        {s.class_name}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onViewStudentSheet(s.id)}
+                        className="inline-flex items-center gap-1 text-xs text-amber-900 hover:text-amber-700 hover:underline font-medium min-h-[32px]"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Fiche & Notes</span>
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(s)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
+                          title="Modifier"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(s.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                    Aucun élève ne correspond à vos critères de recherche.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Ajouter / Modifier Élève */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-display text-lg font-bold text-slate-900 mb-1">
+              {editingStudent ? 'Modifier l\'élève' : 'Ajouter un élève'}
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Renseignez les informations pour les sessions d'examens oraux.
+            </p>
+
+            <form onSubmit={handleSaveStudent} className="space-y-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Prénom <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formFirstName}
+                    onChange={(e) => setFormFirstName(e.target.value)}
+                    placeholder="Jean"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nom <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formLastName}
+                    onChange={(e) => setFormLastName(e.target.value)}
+                    placeholder="Rakoto"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Numéro d'identification / Matricule
+                </label>
+                <input
+                  type="text"
+                  value={formStudentNumber}
+                  onChange={(e) => setFormStudentNumber(e.target.value)}
+                  placeholder="STU-001 (facultatif)"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Classe <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formClassId}
+                  onChange={(e) => setFormClassId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col-reverse xs:flex-row justify-end gap-2 sm:gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="w-full xs:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg min-h-[44px]"
+                >
+                  {editingStudent ? 'Enregistrer' : 'Ajouter l\'élève'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Import CSV / JSON (Section 3.2) */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 mb-4 gap-3">
+              <div>
+                <h3 className="font-display text-lg font-bold text-slate-900">
+                  Importation d'élèves par lots
+                </h3>
+                <p className="text-xs text-slate-500">
+                  CSV ou JSON avec gestion automatique des doublons.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => { setImportType('csv'); setImportText(sampleCsv); setImportPreview(null); }}
+                  className={`px-3 py-1.5 rounded-md font-medium transition-colors min-h-[36px] ${importType === 'csv' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'}`}
+                >
+                  Format CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setImportType('json'); setImportText(sampleJson); setImportPreview(null); }}
+                  className={`px-3 py-1.5 rounded-md font-medium transition-colors min-h-[36px] ${importType === 'json' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'}`}
+                >
+                  Format JSON
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Classe par défaut :
+                </label>
+                <select
+                  value={importTargetClass}
+                  onChange={(e) => setImportTargetClass(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white min-h-[44px]"
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Contenu {importType.toUpperCase()} à coller :
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setImportText(importType === 'csv' ? sampleCsv : sampleJson)}
+                    className="text-xs text-amber-800 hover:underline font-medium min-h-[32px] inline-flex items-center"
+                  >
+                    Charger exemple
+                  </button>
+                </div>
+                <textarea
+                  rows={5}
+                  value={importText}
+                  onChange={(e) => { setImportText(e.target.value); setImportPreview(null); }}
+                  className="w-full font-mono text-xs p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800"
+                  placeholder={importType === 'csv' ? "nom,prenom,classe\n..." : "[\n  {\"nom\": \"...\"}\n]"}
+                />
+              </div>
+
+              <div className="flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={handleParseImport}
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors min-h-[44px]"
+                >
+                  1. Vérifier et prévisualiser
+                </button>
+              </div>
+
+              {importParseError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{importParseError}</span>
+                </div>
+              )}
+
+              {/* Aperçu avant confirmation */}
+              {importPreview && (
+                <div className="space-y-3 pt-2 border-t border-slate-200">
+                  <div className="text-xs font-semibold text-slate-800 flex items-center justify-between">
+                    <span>Aperçu détecté ({importPreview.length} ligne(s)) :</span>
+                  </div>
+
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg text-xs">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                          <th className="p-2">#</th>
+                          <th className="p-2">Prénom</th>
+                          <th className="p-2">Nom</th>
+                          <th className="p-2">Classe</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {importPreview.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="p-2 text-slate-400 font-mono">{idx + 1}</td>
+                            <td className="p-2 font-medium">{item.prenom || item.first_name || '—'}</td>
+                            <td className="p-2 font-medium">{item.nom || item.last_name || '—'}</td>
+                            <td className="p-2 text-slate-600">{item.classe || item.class_name || 'Par défaut'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExecuteImport}
+                    className="w-full py-3 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg transition-colors min-h-[44px]"
+                  >
+                    2. Confirmer l'importation ({importPreview.length} élèves)
+                  </button>
+                </div>
+              )}
+
+              {/* Résumé de l'importation */}
+              {importSummary && (
+                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
+                  <div className="font-semibold text-slate-900 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    <span>Rapport d'importation terminé :</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 py-1 font-mono text-center">
+                    <div className="p-2 bg-emerald-50 rounded border border-emerald-100">
+                      <span className="font-bold text-emerald-800 text-sm block">{importSummary.importedCount}</span>
+                      <span className="text-[10px] text-emerald-600">Importés</span>
+                    </div>
+                    <div className="p-2 bg-amber-50 rounded border border-amber-100">
+                      <span className="font-bold text-amber-800 text-sm block">{importSummary.duplicatesCount}</span>
+                      <span className="text-[10px] text-amber-600">Doublons</span>
+                    </div>
+                    <div className="p-2 bg-rose-50 rounded border border-rose-100">
+                      <span className="font-bold text-rose-800 text-sm block">{importSummary.errorsCount}</span>
+                      <span className="text-[10px] text-rose-600">Erreurs</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-slate-100 mt-4">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Suppression */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 sm:p-6 text-center">
+            <h3 className="font-semibold text-slate-900 mb-2">Supprimer cet élève ?</h3>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              L'élève sera retiré de la liste. Ses évaluations déjà enregistrées sont conservées dans l'historique d'examens.
+            </p>
+            <div className="flex flex-col-reverse xs:flex-row justify-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="w-full xs:w-auto px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteStudent(confirmDeleteId)}
+                className="w-full xs:w-auto px-4 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg min-h-[44px]"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

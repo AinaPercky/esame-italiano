@@ -1,0 +1,6 @@
+{
+  "name": "Italian Oral Exam Manager",
+  "description": "Application professionnelle pour enseignants permettant de gérer les examens oraux d'italien, évaluer les élèves rubrique par rubrique, calculer automatiquement les notes et analyser les statistiques de classe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
