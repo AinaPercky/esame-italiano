@@ -562,7 +562,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const todayGrade = dailyGrades.find(dg => dg.date === todayStr);
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col text-slate-900 pb-16">
+    <div className="min-h-screen bg-white flex flex-col text-slate-900 pb-16">
       
       {/* Top Header Bar */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-2xs px-4 sm:px-8 py-3">
