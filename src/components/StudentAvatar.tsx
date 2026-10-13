@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { UserRound } from 'lucide-react';
 
 interface StudentAvatarProps {
@@ -8,7 +8,7 @@ interface StudentAvatarProps {
 }
 
 export const StudentAvatar: React.FC<StudentAvatarProps> = ({ name, src, className }) => {
-  const [imageFailed, setImageFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const initials = name
     .trim()
     .split(/\s+/)
@@ -16,22 +16,18 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({ name, src, classNa
     .map(part => part.charAt(0).toUpperCase())
     .join('');
 
-  useEffect(() => {
-    setImageFailed(false);
-  }, [src]);
-
   return (
     <div
       className={`rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-amber-100 text-amber-900 ${className}`}
       role="img"
       aria-label={`Photo de profil de ${name}`}
     >
-      {src && !imageFailed ? (
+      {src && failedSrc !== src ? (
         <img
           src={src}
           alt=""
           className="w-full h-full object-cover"
-          onError={() => setImageFailed(true)}
+          onError={() => setFailedSrc(src)}
         />
       ) : initials ? (
         <span className="font-bold">{initials}</span>

@@ -3,6 +3,49 @@ import { Trophy, Medal, Award, TrendingUp, Calendar, Users, Flame, Star, Sparkle
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
 
+function normalizeIdentity(value: string | null | undefined): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function studentIdentityKey(student: Pick<Student, 'class_id' | 'student_number' | 'first_name' | 'last_name'>): string {
+  const number = normalizeIdentity(student.student_number);
+  const name = normalizeIdentity(`${student.first_name} ${student.last_name}`);
+  return `${student.class_id}:${number || name}`;
+}
+
+function matchingStudentIdentityKey(
+  classId: string,
+  studentNumber: string | null | undefined,
+  studentName: string | undefined,
+  students: Student[]
+): string {
+  const classStudents = students.filter(student => student.class_id === classId);
+  const normalizedName = normalizeIdentity(studentName);
+  const nameMatches = normalizedName
+    ? classStudents.filter(student => normalizeIdentity(`${student.first_name} ${student.last_name}`) === normalizedName)
+    : [];
+  if (nameMatches.length === 1) return studentIdentityKey(nameMatches[0]);
+
+  const normalizedNumber = normalizeIdentity(studentNumber);
+  const numberMatches = normalizedNumber
+    ? classStudents.filter(student => normalizeIdentity(student.student_number) === normalizedNumber)
+    : [];
+  if (numberMatches.length === 1) return studentIdentityKey(numberMatches[0]);
+  if (numberMatches.length > 1) return `${classId}:${normalizedNumber}`;
+  return `${classId}:${normalizedNumber || normalizedName}`;
+}
+
+function gradeIdentityKey(grade: DailyGrade, students: Student[]): string {
+  const rosterStudent = students.find(student => student.id === grade.student_id);
+  if (rosterStudent) return studentIdentityKey(rosterStudent);
+
+  return matchingStudentIdentityKey(grade.class_id, grade.student_number, grade.student_name, students);
+}
+
 interface ClassLeaderboardProps {
   dailyGrades: DailyGrade[];
   classes: ClassRoom[];
@@ -53,14 +96,45 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     if (!selectedClassId) return students;
     return students.filter(s => s.class_id === selectedClassId);
   }, [students, selectedClassId]);
-  const getStudent = (studentId: string) => students.find(student => student.id === studentId);
+  const getStudent = (studentId: string, classId: string, studentNumber?: string | null, studentName?: string) => {
+    const exactMatch = students.find(student => student.id === studentId);
+    if (exactMatch?.avatar_url) return exactMatch;
+
+    const identityKey = exactMatch
+      ? studentIdentityKey(exactMatch)
+      : matchingStudentIdentityKey(classId, studentNumber, studentName, students);
+    return students.find(student => studentIdentityKey(student) === identityKey && student.avatar_url)
+      || exactMatch
+      || students.find(student => studentIdentityKey(student) === identityKey);
+  };
 
   // Construire le classement ordonné par note journalière décroissante
   const leaderboardEntries = useMemo(() => {
-    const gradedStudentIds = new Set(filteredGrades.map(g => g.student_id));
+    const gradesByIdentity = new Map<string, DailyGrade>();
+    filteredGrades.forEach(grade => {
+      const key = gradeIdentityKey(grade, students);
+      const current = gradesByIdentity.get(key);
+      const gradeHasSubmission = grade.submissions.some(submission => submission.status !== 'missed');
+      const currentHasSubmission = current?.submissions.some(submission => submission.status !== 'missed') || false;
+      const isCurrentStudent = grade.student_id === currentStudentId;
+      const currentIsCurrentStudent = current?.student_id === currentStudentId;
+
+      if (
+        !current ||
+        (isCurrentStudent && !currentIsCurrentStudent) ||
+        (isCurrentStudent === currentIsCurrentStudent && gradeHasSubmission && !currentHasSubmission) ||
+        (isCurrentStudent === currentIsCurrentStudent && gradeHasSubmission === currentHasSubmission &&
+          (grade.quizzes_count > current.quizzes_count ||
+            (grade.quizzes_count === current.quizzes_count && grade.average_score_20 > current.average_score_20)))
+      ) {
+        gradesByIdentity.set(key, grade);
+      }
+    });
+    const uniqueGrades = Array.from(gradesByIdentity.values());
+    const gradedIdentityKeys = new Set(gradesByIdentity.keys());
 
     // Entrées notées triées par note
-    const gradedList = [...filteredGrades].sort((a, b) => {
+    const gradedList = [...uniqueGrades].sort((a, b) => {
       if (b.average_score_20 !== a.average_score_20) {
         return b.average_score_20 - a.average_score_20;
       }
@@ -80,8 +154,17 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
       isPending: boolean;
     }> = [];
 
-    classStudents.forEach(st => {
-      if (!gradedStudentIds.has(st.id)) {
+    const uniqueClassStudents = new Map<string, Student>();
+    classStudents.forEach(student => {
+      const key = studentIdentityKey(student);
+      const existing = uniqueClassStudents.get(key);
+      if (!existing || (!existing.avatar_url && student.avatar_url)) {
+        uniqueClassStudents.set(key, student);
+      }
+    });
+
+    uniqueClassStudents.forEach((st, identityKey) => {
+      if (!gradedIdentityKeys.has(identityKey)) {
         unrankedList.push({
           student_id: st.id,
           student_name: `${st.first_name} ${st.last_name}`,
@@ -100,7 +183,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
       graded: gradedList,
       pending: unrankedList
     };
-  }, [filteredGrades, classStudents, selectedDate, activeClass]);
+  }, [filteredGrades, classStudents, selectedDate, activeClass, students, currentStudentId]);
 
   const classAverage = useMemo(() => {
     if (leaderboardEntries.graded.length === 0) return null;
@@ -222,7 +305,12 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[0].student_name}
-                  src={getStudent(leaderboardEntries.graded[0].student_id)?.avatar_url || undefined}
+                  src={getStudent(
+                    leaderboardEntries.graded[0].student_id,
+                    leaderboardEntries.graded[0].class_id,
+                    leaderboardEntries.graded[0].student_number,
+                    leaderboardEntries.graded[0].student_name
+                  )?.avatar_url || undefined}
                   className="w-10 h-10 border-2 border-white text-xs"
                 />
                 <div className="min-w-0 flex-1">
@@ -261,7 +349,12 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[1].student_name}
-                  src={getStudent(leaderboardEntries.graded[1].student_id)?.avatar_url || undefined}
+                  src={getStudent(
+                    leaderboardEntries.graded[1].student_id,
+                    leaderboardEntries.graded[1].class_id,
+                    leaderboardEntries.graded[1].student_number,
+                    leaderboardEntries.graded[1].student_name
+                  )?.avatar_url || undefined}
                   className="w-9 h-9 border-2 border-white text-[10px]"
                 />
                 <div className="min-w-0 flex-1">
@@ -300,7 +393,12 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[2].student_name}
-                  src={getStudent(leaderboardEntries.graded[2].student_id)?.avatar_url || undefined}
+                  src={getStudent(
+                    leaderboardEntries.graded[2].student_id,
+                    leaderboardEntries.graded[2].class_id,
+                    leaderboardEntries.graded[2].student_number,
+                    leaderboardEntries.graded[2].student_name
+                  )?.avatar_url || undefined}
                   className="w-9 h-9 border-2 border-white text-[10px]"
                 />
                 <div className="min-w-0 flex-1">
@@ -380,7 +478,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     {rankBadge}
                     <StudentAvatar
                       name={dg.student_name}
-                      src={getStudent(dg.student_id)?.avatar_url || undefined}
+                      src={getStudent(dg.student_id, dg.class_id, dg.student_number, dg.student_name)?.avatar_url || undefined}
                       className="w-9 h-9 border border-slate-200 text-[10px]"
                     />
                     <div className="min-w-0">
@@ -441,7 +539,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                           </span>
                           <StudentAvatar
                             name={pen.student_name}
-                            src={getStudent(pen.student_id)?.avatar_url || undefined}
+                            src={getStudent(pen.student_id, pen.class_id, pen.student_number, pen.student_name)?.avatar_url || undefined}
                             className="w-8 h-8 border border-slate-200 text-[9px]"
                           />
                           <span className="font-medium text-slate-700 truncate">
