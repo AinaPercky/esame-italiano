@@ -3,39 +3,39 @@
 @theme {
   --font-serif: 'Fraunces', Georgia, serif;
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --color-slate-50: #fff8ee;
-  --color-slate-100: #f8efe2;
-  --color-slate-200: #e8ddce;
-  --color-slate-300: #d2c5b5;
-  --color-slate-400: #a59b8e;
-  --color-slate-500: #77746f;
-  --color-slate-600: #5c6068;
-  --color-slate-700: #394b66;
-  --color-slate-800: #253a59;
-  --color-slate-900: #172b4d;
-  --color-slate-950: #101f38;
-  --color-amber-50: #fff1ee;
-  --color-amber-100: #ffe1dc;
-  --color-amber-200: #ffc5bb;
-  --color-amber-300: #ffa092;
-  --color-amber-400: #f78376;
-  --color-amber-500: #f26b5e;
-  --color-amber-600: #e8584c;
-  --color-amber-700: #cf443b;
-  --color-amber-800: #ad362f;
-  --color-amber-900: #852b29;
-  --color-amber-950: #571d20;
-  --color-emerald-50: #eaf7ef;
+  --color-slate-50: #ffffff;
+  --color-slate-100: #e6f0f7;
+  --color-slate-200: #d1e1ec;
+  --color-slate-300: #b3cad9;
+  --color-slate-400: #89a8bb;
+  --color-slate-500: #607f93;
+  --color-slate-600: #46657a;
+  --color-slate-700: #315267;
+  --color-slate-800: #173f58;
+  --color-slate-900: #0b3c5d;
+  --color-slate-950: #072a3f;
+  --color-amber-50: #e6f0f7;
+  --color-amber-100: #d7e8f3;
+  --color-amber-200: #b7d3e4;
+  --color-amber-300: #8eb7ce;
+  --color-amber-400: #5a91af;
+  --color-amber-500: #0b3c5d;
+  --color-amber-600: #09344f;
+  --color-amber-700: #082f49;
+  --color-amber-800: #072a3f;
+  --color-amber-900: #062438;
+  --color-amber-950: #041a29;
+  --color-emerald-50: #e8f7ef;
   --color-emerald-100: #d4efdf;
-  --color-emerald-200: #b4e3c7;
-  --color-emerald-300: #85d0a5;
-  --color-emerald-400: #58ba83;
+  --color-emerald-200: #b3e2c7;
+  --color-emerald-300: #8bd0a8;
+  --color-emerald-400: #59bc84;
   --color-emerald-500: #2fa36b;
-  --color-emerald-600: #248b58;
-  --color-emerald-700: #1d7048;
-  --color-emerald-800: #19583c;
-  --color-emerald-900: #164832;
-  --color-emerald-950: #0d2c20;
+  --color-emerald-600: #268d5b;
+  --color-emerald-700: #20764e;
+  --color-emerald-800: #195e3f;
+  --color-emerald-900: #144c34;
+  --color-emerald-950: #0c2f20;
 }
 
 @layer base {
@@ -45,8 +45,8 @@
   
   body {
     font-family: var(--font-sans);
-    color: #172b4d;
-    background-color: #fff8ee;
+    color: #072a3f;
+    background-color: #ffffff;
     /* Prevent unwanted horizontal scrolling on mobile */
     overflow-x: hidden;
     width: 100%;
@@ -57,12 +57,12 @@
   }
 
   ::selection {
-    color: #172b4d;
-    background: #ffc5bb;
+    color: #072a3f;
+    background: #e6f0f7;
   }
 
   :focus-visible {
-    outline: 3px solid #f26b5e;
+    outline: 3px solid #2fa36b;
     outline-offset: 2px;
   }
 }
