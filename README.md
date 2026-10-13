@@ -13,6 +13,7 @@ Lors d'un examen oral (par exemple la description de l'animal « Lo zébu »), l
 - **Grilles de rubriques en italien** : modèle officiel « Lo zébu » (10 rubriques) et création libre.
 - **Évaluation en direct en 1 clic** : calcul instantané de la note, des points, du % de réussite.
 - **Tirage au sort de l'ordre de passage** : algorithme Fisher-Yates avec suivi des statuts (*En attente, Évalué, Absent*).
+- **Quiz en ligne** : création et lancement des quiz, enregistrement des réponses et des notes, suivi des résultats et classement journalier.
 - **Dashboard statistique** : indicateurs clés, histogramme des notes, taux de réussite par rubrique linguistique.
 - **Fiches individuelles & Exports** : consultation détaillée, exports CSV, JSON et impression PDF.
 
@@ -68,7 +69,9 @@ italian-oral-exam/
 ### 4.1. Base de données Supabase
 1. Créez un projet sur [Supabase](https://supabase.com).
 2. Ouvrez l'éditeur SQL de votre tableau de bord Supabase.
-3. Copiez et exécutez le script contenu dans `database/schema.sql`.
+3. Pour un projet neuf, copiez et exécutez le script contenu dans `database/schema.sql`. Il crée notamment `quizzes` et `quiz_submissions`.
+
+Pour un projet Supabase déjà utilisé, ne relancez pas `database/schema.sql` : il contient des instructions `DROP TABLE`. Dans l'application, ouvrez **Paramètres & Sécurité > Copier la migration Quiz**, collez le SQL dans **Supabase > SQL Editor > New query**, puis cliquez sur **Run**. Cette migration non destructive crée `public.quizzes` et `public.quiz_submissions`, leurs index et les politiques RLS nécessaires. Revenez ensuite dans l'application, enregistrez l'URL du projet et sa clé publique `anon` dans **Paramètres & Sécurité**, puis cliquez sur **Tester la connexion**. La clé `service_role` ne doit jamais être utilisée dans l'application web.
 
 ### 4.2. Lancement du Backend Node.js
 ```bash
@@ -82,12 +85,23 @@ Le serveur REST démarre sur `http://localhost:5000`.
 
 ### 4.3. Lancement de l'application Web React
 ```bash
+Copy-Item .env.example .env.local
+# Renseignez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans .env.local,
+# ou configurez-les dans Paramètres & Sécurité de l'application.
 npm install
 npm run dev
 ```
-L'application démarre sur `http://localhost:3000`.
+Sous Windows PowerShell, ces commandes sont à exécuter depuis la racine du dépôt. L'application démarre sur `http://localhost:3000`. Le fichier `.env.local` est ignoré par Git; ne publiez pas vos clés.
 
-### 4.4. Lancement du Frontend Python Streamlit (optionnel)
+### 4.4. Vérifier l'enregistrement des quiz et des notes
+1. Dans **Paramètres & Sécurité**, testez la connexion Supabase et synchronisez les données locales si elles doivent être conservées.
+2. Créez un quiz depuis l'espace enseignant, puis lancez-le.
+3. Faites-le passer à un élève et soumettez ses réponses.
+4. Dans Supabase **Table Editor**, vérifiez le quiz dans `public.quizzes` et sa soumission/note dans `public.quiz_submissions`. La colonne `score_20` contient la note sur 20.
+
+Les créations, mises à jour, lancements et fermetures de quiz sont synchronisés vers Supabase. Les soumissions sont enregistrées par couple quiz/élève afin d'éviter les doublons. Si le test de connexion signale des tables Quiz absentes, exécutez la migration de l'étape 4.1 avant de créer ou synchroniser des quiz.
+
+### 4.5. Lancement du Frontend Python Streamlit (optionnel)
 ```bash
 cd frontend
 pip install -r requirements.txt

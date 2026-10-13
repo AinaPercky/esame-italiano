@@ -84,9 +84,8 @@ function sanitizeState(appState: AppState): AppState {
   );
 
   const validQuizzes = (appState.quizzes || []).filter(q => classIds.has(q.class_id));
-  const validSubmissions = (appState.quizSubmissions || []).filter(sub => 
-    studentIds.has(sub.student_id)
-  );
+  // Keep quiz submissions even when the student's roster entry is missing or not synced.
+  const validSubmissions = appState.quizSubmissions || [];
 
   return {
     classes: appState.classes,
@@ -156,6 +155,8 @@ export const dataService = {
     exams: Exam[];
     evaluations: Evaluation[];
     passOrder: PassOrderItem[];
+    quizzes?: Quiz[];
+    quizSubmissions?: QuizSubmission[];
   }) {
     const rubrics: ExamRubric[] = [];
     newState.exams.forEach(e => {
@@ -171,8 +172,8 @@ export const dataService = {
       rubrics: rubrics.length > 0 ? rubrics : state.rubrics,
       evaluations: newState.evaluations,
       passOrder: newState.passOrder,
-      quizzes: state.quizzes || [],
-      quizSubmissions: state.quizSubmissions || []
+      quizzes: newState.quizzes ?? state.quizzes ?? [],
+      quizSubmissions: newState.quizSubmissions ?? state.quizSubmissions ?? []
     });
 
     persistState();
@@ -187,13 +188,41 @@ export const dataService = {
     if (!supabaseService.isConfigured()) return false;
     try {
       const res = await supabaseService.importFromSupabase();
+      if (!res.success) {
+        console.warn('Initial cloud import failed:', res.message);
+        return false;
+      }
       if (res.success && res.state) {
         if (res.state.classes.length > 0 || res.state.exams.length > 0) {
-          this.setImportedState(res.state);
+          const localState = this.getRawState();
+          const cloudQuizzes = res.state.quizzes || [];
+          const cloudSubmissions = res.state.quizSubmissions || [];
+          const missingQuizzes = localState.quizzes.filter(
+            localQuiz => !cloudQuizzes.some(cloudQuiz => cloudQuiz.id === localQuiz.id)
+          );
+          const missingSubmissions = localState.quizSubmissions.filter(localSubmission =>
+            !cloudSubmissions.some(cloudSubmission => {
+              if (cloudSubmission.quiz_id !== localSubmission.quiz_id) return false;
+              if (cloudSubmission.student_id === localSubmission.student_id) return true;
+              if (cloudSubmission.class_id !== localSubmission.class_id) return false;
+              return (
+                (localSubmission.student_number && cloudSubmission.student_number === localSubmission.student_number) ||
+                cloudSubmission.student_name.trim().toLowerCase() === localSubmission.student_name.trim().toLowerCase()
+              );
+            })
+          );
+
+          await supabaseService.syncQuizData(missingQuizzes, missingSubmissions);
+          this.setImportedState({
+            ...res.state,
+            quizzes: [...cloudQuizzes, ...missingQuizzes],
+            quizSubmissions: [...cloudSubmissions, ...missingSubmissions]
+          });
           return true;
         } else {
           // Si Supabase est vierge, envoyer l'état initial
-          await supabaseService.syncLocalToSupabase(this.getRawState());
+          const syncResult = await supabaseService.syncLocalToSupabase(this.getRawState());
+          if (!syncResult.success) throw new Error(syncResult.message);
           return true;
         }
       }
@@ -1106,7 +1135,7 @@ export const dataService = {
     const totalPoints = (data.questions || []).reduce((acc, curr) => acc + (Number(curr.points) || 0), 0) || 20;
     const cls = state.classes.find(c => c.id === data.class_id);
     const newQuiz: Quiz = {
-      id: `quiz_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: generateUUID(),
       title: data.title.trim(),
       description: data.description?.trim(),
       class_id: data.class_id,
@@ -1118,6 +1147,7 @@ export const dataService = {
       total_points: totalPoints
     };
 
+    supabaseService.saveQuiz(newQuiz).catch(err => console.error('Cloud createQuiz error:', err));
     if (!state.quizzes) state.quizzes = [];
     state.quizzes.unshift(newQuiz);
     persistState();
@@ -1140,6 +1170,7 @@ export const dataService = {
       total_points: totalPoints || state.quizzes[idx].total_points
     };
 
+    supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud updateQuiz error:', err));
     persistState();
     notifySubscribers();
     return state.quizzes[idx];
@@ -1147,6 +1178,7 @@ export const dataService = {
 
   deleteQuiz(id: string): void {
     if (!state.quizzes) return;
+    supabaseService.deleteQuiz(id).catch(err => console.error('Cloud deleteQuiz error:', err));
     state.quizzes = state.quizzes.filter(q => q.id !== id);
     if (state.quizSubmissions) {
       state.quizSubmissions = state.quizSubmissions.filter(sub => sub.quiz_id !== id);
@@ -1174,6 +1206,7 @@ export const dataService = {
       expires_at: oneHourLater.toISOString()
     };
 
+    supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud launchQuiz error:', err));
     persistState();
     notifySubscribers();
     return state.quizzes[idx];
@@ -1187,6 +1220,7 @@ export const dataService = {
       ...state.quizzes[idx],
       status: 'closed'
     };
+    supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud closeQuiz error:', err));
 
     // Attribution automatique du 0/20 pour tous les élèves qui n'ont pas composé
     this.applyZeroForMissedStudents(state.quizzes[idx]);
@@ -1212,6 +1246,7 @@ export const dataService = {
         if (now >= expireTime) {
           // L'heure est écoulée : fermeture et attribution de 0 pour les retardataires
           q.status = 'closed';
+          supabaseService.saveQuiz(q).catch(err => console.error('Cloud expireQuiz error:', err));
           this.applyZeroForMissedStudents(q);
           hasChanged = true;
         }
@@ -1257,6 +1292,8 @@ export const dataService = {
           feedback: {}
         };
         state.quizSubmissions.push(zeroSubmission);
+        supabaseService.saveQuizSubmission(zeroSubmission)
+          .catch(err => console.error('Cloud save missed quiz submission error:', err));
       }
     });
   },
@@ -1279,13 +1316,17 @@ export const dataService = {
     if (!state.quizSubmissions) state.quizSubmissions = [];
 
     // Vérifier si l'élève a déjà soumis ce quiz
-    const existingIdx = state.quizSubmissions.findIndex(
-      s => s.quiz_id === quizId && (
-        (studentId && s.student_id === studentId) ||
-        (studentName && s.student_name.toLowerCase() === studentName.toLowerCase()) ||
-        (studentNumber && s.student_number === studentNumber)
-      )
-    );
+    const existingIdx = state.quizSubmissions.findIndex(s => {
+      if (s.quiz_id !== quizId) return false;
+      if (studentId && s.student_id === studentId) return true;
+      if (s.class_id !== classId) return false;
+
+      return (
+        (!s.student_id || !studentId) &&
+        ((studentNumber && s.student_number?.trim() === studentNumber.trim()) ||
+          (studentName && s.student_name.trim().toLowerCase() === studentName.trim().toLowerCase()))
+      );
+    });
 
     if (existingIdx !== -1) {
       throw new Error("Vous avez déjà soumis ce quiz et il est définitivement verrouillé.");
@@ -1326,7 +1367,7 @@ export const dataService = {
     const today = now.split('T')[0];
 
     const submission: QuizSubmission = {
-      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: generateUUID(),
       quiz_id: quizId,
       quiz_title: quiz.title,
       student_id: studentId,
@@ -1351,6 +1392,8 @@ export const dataService = {
       state.quizSubmissions.unshift(submission);
     }
 
+    supabaseService.saveQuizSubmission(submission)
+      .catch(err => console.error('Cloud submitQuiz error:', err));
     persistState();
     notifySubscribers();
     return submission;
@@ -1365,7 +1408,7 @@ export const dataService = {
     return list;
   },
 
-  getStudentSubmissions(studentId: string, studentName?: string, studentNumber?: string): QuizSubmission[] {
+  getStudentSubmissions(studentId: string, studentName?: string, studentNumber?: string, classId?: string): QuizSubmission[] {
     this.checkAndApplyExpiredQuizzes();
     const cleanId = (studentId || '').toLowerCase();
     const cleanName = (studentName || '').toLowerCase();
@@ -1375,14 +1418,12 @@ export const dataService = {
       const sId = (s.student_id || '').toLowerCase();
       const sName = (s.student_name || '').toLowerCase();
       const sNum = (s.student_number || '').trim();
+      if (classId && s.class_id !== classId) return false;
+      if (cleanId && sId) return sId === cleanId;
 
       return (
-        (cleanId && sId === cleanId) ||
-        (cleanId && sId.includes(cleanId)) ||
-        (sId && cleanId.includes(sId)) ||
-        (cleanName && sName === cleanName) ||
-        (cleanName && sName.includes(cleanName)) ||
-        (cleanNum && sNum === cleanNum)
+        (cleanNum && sNum === cleanNum) ||
+        (cleanName && sName === cleanName)
       );
     });
   },
@@ -1435,12 +1476,7 @@ export const dataService = {
 
   getStudentDailyGrades(studentId: string): DailyGrade[] {
     this.checkAndApplyExpiredQuizzes();
-    const cleanId = (studentId || '').toLowerCase();
-    
-    const submissions = (state.quizSubmissions || []).filter(s => {
-      const sId = (s.student_id || '').toLowerCase();
-      return sId === cleanId || sId.includes(cleanId) || cleanId.includes(sId);
-    });
+    const submissions = (state.quizSubmissions || []).filter(s => s.student_id === studentId);
 
     const groups: Record<string, QuizSubmission[]> = {};
     submissions.forEach(sub => {
@@ -1471,4 +1507,3 @@ export const dataService = {
     return result.sort((a, b) => b.date.localeCompare(a.date));
   }
 };
-

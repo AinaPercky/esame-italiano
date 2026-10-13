@@ -26,12 +26,14 @@ import { Exam, Student, Evaluation, ClassRoom, ExamRubric } from '../types';
 interface StudentPublicReportViewProps {
   examId?: string;
   studentId?: string;
+  lockedStudentId?: string;
   onBackToApp?: () => void;
 }
 
 export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = ({
   examId: initialExamId,
   studentId: initialStudentId,
+  lockedStudentId,
   onBackToApp
 }) => {
   const allExams = dataService.getExams();
@@ -63,7 +65,8 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     ? allStudents.filter(s => s.class_id === currentExam.class_id)
     : allStudents;
 
-  const currentStudent = selectedStudentId ? dataService.getStudentById(selectedStudentId) : null;
+  const effectiveStudentId = lockedStudentId || selectedStudentId;
+  const currentStudent = effectiveStudentId ? dataService.getStudentById(effectiveStudentId) : null;
   const evals = currentExam && currentStudent 
     ? dataService.getEvaluations(currentExam.id, undefined, currentStudent.id) 
     : [];
@@ -128,8 +131,16 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
 
   const appreciation = getAppreciation(currentScore, maxScore);
 
+  if (lockedStudentId && !currentStudent) {
+    return (
+      <div className="bg-white p-5 rounded-xl border border-amber-200 text-sm text-slate-700">
+        Votre fiche d'examen oral est indisponible. Contactez votre professeur pour vérifier votre compte.
+      </div>
+    );
+  }
+
   // Vue 1 : L'élève a scanné le Code QR commun et doit saisir son numéro d'élève
-  if (!currentStudent || !selectedStudentId) {
+  if (!currentStudent || (!lockedStudentId && !selectedStudentId)) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
         <div className="max-w-xl mx-auto w-full pt-6 sm:pt-12 space-y-6">
@@ -252,19 +263,21 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs font-bold text-slate-800">
-              Fiche officielle en lecture seule (Consultation Code QR)
+              {lockedStudentId ? 'Votre fiche d’examen oral en lecture seule' : 'Fiche officielle en lecture seule (Consultation Code QR)'}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelectedStudentId('')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              title="Consulter un autre numéro d'élève"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Changer d'élève</span>
-            </button>
+            {!lockedStudentId && (
+              <button
+                onClick={() => setSelectedStudentId('')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                title="Consulter un autre numéro d'élève"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Changer d'élève</span>
+              </button>
+            )}
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg transition-colors cursor-pointer"

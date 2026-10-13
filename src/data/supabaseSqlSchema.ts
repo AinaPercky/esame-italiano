@@ -96,6 +96,42 @@ CREATE TABLE exam_pass_order (
     CONSTRAINT unique_exam_position UNIQUE (exam_id, position)
 );
 
+-- 8. Quiz et soumissions
+CREATE TABLE quizzes (
+    id TEXT PRIMARY KEY,
+    class_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    duration_minutes INTEGER NOT NULL DEFAULT 10,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),
+    launched_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    questions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    total_points NUMERIC(7,2) NOT NULL DEFAULT 20
+);
+
+CREATE TABLE quiz_submissions (
+    id TEXT PRIMARY KEY,
+    quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    quiz_title TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    student_name TEXT NOT NULL,
+    student_number TEXT,
+    class_id TEXT NOT NULL,
+    class_name TEXT,
+    started_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ,
+    answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+    score NUMERIC(7,2) NOT NULL DEFAULT 0,
+    max_score NUMERIC(7,2) NOT NULL DEFAULT 20,
+    score_20 NUMERIC(5,2) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'timeout', 'missed')),
+    feedback JSONB NOT NULL DEFAULT '{}'::jsonb,
+    date DATE NOT NULL,
+    CONSTRAINT unique_quiz_student_submission UNIQUE (quiz_id, student_id)
+);
+
 -- Index
 CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id);
 CREATE INDEX IF NOT EXISTS idx_exams_class_id ON exams(class_id);
@@ -111,6 +147,8 @@ ALTER TABLE exam_rubrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evaluation_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_pass_order ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_submissions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Classes full access" ON classes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Students full access" ON students FOR ALL USING (true) WITH CHECK (true);
@@ -119,4 +157,57 @@ CREATE POLICY "Exam rubrics full access" ON exam_rubrics FOR ALL USING (true) WI
 CREATE POLICY "Evaluations full access" ON evaluations FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Evaluation details full access" ON evaluation_details FOR ALL USING (true);
 CREATE POLICY "Exam pass order full access" ON exam_pass_order FOR ALL USING (true);
+CREATE POLICY "Quizzes full access" ON quizzes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Quiz submissions full access" ON quiz_submissions FOR ALL USING (true) WITH CHECK (true);
+`;
+
+export const QUIZ_SUPABASE_MIGRATION_SQL = `-- Ajout non destructif de la persistance des quiz et de leurs résultats
+CREATE TABLE IF NOT EXISTS public.quizzes (
+    id TEXT PRIMARY KEY,
+    class_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    duration_minutes INTEGER NOT NULL DEFAULT 10,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),
+    launched_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    questions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    total_points NUMERIC(7,2) NOT NULL DEFAULT 20
+);
+
+CREATE TABLE IF NOT EXISTS public.quiz_submissions (
+    id TEXT PRIMARY KEY,
+    quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+    quiz_title TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    student_name TEXT NOT NULL,
+    student_number TEXT,
+    class_id TEXT NOT NULL,
+    class_name TEXT,
+    started_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ,
+    answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+    score NUMERIC(7,2) NOT NULL DEFAULT 0,
+    max_score NUMERIC(7,2) NOT NULL DEFAULT 20,
+    score_20 NUMERIC(5,2) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'timeout', 'missed')),
+    feedback JSONB NOT NULL DEFAULT '{}'::jsonb,
+    date DATE NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_quiz_student_submission
+    ON public.quiz_submissions (quiz_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_quizzes_class_id ON public.quizzes (class_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_submissions_quiz_id ON public.quiz_submissions (quiz_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student_date
+    ON public.quiz_submissions (student_id, date);
+
+ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_submissions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Quizzes full access" ON public.quizzes;
+CREATE POLICY "Quizzes full access" ON public.quizzes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Quiz submissions full access" ON public.quiz_submissions;
+CREATE POLICY "Quiz submissions full access" ON public.quiz_submissions FOR ALL USING (true) WITH CHECK (true);
 `;

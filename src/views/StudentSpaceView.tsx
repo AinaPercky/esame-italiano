@@ -114,21 +114,24 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const stId = currentUser.student_id || studentRecord?.id || `student_${currentUser.id}`;
     const stName = currentUser.name;
     const stNum = currentUser.student_number || studentRecord?.student_number || '1';
-    return { stId, stName, stNum };
+    const classId = currentUser.class_id || studentRecord?.class_id || '';
+    return { stId, stName, stNum, classId };
   };
 
   const hasCompletedQuiz = (quizId: string) => {
-    const { stId, stName, stNum } = getStudentQueryInfo();
-    const liveSubs = dataService.getStudentSubmissions(stId, stName, stNum);
+    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+    const liveSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
     const allQuizSubs = dataService.getQuizSubmissions(quizId);
-    
-    const matchedBySubs = liveSubs.some(s => s.quiz_id === quizId && (s.status === 'completed' || s.status === 'timeout' || s.status === 'missed'));
-    const matchedByQuizSubs = allQuizSubs.some(s => 
-      (s.student_id && s.student_id.toLowerCase() === stId.toLowerCase()) ||
-      (s.student_name && s.student_name.toLowerCase() === stName.toLowerCase()) ||
-      (s.student_number && s.student_number.trim() === stNum.trim()) ||
-      (currentUser.email && s.student_name && s.student_name.toLowerCase() === currentUser.email.toLowerCase())
-    );
+
+    const matchedBySubs = liveSubs.some(s => s.quiz_id === quizId);
+    const matchedByQuizSubs = allQuizSubs.some(s => {
+      if (s.student_id && s.student_id === stId) return true;
+      if (!classId || s.class_id !== classId) return false;
+      return (
+        s.student_number?.trim() === stNum.trim() ||
+        s.student_name.trim().toLowerCase() === stName.trim().toLowerCase()
+      );
+    });
 
     return matchedBySubs || matchedByQuizSubs || mySubmissions.some(s => s.quiz_id === quizId);
   };
@@ -136,7 +139,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const loadData = () => {
     // Synchroniser avec dataService
     const stList = dataService.getStudents();
-    const st = stList.find(s => s.id === currentUser.student_id || s.student_number === currentUser.student_number);
+    const st = stList.find(s => s.id === currentUser.student_id) || (() => {
+      const classStudents = currentUser.class_id
+        ? stList.filter(s => s.class_id === currentUser.class_id)
+        : stList;
+      const numberMatches = currentUser.student_number
+        ? classStudents.filter(s => s.student_number?.trim() === currentUser.student_number?.trim())
+        : [];
+      return numberMatches.length === 1 ? numberMatches[0] : undefined;
+    })();
     setStudentRecord(st || null);
 
     const allCls = dataService.getClasses();
@@ -145,10 +156,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
     const classId = currentUser.class_id || st?.class_id;
 
-    const { stId, stName, stNum } = getStudentQueryInfo();
+    const { stId, stName, stNum, classId: studentClassId } = getStudentQueryInfo();
     let subs: QuizSubmission[] = [];
     if (stId) {
-      subs = dataService.getStudentSubmissions(stId, stName, stNum);
+      subs = dataService.getStudentSubmissions(stId, stName, stNum, studentClassId);
       const dgs = dataService.getStudentDailyGrades(stId);
       setMySubmissions(subs);
       setDailyGrades(dgs);
@@ -268,8 +279,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   const handleStartQuiz = (quiz: Quiz) => {
     // RÈGLE STRICTE : Une fois le quiz fait, l'élève ne peut plus le recommencer
-    const { stId, stName, stNum } = getStudentQueryInfo();
-    const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum);
+    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+    const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
     const alreadySubmitted = mySubmissions.some(s => s.quiz_id === quiz.id) || freshSubs.some(s => s.quiz_id === quiz.id);
 
     if (alreadySubmitted) {
@@ -709,8 +720,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {quizzes.map(quiz => {
                     const done = hasCompletedQuiz(quiz.id);
-                    const { stId, stName, stNum } = getStudentQueryInfo();
-                    const sub = mySubmissions.find(s => s.quiz_id === quiz.id) || dataService.getStudentSubmissions(stId, stName, stNum).find(s => s.quiz_id === quiz.id);
+                    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+                    const sub = mySubmissions.find(s => s.quiz_id === quiz.id) || dataService.getStudentSubmissions(stId, stName, stNum, classId).find(s => s.quiz_id === quiz.id);
                     const isCompleted = done || (sub && (sub.status === 'completed' || sub.status === 'timeout' || sub.status === 'missed'));
                     const isMissed = sub && sub.status === 'missed';
                     const isLive = quiz.status === 'launched' && !isCompleted;
@@ -1274,11 +1285,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         {activeTab === 'oral_exam' && (
           <div className="space-y-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs text-slate-500">
-              Consultation officielle de votre fiche d'examen oral (grille des 10 critères, animal présenté et chronomètre de parole).
+              Consultation de votre note d'examen oral et de votre fiche personnelle.
             </div>
-            <StudentPublicReportView
-              studentId={currentUser.student_id || studentRecord?.id}
-            />
+            {studentRecord?.id ? (
+              <StudentPublicReportView
+                studentId={studentRecord.id}
+                lockedStudentId={studentRecord.id}
+              />
+            ) : (
+              <div className="bg-white p-5 rounded-xl border border-amber-200 text-sm text-slate-700">
+                Votre compte n'est pas associé à une fiche élève unique. Contactez votre professeur pour vérifier votre matricule.
+              </div>
+            )}
           </div>
         )}
 

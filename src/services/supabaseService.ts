@@ -1,5 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ClassRoom, Exam, Student, ExamRubric, Evaluation, PassOrderItem } from '../types';
+import {
+  ClassRoom,
+  Exam,
+  Student,
+  ExamRubric,
+  Evaluation,
+  PassOrderItem,
+  Quiz,
+  QuizSubmission
+} from '../types';
 
 const STORAGE_CONFIG_KEY = 'oral_exam_supabase_config';
 
@@ -51,6 +60,8 @@ export interface ConnectionTestResult {
     studentsCount?: number;
     examsCount?: number;
     evaluationsCount?: number;
+    quizzesCount?: number;
+    quizSubmissionsCount?: number;
     tablesCreated?: boolean;
   };
 }
@@ -58,6 +69,7 @@ export interface ConnectionTestResult {
 class SupabaseService {
   private client: SupabaseClient | null = null;
   private currentConfig: SupabaseConfig = this.loadConfig();
+  private quizWriteQueues = new Map<string, Promise<void>>();
 
   public loadConfig(): SupabaseConfig {
     try {
@@ -185,16 +197,31 @@ class SupabaseService {
       const { count: studentsCount } = await testClient.from('students').select('*', { count: 'exact', head: true });
       const { count: examsCount } = await testClient.from('exams').select('*', { count: 'exact', head: true });
       const { count: evalsCount } = await testClient.from('evaluations').select('*', { count: 'exact', head: true });
+      const { count: quizzesCount, error: quizzesError } = await testClient
+        .from('quizzes')
+        .select('*', { count: 'exact', head: true });
+      const { count: quizSubmissionsCount, error: submissionsError } = await testClient
+        .from('quiz_submissions')
+        .select('*', { count: 'exact', head: true });
+
+      if (quizzesError || submissionsError) {
+        return {
+          success: false,
+          message: "La connexion Supabase fonctionne, mais les tables des quiz sont absentes ou inaccessibles. Copiez et exécutez la migration « Ajouter les tables Quiz » depuis ce panneau Paramètres."
+        };
+      }
 
       return {
         success: true,
-        message: `Connexion à Supabase PostgreSQL réussie ! Tables vérifiées et actives.`,
+        message: `Connexion Supabase réussie. Tables des quiz et résultats vérifiées.`,
         details: {
           tablesCreated: true,
           classesCount: classesCount || 0,
           studentsCount: studentsCount || 0,
           examsCount: examsCount || 0,
-          evaluationsCount: evalsCount || 0
+          evaluationsCount: evalsCount || 0,
+          quizzesCount: quizzesCount || 0,
+          quizSubmissionsCount: quizSubmissionsCount || 0
         }
       };
     } catch (err: any) {
@@ -406,6 +433,83 @@ class SupabaseService {
     }
   }
 
+  public async saveQuiz(quiz: Quiz): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+
+    const previousWrite = this.quizWriteQueues.get(quiz.id) || Promise.resolve();
+    const write = previousWrite.catch(() => undefined).then(async () => {
+      const { error } = await client.from('quizzes').upsert({
+        id: quiz.id,
+        class_id: quiz.class_id,
+        title: quiz.title,
+        description: quiz.description || null,
+        created_at: quiz.created_at || new Date().toISOString(),
+        duration_minutes: quiz.duration_minutes || 10,
+        status: quiz.status || 'draft',
+        launched_at: quiz.launched_at || null,
+        expires_at: quiz.expires_at || null,
+        questions: quiz.questions || [],
+        total_points: Number(quiz.total_points) || 20
+      }, { onConflict: 'id' });
+
+      if (error) throw new Error(`Quiz « ${quiz.title} » : ${error.message}`);
+    });
+
+    this.quizWriteQueues.set(quiz.id, write);
+    try {
+      await write;
+    } finally {
+      if (this.quizWriteQueues.get(quiz.id) === write) {
+        this.quizWriteQueues.delete(quiz.id);
+      }
+    }
+  }
+
+  public async deleteQuiz(id: string): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+
+    const { error } = await client.from('quizzes').delete().eq('id', id);
+    if (error) throw new Error(`Suppression du quiz : ${error.message}`);
+  }
+
+  public async saveQuizSubmission(submission: QuizSubmission): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+
+    const { error } = await client.from('quiz_submissions').upsert({
+      id: submission.id,
+      quiz_id: submission.quiz_id,
+      quiz_title: submission.quiz_title,
+      student_id: submission.student_id,
+      student_name: submission.student_name,
+      student_number: submission.student_number || null,
+      class_id: submission.class_id,
+      class_name: submission.class_name || null,
+      started_at: submission.started_at,
+      submitted_at: submission.submitted_at || null,
+      answers: submission.answers || {},
+      score: Number(submission.score) || 0,
+      max_score: Number(submission.max_score) || 20,
+      score_20: Number(submission.score_20) || 0,
+      status: submission.status,
+      feedback: submission.feedback || {},
+      date: submission.date
+    }, { onConflict: 'quiz_id,student_id' });
+
+    if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
+  }
+
+  public async syncQuizData(quizzes: Quiz[] = [], submissions: QuizSubmission[] = []): Promise<void> {
+    for (const quiz of quizzes) {
+      await this.saveQuiz(quiz);
+    }
+    for (const submission of submissions) {
+      await this.saveQuizSubmission(submission);
+    }
+  }
+
   /**
    * Synchronise (exporte) les données locales vers Supabase PostgreSQL
    */
@@ -415,6 +519,8 @@ class SupabaseService {
     exams: Exam[];
     evaluations: Evaluation[];
     passOrder: PassOrderItem[];
+    quizzes?: Quiz[];
+    quizSubmissions?: QuizSubmission[];
   }): Promise<{ success: boolean; message: string }> {
     const client = this.getClient();
     if (!client) {
@@ -567,6 +673,8 @@ class SupabaseService {
         }
       }
 
+      await this.syncQuizData(localState.quizzes, localState.quizSubmissions);
+
       return {
         success: true,
         message: `Synchronisation réussie : données sauvegardées dans Supabase.`
@@ -591,6 +699,8 @@ class SupabaseService {
       exams: Exam[];
       evaluations: Evaluation[];
       passOrder: PassOrderItem[];
+      quizzes: Quiz[];
+      quizSubmissions: QuizSubmission[];
     };
   }> {
     const client = this.getClient();
@@ -609,7 +719,9 @@ class SupabaseService {
         { data: rubricsData, error: errR },
         { data: evalsData, error: errEv },
         { data: detailsData, error: errD },
-        { data: passOrderData, error: errPO }
+        { data: passOrderData, error: errPO },
+        { data: quizzesData, error: errQ },
+        { data: quizSubmissionsData, error: errQS }
       ] = await Promise.all([
         client.from('classes').select('*'),
         client.from('students').select('*'),
@@ -617,12 +729,16 @@ class SupabaseService {
         client.from('exam_rubrics').select('*'),
         client.from('evaluations').select('*'),
         client.from('evaluation_details').select('*'),
-        client.from('exam_pass_order').select('*')
+        client.from('exam_pass_order').select('*'),
+        client.from('quizzes').select('*'),
+        client.from('quiz_submissions').select('*')
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errQ) throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
+      if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
         id: c.id,
@@ -695,15 +811,51 @@ class SupabaseService {
         created_at: po.created_at
       }));
 
+      const quizzes: Quiz[] = (quizzesData || []).map(q => ({
+        id: q.id,
+        class_id: q.class_id,
+        title: q.title,
+        description: q.description || undefined,
+        created_at: q.created_at,
+        duration_minutes: Number(q.duration_minutes) || 10,
+        status: q.status,
+        launched_at: q.launched_at || undefined,
+        expires_at: q.expires_at || undefined,
+        questions: Array.isArray(q.questions) ? q.questions : [],
+        total_points: Number(q.total_points) || 20
+      }));
+
+      const quizSubmissions: QuizSubmission[] = (quizSubmissionsData || []).map(s => ({
+        id: s.id,
+        quiz_id: s.quiz_id,
+        quiz_title: s.quiz_title,
+        student_id: s.student_id,
+        student_name: s.student_name,
+        student_number: s.student_number,
+        class_id: s.class_id,
+        class_name: s.class_name || undefined,
+        started_at: s.started_at,
+        submitted_at: s.submitted_at || undefined,
+        answers: s.answers || {},
+        score: Number(s.score) || 0,
+        max_score: Number(s.max_score) || 20,
+        score_20: Number(s.score_20) || 0,
+        status: s.status,
+        feedback: s.feedback || {},
+        date: s.date
+      }));
+
       return {
         success: true,
-        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} élèves, ${exams.length} examens récupérés.`,
+        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} élèves, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.`,
         state: {
           classes,
           students,
           exams,
           evaluations,
-          passOrder
+          passOrder,
+          quizzes,
+          quizSubmissions
         }
       };
     } catch (e: any) {

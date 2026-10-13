@@ -95,6 +95,42 @@ CREATE TABLE exam_pass_order (
     CONSTRAINT unique_exam_position UNIQUE (exam_id, position)
 );
 
+-- 9. Quiz et résultats
+CREATE TABLE quizzes (
+    id TEXT PRIMARY KEY,
+    class_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    duration_minutes INTEGER NOT NULL DEFAULT 10,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),
+    launched_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ,
+    questions JSONB NOT NULL DEFAULT '[]'::jsonb,
+    total_points NUMERIC(7,2) NOT NULL DEFAULT 20
+);
+
+CREATE TABLE quiz_submissions (
+    id TEXT PRIMARY KEY,
+    quiz_id TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    quiz_title TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    student_name TEXT NOT NULL,
+    student_number TEXT,
+    class_id TEXT NOT NULL,
+    class_name TEXT,
+    started_at TIMESTAMPTZ NOT NULL,
+    submitted_at TIMESTAMPTZ,
+    answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+    score NUMERIC(7,2) NOT NULL DEFAULT 0,
+    max_score NUMERIC(7,2) NOT NULL DEFAULT 20,
+    score_20 NUMERIC(5,2) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'timeout', 'missed')),
+    feedback JSONB NOT NULL DEFAULT '{}'::jsonb,
+    date DATE NOT NULL,
+    CONSTRAINT unique_quiz_student_submission UNIQUE (quiz_id, student_id)
+);
+
 -- ==============================================================================
 -- INDEX POUR L'OPTIMISATION DES PERFORMANCES
 -- ==============================================================================
@@ -106,6 +142,9 @@ CREATE INDEX idx_evaluations_exam_id ON evaluations(exam_id);
 CREATE INDEX idx_evaluations_student_id ON evaluations(student_id);
 CREATE INDEX idx_eval_details_evaluation_id ON evaluation_details(evaluation_id);
 CREATE INDEX idx_pass_order_exam_id ON exam_pass_order(exam_id);
+CREATE INDEX idx_quizzes_class_id ON quizzes(class_id);
+CREATE INDEX idx_quiz_submissions_quiz_id ON quiz_submissions(quiz_id);
+CREATE INDEX idx_quiz_submissions_student_date ON quiz_submissions(student_id, date);
 
 -- ==============================================================================
 -- FONCTIONS & DÉCLENCHEURS (TRIGGERS)
@@ -162,6 +201,8 @@ ALTER TABLE exam_rubrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evaluation_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_pass_order ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_submissions ENABLE ROW LEVEL SECURITY;
 
 -- Autorise l'accès complet avec la clé publique (anon) ou un utilisateur authentifié
 CREATE POLICY "Classes full access" ON classes FOR ALL USING (true) WITH CHECK (true);
@@ -171,6 +212,8 @@ CREATE POLICY "Exam rubrics full access" ON exam_rubrics FOR ALL USING (true) WI
 CREATE POLICY "Evaluations full access" ON evaluations FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Evaluation details full access" ON evaluation_details FOR ALL USING (true);
 CREATE POLICY "Exam pass order full access" ON exam_pass_order FOR ALL USING (true);
+CREATE POLICY "Quizzes full access" ON quizzes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Quiz submissions full access" ON quiz_submissions FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- JEU DE DONNÉES INITIAL (EXEMPLE : PRÉSENTATION ORALE DU ZÉBU)
