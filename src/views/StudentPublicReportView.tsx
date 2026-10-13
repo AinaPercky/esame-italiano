@@ -37,15 +37,18 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   onBackToApp
 }) => {
   const allExams = dataService.getExams();
+  const studentExams = lockedStudentId
+    ? allExams.filter(exam => dataService.getEvaluations(exam.id, undefined, lockedStudentId).length > 0)
+    : allExams;
   const allStudents = dataService.getStudents();
   const allClasses = dataService.getClasses();
 
   // Examen actif
   const [selectedExamId, setSelectedExamId] = useState<string>(() => {
-    if (initialExamId && allExams.some(e => e.id === initialExamId)) {
+    if (initialExamId && studentExams.some(e => e.id === initialExamId)) {
       return initialExamId;
     }
-    return allExams[0]?.id || '';
+    return studentExams[0]?.id || '';
   });
 
   // Élève sélectionné pour consultation
@@ -60,7 +63,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  const currentExam = dataService.getExamById(selectedExamId) || allExams[0];
+  const currentExam = dataService.getExamById(selectedExamId) || studentExams[0];
   const examClassStudents = currentExam 
     ? allStudents.filter(s => s.class_id === currentExam.class_id)
     : allStudents;
@@ -137,6 +140,10 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
         Votre fiche d'examen oral est indisponible. Contactez votre professeur pour vérifier votre compte.
       </div>
     );
+  }
+
+  if (lockedStudentId && (!currentExam || !evaluation)) {
+    return null;
   }
 
   // Vue 1 : L'élève a scanné le Code QR commun et doit saisir son numéro d'élève

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Trophy, Medal, Award, TrendingUp, Calendar, Users, Flame, Star, Sparkles, Filter } from 'lucide-react';
 import { DailyGrade, ClassRoom, Student } from '../types';
+import { StudentAvatar } from './StudentAvatar';
 
 interface ClassLeaderboardProps {
   dailyGrades: DailyGrade[];
@@ -52,6 +53,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     if (!selectedClassId) return students;
     return students.filter(s => s.class_id === selectedClassId);
   }, [students, selectedClassId]);
+  const getStudent = (studentId: string) => students.find(student => student.id === studentId);
 
   // Construire le classement ordonné par note journalière décroissante
   const leaderboardEntries = useMemo(() => {
@@ -218,6 +220,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-amber-400 text-amber-950 font-extrabold text-xl flex items-center justify-center shrink-0 shadow-sm border-2 border-white">
                   🥇
                 </div>
+                <StudentAvatar
+                  name={leaderboardEntries.graded[0].student_name}
+                  src={getStudent(leaderboardEntries.graded[0].student_id)?.avatar_url || undefined}
+                  className="w-10 h-10 border-2 border-white text-xs"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
@@ -252,6 +259,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 <div className="w-10 h-10 rounded-2xl bg-slate-200 text-slate-700 font-extrabold text-lg flex items-center justify-center shrink-0 border-2 border-white">
                   🥈
                 </div>
+                <StudentAvatar
+                  name={leaderboardEntries.graded[1].student_name}
+                  src={getStudent(leaderboardEntries.graded[1].student_id)?.avatar_url || undefined}
+                  className="w-9 h-9 border-2 border-white text-[10px]"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">
@@ -286,6 +298,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 <div className="w-10 h-10 rounded-2xl bg-orange-200 text-orange-900 font-extrabold text-lg flex items-center justify-center shrink-0 border-2 border-white">
                   🥉
                 </div>
+                <StudentAvatar
+                  name={leaderboardEntries.graded[2].student_name}
+                  src={getStudent(leaderboardEntries.graded[2].student_id)?.avatar_url || undefined}
+                  className="w-9 h-9 border-2 border-white text-[10px]"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-900">
@@ -361,6 +378,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {rankBadge}
+                    <StudentAvatar
+                      name={dg.student_name}
+                      src={getStudent(dg.student_id)?.avatar_url || undefined}
+                      className="w-9 h-9 border border-slate-200 text-[10px]"
+                    />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 truncate">
@@ -417,6 +439,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                           <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-400 font-mono text-[10px] flex items-center justify-center">
                             -
                           </span>
+                          <StudentAvatar
+                            name={pen.student_name}
+                            src={getStudent(pen.student_id)?.avatar_url || undefined}
+                            className="w-8 h-8 border border-slate-200 text-[9px]"
+                          />
                           <span className="font-medium text-slate-700 truncate">
                             {pen.student_name}
                           </span>
