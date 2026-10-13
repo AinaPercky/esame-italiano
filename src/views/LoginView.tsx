@@ -157,20 +157,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
         {/* Emblem / Logo */}
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 p-0.5 shadow-xl shadow-amber-900/40 flex items-center justify-center">
-            <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-              <span className="font-display font-black text-2xl text-amber-400 tracking-wider">
-                E
-              </span>
-            </div>
-          </div>
+          <img
+            src="/lingua-percky-logo.png"
+            alt="LinguaPercky"
+            className="w-36 h-36 sm:w-40 sm:h-40 rounded-3xl object-contain bg-white shadow-xl"
+          />
         </div>
 
-        <h1 className="mt-4 font-display text-3xl font-extrabold tracking-tight text-white">
-          Esame
-        </h1>
+        <h1 className="sr-only">LinguaPercky</h1>
         <p className="mt-1 text-xs sm:text-sm text-slate-300">
-          Portail officiel d'examens & quiz de langue italienne
+          Le plaisir d’apprendre l’italien, à chaque étape
         </p>
 
         {/* Security Badge */}
@@ -467,7 +463,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Esame • Lingua e Cultura Italiana
+          LinguaPercky • Lingua e Cultura Italiana
         </p>
       </div>
 

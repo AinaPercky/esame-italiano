@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="hidden lg:flex w-68 bg-white border-r border-slate-200 flex-col shrink-0 no-print min-h-[calc(100vh-60px)]">
       <div className="p-4 border-b border-slate-100 bg-slate-50/50">
         <div className="text-[10px] font-bold tracking-wider text-amber-900 uppercase mb-0.5">
-          Espace Enseignant • Esame
+          Espace Enseignant • LinguaPercky
         </div>
         <div className="text-xs font-medium text-slate-800 flex items-center justify-between">
           <span>Session Italienne 2026</span>

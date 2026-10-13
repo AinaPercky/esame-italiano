@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-8 py-2.5 sm:py-3.5 no-print">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* Zone 1: Brand Wordmark & Mobile Menu Trigger */}
           <div className="flex items-center gap-2">
             <button
@@ -69,12 +69,14 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button 
               onClick={() => onSelectTab('dashboard')} 
-              className="text-left font-display text-xl sm:text-2xl font-bold tracking-tight text-slate-900 hover:text-amber-800 transition-colors flex items-center gap-2"
+              className="text-left font-display text-base sm:text-2xl font-bold tracking-tight text-slate-900 hover:text-amber-800 transition-colors flex items-center gap-1.5 sm:gap-2"
             >
-              <span className="w-7 h-7 rounded-lg bg-amber-800 text-amber-300 font-extrabold flex items-center justify-center text-sm shadow-xs">
-                E
-              </span>
-              <span>Esame</span>
+              <img
+                src="/lingua-percky-logo.png"
+                alt=""
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain bg-white shadow-xs"
+              />
+              <span>LinguaPercky</span>
             </button>
           </div>
 

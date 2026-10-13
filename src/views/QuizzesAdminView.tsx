@@ -323,7 +323,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                 Gestion des Quiz & Évaluations Directes
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                Esame
+                LinguaPercky
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
