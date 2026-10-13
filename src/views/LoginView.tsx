@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { authService, ADMIN_EMAIL } from '../services/authService';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { ClassRoom } from '../types';
 
 interface LoginViewProps {
@@ -49,15 +50,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   const [classes, setClasses] = useState<ClassRoom[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
 
   useEffect(() => {
-    const cls = dataService.getClasses();
-    setClasses(cls);
-    if (cls.length > 0 && !regClassId) {
-      setRegClassId(cls[0].id);
-    }
+    const refreshClasses = () => {
+      const latestClasses = dataService.getClasses();
+      setClasses(latestClasses);
+      setRegClassId(current => latestClasses.some(classroom => classroom.id === current)
+        ? current
+        : latestClasses[0]?.id || '');
+    };
+    refreshClasses();
+    return dataService.subscribe(refreshClasses);
   }, []);
 
   // Décompte de verrouillage temporaire anti-bruteforce
@@ -84,16 +90,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   }, [lockoutSeconds]);
 
   // Connexion Unique : le système identifie automatiquement enseignant ou étudiant
-  const handleUnifiedLogin = (e: React.FormEvent) => {
+  const handleUnifiedLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutSeconds > 0) return;
     setErrorMessage(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = authService.login(email, password);
-      setIsLoading(false);
-
+    try {
+      const result = await authService.login(email, password);
       if (result.success) {
         onLoginSuccess();
       } else {
@@ -103,24 +108,39 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           setLockoutSeconds(status.remainingSeconds);
         }
       }
-    }, 300);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Connexion impossible. Veuillez réessayer.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Inscription Étudiant
-  const handleStudentRegister = (e: React.FormEvent) => {
+  const handleStudentRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regPassword !== regConfirmPassword) {
       setErrorMessage('Les mots de passe ne correspondent pas.');
       return;
     }
     setErrorMessage(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
-    const rosterStudent = dataService.getStudentByEmail(regEmail);
-    const targetClass = classes.find(c => c.id === (rosterStudent?.class_id || regClassId));
+    try {
+      let rosterStudent = dataService.getStudentByEmail(regEmail);
+      const targetClass = classes.find(c => c.id === (rosterStudent?.class_id || regClassId));
 
-    setTimeout(async () => {
-      const result = authService.registerStudent({
+      if (!rosterStudent && supabaseService.isConfigured()) {
+        rosterStudent = await dataService.createStudent(
+          regFirstName,
+          regLastName,
+          regClassId,
+          regEmail,
+          regStudentNumber
+        );
+      }
+
+      const result = await authService.registerStudent({
         firstName: rosterStudent?.first_name || regFirstName,
         lastName: rosterStudent?.last_name || regLastName,
         studentNumber: rosterStudent?.student_number || regStudentNumber,
@@ -132,30 +152,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         existingStudentId: rosterStudent?.id
       });
 
-      setIsLoading(false);
-
-      if (result.success) {
-        if (!rosterStudent && result.user?.student_id) {
-          try {
-            await dataService.createStudent(
-              regFirstName,
-              regLastName,
-              regClassId,
-              regEmail,
-              regStudentNumber,
-              result.user.student_id
-            );
-          } catch (error) {
-            authService.removeStudentAccountByEmail(regEmail);
-            setErrorMessage(error instanceof Error ? error.message : 'Impossible de créer la fiche élève.');
-            return;
-          }
-        }
-        onLoginSuccess();
-      } else {
+      if (!result.success) {
         setErrorMessage(result.error || 'Erreur lors de l\'inscription.');
+        return;
       }
-    }, 300);
+
+      if (result.confirmationRequired) {
+        setEmail(regEmail.trim().toLowerCase());
+        setViewMode('login');
+        setSuccessMessage('Compte créé. Confirmez votre adresse e-mail avec le lien reçu, puis connectez-vous.');
+        return;
+      }
+
+      if (!rosterStudent && result.user?.student_id) {
+        await dataService.createStudent(
+          regFirstName,
+          regLastName,
+          regClassId,
+          regEmail,
+          regStudentNumber,
+          result.user.student_id
+        );
+      }
+      onLoginSuccess();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Impossible de créer le compte étudiant.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -202,6 +226,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <p className="font-semibold text-rose-800">Erreur de connexion</p>
                 <p>{errorMessage}</p>
               </div>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <p>{successMessage}</p>
             </div>
           )}
 
@@ -287,6 +318,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     onClick={() => {
                       setViewMode('register');
                       setErrorMessage(null);
+                      setSuccessMessage(null);
                     }}
                     className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline cursor-pointer inline-flex items-center gap-1"
                   >
@@ -310,6 +342,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   onClick={() => {
                     setViewMode('login');
                     setErrorMessage(null);
+                    setSuccessMessage(null);
                   }}
                   className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-950 cursor-pointer"
                 >

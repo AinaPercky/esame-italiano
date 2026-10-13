@@ -1,5 +1,6 @@
 import { isValidEmail, normalizeEmail } from '../utils/email';
 import { ClassRoom, Student } from '../types';
+import { supabaseService } from './supabaseService';
 
 /**
  * Service d'authentification et de contrôle d'accès multi-rôles pour Esame :
@@ -298,28 +299,52 @@ export const authService = {
    * L'utilisateur saisit son adresse email et son mot de passe.
    * Le système identifie automatiquement s'il s'agit de l'enseignant (Admin) ou d'un étudiant.
    */
-  login(identifier: string, passwordOrCode: string): { success: boolean; error?: string; user?: AuthUser } {
+  async login(identifier: string, passwordOrCode: string): Promise<{ success: boolean; error?: string; user?: AuthUser }> {
     const cleanId = normalizeEmail(identifier || '');
-    const cleanPass = (passwordOrCode || '').trim();
 
     if (!cleanId) {
       return { success: false, error: 'Veuillez renseigner votre adresse e-mail.' };
     }
-    if (!cleanPass) {
+    if (!passwordOrCode) {
       return { success: false, error: 'Veuillez saisir votre mot de passe ou code d\'accès.' };
     }
 
     // 1. Détection automatique : Compte Administrateur / Enseignant (AinaPercky)
     const isAdminCandidate = cleanId === ADMIN_EMAIL.toLowerCase() || cleanId === 'ainapercky' || cleanId === ADMIN_NAME.toLowerCase();
     if (isAdminCandidate) {
-      return this.loginAdmin(cleanId, cleanPass);
+      return this.loginAdmin(cleanId, passwordOrCode.trim());
     }
 
-    // 2. Détection automatique : compte étudiant par e-mail uniquement
+    // New student accounts authenticate through Supabase so they work across devices.
     const accounts = getStoredStudentAccounts();
     const matchedStudent = accounts.find(account => normalizeEmail(account.email) === cleanId);
+    let cloudError: string | undefined;
+    if (supabaseService.isConfigured()) {
+      try {
+        const student = await supabaseService.authenticateStudent(cleanId, passwordOrCode);
+        const user: AuthUser = {
+          id: `session_${student.id}`,
+          email: student.email,
+          name: `${student.first_name} ${student.last_name}`,
+          role: 'student',
+          student_id: student.id,
+          student_number: student.student_number,
+          class_id: student.class_id,
+          class_name: student.class_name,
+          avatar: student.avatar_url || undefined,
+          loginAt: new Date().toISOString()
+        };
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+        notifyAuthChange();
+        return { success: true, user };
+      } catch (error) {
+        cloudError = error instanceof Error ? error.message : 'Connexion Supabase impossible.';
+      }
+    }
+
+    // Backward compatibility for accounts registered before Supabase Auth was enabled.
     if (matchedStudent) {
-      if (cleanPass && matchedStudent.password_hash !== cleanPass) {
+      if (matchedStudent.password_hash !== passwordOrCode.trim()) {
         return { success: false, error: 'Mot de passe incorrect.' };
       }
 
@@ -347,7 +372,7 @@ export const authService = {
 
     return {
       success: false,
-      error: 'Adresse e-mail ou mot de passe non reconnu. Veuillez vérifier ou créer un compte.'
+      error: cloudError || 'Adresse e-mail ou mot de passe non reconnu. Veuillez vérifier ou créer un compte.'
     };
   },
 
@@ -418,7 +443,7 @@ export const authService = {
   /**
    * Inscription d'un nouvel élève
    */
-  registerStudent(params: {
+  async registerStudent(params: {
     firstName: string;
     lastName: string;
     studentNumber: string;
@@ -428,14 +453,14 @@ export const authService = {
     phone?: string;
     password: string;
     existingStudentId?: string;
-  }): { success: boolean; error?: string; user?: AuthUser } {
+  }): Promise<{ success: boolean; error?: string; user?: AuthUser; confirmationRequired?: boolean }> {
     const firstName = params.firstName.trim();
     const lastName = params.lastName.trim();
     const studentNumber = params.studentNumber.trim();
     const classId = params.classId.trim();
     const email = normalizeEmail(params.email);
     const phone = params.phone ? params.phone.trim() : undefined;
-    const password = params.password.trim();
+    const password = params.password;
 
     if (!firstName || !lastName) {
       return { success: false, error: 'Le prénom et le nom sont obligatoires.' };
@@ -450,20 +475,49 @@ export const authService = {
       return { success: false, error: 'Le mot de passe doit comporter au moins 4 caractères.' };
     }
 
-    const accounts = getStoredStudentAccounts();
-    const existing = accounts.find(account => normalizeEmail(account.email) === email);
-    if (existing) {
-      return {
-        success: false,
-        error: 'Cette adresse e-mail est déjà utilisée par un autre élève.'
-      };
-    }
-
     const studentId = params.existingStudentId || (
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     );
+
+    if (supabaseService.isConfigured()) {
+      try {
+        const sessionCreated = await supabaseService.registerStudentAuth(email, password, studentId);
+        if (!sessionCreated) {
+          return {
+            success: true,
+            confirmationRequired: true
+          };
+        }
+
+        const user: AuthUser = {
+          id: `session_${studentId}`,
+          email,
+          name: `${firstName} ${lastName}`,
+          role: 'student',
+          student_id: studentId,
+          student_number: studentNumber || null,
+          class_id: classId,
+          class_name: params.className || 'Classe',
+          loginAt: new Date().toISOString()
+        };
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+        notifyAuthChange();
+        return { success: true, user };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Erreur lors de la création du compte Supabase.'
+        };
+      }
+    }
+
+    const accounts = getStoredStudentAccounts();
+    const existing = accounts.find(account => normalizeEmail(account.email) === email);
+    if (existing) {
+      return { success: false, error: 'Cette adresse possède déjà un compte. Connectez-vous avec votre mot de passe.' };
+    }
 
     const newAccount: StudentAccount = {
       id: `acc_${Date.now()}`,
@@ -623,6 +677,9 @@ export const authService = {
   },
 
   logout(): void {
+    supabaseService.signOutStudent().catch(error => {
+      console.error('Déconnexion Supabase impossible :', error);
+    });
     try {
       localStorage.removeItem(STORAGE_USER_KEY);
     } catch (e) {

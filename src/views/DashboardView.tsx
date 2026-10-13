@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Exam, ClassRoom } from '../types';
 import { dataService } from '../services/dataService';
+import heroImage from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 interface DashboardViewProps {
   exams: Exam[];
@@ -92,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="md:col-span-5 h-48 md:h-full relative overflow-hidden bg-slate-100 border-t md:border-t-0 md:border-l border-slate-200">
             <img 
-              src="/src/assets/images/hero_italian_oral_exam_1790527515781.jpg" 
+              src={heroImage}
               alt="Classe d'examen oral d'italien" 
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"

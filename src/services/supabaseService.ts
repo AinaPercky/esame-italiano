@@ -126,16 +126,82 @@ class SupabaseService {
       try {
         this.client = createClient(this.currentConfig.url, this.currentConfig.anonKey, {
           auth: {
-            persistSession: false,
-            autoRefreshToken: false
+            persistSession: true,
+            autoRefreshToken: true
           }
         });
       } catch (e) {
         console.error('Erreur initialisation client Supabase:', e);
         return null;
       }
+
     }
     return this.client;
+  }
+
+  public async authenticateStudent(email: string, password: string): Promise<Student> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+
+    const { data, error } = await client.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password
+    });
+    if (error) throw new Error('Adresse e-mail ou mot de passe incorrect.');
+    if (!data.user) throw new Error('Supabase n’a retourné aucun compte étudiant.');
+
+    const { data: student, error: studentError } = await client
+      .from('students')
+      .select('id, class_id, first_name, last_name, email, student_number, created_at, updated_at')
+      .eq('email', email.trim().toLowerCase())
+      .maybeSingle();
+    if (studentError) {
+      await client.auth.signOut();
+      throw new Error(`Impossible de charger la fiche élève : ${studentError.message}`);
+    }
+    if (!student) {
+      await client.auth.signOut();
+      throw new Error('Aucune fiche élève ne correspond à ce compte. Contactez votre enseignant.');
+    }
+
+    const { data: classroom, error: classError } = await client
+      .from('classes')
+      .select('name')
+      .eq('id', student.class_id)
+      .maybeSingle();
+    if (classError) {
+      await client.auth.signOut();
+      throw new Error(`Impossible de charger la classe de l’élève : ${classError.message}`);
+    }
+
+    return { ...student, class_name: classroom?.name } as Student;
+  }
+
+  public async registerStudentAuth(email: string, password: string, studentId: string): Promise<boolean> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+
+    const { data, error } = await client.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        data: { role: 'student', student_id: studentId }
+      }
+    });
+    if (error) {
+      throw new Error(error.message.toLowerCase().includes('already registered')
+        ? 'Cette adresse possède déjà un compte. Connectez-vous avec votre mot de passe.'
+        : `Inscription Supabase impossible : ${error.message}`);
+    }
+    if (!data.user) throw new Error('Supabase n’a pas créé le compte étudiant.');
+    return data.session !== null;
+  }
+
+  public async signOutStudent(): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+    const { error } = await client.auth.signOut();
+    if (error) throw new Error(`Déconnexion Supabase impossible : ${error.message}`);
   }
 
   /**

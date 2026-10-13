@@ -78,6 +78,8 @@ Pour enregistrer les photos de profil des élèves sur Supabase, ouvrez **Param�
 
 Pour un projet Supabase existant, copiez **Migration e-mail** depuis **Paramètres & Sécurité > Guide de configuration Supabase** avant d’ajouter de nouveaux élèves. Cette migration supprime les anciens élèves, leurs évaluations orales, ordres de passage et soumissions de quiz, puis impose un e-mail unique (insensible à la casse). Les classes, examens et quiz restent en place. Elle ne supprime pas les fichiers déjà téléversés dans Supabase Storage : si vous devez aussi effacer les anciennes photos, supprimez-les séparément dans le bucket `student-avatars`. Au prochain chargement, l’application rapproche les comptes étudiants locaux par e-mail avec le nouvel annuaire et retire les comptes qui n’y correspondent pas. N’exécutez pas le script complet `database/schema.sql` sur une base existante : il supprime et recrée plusieurs tables.
 
+Les comptes étudiants utilisent Supabase Auth lorsque Supabase est configuré, ce qui permet la connexion depuis plusieurs appareils et domaines. Dans **Authentication > Providers**, activez le fournisseur **Email** ; dans **Authentication > URL Configuration**, ajoutez l’URL publique de l’application aux URL de redirection autorisées. Si la confirmation d’e-mail est activée, l’élève doit cliquer sur le lien reçu avant sa première connexion. Les anciens mots de passe créés par une version qui ne stockait les comptes que dans le navigateur ne sont pas présents dans Supabase Auth : l’élève doit créer son compte depuis la nouvelle application, avec la même adresse que sa fiche élève.
+
 ### 4.2. Lancement du Backend Node.js
 ```bash
 cd backend
