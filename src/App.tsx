@@ -222,8 +222,8 @@ export default function App() {
                 dataService.updateClass(id, name);
                 reloadData();
               }}
-              onDeleteClass={(id) => {
-                dataService.deleteClass(id);
+              onDeleteClass={async (id) => {
+                await dataService.deleteClass(id);
                 reloadData();
               }}
               onSelectClassStudents={handleSelectClassStudents}

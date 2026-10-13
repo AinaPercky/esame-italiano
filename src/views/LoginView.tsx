@@ -116,27 +116,40 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setErrorMessage(null);
     setIsLoading(true);
 
-    const targetClass = classes.find(c => c.id === regClassId);
+    const rosterStudent = dataService.getStudentByEmail(regEmail);
+    const targetClass = classes.find(c => c.id === (rosterStudent?.class_id || regClassId));
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const result = authService.registerStudent({
-        firstName: regFirstName,
-        lastName: regLastName,
-        studentNumber: regStudentNumber,
-        classId: regClassId,
+        firstName: rosterStudent?.first_name || regFirstName,
+        lastName: rosterStudent?.last_name || regLastName,
+        studentNumber: rosterStudent?.student_number || regStudentNumber,
+        classId: rosterStudent?.class_id || regClassId,
         className: targetClass?.name,
         email: regEmail,
         phone: regPhone,
-        password: regPassword
+        password: regPassword,
+        existingStudentId: rosterStudent?.id
       });
 
       setIsLoading(false);
 
       if (result.success) {
-        try {
-          dataService.createStudent(regFirstName, regLastName, regClassId, regStudentNumber);
-        } catch (e) {
-          console.warn('Note:', e);
+        if (!rosterStudent && result.user?.student_id) {
+          try {
+            await dataService.createStudent(
+              regFirstName,
+              regLastName,
+              regClassId,
+              regEmail,
+              regStudentNumber,
+              result.user.student_id
+            );
+          } catch (error) {
+            authService.removeStudentAccountByEmail(regEmail);
+            setErrorMessage(error instanceof Error ? error.message : 'Impossible de créer la fiche élève.');
+            return;
+          }
         }
         onLoginSuccess();
       } else {
@@ -211,7 +224,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Adresse Email ou Numéro de téléphone
+                  Adresse e-mail
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -220,7 +233,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="votre.email@domaine.fr ou 06XXXXXXXX"
+                    placeholder="votre.email@domaine.fr"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-950 placeholder:text-slate-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -341,11 +354,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Numéro d'élève (ex: 1, 2) *
+                      Numéro d'élève (facultatif)
                     </label>
                     <input
                       type="text"
-                      required
                       value={regStudentNumber}
                       onChange={(e) => setRegStudentNumber(e.target.value)}
                       placeholder="ex: 3"

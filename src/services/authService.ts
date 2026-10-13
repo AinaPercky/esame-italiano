@@ -1,3 +1,6 @@
+import { isValidEmail, normalizeEmail } from '../utils/email';
+import { ClassRoom, Student } from '../types';
+
 /**
  * Service d'authentification et de contrôle d'accès multi-rôles pour Esame :
  * 1. Admin par défaut : AinaPercky (ainapercky@gmail.com, code: user1234)
@@ -93,7 +96,7 @@ function getStoredStudentAccounts(): StudentAccount[] {
       return [...DEFAULT_STUDENT_ACCOUNTS];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...DEFAULT_STUDENT_ACCOUNTS];
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_STUDENT_ACCOUNTS];
   } catch {
     return [...DEFAULT_STUDENT_ACCOUNTS];
   }
@@ -108,6 +111,82 @@ function saveStudentAccounts(accounts: StudentAccount[]) {
 }
 
 export const authService = {
+  removeStudentAccountByEmail(email: string): void {
+    const normalizedEmail = normalizeEmail(email);
+    const accounts = getStoredStudentAccounts();
+    saveStudentAccounts(accounts.filter(account => normalizeEmail(account.email) !== normalizedEmail));
+
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.role === 'student' && normalizeEmail(currentUser.email) === normalizedEmail) {
+      this.logout();
+    }
+  },
+
+  removeStudentAccountsForClass(classId: string): void {
+    const accounts = getStoredStudentAccounts();
+    saveStudentAccounts(accounts.filter(account => account.class_id !== classId));
+
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.role === 'student' && currentUser.class_id === classId) {
+      try {
+        localStorage.removeItem(STORAGE_USER_KEY);
+      } catch (error) {
+        console.error('Impossible de fermer la session de l’élève supprimé :', error);
+      }
+      notifyAuthChange();
+    }
+  },
+
+  clearStudentAccounts(): void {
+    saveStudentAccounts([]);
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.role === 'student') {
+      this.logout();
+    }
+  },
+
+  synchronizeStudentAccountsWithRoster(students: Student[], classes: ClassRoom[]): void {
+    const studentsByEmail = new Map(students.map(student => [normalizeEmail(student.email), student]));
+    const classNamesById = new Map(classes.map(classroom => [classroom.id, classroom.name]));
+    const accounts = getStoredStudentAccounts()
+      .flatMap(account => {
+        const student = studentsByEmail.get(normalizeEmail(account.email));
+        if (!student) return [];
+        return [{
+          ...account,
+          student_id: student.id,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          student_number: student.student_number || '',
+          class_id: student.class_id
+        }];
+      });
+    saveStudentAccounts(accounts);
+
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.role === 'student') {
+      const student = studentsByEmail.get(normalizeEmail(currentUser.email));
+      if (!student) {
+        this.logout();
+        return;
+      }
+      const updatedUser: AuthUser = {
+        ...currentUser,
+        student_id: student.id,
+        student_number: student.student_number,
+        class_id: student.class_id,
+        class_name: classNamesById.get(student.class_id) || currentUser.class_name,
+        name: `${student.first_name} ${student.last_name}`
+      };
+      try {
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
+        notifyAuthChange();
+      } catch (error) {
+        console.error('Impossible de synchroniser la session élève avec son adresse e-mail :', error);
+      }
+    }
+  },
+
   getAdminEmail(): string {
     return ADMIN_EMAIL;
   },
@@ -220,12 +299,11 @@ export const authService = {
    * Le système identifie automatiquement s'il s'agit de l'enseignant (Admin) ou d'un étudiant.
    */
   login(identifier: string, passwordOrCode: string): { success: boolean; error?: string; user?: AuthUser } {
-    const cleanId = (identifier || '').trim().toLowerCase();
+    const cleanId = normalizeEmail(identifier || '');
     const cleanPass = (passwordOrCode || '').trim();
-    const cleanPhone = cleanId.replace(/\s+/g, '');
 
     if (!cleanId) {
-      return { success: false, error: 'Veuillez renseigner votre adresse email ou numéro de téléphone.' };
+      return { success: false, error: 'Veuillez renseigner votre adresse e-mail.' };
     }
     if (!cleanPass) {
       return { success: false, error: 'Veuillez saisir votre mot de passe ou code d\'accès.' };
@@ -237,12 +315,9 @@ export const authService = {
       return this.loginAdmin(cleanId, cleanPass);
     }
 
-    // 2. Détection automatique : Compte Étudiant par email ou téléphone
+    // 2. Détection automatique : compte étudiant par e-mail uniquement
     const accounts = getStoredStudentAccounts();
-    const matchedStudent = accounts.find(a => 
-      a.email.toLowerCase() === cleanId || 
-      (a.phone && a.phone.replace(/\s+/g, '') === cleanPhone)
-    );
+    const matchedStudent = accounts.find(account => normalizeEmail(account.email) === cleanId);
     if (matchedStudent) {
       if (cleanPass && matchedStudent.password_hash !== cleanPass) {
         return { success: false, error: 'Mot de passe incorrect.' };
@@ -272,7 +347,7 @@ export const authService = {
 
     return {
       success: false,
-      error: 'Identifiant (email ou téléphone) ou mot de passe non reconnu. Veuillez vérifier ou créer un compte.'
+      error: 'Adresse e-mail ou mot de passe non reconnu. Veuillez vérifier ou créer un compte.'
     };
   },
 
@@ -358,20 +433,17 @@ export const authService = {
     const lastName = params.lastName.trim();
     const studentNumber = params.studentNumber.trim();
     const classId = params.classId.trim();
-    const email = params.email.trim().toLowerCase();
+    const email = normalizeEmail(params.email);
     const phone = params.phone ? params.phone.trim() : undefined;
     const password = params.password.trim();
 
     if (!firstName || !lastName) {
       return { success: false, error: 'Le prénom et le nom sont obligatoires.' };
     }
-    if (!studentNumber) {
-      return { success: false, error: 'Le numéro d\'étudiant est obligatoire (ex: 1, 2, 3).' };
-    }
     if (!classId) {
       return { success: false, error: 'Veuillez sélectionner votre classe.' };
     }
-    if (!email || !email.includes('@')) {
+    if (!isValidEmail(email)) {
       return { success: false, error: 'Une adresse email valide est obligatoire.' };
     }
     if (!password || password.length < 4) {
@@ -379,19 +451,19 @@ export const authService = {
     }
 
     const accounts = getStoredStudentAccounts();
-    const existing = accounts.find(a => 
-      a.email.toLowerCase() === email || 
-      (phone && a.phone && a.phone.replace(/\s+/g, '') === phone.replace(/\s+/g, '')) ||
-      (a.class_id === classId && a.student_number === studentNumber)
-    );
+    const existing = accounts.find(account => normalizeEmail(account.email) === email);
     if (existing) {
       return {
         success: false,
-        error: `Un compte existe déjà avec cet email, ce numéro de téléphone ou ce numéro d'élève (${studentNumber}) dans cette classe.`
+        error: 'Cette adresse e-mail est déjà utilisée par un autre élève.'
       };
     }
 
-    const studentId = params.existingStudentId || `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const studentId = params.existingStudentId || (
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    );
 
     const newAccount: StudentAccount = {
       id: `acc_${Date.now()}`,
@@ -435,7 +507,7 @@ export const authService = {
    * Connexion Étudiant par Adresse Email + Mot de passe
    */
   loginStudent(email: string, password: string): { success: boolean; error?: string; user?: AuthUser } {
-    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanEmail = normalizeEmail(email || '');
     const cleanPass = (password || '').trim();
 
     if (!cleanEmail) {
@@ -481,10 +553,10 @@ export const authService = {
   /**
    * Connexion directe pour un élève existant de la base de données (Démo / Accès direct)
    */
-  loginAsRosterStudent(student: { id: string; first_name: string; last_name: string; student_number?: string | null; class_id: string; class_name?: string }): AuthUser {
+  loginAsRosterStudent(student: { id: string; first_name: string; last_name: string; email: string; student_number?: string | null; class_id: string; class_name?: string }): AuthUser {
     const user: AuthUser = {
       id: `session_${student.id}`,
-      email: `${student.first_name.toLowerCase()}.${student.last_name.toLowerCase()}@eleve.esame.fr`,
+      email: student.email,
       name: `${student.first_name} ${student.last_name}`,
       role: 'student',
       student_id: student.id,
@@ -513,11 +585,19 @@ export const authService = {
 
     const accounts = getStoredStudentAccounts();
     const idx = accounts.findIndex(a => a.student_id === studentId || a.id === currentUser.id);
+    if (updates.email) {
+      const normalizedEmail = normalizeEmail(updates.email);
+      if (!isValidEmail(normalizedEmail)) return false;
+      if (accounts.some(account =>
+        account.id !== currentUser.id &&
+        normalizeEmail(account.email) === normalizedEmail
+      )) return false;
+    }
     if (idx !== -1) {
       if (updates.firstName) accounts[idx].first_name = updates.firstName.trim();
       if (updates.lastName) accounts[idx].last_name = updates.lastName.trim();
       if (updates.studentNumber) accounts[idx].student_number = updates.studentNumber.trim();
-      if (updates.email) accounts[idx].email = updates.email.trim().toLowerCase();
+      if (updates.email) accounts[idx].email = normalizeEmail(updates.email);
       if (updates.phone !== undefined) accounts[idx].phone = updates.phone.trim();
       if (updates.avatar !== undefined) accounts[idx].avatar = updates.avatar.trim();
       saveStudentAccounts(accounts);

@@ -22,7 +22,12 @@ import {
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { supabaseService, ConnectionTestResult } from '../services/supabaseService';
-import { QUIZ_SUPABASE_MIGRATION_SQL, STUDENT_AVATAR_MIGRATION_SQL, SUPABASE_SQL_SCHEMA } from '../data/supabaseSqlSchema';
+import {
+  QUIZ_SUPABASE_MIGRATION_SQL,
+  STUDENT_AVATAR_MIGRATION_SQL,
+  STUDENT_EMAIL_IDENTITY_MIGRATION_SQL,
+  SUPABASE_SQL_SCHEMA
+} from '../data/supabaseSqlSchema';
 import { authService, AUTHORIZED_EMAIL, DEFAULT_ACCESS_CODE, AuthUser } from '../services/authService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -39,6 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedQuizMigration, setCopiedQuizMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
+  const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -122,6 +128,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration photo de profil:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration photo. Autorisez l’accès au presse-papiers puis réessayez.' });
+    }
+  };
+
+  const handleCopyStudentEmailMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(STUDENT_EMAIL_IDENTITY_MIGRATION_SQL);
+      setCopiedStudentEmailMigration(true);
+      setTimeout(() => setCopiedStudentEmailMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration identité e-mail:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration e-mail. Autorisez l’accès au presse-papiers puis réessayez.' });
     }
   };
 
@@ -402,7 +419,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
                 <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-mono text-[11px]">2</span>
                 <span>Exécuter le script SQL</span>
               </div>
-              <p>Pour un projet déjà utilisé, exécutez uniquement la migration Quiz non destructive ci-dessous. Le script complet peut réinitialiser les tables existantes.</p>
+              <p>Pour un projet déjà utilisé, exécutez la migration d’identité e-mail ci-dessous : elle supprime les anciens élèves, leurs évaluations orales, ordres de passage et soumissions de quiz. Le script complet réinitialise davantage de tables.</p>
             </div>
 
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
@@ -415,6 +432,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           </div>
 
           <div className="pt-1 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopyStudentEmailMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-rose-700 hover:bg-rose-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedStudentEmailMigration ? '✓ Migration e-mail copiée !' : 'Migration e-mail (efface les anciens élèves)'}</span>
+            </button>
             <button
               type="button"
               onClick={handleCopyAvatarMigration}

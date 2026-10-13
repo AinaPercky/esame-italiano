@@ -29,6 +29,7 @@ CREATE TABLE students (
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
+    email TEXT NOT NULL CHECK (btrim(email) <> ''),
     student_number TEXT,
     avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -137,6 +138,7 @@ CREATE TABLE quiz_submissions (
 -- ==============================================================================
 CREATE INDEX idx_students_class_id ON students(class_id);
 CREATE INDEX idx_students_names ON students(last_name, first_name);
+CREATE UNIQUE INDEX idx_students_email_unique ON students (lower(btrim(email)));
 CREATE INDEX idx_exams_class_id ON exams(class_id);
 CREATE INDEX idx_exam_rubrics_exam_id ON exam_rubrics(exam_id);
 CREATE INDEX idx_evaluations_exam_id ON evaluations(exam_id);
@@ -263,17 +265,17 @@ BEGIN
     INSERT INTO classes (name) VALUES ('Classe A1 - Débutants') RETURNING id INTO v_class_id;
 
     -- 2. Création des élèves de test
-    INSERT INTO students (class_id, first_name, last_name, student_number)
-    VALUES (v_class_id, 'Jean', 'Rakoto', 'STU-001') RETURNING id INTO v_student_jean;
+    INSERT INTO students (class_id, first_name, last_name, email, student_number)
+    VALUES (v_class_id, 'Jean', 'Rakoto', 'jean.rakoto@eleve.esame.fr', 'STU-001') RETURNING id INTO v_student_jean;
 
-    INSERT INTO students (class_id, first_name, last_name, student_number)
-    VALUES (v_class_id, 'Marie', 'Rabe', 'STU-002') RETURNING id INTO v_student_marie;
+    INSERT INTO students (class_id, first_name, last_name, email, student_number)
+    VALUES (v_class_id, 'Marie', 'Rabe', 'marie.rabe@eleve.esame.fr', 'STU-002') RETURNING id INTO v_student_marie;
 
-    INSERT INTO students (class_id, first_name, last_name, student_number)
-    VALUES (v_class_id, 'Paul', 'Rasoa', 'STU-003') RETURNING id INTO v_student_paul;
+    INSERT INTO students (class_id, first_name, last_name, email, student_number)
+    VALUES (v_class_id, 'Paul', 'Rasoa', 'paul.rasoa@eleve.esame.fr', 'STU-003') RETURNING id INTO v_student_paul;
 
-    INSERT INTO students (class_id, first_name, last_name, student_number)
-    VALUES (v_class_id, 'Sarah', 'Ranaivo', 'STU-004') RETURNING id INTO v_student_sarah;
+    INSERT INTO students (class_id, first_name, last_name, email, student_number)
+    VALUES (v_class_id, 'Sarah', 'Ranaivo', 'sarah.ranaivo@eleve.esame.fr', 'STU-004') RETURNING id INTO v_student_sarah;
 
     -- 3. Création de l'examen modèle "Présentation orale — Lo zébu"
     INSERT INTO exams (class_id, title, description, exam_date, status)

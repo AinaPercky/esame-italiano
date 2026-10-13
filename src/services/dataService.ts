@@ -23,6 +23,8 @@ import {
   ZEBU_DEFAULT_RUBRICS 
 } from '../data/seedData';
 import { supabaseService, generateUUID, isUUID } from './supabaseService';
+import { authService } from './authService';
+import { isValidEmail, normalizeEmail } from '../utils/email';
 
 const STORAGE_KEY = 'esame_app_state_v4';
 
@@ -58,8 +60,11 @@ function notifySubscribers() {
  */
 function sanitizeState(appState: AppState): AppState {
   const classIds = new Set(appState.classes.map(c => c.id));
+  const legacyStudentIds = new Set(
+    appState.students.filter(student => !isValidEmail(student.email || '')).map(student => student.id)
+  );
   const validStudents = appState.students
-    .filter(s => classIds.has(s.class_id))
+    .filter(s => classIds.has(s.class_id) && isValidEmail(s.email || ''))
     .map(s => {
       let num = s.student_number || '';
       if (num.toUpperCase().startsWith('STU-')) {
@@ -67,6 +72,7 @@ function sanitizeState(appState: AppState): AppState {
       }
       return {
         ...s,
+        email: normalizeEmail(s.email),
         student_number: num || '1'
       };
     });
@@ -85,7 +91,8 @@ function sanitizeState(appState: AppState): AppState {
 
   const validQuizzes = (appState.quizzes || []).filter(q => classIds.has(q.class_id));
   // Keep quiz submissions even when the student's roster entry is missing or not synced.
-  const validSubmissions = appState.quizSubmissions || [];
+  const validSubmissions = (appState.quizSubmissions || [])
+    .filter(submission => !legacyStudentIds.has(submission.student_id));
 
   return {
     classes: appState.classes,
@@ -107,7 +114,15 @@ function loadInitialState(): AppState {
       if (parsed.classes && parsed.students && parsed.exams) {
         if (!parsed.quizzes) parsed.quizzes = [...SEED_QUIZZES];
         if (!parsed.quizSubmissions) parsed.quizSubmissions = [...SEED_QUIZ_SUBMISSIONS];
-        return sanitizeState(parsed);
+        const legacyStudentIds = parsed.students
+          .filter((student: Student) => !isValidEmail(student.email || ''))
+          .map((student: Student) => student.id);
+        const sanitizedState = sanitizeState(parsed);
+        if (legacyStudentIds.length > 0) {
+          authService.clearStudentAccounts();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedState));
+        }
+        return sanitizedState;
       }
     }
   } catch (e) {
@@ -197,18 +212,15 @@ export const dataService = {
           const localState = this.getRawState();
           const cloudQuizzes = res.state.quizzes || [];
           const cloudSubmissions = res.state.quizSubmissions || [];
+          const cloudStudentIds = new Set(res.state.students.map(student => student.id));
           const missingQuizzes = localState.quizzes.filter(
             localQuiz => !cloudQuizzes.some(cloudQuiz => cloudQuiz.id === localQuiz.id)
           );
           const missingSubmissions = localState.quizSubmissions.filter(localSubmission =>
+            cloudStudentIds.has(localSubmission.student_id) &&
             !cloudSubmissions.some(cloudSubmission => {
-              if (cloudSubmission.quiz_id !== localSubmission.quiz_id) return false;
-              if (cloudSubmission.student_id === localSubmission.student_id) return true;
-              if (cloudSubmission.class_id !== localSubmission.class_id) return false;
-              return (
-                (localSubmission.student_number && cloudSubmission.student_number === localSubmission.student_number) ||
-                cloudSubmission.student_name.trim().toLowerCase() === localSubmission.student_name.trim().toLowerCase()
-              );
+              return cloudSubmission.quiz_id === localSubmission.quiz_id &&
+                cloudSubmission.student_id === localSubmission.student_id;
             })
           );
 
@@ -218,6 +230,7 @@ export const dataService = {
             quizzes: [...cloudQuizzes, ...missingQuizzes],
             quizSubmissions: [...cloudSubmissions, ...missingSubmissions]
           });
+          authService.synchronizeStudentAccountsWithRoster(res.state.students, res.state.classes);
           return true;
         } else {
           // Si Supabase est vierge, envoyer l'état initial
@@ -294,9 +307,12 @@ export const dataService = {
     return state.classes[idx];
   },
 
-  deleteClass(id: string) {
+  async deleteClass(id: string): Promise<void> {
+    await supabaseService.deleteClass(id);
+
     const classStudentIds = new Set(state.students.filter(s => s.class_id === id).map(s => s.id));
     const classExamIds = new Set(state.exams.filter(e => e.class_id === id).map(e => e.id));
+    const classQuizIds = new Set((state.quizzes || []).filter(quiz => quiz.class_id === id).map(quiz => quiz.id));
 
     state.classes = state.classes.filter(c => c.id !== id);
     state.students = state.students.filter(s => s.class_id !== id);
@@ -304,12 +320,14 @@ export const dataService = {
     state.rubrics = state.rubrics.filter(r => !classExamIds.has(r.exam_id));
     state.evaluations = state.evaluations.filter(ev => !classExamIds.has(ev.exam_id) && !classStudentIds.has(ev.student_id));
     state.passOrder = state.passOrder.filter(po => !classExamIds.has(po.exam_id) && !classStudentIds.has(po.student_id));
-    
+    state.quizzes = (state.quizzes || []).filter(quiz => quiz.class_id !== id);
+    state.quizSubmissions = (state.quizSubmissions || []).filter(submission =>
+      submission.class_id !== id && !classQuizIds.has(submission.quiz_id)
+    );
+    authService.removeStudentAccountsForClass(id);
+
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase (CASCADE gérée en base)
-    supabaseService.deleteClass(id).catch(err => console.error('Cloud deleteClass error:', err));
   },
 
   // =========================================================================
@@ -325,6 +343,7 @@ export const dataService = {
       list = list.filter(s => 
         s.first_name.toLowerCase().includes(q) ||
         s.last_name.toLowerCase().includes(q) ||
+        s.email.includes(q) ||
         (s.student_number && s.student_number.toLowerCase().includes(q))
       );
     }
@@ -346,42 +365,59 @@ export const dataService = {
     };
   },
 
-  createStudent(firstName: string, lastName: string, classId: string, studentNumber?: string): Student {
+  getStudentByEmail(email: string): Student | null {
+    const normalizedEmail = normalizeEmail(email);
+    return state.students.find(student => normalizeEmail(student.email) === normalizedEmail) || null;
+  },
+
+  async createStudent(firstName: string, lastName: string, classId: string, email: string, studentNumber?: string, id?: string): Promise<Student> {
     if (!firstName.trim() || !lastName.trim() || !classId) {
       throw new Error('Prénom, nom et classe sont obligatoires');
     }
+    const normalizedEmail = normalizeEmail(email);
+    if (!isValidEmail(normalizedEmail)) throw new Error('Une adresse e-mail valide est obligatoire.');
+    if (state.students.some(student => normalizeEmail(student.email) === normalizedEmail)) {
+      throw new Error('Cette adresse e-mail est déjà utilisée par un autre élève.');
+    }
+    const studentId = id || generateUUID();
+    await supabaseService.assertStudentEmailAvailable(normalizedEmail, studentId);
     const newStudent: Student = {
-      id: generateUUID(),
+      id: studentId,
       class_id: classId,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
+      email: normalizedEmail,
       student_number: studentNumber?.trim() || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+    await supabaseService.saveStudent(newStudent);
     state.students.push(newStudent);
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase
-    supabaseService.saveStudent(newStudent).catch(err => console.error('Cloud createStudent error:', err));
     return newStudent;
   },
 
-  updateStudent(id: string, updates: Partial<Student>): Student {
+  async updateStudent(id: string, updates: Partial<Student>): Promise<Student> {
     const idx = state.students.findIndex(s => s.id === id);
     if (idx === -1) throw new Error('Élève introuvable');
-    state.students[idx] = {
+    const normalizedEmail = normalizeEmail(updates.email ?? state.students[idx].email);
+    if (!isValidEmail(normalizedEmail)) throw new Error('Une adresse e-mail valide est obligatoire.');
+    if (state.students.some(student => student.id !== id && normalizeEmail(student.email) === normalizedEmail)) {
+      throw new Error('Cette adresse e-mail est déjà utilisée par un autre élève.');
+    }
+    const updatedStudent = {
       ...state.students[idx],
       ...updates,
+      email: normalizedEmail,
       updated_at: new Date().toISOString()
     };
+    await supabaseService.assertStudentEmailAvailable(normalizedEmail, id);
+    await supabaseService.saveStudent(updatedStudent);
+    state.students[idx] = updatedStudent;
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase
-    supabaseService.saveStudent(state.students[idx]).catch(err => console.error('Cloud updateStudent error:', err));
-    return state.students[idx];
+    return updatedStudent;
   },
 
   deleteStudent(id: string) {
@@ -395,15 +431,17 @@ export const dataService = {
     supabaseService.deleteStudent(id).catch(err => console.error('Cloud deleteStudent error:', err));
   },
 
-  importStudents(rawList: Array<Record<string, any>>, defaultClassId?: string) {
+  async importStudents(rawList: Array<Record<string, any>>, defaultClassId?: string) {
     const imported: Student[] = [];
     const duplicates: Array<{ line: number; student: string }> = [];
     const errors: Array<{ line: number; reason: string }> = [];
+    const seenEmails = new Set(state.students.map(student => normalizeEmail(student.email)));
 
     rawList.forEach((item, idx) => {
       const lineNum = idx + 1;
       const firstName = (item.prenom || item.first_name || item.Prenom || '').trim();
       const lastName = (item.nom || item.last_name || item.Nom || '').trim();
+      const email = normalizeEmail((item.email || item.courriel || item['e-mail'] || item.Email || '').toString());
       const studentNum = (item.numero || item.student_number || item.id || '').trim();
 
       let targetClassId = item.class_id || defaultClassId;
@@ -420,44 +458,43 @@ export const dataService = {
         return;
       }
 
+      if (!isValidEmail(email)) {
+        errors.push({ line: lineNum, reason: 'Adresse e-mail manquante ou invalide' });
+        return;
+      }
+
       if (!targetClassId) {
         errors.push({ line: lineNum, reason: 'Classe non spécifiée ou introuvable' });
         return;
       }
 
-      // Check duplicate
-      const isDup = state.students.some(s => 
-        s.class_id === targetClassId &&
-        s.first_name.toLowerCase() === firstName.toLowerCase() &&
-        s.last_name.toLowerCase() === lastName.toLowerCase()
-      );
-
-      if (isDup) {
-        duplicates.push({ line: lineNum, student: `${firstName} ${lastName}` });
+      if (seenEmails.has(email)) {
+        duplicates.push({ line: lineNum, student: email });
         return;
       }
+      seenEmails.add(email);
 
       const newStudent: Student = {
         id: generateUUID(),
         class_id: targetClassId,
         first_name: firstName,
         last_name: lastName,
+        email,
         student_number: studentNum || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      state.students.push(newStudent);
       imported.push(newStudent);
     });
 
+    await Promise.all(imported.map(student =>
+      supabaseService.assertStudentEmailAvailable(student.email, student.id)
+    ));
+    await supabaseService.saveStudents(imported);
+    state.students.push(...imported);
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud en lot
-    imported.forEach(s => {
-      supabaseService.saveStudent(s).catch(err => console.error('Cloud importStudent error:', err));
-    });
 
     return {
       total: rawList.length,
@@ -1317,15 +1354,7 @@ export const dataService = {
 
     // Vérifier si l'élève a déjà soumis ce quiz
     const existingIdx = state.quizSubmissions.findIndex(s => {
-      if (s.quiz_id !== quizId) return false;
-      if (studentId && s.student_id === studentId) return true;
-      if (s.class_id !== classId) return false;
-
-      return (
-        (!s.student_id || !studentId) &&
-        ((studentNumber && s.student_number?.trim() === studentNumber.trim()) ||
-          (studentName && s.student_name.trim().toLowerCase() === studentName.trim().toLowerCase()))
-      );
+      return s.quiz_id === quizId && Boolean(studentId) && s.student_id === studentId;
     });
 
     if (existingIdx !== -1) {
@@ -1408,23 +1437,14 @@ export const dataService = {
     return list;
   },
 
-  getStudentSubmissions(studentId: string, studentName?: string, studentNumber?: string, classId?: string): QuizSubmission[] {
+  getStudentSubmissions(studentId: string, _studentName?: string, _studentNumber?: string, classId?: string): QuizSubmission[] {
     this.checkAndApplyExpiredQuizzes();
     const cleanId = (studentId || '').toLowerCase();
-    const cleanName = (studentName || '').toLowerCase();
-    const cleanNum = (studentNumber || '').trim();
 
     return (state.quizSubmissions || []).filter(s => {
       const sId = (s.student_id || '').toLowerCase();
-      const sName = (s.student_name || '').toLowerCase();
-      const sNum = (s.student_number || '').trim();
       if (classId && s.class_id !== classId) return false;
-      if (cleanId && sId) return sId === cleanId;
-
-      return (
-        (cleanNum && sNum === cleanNum) ||
-        (cleanName && sName === cleanName)
-      );
+      return Boolean(cleanId && sId === cleanId);
     });
   },
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { School, Plus, Edit2, Trash2, Users, BookOpen } from 'lucide-react';
+import { AlertCircle, School, Plus, Edit2, Trash2, Users, BookOpen } from 'lucide-react';
 import { ClassRoom } from '../types';
 
 interface ClassesViewProps {
   classes: ClassRoom[];
   onCreateClass: (name: string) => void;
   onUpdateClass: (id: string, name: string) => void;
-  onDeleteClass: (id: string) => void;
+  onDeleteClass: (id: string) => Promise<void>;
   onSelectClassStudents: (classId: string) => void;
 }
 
@@ -21,6 +21,8 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   const [editingClass, setEditingClass] = useState<ClassRoom | null>(null);
   const [classNameInput, setClassNameInput] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletingClass, setIsDeletingClass] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,25 +199,45 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
               Supprimer cette classe ?
             </h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Attention : Cette action supprimera également les élèves et les examens associés à cette classe.
+              Cette action supprimera définitivement la classe, ses élèves, leurs photos et notes, les résultats de quiz, ainsi que les examens et données associés. Les comptes d’élèves enregistrés dans ce navigateur seront aussi supprimés.
             </p>
+            {deleteError && (
+              <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-left text-xs text-rose-800">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
             <div className="flex flex-col-reverse xs:flex-row justify-center gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmDeleteId(null)}
+                disabled={isDeletingClass}
+                onClick={() => {
+                  setConfirmDeleteId(null);
+                  setDeleteError(null);
+                }}
                 className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
               >
                 Annuler
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  onDeleteClass(confirmDeleteId);
-                  setConfirmDeleteId(null);
+                disabled={isDeletingClass}
+                onClick={async () => {
+                  setIsDeletingClass(true);
+                  setDeleteError(null);
+                  try {
+                    await onDeleteClass(confirmDeleteId);
+                    setConfirmDeleteId(null);
+                  } catch (error) {
+                    console.error('Erreur lors de la suppression de la classe :', error);
+                    setDeleteError(error instanceof Error ? error.message : 'La suppression de la classe a échoué. Réessayez.');
+                  } finally {
+                    setIsDeletingClass(false);
+                  }
                 }}
-                className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-lg min-h-[44px]"
+                className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:cursor-wait disabled:opacity-60 rounded-lg min-h-[44px]"
               >
-                Confirmer la suppression
+                {isDeletingClass ? 'Suppression en cours…' : 'Confirmer la suppression'}
               </button>
             </div>
           </div>

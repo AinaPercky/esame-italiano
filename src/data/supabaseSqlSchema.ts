@@ -30,6 +30,7 @@ CREATE TABLE students (
     class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
+    email TEXT NOT NULL CHECK (btrim(email) <> ''),
     student_number TEXT,
     avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -135,6 +136,7 @@ CREATE TABLE quiz_submissions (
 
 -- Index
 CREATE INDEX IF NOT EXISTS idx_students_class_id ON students(class_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email_unique ON students (lower(btrim(email)));
 CREATE INDEX IF NOT EXISTS idx_exams_class_id ON exams(class_id);
 CREATE INDEX IF NOT EXISTS idx_exam_rubrics_exam_id ON exam_rubrics(exam_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_exam_id ON evaluations(exam_id);
@@ -199,6 +201,25 @@ DROP POLICY IF EXISTS "Student avatars can be removed" ON storage.objects;
 CREATE POLICY "Student avatars can be removed"
     ON storage.objects FOR DELETE TO anon, authenticated
     USING (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars');
+`;
+
+export const STUDENT_EMAIL_IDENTITY_MIGRATION_SQL = `-- Migration destructive pour remplacer l'ancien annuaire par une identité élève basée sur l'e-mail
+-- Supprime les anciennes soumissions de quiz et les élèves. Les évaluations orales
+-- et ordres de passage sont supprimés automatiquement par les clés étrangères.
+BEGIN;
+
+DELETE FROM public.quiz_submissions;
+DELETE FROM public.students;
+
+ALTER TABLE public.students
+    ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.students
+    ALTER COLUMN email SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email_unique
+    ON public.students (lower(btrim(email)));
+
+COMMIT;
 `;
 
 export const QUIZ_SUPABASE_MIGRATION_SQL = `-- Ajout non destructif de la persistance des quiz et de leurs résultats

@@ -59,7 +59,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     return '';
   });
 
-  // Champ de recherche par matricule / numéro d'élève / nom
+  // Champ de recherche par adresse e-mail uniquement
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -80,40 +80,24 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   const currentScore = evaluation ? evaluation.total_score : 0;
   const percentage = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
 
-  // Recherche par numéro d'élève / matricule
+  // Recherche de l'élève par adresse e-mail uniquement
   const handleSearchStudent = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSearchError(null);
 
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
-      setSearchError('Veuillez saisir votre numéro d\'élève ou votre nom.');
+      setSearchError('Veuillez saisir votre adresse e-mail.');
       return;
     }
 
-    // Recherche par numéro d'élève (ex: STU-001, 1, 001) ou par nom/prénom
-    const found = examClassStudents.find(s => {
-      const num = (s.student_number || '').toLowerCase();
-      const numDigits = num.replace(/\D/g, '');
-      const queryDigits = query.replace(/\D/g, '');
-      const fullName = `${s.first_name} ${s.last_name}`.toLowerCase();
-      const reverseName = `${s.last_name} ${s.first_name}`.toLowerCase();
-
-      return (
-        num === query ||
-        (queryDigits && numDigits === queryDigits) ||
-        fullName.includes(query) ||
-        reverseName.includes(query) ||
-        s.first_name.toLowerCase() === query ||
-        s.last_name.toLowerCase() === query
-      );
-    });
+    const found = examClassStudents.find(s => s.email.toLowerCase() === query);
 
     if (found) {
       setSelectedStudentId(found.id);
       setSearchError(null);
     } else {
-      setSearchError(`Aucun élève trouvé avec le numéro ou nom "${searchQuery}". Vérifiez votre matricule.`);
+      setSearchError(`Aucun élève trouvé avec l’adresse e-mail "${searchQuery}".`);
     }
   };
 
@@ -146,7 +130,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     return null;
   }
 
-  // Vue 1 : L'élève a scanné le Code QR commun et doit saisir son numéro d'élève
+  // Vue 1 : L'élève a scanné le Code QR commun et doit saisir son adresse e-mail
   if (!currentStudent || (!lockedStudentId && !selectedStudentId)) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
@@ -171,7 +155,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
             </p>
           </div>
 
-          {/* Saisie du numéro d'élève / matricule */}
+          {/* Saisie de l'adresse e-mail */}
           <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5">
             <div className="space-y-1 text-center sm:text-left">
               <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
@@ -179,10 +163,10 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
                 <span>Identification de l'élève</span>
               </div>
               <h2 className="text-lg font-extrabold text-slate-900">
-                Entrez votre numéro d'élève ou votre nom
+                Entrez votre adresse e-mail
               </h2>
               <p className="text-xs text-slate-500">
-                Saisissez votre matricule (ex: <strong className="text-slate-700 font-mono">STU-001</strong> ou votre nom) pour afficher les détails complets de votre examen oral.
+                Saisissez l'adresse e-mail associée à votre compte pour afficher les détails de votre examen oral.
               </p>
             </div>
 
@@ -190,13 +174,13 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
               <div className="relative">
                 <User className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text"
+                  type="email"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     if (searchError) setSearchError(null);
                   }}
-                  placeholder="ex: STU-001, Jean, Rakoto..."
+                  placeholder="eleve@exemple.fr"
                   autoFocus
                   className="w-full pl-11 pr-28 py-3.5 bg-slate-50 border-2 border-slate-300 focus:border-amber-700 rounded-xl text-base font-bold text-slate-900 placeholder:text-slate-400 focus:outline-hidden transition-all shadow-inner"
                 />
@@ -216,33 +200,6 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
                 </div>
               )}
             </form>
-
-            {/* Quick-Pick Student Pills */}
-            <div className="pt-4 border-t border-slate-100 space-y-2">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                Ou cliquez directement sur votre nom :
-              </span>
-              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                {examClassStudents.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedStudentId(st.id);
-                      setSearchError(null);
-                    }}
-                    className="p-2.5 rounded-xl border border-slate-200 hover:border-amber-700 hover:bg-amber-50/80 bg-slate-50 text-left transition-all cursor-pointer group"
-                  >
-                    <div className="font-bold text-xs text-slate-900 group-hover:text-amber-950 truncate">
-                      {st.first_name} {st.last_name}
-                    </div>
-                    <div className="text-[10px] font-mono text-slate-500 group-hover:text-amber-800">
-                      {st.student_number || 'Sans matricule'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
 
           </div>
 
@@ -284,7 +241,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
               <button
                 onClick={() => setSelectedStudentId('')}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                title="Consulter un autre numéro d'élève"
+                title="Consulter l’examen par adresse e-mail"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Changer d'élève</span>

@@ -43,8 +43,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   // Single Form State
   const [formFirstName, setFormFirstName] = useState('');
   const [formLastName, setFormLastName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
   const [formStudentNumber, setFormStudentNumber] = useState('');
   const [formClassId, setFormClassId] = useState(classes[0]?.id || '');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Import State
   const [importType, setImportType] = useState<'csv' | 'json'>('csv');
@@ -60,6 +62,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     const matchesSearch = !searchTerm || 
       s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.student_number && s.student_number.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesClass && matchesSearch;
   });
@@ -68,8 +71,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setEditingStudent(null);
     setFormFirstName('');
     setFormLastName('');
+    setFormEmail('');
     setFormStudentNumber('');
     setFormClassId(classFilter || classes[0]?.id || '');
+    setFormError(null);
     setIsAddModalOpen(true);
   };
 
@@ -77,29 +82,38 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setEditingStudent(student);
     setFormFirstName(student.first_name);
     setFormLastName(student.last_name);
+    setFormEmail(student.email);
     setFormStudentNumber(student.student_number || '');
     setFormClassId(student.class_id);
+    setFormError(null);
     setIsAddModalOpen(true);
   };
 
-  const handleSaveStudent = (e: React.FormEvent) => {
+  const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formFirstName.trim() || !formLastName.trim() || !formClassId) return;
 
-    if (editingStudent) {
-      dataService.updateStudent(editingStudent.id, {
-        first_name: formFirstName.trim(),
-        last_name: formLastName.trim(),
-        student_number: formStudentNumber.trim() || null,
-        class_id: formClassId
-      });
-    } else {
-      dataService.createStudent(
-        formFirstName.trim(),
-        formLastName.trim(),
-        formClassId,
-        formStudentNumber.trim() || undefined
-      );
+    try {
+      if (editingStudent) {
+        await dataService.updateStudent(editingStudent.id, {
+          first_name: formFirstName.trim(),
+          last_name: formLastName.trim(),
+          email: formEmail,
+          student_number: formStudentNumber.trim() || null,
+          class_id: formClassId
+        });
+      } else {
+        await dataService.createStudent(
+          formFirstName.trim(),
+          formLastName.trim(),
+          formClassId,
+          formEmail,
+          formStudentNumber.trim() || undefined
+        );
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Impossible d’enregistrer cet élève.');
+      return;
     }
 
     setIsAddModalOpen(false);
@@ -151,15 +165,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     }
   };
 
-  const handleExecuteImport = () => {
+  const handleExecuteImport = async () => {
     if (!importPreview) return;
-    const res = dataService.importStudents(importPreview, importTargetClass);
-    setImportSummary(res);
-    onRefresh();
+    setImportParseError(null);
+    try {
+      const res = await dataService.importStudents(importPreview, importTargetClass);
+      setImportSummary(res);
+      onRefresh();
+    } catch (error) {
+      setImportParseError(error instanceof Error ? error.message : 'Impossible d’importer les élèves.');
+    }
   };
 
-  const sampleCsv = `nom,prenom,classe\nRakoto,Jean,A1\nRabe,Marie,A1\nRasoa,Paul,A1`;
-  const sampleJson = `[\n  {\n    "nom": "Rakoto",\n    "prenom": "Jean",\n    "classe": "A1"\n  },\n  {\n    "nom": "Rabe",\n    "prenom": "Marie",\n    "classe": "A1"\n  }\n]`;
+  const sampleCsv = `nom,prenom,email,classe\nRakoto,Jean,jean.rakoto@example.com,A1\nRabe,Marie,marie.rabe@example.com,A1\nRasoa,Paul,paul.rasoa@example.com,A1`;
+  const sampleJson = `[\n  {\n    "nom": "Rakoto",\n    "prenom": "Jean",\n    "email": "jean.rakoto@example.com",\n    "classe": "A1"\n  },\n  {\n    "nom": "Rabe",\n    "prenom": "Marie",\n    "email": "marie.rabe@example.com",\n    "classe": "A1"\n  }\n]`;
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-6xl mx-auto">
@@ -239,6 +258,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   <h4 className="font-semibold text-slate-900 text-base">
                     {s.first_name} {s.last_name}
                   </h4>
+                  <div className="text-xs text-slate-500 break-all">{s.email}</div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs font-medium text-amber-900 bg-amber-50 px-2 py-0.5 rounded">
                       {s.class_name}
@@ -299,7 +319,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-600">
                 <th className="py-3 px-4">Élève</th>
-                <th className="py-3 px-4">Identifiant</th>
+                <th className="py-3 px-4">Adresse e-mail</th>
+                <th className="py-3 px-4">Matricule</th>
                 <th className="py-3 px-4">Classe</th>
                 <th className="py-3 px-4 text-center">Historique</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -317,6 +338,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         Ajouté le {new Date(s.created_at).toLocaleDateString('fr-FR')}
                       </div>
                     </td>
+                    <td className="py-3 px-4 text-xs text-slate-600">{s.email}</td>
                     <td className="py-3 px-4 font-mono text-xs text-slate-600">
                       {s.student_number || '—'}
                     </td>
@@ -359,7 +381,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">
                     Aucun élève ne correspond à vos critères de recherche.
                   </td>
                 </tr>
@@ -381,6 +403,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             </p>
 
             <form onSubmit={handleSaveStudent} className="space-y-4">
+              {formError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">
+                  {formError}
+                </div>
+              )}
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -408,6 +435,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Adresse e-mail <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  placeholder="eleve@exemple.fr"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                />
               </div>
 
               <div>
@@ -468,7 +509,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   Importation d'élèves par lots
                 </h3>
                 <p className="text-xs text-slate-500">
-                  CSV ou JSON avec gestion automatique des doublons.
+                  Chaque élève doit avoir une adresse e-mail unique. Les noms et prénoms peuvent être identiques.
                 </p>
               </div>
               <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs self-start sm:self-auto">
@@ -558,6 +599,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                           <th className="p-2">#</th>
                           <th className="p-2">Prénom</th>
                           <th className="p-2">Nom</th>
+                          <th className="p-2">E-mail</th>
                           <th className="p-2">Classe</th>
                         </tr>
                       </thead>
@@ -567,6 +609,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                             <td className="p-2 text-slate-400 font-mono">{idx + 1}</td>
                             <td className="p-2 font-medium">{item.prenom || item.first_name || '—'}</td>
                             <td className="p-2 font-medium">{item.nom || item.last_name || '—'}</td>
+                            <td className="p-2">{item.email || item.courriel || item['e-mail'] || '—'}</td>
                             <td className="p-2 text-slate-600">{item.classe || item.class_name || 'Par défaut'}</td>
                           </tr>
                         ))}

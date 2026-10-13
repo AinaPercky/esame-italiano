@@ -253,31 +253,176 @@ class SupabaseService {
 
   public async deleteClass(id: string): Promise<void> {
     const client = this.getClient();
-    if (!client || !isUUID(id)) return;
-    try {
-      await client.from('classes').delete().eq('id', id);
-    } catch (e) {
-      console.error('Supabase deleteClass error:', e);
+    if (!client) {
+      throw new Error('Suppression impossible : Supabase n’est pas configuré ou accessible.');
+    }
+    if (!isUUID(id)) {
+      throw new Error('Suppression impossible dans Supabase : identifiant de classe invalide.');
+    }
+
+    const failOnError = (operation: string, error: { message: string } | null) => {
+      if (error) {
+        throw new Error(`Suppression Supabase (${operation}) impossible : ${error.message}`);
+      }
+    };
+
+    const { data: students, error: studentsError } = await client
+      .from('students')
+      .select('id, avatar_url')
+      .eq('class_id', id);
+    failOnError('chargement des élèves', studentsError);
+
+    const { data: exams, error: examsError } = await client
+      .from('exams')
+      .select('id')
+      .eq('class_id', id);
+    failOnError('chargement des examens', examsError);
+
+    const studentIds = (students || []).map(student => student.id);
+    const examIds = (exams || []).map(exam => exam.id);
+    const evaluationIds = new Set<string>();
+
+    if (studentIds.length > 0) {
+      const { data: studentEvaluations, error } = await client
+        .from('evaluations')
+        .select('id')
+        .in('student_id', studentIds);
+      failOnError('chargement des évaluations des élèves', error);
+      (studentEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
+    }
+    if (examIds.length > 0) {
+      const { data: examEvaluations, error } = await client
+        .from('evaluations')
+        .select('id')
+        .in('exam_id', examIds);
+      failOnError('chargement des évaluations des examens', error);
+      (examEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
+    }
+
+    const avatarPaths = (students || [])
+      .filter(student => student.avatar_url && isUUID(student.id))
+      .map(student => `avatars/${student.id}.jpg`);
+    if (avatarPaths.length > 0) {
+      const { error } = await client.storage.from('student-avatars').remove(avatarPaths);
+      failOnError('suppression des photos de profil', error);
+    }
+
+    const { error: submissionsError } = await client
+      .from('quiz_submissions')
+      .delete()
+      .eq('class_id', id);
+    failOnError('suppression des résultats de quiz', submissionsError);
+
+    const { error: quizzesError } = await client
+      .from('quizzes')
+      .delete()
+      .eq('class_id', id);
+    failOnError('suppression des quiz', quizzesError);
+
+    if (evaluationIds.size > 0) {
+      const { error } = await client
+        .from('evaluation_details')
+        .delete()
+        .in('evaluation_id', Array.from(evaluationIds));
+      failOnError('suppression des détails d’évaluation', error);
+
+      const { error: evaluationsError } = await client
+        .from('evaluations')
+        .delete()
+        .in('id', Array.from(evaluationIds));
+      failOnError('suppression des évaluations orales', evaluationsError);
+    }
+
+    if (studentIds.length > 0) {
+      const { error } = await client
+        .from('exam_pass_order')
+        .delete()
+        .in('student_id', studentIds);
+      failOnError('suppression des ordres de passage des élèves', error);
+    }
+
+    if (examIds.length > 0) {
+      const { error: passOrderError } = await client
+        .from('exam_pass_order')
+        .delete()
+        .in('exam_id', examIds);
+      failOnError('suppression des ordres de passage des examens', passOrderError);
+
+      const { error: rubricsError } = await client
+        .from('exam_rubrics')
+        .delete()
+        .in('exam_id', examIds);
+      failOnError('suppression des rubriques', rubricsError);
+    }
+
+    const { error: deleteStudentsError } = await client
+      .from('students')
+      .delete()
+      .eq('class_id', id);
+    failOnError('suppression des élèves', deleteStudentsError);
+
+    const { error: deleteExamsError } = await client
+      .from('exams')
+      .delete()
+      .eq('class_id', id);
+    failOnError('suppression des examens', deleteExamsError);
+
+    const { data: deletedClass, error: deleteClassError } = await client
+      .from('classes')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    failOnError('suppression de la classe', deleteClassError);
+    if (!deletedClass) {
+      throw new Error('Suppression Supabase impossible : classe introuvable ou droits de suppression insuffisants.');
     }
   }
 
   // --- STUDENTS ---
   public async saveStudent(s: Student): Promise<void> {
+    return this.saveStudents([s]);
+  }
+
+  public async assertStudentEmailAvailable(email: string, excludeStudentId?: string): Promise<void> {
     const client = this.getClient();
-    if (!client || !isUUID(s.id) || !isUUID(s.class_id)) return;
-    try {
-      await client.from('students').upsert({
-        id: s.id,
-        class_id: s.class_id,
-        first_name: s.first_name,
-        last_name: s.last_name,
-        student_number: s.student_number || null,
-        avatar_url: s.avatar_url || null,
-        created_at: s.created_at || new Date().toISOString(),
-        updated_at: s.updated_at || new Date().toISOString()
-      }, { onConflict: 'id' });
-    } catch (e) {
-      console.error('Supabase saveStudent error:', e);
+    if (!client) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    let query = client
+      .from('students')
+      .select('id')
+      .eq('email', normalizedEmail);
+    if (excludeStudentId && isUUID(excludeStudentId)) {
+      query = query.neq('id', excludeStudentId);
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new Error(`Vérification de l’e-mail dans Supabase impossible : ${error.message}`);
+    if (data) throw new Error('Cette adresse e-mail est déjà utilisée par un autre élève.');
+  }
+
+  public async saveStudents(students: Student[]): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+    const payload = students
+      .filter(student => isUUID(student.id) && isUUID(student.class_id))
+      .map(student => ({
+        id: student.id,
+        class_id: student.class_id,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        email: student.email.trim().toLowerCase(),
+        student_number: student.student_number || null,
+        avatar_url: student.avatar_url || null,
+        created_at: student.created_at || new Date().toISOString(),
+        updated_at: student.updated_at || new Date().toISOString()
+      }));
+    if (payload.length === 0) return;
+    const { error } = await client.from('students').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Cette adresse e-mail est déjà utilisée par un autre élève.');
+      }
+      throw new Error(`Enregistrement de l’élève dans Supabase impossible : ${error.message}`);
     }
   }
 
@@ -617,6 +762,7 @@ class SupabaseService {
             class_id: s.class_id,
             first_name: s.first_name,
             last_name: s.last_name,
+            email: s.email.trim().toLowerCase(),
             student_number: s.student_number || null,
             avatar_url: s.avatar_url || null,
             created_at: s.created_at || new Date().toISOString(),
@@ -814,6 +960,7 @@ class SupabaseService {
         class_id: s.class_id,
         first_name: s.first_name,
         last_name: s.last_name,
+        email: s.email,
         student_number: s.student_number,
         avatar_url: s.avatar_url || null,
         created_at: s.created_at,

@@ -3,47 +3,12 @@ import { Trophy, Medal, Award, TrendingUp, Calendar, Users, Flame, Star, Sparkle
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
 
-function normalizeIdentity(value: string | null | undefined): string {
-  return (value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-}
-
-function studentIdentityKey(student: Pick<Student, 'class_id' | 'student_number' | 'first_name' | 'last_name'>): string {
-  const number = normalizeIdentity(student.student_number);
-  const name = normalizeIdentity(`${student.first_name} ${student.last_name}`);
-  return `${student.class_id}:${number || name}`;
-}
-
-function matchingStudentIdentityKey(
-  classId: string,
-  studentNumber: string | null | undefined,
-  studentName: string | undefined,
-  students: Student[]
-): string {
-  const classStudents = students.filter(student => student.class_id === classId);
-  const normalizedName = normalizeIdentity(studentName);
-  const nameMatches = normalizedName
-    ? classStudents.filter(student => normalizeIdentity(`${student.first_name} ${student.last_name}`) === normalizedName)
-    : [];
-  if (nameMatches.length === 1) return studentIdentityKey(nameMatches[0]);
-
-  const normalizedNumber = normalizeIdentity(studentNumber);
-  const numberMatches = normalizedNumber
-    ? classStudents.filter(student => normalizeIdentity(student.student_number) === normalizedNumber)
-    : [];
-  if (numberMatches.length === 1) return studentIdentityKey(numberMatches[0]);
-  if (numberMatches.length > 1) return `${classId}:${normalizedNumber}`;
-  return `${classId}:${normalizedNumber || normalizedName}`;
+function studentIdentityKey(student: Pick<Student, 'id'>): string {
+  return student.id;
 }
 
 function gradeIdentityKey(grade: DailyGrade, students: Student[]): string {
-  const rosterStudent = students.find(student => student.id === grade.student_id);
-  if (rosterStudent) return studentIdentityKey(rosterStudent);
-
-  return matchingStudentIdentityKey(grade.class_id, grade.student_number, grade.student_name, students);
+  return students.find(student => student.id === grade.student_id)?.id || grade.student_id;
 }
 
 interface ClassLeaderboardProps {
@@ -96,16 +61,8 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     if (!selectedClassId) return students;
     return students.filter(s => s.class_id === selectedClassId);
   }, [students, selectedClassId]);
-  const getStudent = (studentId: string, classId: string, studentNumber?: string | null, studentName?: string) => {
-    const exactMatch = students.find(student => student.id === studentId);
-    if (exactMatch?.avatar_url) return exactMatch;
-
-    const identityKey = exactMatch
-      ? studentIdentityKey(exactMatch)
-      : matchingStudentIdentityKey(classId, studentNumber, studentName, students);
-    return students.find(student => studentIdentityKey(student) === identityKey && student.avatar_url)
-      || exactMatch
-      || students.find(student => studentIdentityKey(student) === identityKey);
+  const getStudent = (studentId: string, _classId: string, _studentNumber?: string | null, _studentName?: string) => {
+    return students.find(student => student.id === studentId);
   };
 
   // Construire le classement ordonné par note journalière décroissante

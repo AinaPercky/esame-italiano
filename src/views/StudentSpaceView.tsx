@@ -122,10 +122,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   }, [studentRecord?.avatar_url]);
 
   const getStudentQueryInfo = () => {
-    const stId = currentUser.student_id || studentRecord?.id || `student_${currentUser.id}`;
-    const stName = currentUser.name;
-    const stNum = currentUser.student_number || studentRecord?.student_number || '1';
-    const classId = currentUser.class_id || studentRecord?.class_id || '';
+    const stId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
+    const stName = studentRecord
+      ? `${studentRecord.first_name} ${studentRecord.last_name}`
+      : currentUser.name;
+    const stNum = studentRecord?.student_number || currentUser.student_number || '1';
+    const classId = studentRecord?.class_id || currentUser.class_id || '';
     return { stId, stName, stNum, classId };
   };
 
@@ -135,14 +137,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const allQuizSubs = dataService.getQuizSubmissions(quizId);
 
     const matchedBySubs = liveSubs.some(s => s.quiz_id === quizId);
-    const matchedByQuizSubs = allQuizSubs.some(s => {
-      if (s.student_id && s.student_id === stId) return true;
-      if (!classId || s.class_id !== classId) return false;
-      return (
-        s.student_number?.trim() === stNum.trim() ||
-        s.student_name.trim().toLowerCase() === stName.trim().toLowerCase()
-      );
-    });
+    const matchedByQuizSubs = allQuizSubs.some(s => s.student_id === stId);
 
     return matchedBySubs || matchedByQuizSubs || mySubmissions.some(s => s.quiz_id === quizId);
   };
@@ -150,22 +145,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const loadData = () => {
     // Synchroniser avec dataService
     const stList = dataService.getStudents();
-    const st = stList.find(s => s.id === currentUser.student_id) || (() => {
-      const classStudents = currentUser.class_id
-        ? stList.filter(s => s.class_id === currentUser.class_id)
-        : stList;
-      const numberMatches = currentUser.student_number
-        ? classStudents.filter(s => s.student_number?.trim() === currentUser.student_number?.trim())
-        : [];
-      return numberMatches.length === 1 ? numberMatches[0] : undefined;
-    })();
+    const st = stList.find(student => student.email.toLowerCase() === currentUser.email.toLowerCase())
+      || stList.find(student => student.id === currentUser.student_id);
     setStudentRecord(st || null);
 
     const allCls = dataService.getClasses();
     setClassesList(allCls);
     setClassStudentsList(stList);
 
-    const classId = currentUser.class_id || st?.class_id;
+    const classId = st?.class_id || currentUser.class_id;
 
     const { stId, stName, stNum, classId: studentClassId } = getStudentQueryInfo();
     let subs: QuizSubmission[] = [];
@@ -480,7 +468,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       if (!ok) throw new Error('Impossible d’enregistrer le profil étudiant.');
 
       if (studentRecord && savedAvatar !== cloudAvatar) {
-        dataService.updateStudent(studentRecord.id, { avatar_url: savedAvatar || null });
+        await dataService.updateStudent(studentRecord.id, { avatar_url: savedAvatar || null });
       }
 
       setProfileSuccessMsg(
@@ -1371,8 +1359,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               dailyGrades={classDailyGrades}
               classes={classesList}
               students={classStudentsList}
-              currentStudentId={currentUser.student_id || studentRecord?.id}
-              initialClassId={currentUser.class_id || studentRecord?.class_id}
+              currentStudentId={studentRecord?.id || currentUser.student_id}
+              initialClassId={studentRecord?.class_id || currentUser.class_id}
               isStudentView={true}
             />
           </div>
