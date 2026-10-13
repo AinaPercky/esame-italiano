@@ -22,14 +22,19 @@ import {
   Trophy,
   FastForward,
   ChevronRight,
-  Lock
+  Lock,
+  ImagePlus,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { AuthUser, authService } from '../services/authService';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { Quiz, QuizQuestion, QuizSubmission, DailyGrade, Student, Exam, ClassRoom } from '../types';
 import { StudentPublicReportView } from './StudentPublicReportView';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { StudentAvatar } from '../components/StudentAvatar';
 
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
@@ -92,6 +97,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [editPhone, setEditPhone] = useState<string>('');
   const [editAvatar, setEditAvatar] = useState<string>(currentUser.avatar || '');
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
+  const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
     try {
@@ -109,6 +116,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [mySubmissions, setMySubmissions] = useState<QuizSubmission[]>([]);
   const [dailyGrades, setDailyGrades] = useState<DailyGrade[]>([]);
   const [studentRecord, setStudentRecord] = useState<Student | null>(null);
+
+  useEffect(() => {
+    if (studentRecord?.avatar_url) setEditAvatar(studentRecord.avatar_url);
+  }, [studentRecord?.avatar_url]);
 
   const getStudentQueryInfo = () => {
     const stId = currentUser.student_id || studentRecord?.id || `student_${currentUser.id}`;
@@ -439,21 +450,95 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = authService.updateStudentProfile(currentUser.student_id || '', {
-      firstName: editFirstName,
-      lastName: editLastName,
-      studentNumber: editStudentNumber,
-      phone: editPhone,
-      avatar: editAvatar
-    });
+    setProfileErrorMsg(null);
+    setIsSavingProfile(true);
 
-    if (ok) {
-      setProfileSuccessMsg('Profil et identifiants mis à jour avec succès.');
+    try {
+      const studentId = studentRecord?.id || currentUser.student_id || '';
+      let savedAvatar = editAvatar;
+      const cloudAvatar = studentRecord?.avatar_url || '';
+      const avatarIsNewUpload = editAvatar.startsWith('data:image/jpeg;base64,');
+      const avatarChanged = avatarIsNewUpload || editAvatar !== cloudAvatar;
+
+      if (avatarChanged) {
+        savedAvatar = (await supabaseService.saveStudentAvatar(
+          studentId,
+          editAvatar || null
+        )) || '';
+      }
+
+      const ok = authService.updateStudentProfile(studentId, {
+        firstName: editFirstName,
+        lastName: editLastName,
+        studentNumber: editStudentNumber,
+        phone: editPhone,
+        avatar: savedAvatar
+      });
+
+      if (!ok) throw new Error('Impossible d’enregistrer le profil étudiant.');
+
+      if (studentRecord && savedAvatar !== cloudAvatar) {
+        dataService.updateStudent(studentRecord.id, { avatar_url: savedAvatar || null });
+      }
+
+      setProfileSuccessMsg(
+        avatarChanged
+          ? savedAvatar
+            ? 'Profil mis à jour. Photo enregistrée sur Supabase.'
+            : 'Profil mis à jour. Photo supprimée de Supabase.'
+          : 'Profil étudiant mis à jour.'
+      );
       setTimeout(() => setProfileSuccessMsg(null), 3000);
       loadData();
+    } catch (error) {
+      console.error('Erreur sauvegarde profil étudiant:', error);
+      setProfileErrorMsg(error instanceof Error ? error.message : 'Impossible d’enregistrer le profil. Réessayez.');
+    } finally {
+      setIsSavingProfile(false);
     }
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileErrorMsg('Veuillez sélectionner un fichier image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileErrorMsg('La photo doit peser moins de 5 Mo.');
+      return;
+    }
+
+    setProfileErrorMsg(null);
+    const imageUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const maxDimension = 512;
+        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas indisponible');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        setEditAvatar(canvas.toDataURL('image/jpeg', 0.82));
+      } catch {
+        setProfileErrorMsg('Impossible de traiter cette image. Essayez un autre fichier.');
+      } finally {
+        URL.revokeObjectURL(imageUrl);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      setProfileErrorMsg('Impossible de lire cette image. Essayez un autre fichier.');
+    };
+    image.src = imageUrl;
   };
 
   // Calcul du temps restant sur la session d'1 heure du quiz lancé par le prof
@@ -504,6 +589,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            <StudentAvatar
+              name={currentUser.name}
+              src={studentRecord?.avatar_url || currentUser.avatar}
+              className="w-9 h-9 border-2 border-amber-200 text-xs"
+            />
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
               <div className="text-[11px] text-slate-500 font-mono">
@@ -530,7 +620,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         {/* Student Welcome Banner & Cumulative Grade Card */}
         <div className="bg-gradient-to-r from-amber-900 via-amber-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-800/40 relative overflow-hidden">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
+            <div className="flex items-center gap-4 space-y-2">
+              <StudentAvatar
+                name={currentUser.name}
+                src={studentRecord?.avatar_url || currentUser.avatar}
+                className="w-16 h-16 border-2 border-amber-300 text-lg"
+              />
+              <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/20 text-amber-300 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-400/30">
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>Session Active • Année Scolaire 2026-2027</span>
@@ -541,6 +637,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <p className="text-xs sm:text-sm text-slate-300 max-w-lg">
                 Consultez les quiz lancés par le professeur, passez vos évaluations en direct dans la fenêtre d'une heure et suivez votre note journalière.
               </p>
+              </div>
             </div>
 
             {/* Daily Grade Showcase Box */}
@@ -1324,6 +1421,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
             )}
 
+            {profileErrorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-center gap-2" role="alert">
+                <AlertCircle className="w-4 h-4 text-rose-600" />
+                <span>{profileErrorMsg}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -1383,34 +1487,49 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <span className="text-[10px] text-slate-400">Le numéro de téléphone peut également servir pour vous identifier.</span>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Photo de profil (URL de l'image)</label>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden shrink-0">
-                    {editAvatar ? (
-                      <img src={editAvatar} alt="Avatar" className="w-full h-full object-cover" onError={(e)=>{(e.target as HTMLElement).style.display='none';}} />
-                    ) : (
-                      <User className="w-6 h-6 text-slate-400" />
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700">Photo de profil</label>
+                <div className="flex items-center gap-4">
+                  <StudentAvatar
+                    name={`${editFirstName} ${editLastName}`}
+                    src={editAvatar}
+                    className="w-16 h-16 border border-slate-300 text-base"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors">
+                      <ImagePlus className="w-4 h-4" />
+                      <span>{editAvatar ? 'Remplacer la photo' : 'Ajouter une photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarFileChange}
+                        className="sr-only"
+                        aria-label="Télécharger une photo de profil"
+                      />
+                    </label>
+                    {editAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatar('')}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Supprimer</span>
+                      </button>
                     )}
                   </div>
-                  <input
-                    type="url"
-                    value={editAvatar}
-                    onChange={(e) => setEditAvatar(e.target.value)}
-                    placeholder="https://exemple.com/photo.jpg"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                  />
                 </div>
-                <span className="text-[10px] text-slate-400">Entrez une URL d'image valide pour votre photo de profil.</span>
+                <span className="text-[10px] text-slate-400">Formats image acceptés. Taille maximale : 5 Mo. La photo est redimensionnée avant son enregistrement.</span>
               </div>
 
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-3 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  disabled={isSavingProfile}
+                  className="w-full py-3 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Enregistrer mes identifiants</span>
+                  {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>{isSavingProfile ? 'Enregistrement sur Supabase...' : 'Enregistrer mes identifiants'}</span>
                 </button>
               </div>
             </form>

@@ -272,6 +272,7 @@ class SupabaseService {
         first_name: s.first_name,
         last_name: s.last_name,
         student_number: s.student_number || null,
+        avatar_url: s.avatar_url || null,
         created_at: s.created_at || new Date().toISOString(),
         updated_at: s.updated_at || new Date().toISOString()
       }, { onConflict: 'id' });
@@ -288,6 +289,67 @@ class SupabaseService {
     } catch (e) {
       console.error('Supabase deleteStudent error:', e);
     }
+  }
+
+  public async saveStudentAvatar(studentId: string, imageDataUrl: string | null): Promise<string | null> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase n'est pas configuré.");
+    if (!isUUID(studentId)) throw new Error("La fiche élève n'a pas d'identifiant Supabase valide.");
+
+    const path = `avatars/${studentId}.jpg`;
+    let avatarUrl: string | null = null;
+
+    if (imageDataUrl) {
+      if (!imageDataUrl.startsWith('data:image/jpeg;base64,')) {
+        throw new Error("Le format de la photo est invalide. Sélectionnez à nouveau une image.");
+      }
+
+      const imageResponse = await fetch(imageDataUrl);
+      if (!imageResponse.ok) throw new Error("Impossible de préparer la photo sélectionnée.");
+      const imageBlob = await imageResponse.blob();
+      if (imageBlob.size > 2 * 1024 * 1024) {
+        throw new Error('La photo redimensionnée dépasse la limite Supabase de 2 Mo.');
+      }
+
+      const { error: uploadError } = await client.storage
+        .from('student-avatars')
+        .upload(path, imageBlob, {
+          cacheControl: '3600',
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+      if (uploadError) {
+        throw new Error(`Envoi de la photo vers Supabase impossible : ${uploadError.message}`);
+      }
+
+      const { data } = client.storage.from('student-avatars').getPublicUrl(path);
+      avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+    }
+
+    const { data: updatedStudent, error: updateError } = await client
+      .from('students')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', studentId)
+      .select('id')
+      .maybeSingle();
+
+    if (updateError) {
+      throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
+    }
+    if (!updatedStudent) {
+      throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
+    }
+
+    if (!imageDataUrl) {
+      const { error: removeError } = await client.storage
+        .from('student-avatars')
+        .remove([path]);
+      if (removeError) {
+        console.error('Supabase removeStudentAvatar error:', removeError);
+      }
+    }
+
+    return avatarUrl;
   }
 
   // --- EXAMS & RUBRICS ---
@@ -556,6 +618,7 @@ class SupabaseService {
             first_name: s.first_name,
             last_name: s.last_name,
             student_number: s.student_number || null,
+            avatar_url: s.avatar_url || null,
             created_at: s.created_at || new Date().toISOString(),
             updated_at: s.updated_at || new Date().toISOString()
           }));
@@ -752,6 +815,7 @@ class SupabaseService {
         first_name: s.first_name,
         last_name: s.last_name,
         student_number: s.student_number,
+        avatar_url: s.avatar_url || null,
         created_at: s.created_at,
         updated_at: s.updated_at
       }));

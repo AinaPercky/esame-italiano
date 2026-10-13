@@ -31,6 +31,7 @@ CREATE TABLE students (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     student_number TEXT,
+    avatar_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
@@ -159,6 +160,45 @@ CREATE POLICY "Evaluation details full access" ON evaluation_details FOR ALL USI
 CREATE POLICY "Exam pass order full access" ON exam_pass_order FOR ALL USING (true);
 CREATE POLICY "Quizzes full access" ON quizzes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Quiz submissions full access" ON quiz_submissions FOR ALL USING (true) WITH CHECK (true);
+`;
+
+export const STUDENT_AVATAR_MIGRATION_SQL = `-- Migration non destructive : stockage des photos de profil des élèves
+ALTER TABLE public.students
+    ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'student-avatars',
+    'student-avatars',
+    TRUE,
+    2097152,
+    ARRAY['image/jpeg']::text[]
+)
+ON CONFLICT (id) DO UPDATE
+SET public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "Student avatars are publicly readable" ON storage.objects;
+CREATE POLICY "Student avatars are publicly readable"
+    ON storage.objects FOR SELECT TO anon, authenticated
+    USING (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars');
+
+DROP POLICY IF EXISTS "Student avatars can be uploaded" ON storage.objects;
+CREATE POLICY "Student avatars can be uploaded"
+    ON storage.objects FOR INSERT TO anon, authenticated
+    WITH CHECK (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars');
+
+DROP POLICY IF EXISTS "Student avatars can be replaced" ON storage.objects;
+CREATE POLICY "Student avatars can be replaced"
+    ON storage.objects FOR UPDATE TO anon, authenticated
+    USING (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars')
+    WITH CHECK (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars');
+
+DROP POLICY IF EXISTS "Student avatars can be removed" ON storage.objects;
+CREATE POLICY "Student avatars can be removed"
+    ON storage.objects FOR DELETE TO anon, authenticated
+    USING (bucket_id = 'student-avatars' AND (storage.foldername(name))[1] = 'avatars');
 `;
 
 export const QUIZ_SUPABASE_MIGRATION_SQL = `-- Ajout non destructif de la persistance des quiz et de leurs résultats

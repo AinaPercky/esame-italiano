@@ -73,6 +73,8 @@ italian-oral-exam/
 
 Pour un projet Supabase déjà utilisé, ne relancez pas `database/schema.sql` : il contient des instructions `DROP TABLE`. Dans l'application, ouvrez **Paramètres & Sécurité > Copier la migration Quiz**, collez le SQL dans **Supabase > SQL Editor > New query**, puis cliquez sur **Run**. Cette migration non destructive crée `public.quizzes` et `public.quiz_submissions`, leurs index et les politiques RLS nécessaires. Revenez ensuite dans l'application, enregistrez l'URL du projet et sa clé publique `anon` dans **Paramètres & Sécurité**, puis cliquez sur **Tester la connexion**. La clé `service_role` ne doit jamais être utilisée dans l'application web.
 
+Pour enregistrer les photos de profil des élèves sur Supabase, ouvrez **Paramètres & Sécurité > Guide de configuration Supabase**, copiez **Migration Photo**, puis exécutez-la dans **Supabase > SQL Editor**. Elle ajoute la colonne `students.avatar_url`, le bucket `student-avatars` (photos JPEG publiques, limitées à 2 Mo) et ses politiques de stockage, sans supprimer les données existantes. Ensuite, l'élève peut ajouter ou remplacer sa photo dans **Mes Identifiants** ; l'image est téléversée dans Supabase Storage et son URL est enregistrée sur la fiche de l'élève. Les politiques suivent l'accès anonyme déjà utilisé par l'application : les photos sont publiques et toute personne munie de la clé publique peut écrire dans le dossier d'avatars. N'y stockez pas d'images sensibles ; une authentification Supabase est nécessaire pour restreindre les téléversements à leur propriétaire.
+
 ### 4.2. Lancement du Backend Node.js
 ```bash
 cd backend

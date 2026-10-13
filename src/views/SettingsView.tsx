@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { supabaseService, ConnectionTestResult } from '../services/supabaseService';
-import { QUIZ_SUPABASE_MIGRATION_SQL, SUPABASE_SQL_SCHEMA } from '../data/supabaseSqlSchema';
+import { QUIZ_SUPABASE_MIGRATION_SQL, STUDENT_AVATAR_MIGRATION_SQL, SUPABASE_SQL_SCHEMA } from '../data/supabaseSqlSchema';
 import { authService, AUTHORIZED_EMAIL, DEFAULT_ACCESS_CODE, AuthUser } from '../services/authService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -38,6 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [supabaseKey, setSupabaseKey] = useState(initialConfig.anonKey);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedQuizMigration, setCopiedQuizMigration] = useState(false);
+  const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -110,6 +111,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
       setTimeout(() => setCopiedQuizMigration(false), 2500);
     } catch (e) {
       console.error('Erreur copie migration Quiz:', e);
+    }
+  };
+
+  const handleCopyAvatarMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(STUDENT_AVATAR_MIGRATION_SQL);
+      setCopiedAvatarMigration(true);
+      setTimeout(() => setCopiedAvatarMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration photo de profil:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration photo. Autorisez l’accès au presse-papiers puis réessayez.' });
     }
   };
 
@@ -405,6 +417,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           <div className="pt-1 flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={handleCopyAvatarMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-700 hover:bg-indigo-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedAvatarMigration ? '✓ Migration photo copiée !' : 'Copier la migration Photo (sans effacer les données)'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyQuizMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -420,7 +440,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               <span>{copiedSql ? '✓ Script SQL copié dans le presse-papier !' : 'Copier le script SQL complet (schema.sql)'}</span>
             </button>
             <span className="text-[11px] text-slate-500 italic">
-              Ajoute les 2 tables Quiz et résultats sur un projet existant, sans supprimer les autres données.
+              La migration Photo ajoute le bucket et la colonne nécessaires sans supprimer les données existantes.
             </span>
           </div>
         </div>

@@ -256,6 +256,7 @@ export const authService = {
         student_id: matchedStudent.student_id,
         student_number: matchedStudent.student_number,
         class_id: matchedStudent.class_id,
+        avatar: matchedStudent.avatar,
         loginAt: new Date().toISOString()
       };
 
@@ -457,6 +458,7 @@ export const authService = {
         student_id: matched.student_id,
         student_number: matched.student_number,
         class_id: matched.class_id,
+        avatar: matched.avatar,
         loginAt: new Date().toISOString()
       };
 

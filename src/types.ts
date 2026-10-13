@@ -16,6 +16,7 @@ export interface Student {
   first_name: string;
   last_name: string;
   student_number?: string | null;
+  avatar_url?: string | null;
   created_at: string;
   updated_at: string;
   class_name?: string;
@@ -188,4 +189,3 @@ export interface DailyGrade {
   average_score_20: number; // Note journalière moyenne sur 20
   submissions: QuizSubmission[];
 }
-
