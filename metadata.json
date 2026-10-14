@@ -1,5 +1,5 @@
 {
-  "name": "LinguaPercky",
+  "name": "PerckyLingua",
   "description": "Plateforme pédagogique pour apprendre l'italien avec des quiz, examens oraux et évaluations pour enseignants et étudiants.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

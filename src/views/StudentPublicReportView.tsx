@@ -139,8 +139,8 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
           {/* Header Banner */}
           <div className="text-center space-y-2">
             <img
-              src="/lingua-percky-logo.png"
-              alt="LinguaPercky"
+              src="/percky-lingua-logo.png"
+              alt="PerckyLingua"
               className="w-20 h-20 mx-auto rounded-2xl object-contain bg-white shadow-lg"
             />
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
@@ -148,7 +148,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
               <span>Portail Élève • Consultation Examen Oral</span>
             </div>
             <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              LinguaPercky • Esame orale di italiano
+              PerckyLingua • Esame orale di italiano
             </h1>
             <p className="text-xs sm:text-sm text-slate-300">
               {currentExam ? `${currentExam.title} (${currentExam.class_name || 'Classe'})` : 'Épreuve orale'}
@@ -216,7 +216,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
         </div>
 
         <div className="text-center text-[11px] text-slate-500 pt-8 pb-4">
-          Italian Oral Exam Manager • Portail officiel de consultation
+          PerckyLingua • Portail officiel de consultation
         </div>
       </div>
     );
@@ -464,7 +464,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
 
         {/* Footer Note */}
         <p className="text-center text-xs text-slate-400 no-print pb-8">
-          LinguaPercky • Portail d’évaluation de la langue italienne
+          PerckyLingua • Portail d’évaluation de la langue italienne
         </p>
       </div>
     </div>

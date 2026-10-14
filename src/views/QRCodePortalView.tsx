@@ -535,7 +535,7 @@ export const QRCodePortalView: React.FC<QRCodePortalViewProps> = ({
           <div className="max-w-2xl w-full text-center space-y-6">
             <div className="space-y-2">
               <span className="inline-block px-4 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-sm font-bold uppercase tracking-widest">
-                LinguaPercky • Esame orale di italiano
+                PerckyLingua • Esame orale di italiano
               </span>
               <h2 className="font-display text-3xl sm:text-4xl font-black text-white">
                 Scannez le Code QR avec votre smartphone

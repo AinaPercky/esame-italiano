@@ -546,14 +546,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
-              src="/lingua-percky-logo.png"
+              src="/percky-lingua-logo.png"
               alt=""
               className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-contain bg-white shadow-xs"
             />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-display font-bold text-base sm:text-xl text-slate-900 tracking-tight">
-                  LinguaPercky
+                  PerckyLingua
                 </span>
                 <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
                   Espace Étudiant
@@ -1504,7 +1504,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       </main>
 
       <footer className="text-center text-xs text-slate-400 py-4">
-        LinguaPercky • Apprendre et progresser en italien
+        PerckyLingua • Apprendre et progresser en italien
       </footer>
 
       {/* In-App Confirm Dialog */}

@@ -72,11 +72,11 @@ export const Header: React.FC<HeaderProps> = ({
               className="text-left font-display text-base sm:text-2xl font-bold tracking-tight text-slate-900 hover:text-amber-800 transition-colors flex items-center gap-1.5 sm:gap-2"
             >
               <img
-                src="/lingua-percky-logo.png"
+                src="/percky-lingua-logo.png"
                 alt=""
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain bg-white shadow-xs"
               />
-              <span>LinguaPercky</span>
+              <span>PerckyLingua</span>
             </button>
           </div>
 

@@ -56,7 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 items-center">
           <div className="p-6 md:p-8 md:col-span-7">
             <span className="text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded inline-block mb-3">
-              LinguaPercky • Imparare l’italiano insieme
+              PerckyLingua • Imparare l’italiano insieme
             </span>
             <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-2">
               Espace Professeur — Gestion et Évaluation

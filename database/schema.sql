@@ -1,6 +1,6 @@
 -- ==============================================================================
--- Italian Oral Exam Manager - PostgreSQL & Supabase Database Schema
--- Nom du projet : Italian Oral Exam Manager
+-- PerckyLingua - PostgreSQL & Supabase Database Schema
+-- Nom du projet : PerckyLingua
 -- ==============================================================================
 
 -- 1. Extensions nécessaires

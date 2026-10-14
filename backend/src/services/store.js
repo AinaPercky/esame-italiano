@@ -1,5 +1,5 @@
 /**
- * Service de stockage de données pour Italian Oral Exam Manager
+ * Service de stockage de données pour PerckyLingua
  * Prend en charge Supabase PostgreSQL ou stockage structuré en mémoire avec persistance
  */
 

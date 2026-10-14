@@ -1,4 +1,4 @@
-# LinguaPercky (Gestionnaire d'examens oraux d'italien)
+# PerckyLingua (Gestionnaire d'examens oraux d'italien)
 
 Application web professionnelle complète pour enseignants d'italien permettant d'organiser, évaluer et analyser les examens oraux en temps réel selon des grilles de rubriques prédéfinies ou personnalisées.
 

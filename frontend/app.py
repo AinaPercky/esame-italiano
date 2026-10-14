@@ -1,5 +1,5 @@
 """
-Italian Oral Exam Manager - Application Streamlit
+PerckyLingua - Application Streamlit
 Point d'entrée principal du frontend Python
 """
 
@@ -7,7 +7,7 @@ import streamlit as st
 from services.api_client import api
 
 st.set_page_config(
-    page_title="Italian Oral Exam Manager",
+    page_title="PerckyLingua",
     page_icon="🇮🇹",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -37,7 +37,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header">🇮🇹 Italian Oral Exam Manager</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🇮🇹 PerckyLingua</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Plateforme complète de gestion et d\'évaluation des examens oraux d\'italien pour enseignants</div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 1, 1])

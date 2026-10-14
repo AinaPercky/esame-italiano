@@ -1,5 +1,5 @@
 /**
- * Tests unitaires et d'intégration pour Italian Oral Exam Manager
+ * Tests unitaires et d'intégration pour PerckyLingua
  * Section 15 du cahier des charges
  */
 

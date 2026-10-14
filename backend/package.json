@@ -1,7 +1,7 @@
 {
-  "name": "italian-oral-exam-backend",
+  "name": "percky-lingua-backend",
   "version": "1.0.0",
-  "description": "Backend REST API Node.js & Express pour Italian Oral Exam Manager",
+  "description": "Backend REST API Node.js & Express pour PerckyLingua",
   "main": "src/app.js",
   "type": "commonjs",
   "scripts": {

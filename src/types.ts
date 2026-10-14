@@ -1,5 +1,5 @@
 /**
- * Modèles de données pour Italian Oral Exam Manager
+ * Modèles de données pour PerckyLingua
  */
 
 export interface ClassRoom {

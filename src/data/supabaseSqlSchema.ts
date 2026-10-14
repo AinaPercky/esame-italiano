@@ -2,7 +2,7 @@
  * Script SQL complet pour l'initialisation de Supabase PostgreSQL
  */
 export const SUPABASE_SQL_SCHEMA = `-- ==============================================================================
--- Italian Oral Exam Manager - PostgreSQL & Supabase Database Schema
+-- PerckyLingua - PostgreSQL & Supabase Database Schema
 -- ==============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

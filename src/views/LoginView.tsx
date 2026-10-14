@@ -192,13 +192,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {/* Emblem / Logo */}
         <div className="flex justify-center">
           <img
-            src="/lingua-percky-logo.png"
-            alt="LinguaPercky"
+            src="/percky-lingua-logo.png"
+            alt="PerckyLingua"
             className="w-36 h-36 sm:w-40 sm:h-40 rounded-3xl object-contain bg-white shadow-xl"
           />
         </div>
 
-        <h1 className="sr-only">LinguaPercky</h1>
+        <h1 className="sr-only">PerckyLingua</h1>
         <p className="mt-1 text-xs sm:text-sm text-slate-700">
           Le plaisir d’apprendre l’italien, à chaque étape
         </p>
@@ -489,7 +489,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          LinguaPercky • Lingua e Cultura Italiana
+          PerckyLingua • Lingua e Cultura Italiana
         </p>
       </div>
 

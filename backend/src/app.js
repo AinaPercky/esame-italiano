@@ -21,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'Italian Oral Exam Manager API',
+    service: 'PerckyLingua API',
     timestamp: new Date().toISOString()
   });
 });
@@ -44,7 +44,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Serveur Italian Oral Exam Manager démarré sur http://localhost:${PORT}`);
+    console.log(`Serveur PerckyLingua démarré sur http://localhost:${PORT}`);
   });
 }
 
