@@ -765,7 +765,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                       Quiz validé et corrigé avec succès !
                     </h3>
                     <p className="text-xs text-emerald-800">
-                      Votre note obtenue : <strong className="text-base font-mono font-extrabold">{lastSubmissionResult.score_20} / 20</strong> ({lastSubmissionResult.score}/{lastSubmissionResult.max_score} pts). Cette note est désormais cumulée dans votre moyenne journalière.
+                      Votre note obtenue : <strong className="text-base font-mono font-extrabold">{lastSubmissionResult.score_20} / 20</strong> ({lastSubmissionResult.score}/{lastSubmissionResult.max_score} pts). Ces points sont pris en compte dans votre note journalière pondérée.
                     </p>
                   </div>
                 </div>
@@ -1290,7 +1290,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 Notes Journalières Cumulées
               </h2>
               <p className="text-xs text-slate-500">
-                Chaque quiz effectué dans la journée est cumulé pour donner votre note moyenne journalière.
+                La note journalière est calculée à partir du total des points obtenus sur le total des points possibles, puis ramenée sur 20.
               </p>
             </div>
 

@@ -187,6 +187,6 @@ export interface DailyGrade {
   class_name?: string;
   date: string; // YYYY-MM-DD
   quizzes_count: number;
-  average_score_20: number; // Note journalière moyenne sur 20
+  average_score_20: number; // Total des points obtenus / total possible, ramené sur 20
   submissions: QuizSubmission[];
 }

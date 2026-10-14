@@ -3,6 +3,8 @@ import { Trophy, Medal, Award, TrendingUp, Calendar, Users, Flame, Star, Sparkle
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
 
+const ALL_DATES = 'all';
+
 function studentIdentityKey(student: Pick<Student, 'id'>): string {
   return student.id;
 }
@@ -42,18 +44,65 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     availableDates[0] || new Date().toISOString().split('T')[0]
   );
 
+  const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [selectedClassId, setSelectedClassId] = useState<string>(
     initialClassId || classes[0]?.id || ''
   );
 
+  const availableQuizzes = useMemo(() => {
+    const quizzesById = new Map<string, string>();
+    dailyGrades
+      .filter(grade =>
+        (selectedDate === ALL_DATES || grade.date === selectedDate) &&
+        (!selectedClassId || grade.class_id === selectedClassId)
+      )
+      .flatMap(grade => grade.submissions)
+      .forEach(submission => quizzesById.set(submission.quiz_id, submission.quiz_title));
+    return Array.from(quizzesById, ([id, title]) => ({ id, title }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [dailyGrades, selectedClassId, selectedDate]);
+
+  const effectiveQuizId = availableQuizzes.some(quiz => quiz.id === selectedQuizId)
+    ? selectedQuizId
+    : '';
+
   // Filtrer les dailyGrades pour la classe et la date sélectionnées
   const filteredGrades = useMemo(() => {
-    return dailyGrades.filter(dg => {
-      const matchClass = !selectedClassId || dg.class_id === selectedClassId;
-      const matchDate = !selectedDate || dg.date === selectedDate;
-      return matchClass && matchDate;
+    const submissionsByStudent = new Map<string, DailyGrade['submissions']>();
+    dailyGrades
+      .filter(grade =>
+        (!selectedClassId || grade.class_id === selectedClassId) &&
+        (selectedDate === ALL_DATES || grade.date === selectedDate)
+      )
+      .flatMap(grade => grade.submissions)
+      .filter(submission => !effectiveQuizId || submission.quiz_id === effectiveQuizId)
+      .forEach(submission => {
+        const key = `${submission.class_id}_${submission.student_id}`;
+        const submissions = submissionsByStudent.get(key) || [];
+        submissions.push(submission);
+        submissionsByStudent.set(key, submissions);
+      });
+
+    return Array.from(submissionsByStudent.values()).map(submissions => {
+      const first = submissions[0];
+      const totalScore = submissions.reduce((sum, submission) => sum + submission.score, 0);
+      const totalPossible = submissions.reduce((sum, submission) => sum + submission.max_score, 0);
+
+      return {
+        student_id: first.student_id,
+        student_name: first.student_name,
+        student_number: first.student_number,
+        class_id: first.class_id,
+        class_name: first.class_name,
+        date: selectedDate,
+        quizzes_count: submissions.length,
+        average_score_20: totalPossible > 0
+          ? Number(((totalScore / totalPossible) * 20).toFixed(2))
+          : 0,
+        submissions
+      };
     });
-  }, [dailyGrades, selectedClassId, selectedDate]);
+  }, [dailyGrades, selectedClassId, selectedDate, effectiveQuizId]);
 
   // Si on est dans une classe spécifique, on peut aussi lister les élèves qui n'ont pas encore de note aujourd'hui
   const activeClass = classes.find(c => c.id === selectedClassId);
@@ -65,7 +114,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     return students.find(student => student.id === studentId);
   };
 
-  // Construire le classement ordonné par note journalière décroissante
+  // Construire le classement ordonné par note décroissante
   const leaderboardEntries = useMemo(() => {
     const gradesByIdentity = new Map<string, DailyGrade>();
     filteredGrades.forEach(grade => {
@@ -165,7 +214,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-display font-bold text-lg sm:text-xl text-white">
-                  Leaderboard Journalier en Temps Réel
+                  {effectiveQuizId
+                    ? 'Classement du Quiz'
+                    : selectedDate === ALL_DATES
+                      ? 'Classement Cumulé — Tous les Quiz'
+                      : 'Classement Journalier Cumulé'}
                 </h3>
                 {isToday && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 animate-pulse">
@@ -174,7 +227,9 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 )}
               </div>
               <p className="text-xs text-amber-200/80 mt-0.5">
-                Classement officiel basé sur la moyenne des notes de quiz obtenues le jour même
+                {effectiveQuizId
+                  ? 'Classement des élèves selon leur note à ce quiz.'
+                  : 'Classement basé sur le total des points obtenus par rapport aux points possibles.'}
               </p>
             </div>
           </div>
@@ -206,7 +261,10 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
               </label>
               <select
                 value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedClassId(e.target.value);
+                  setSelectedQuizId('');
+                }}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
               >
                 {classes.map(c => (
@@ -221,15 +279,21 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
           {/* Date selector */}
           <div className={isStudentView ? 'sm:col-span-2' : ''}>
             <label className="text-[10px] font-bold uppercase tracking-wider text-amber-200 block mb-1">
-              Journée de cours
+              Période
             </label>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-amber-300 shrink-0" />
               <select
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setSelectedQuizId('');
+                }}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
               >
+                <option value={ALL_DATES} className="bg-slate-900 text-white">
+                  Toutes les dates
+                </option>
                 {availableDates.map(d => (
                   <option key={d} value={d} className="bg-slate-900 text-white">
                     {d === todayFormatted ? `Aujourd'hui (${d})` : d}
@@ -237,6 +301,28 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className={isStudentView ? 'sm:col-span-2' : ''}>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-amber-200 block mb-1">
+              Classement à afficher
+            </label>
+            <select
+              value={effectiveQuizId}
+              onChange={(e) => setSelectedQuizId(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
+            >
+              <option value="" className="bg-slate-900 text-white">
+                {selectedDate === ALL_DATES
+                  ? 'Tous les quiz, toutes les dates'
+                  : 'Cumul journalier de tous les quiz'}
+              </option>
+              {availableQuizzes.map(quiz => (
+                <option key={quiz.id} value={quiz.id} className="bg-slate-900 text-white">
+                  {quiz.title}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -246,7 +332,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         <div className="p-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Podium de la journée</span>
+            <span>{effectiveQuizId ? 'Podium du quiz' : 'Podium de la journée'}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -390,16 +476,19 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
             <Users className="w-4 h-4 text-slate-400" />
-            <span>Classement Général ({leaderboardEntries.graded.length} élève(s) classé(s))</span>
+            <span>
+              {effectiveQuizId ? 'Classement du quiz' : 'Classement général de la journée'}
+              {' '}({leaderboardEntries.graded.length} élève(s) classé(s))
+            </span>
           </div>
           <span className="text-[11px] text-slate-400 font-mono">
-            {selectedDate}
+            {selectedDate === ALL_DATES ? 'Toutes les dates' : selectedDate}
           </span>
         </div>
 
         {leaderboardEntries.graded.length === 0 && leaderboardEntries.pending.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            Aucun élève ni quiz enregistré pour cette date.
+            Aucun élève ni quiz enregistré pour cette période.
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -450,7 +539,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                         )}
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono">
-                        N° {dg.student_number || '1'} • {dg.quizzes_count} quiz validé(s)
+                        N° {dg.student_number || '1'} •                         {dg.quizzes_count} quiz pris en compte
                       </div>
                     </div>
                   </div>

@@ -1420,8 +1420,7 @@ export const dataService = {
   },
 
   /**
-   * Calcul des notes journalières :
-   * Chaque note de quiz se cumule pour donner une note journalière (moyenne des quiz du jour)
+   * Calcule la note journalière en pondérant chaque quiz selon son barème.
    */
   getDailyGrades(classId?: string, targetDate?: string): DailyGrade[] {
     this.checkAndApplyExpiredQuizzes();
@@ -1446,8 +1445,9 @@ export const dataService = {
     Object.keys(groups).forEach(key => {
       const subs = groups[key];
       const first = subs[0];
-      const sum = subs.reduce((acc, curr) => acc + curr.score_20, 0);
-      const avg = Number((sum / subs.length).toFixed(1));
+      const totalScore = subs.reduce((acc, curr) => acc + curr.score, 0);
+      const totalPossible = subs.reduce((acc, curr) => acc + curr.max_score, 0);
+      const avg = totalPossible > 0 ? Number(((totalScore / totalPossible) * 20).toFixed(2)) : 0;
 
       result.push({
         student_id: first.student_id,
@@ -1479,8 +1479,9 @@ export const dataService = {
     Object.keys(groups).forEach(date => {
       const subs = groups[date];
       const first = subs[0];
-      const sum = subs.reduce((acc, curr) => acc + curr.score_20, 0);
-      const avg = Number((sum / subs.length).toFixed(1));
+      const totalScore = subs.reduce((acc, curr) => acc + curr.score, 0);
+      const totalPossible = subs.reduce((acc, curr) => acc + curr.max_score, 0);
+      const avg = totalPossible > 0 ? Number(((totalScore / totalPossible) * 20).toFixed(2)) : 0;
 
       result.push({
         student_id: studentId,

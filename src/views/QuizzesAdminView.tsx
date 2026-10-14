@@ -687,11 +687,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   Notes Journalières Cumulées ({dailyGrades.length})
                 </h3>
               </div>
-              <span className="text-[11px] text-slate-400 font-mono">Moyenne des quiz du jour</span>
+              <span className="text-[11px] text-slate-400 font-mono">Points obtenus / points possibles × 20</span>
             </div>
 
             <p className="text-xs text-slate-500">
-              Chaque quiz passé dans la journée est automatiquement cumulé pour former la <strong>note journalière</strong> de l'élève.
+              La note journalière est calculée en divisant le total des points obtenus par le total des points possibles, puis en multipliant par 20.
             </p>
 
             {dailyGrades.length === 0 ? (
