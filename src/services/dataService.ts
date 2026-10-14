@@ -25,6 +25,7 @@ import {
 import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
+import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 
 interface AppState {
   classes: ClassRoom[];
@@ -70,6 +71,8 @@ function sanitizeState(appState: AppState): AppState {
       }
       return {
         ...s,
+        first_name: normalizeFirstName(s.first_name),
+        last_name: normalizeLastName(s.last_name),
         email: normalizeEmail(s.email),
         student_number: num || '1'
       };
@@ -342,7 +345,9 @@ export const dataService = {
   },
 
   async createStudent(firstName: string, lastName: string, classId: string, email: string, studentNumber?: string, id?: string): Promise<Student> {
-    if (!firstName.trim() || !lastName.trim() || !classId) {
+    const normalizedFirstName = normalizeFirstName(firstName);
+    const normalizedLastName = normalizeLastName(lastName);
+    if (!normalizedFirstName || !normalizedLastName || !classId) {
       throw new Error('Prénom, nom et classe sont obligatoires');
     }
     const normalizedEmail = normalizeEmail(email);
@@ -355,8 +360,8 @@ export const dataService = {
     const newStudent: Student = {
       id: studentId,
       class_id: classId,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
+      first_name: normalizedFirstName,
+      last_name: normalizedLastName,
       email: normalizedEmail,
       student_number: studentNumber?.trim() || null,
       created_at: new Date().toISOString(),
@@ -380,6 +385,8 @@ export const dataService = {
     const updatedStudent = {
       ...state.students[idx],
       ...updates,
+      first_name: normalizeFirstName(updates.first_name ?? state.students[idx].first_name),
+      last_name: normalizeLastName(updates.last_name ?? state.students[idx].last_name),
       email: normalizedEmail,
       updated_at: new Date().toISOString()
     };
@@ -410,8 +417,8 @@ export const dataService = {
 
     rawList.forEach((item, idx) => {
       const lineNum = idx + 1;
-      const firstName = (item.prenom || item.first_name || item.Prenom || '').trim();
-      const lastName = (item.nom || item.last_name || item.Nom || '').trim();
+      const firstName = normalizeFirstName((item.prenom || item.first_name || item.Prenom || '').toString());
+      const lastName = normalizeLastName((item.nom || item.last_name || item.Nom || '').toString());
       const email = normalizeEmail((item.email || item.courriel || item['e-mail'] || item.Email || '').toString());
       const studentNum = (item.numero || item.student_number || item.id || '').trim();
 

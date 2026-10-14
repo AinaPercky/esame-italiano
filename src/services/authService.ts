@@ -1,4 +1,5 @@
 import { isValidEmail, normalizeEmail } from '../utils/email';
+import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { ClassRoom, Student } from '../types';
 import { supabaseService } from './supabaseService';
 
@@ -276,8 +277,8 @@ export const authService = {
     password: string;
     existingStudentId?: string;
   }): Promise<{ success: boolean; error?: string; user?: AuthUser; confirmationRequired?: boolean }> {
-    const firstName = params.firstName.trim();
-    const lastName = params.lastName.trim();
+    const firstName = normalizeFirstName(params.firstName);
+    const lastName = normalizeLastName(params.lastName);
     const studentNumber = params.studentNumber.trim();
     const classId = params.classId.trim();
     const email = normalizeEmail(params.email);
@@ -345,7 +346,7 @@ export const authService = {
 
     currentUser = {
       ...currentUser,
-      name: `${updates.firstName || currentUser.name.split(' ')[0]} ${updates.lastName || currentUser.name.split(' ').slice(1).join(' ')}`.trim(),
+      name: `${normalizeFirstName(updates.firstName || currentUser.name.split(' ')[0])} ${normalizeLastName(updates.lastName || currentUser.name.split(' ').slice(1).join(' '))}`.trim(),
       student_number: updates.studentNumber || currentUser.student_number,
       avatar: updates.avatar !== undefined ? updates.avatar : currentUser.avatar
     };
