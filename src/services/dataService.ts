@@ -26,8 +26,6 @@ import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
 
-const STORAGE_KEY = 'esame_app_state_v4';
-
 interface AppState {
   classes: ClassRoom[];
   students: Student[];
@@ -107,28 +105,6 @@ function sanitizeState(appState: AppState): AppState {
 }
 
 function loadInitialState(): AppState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.classes && parsed.students && parsed.exams) {
-        if (!parsed.quizzes) parsed.quizzes = [...SEED_QUIZZES];
-        if (!parsed.quizSubmissions) parsed.quizSubmissions = [...SEED_QUIZ_SUBMISSIONS];
-        const legacyStudentIds = parsed.students
-          .filter((student: Student) => !isValidEmail(student.email || ''))
-          .map((student: Student) => student.id);
-        const sanitizedState = sanitizeState(parsed);
-        if (legacyStudentIds.length > 0) {
-          authService.clearStudentAccounts();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedState));
-        }
-        return sanitizedState;
-      }
-    }
-  } catch (e) {
-    console.warn('Erreur lecture localStorage, utilisation du jeu initial:', e);
-  }
-
   return sanitizeState({
     classes: [...SEED_CLASSES],
     students: [...SEED_STUDENTS],
@@ -144,12 +120,7 @@ function loadInitialState(): AppState {
 let state: AppState = loadInitialState();
 
 function persistState() {
-  try {
-    state = sanitizeState(state);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.error('Erreur écriture localStorage:', e);
-  }
+  state = sanitizeState(state);
 }
 
 export const dataService = {

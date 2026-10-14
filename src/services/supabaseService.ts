@@ -10,11 +10,6 @@ import {
   QuizSubmission
 } from '../types';
 
-const STORAGE_CONFIG_KEY = 'oral_exam_supabase_config';
-
-export const DEFAULT_SUPABASE_URL = 'https://lkgrthomtxbupquodgwc.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxrZ3J0aG9tdHhidXBxdW9kZ3djIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MDc0MzQsImV4cCI6MjEwNjE4MzQzNH0.qUXMGBpXkLNSaY-p7j9Dm2MuHbkFqBXseVJ3XNdatEg';
-
 export function cleanSupabaseUrl(url: string): string {
   if (!url) return '';
   return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
@@ -72,27 +67,12 @@ class SupabaseService {
   private quizWriteQueues = new Map<string, Promise<void>>();
 
   public loadConfig(): SupabaseConfig {
-    try {
-      const saved = localStorage.getItem(STORAGE_CONFIG_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.url && parsed.anonKey) {
-          return {
-            url: cleanSupabaseUrl(parsed.url),
-            anonKey: parsed.anonKey.trim()
-          };
-        }
-      }
-    } catch (e) {
-      console.warn('Erreur lecture config Supabase:', e);
-    }
-
     const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
     const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
     return {
-      url: cleanSupabaseUrl(envUrl || DEFAULT_SUPABASE_URL),
-      anonKey: (envKey || DEFAULT_SUPABASE_ANON_KEY).trim()
+      url: cleanSupabaseUrl(envUrl),
+      anonKey: envKey.trim()
     };
   }
 
@@ -101,11 +81,6 @@ class SupabaseService {
       url: cleanSupabaseUrl(config.url),
       anonKey: config.anonKey.trim()
     };
-    try {
-      localStorage.setItem(STORAGE_CONFIG_KEY, JSON.stringify(this.currentConfig));
-    } catch (e) {
-      console.error('Erreur sauvegarde config Supabase:', e);
-    }
     this.client = null; // Réinitialise l'instance client
   }
 
@@ -126,8 +101,8 @@ class SupabaseService {
       try {
         this.client = createClient(this.currentConfig.url, this.currentConfig.anonKey, {
           auth: {
-            persistSession: true,
-            autoRefreshToken: true
+            persistSession: false,
+            autoRefreshToken: false
           }
         });
       } catch (e) {
@@ -147,13 +122,22 @@ class SupabaseService {
       email: email.trim().toLowerCase(),
       password
     });
-    if (error) throw new Error('Adresse e-mail ou mot de passe incorrect.');
+    if (error) {
+      const details = error.message.toLowerCase();
+      if (details.includes('email not confirmed')) {
+        throw new Error('Cette adresse e-mail n’a pas encore été confirmée. Consultez le message envoyé par Supabase.');
+      }
+      if (details.includes('invalid login credentials')) {
+        throw new Error('Compte Supabase Auth introuvable ou mot de passe incorrect. Une fiche dans public.students ne crée pas automatiquement un compte de connexion.');
+      }
+      throw new Error(`Échec de connexion Supabase Auth : ${error.message}`);
+    }
     if (!data.user) throw new Error('Supabase n’a retourné aucun compte étudiant.');
 
     const { data: student, error: studentError } = await client
       .from('students')
       .select('id, class_id, first_name, last_name, email, student_number, created_at, updated_at')
-      .eq('email', email.trim().toLowerCase())
+      .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
       .maybeSingle();
     if (studentError) {
       await client.auth.signOut();

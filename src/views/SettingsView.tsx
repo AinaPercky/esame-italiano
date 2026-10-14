@@ -150,7 +150,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     });
     setActionMessage({
       type: 'success',
-      text: 'Configuration Supabase enregistrée avec succès.'
+      text: 'Configuration active pour cet onglet. Pour la conserver au déploiement, définissez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.'
     });
     setTimeout(() => setActionMessage(null), 3500);
   };

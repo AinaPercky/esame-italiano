@@ -94,22 +94,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [editFirstName, setEditFirstName] = useState<string>(currentUser.name.split(' ')[0] || '');
   const [editLastName, setEditLastName] = useState<string>(currentUser.name.split(' ').slice(1).join(' ') || '');
   const [editStudentNumber, setEditStudentNumber] = useState<string>(currentUser.student_number || '1');
-  const [editPhone, setEditPhone] = useState<string>('');
   const [editAvatar, setEditAvatar] = useState<string>(currentUser.avatar || '');
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-  useEffect(() => {
-    try {
-      const storedAccs = JSON.parse(localStorage.getItem('esame_registered_student_accounts_v2') || '[]');
-      const acc = storedAccs.find((a: any) => a.student_id === currentUser.student_id || a.email === currentUser.email);
-      if (acc) {
-        if (acc.phone) setEditPhone(acc.phone);
-        if (acc.avatar) setEditAvatar(acc.avatar);
-      }
-    } catch (e) {}
-  }, [currentUser]);
 
   // Données de l'élève
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -457,19 +445,20 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         )) || '';
       }
 
+      if (!studentRecord) throw new Error('Fiche élève indisponible. Vérifiez les droits de lecture Supabase puis rechargez la page.');
+      await dataService.updateStudent(studentRecord.id, {
+        first_name: editFirstName.trim(),
+        last_name: editLastName.trim(),
+        student_number: editStudentNumber.trim(),
+        avatar_url: savedAvatar || null
+      });
       const ok = authService.updateStudentProfile(studentId, {
         firstName: editFirstName,
         lastName: editLastName,
         studentNumber: editStudentNumber,
-        phone: editPhone,
         avatar: savedAvatar
       });
-
-      if (!ok) throw new Error('Impossible d’enregistrer le profil étudiant.');
-
-      if (studentRecord && savedAvatar !== cloudAvatar) {
-        await dataService.updateStudent(studentRecord.id, { avatar_url: savedAvatar || null });
-      }
+      if (!ok) throw new Error('Impossible de mettre à jour la session élève.');
 
       setProfileSuccessMsg(
         avatarChanged
@@ -1461,18 +1450,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   className="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-500 font-mono cursor-not-allowed"
                 />
                 <span className="text-[10px] text-slate-400">L'email sert d'identifiant de connexion unique.</span>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Numéro de téléphone</label>
-                <input
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="06 12 34 56 78"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                />
-                <span className="text-[10px] text-slate-400">Le numéro de téléphone peut également servir pour vous identifier.</span>
               </div>
 
               <div className="space-y-2">

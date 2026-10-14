@@ -30,29 +30,13 @@ export interface AuthUser {
   loginAt: string;
 }
 
-export interface StudentAccount {
-  id: string;
-  student_id: string;
-  first_name: string;
-  last_name: string;
-  student_number: string;
-  class_id: string;
-  email: string;
-  phone?: string;
-  avatar?: string;
-  password_hash: string;
-  created_at: string;
-}
-
-const STORAGE_USER_KEY = 'esame_auth_current_user_v2';
-const STORAGE_CODE_KEY = 'esame_admin_access_code_v2';
-const STORAGE_FAILED_KEY = 'esame_failed_attempts_v2';
-const STORAGE_STUDENTS_KEY = 'esame_registered_student_accounts_v2';
-
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 30000; // 30s
 
 const listeners: Array<() => void> = [];
+let currentUser: AuthUser | null = null;
+let accessCode = DEFAULT_ACCESS_CODE;
+let failedAttempts = { count: 0, lockedUntil: 0 };
 
 function notifyAuthChange() {
   listeners.forEach(fn => {
@@ -64,83 +48,20 @@ function notifyAuthChange() {
   });
 }
 
-const DEFAULT_STUDENT_ACCOUNTS: StudentAccount[] = [
-  {
-    id: 'acc_jean_01',
-    student_id: 'cc5a2fbf-5bd7-4b48-a9eb-79582de7ee8e',
-    first_name: 'Jean',
-    last_name: 'Rakoto',
-    student_number: '1',
-    class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae',
-    email: 'jean.rakoto@eleve.esame.fr',
-    password_hash: '1234',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'acc_marie_02',
-    student_id: '14a6ad2b-b2a2-41d9-a3ff-46ba9dce78f5',
-    first_name: 'Marie',
-    last_name: 'Rabe',
-    student_number: '2',
-    class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae',
-    email: 'marie.rabe@eleve.esame.fr',
-    password_hash: '1234',
-    created_at: new Date().toISOString()
-  }
-];
-
-function getStoredStudentAccounts(): StudentAccount[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_STUDENTS_KEY);
-    if (!raw) {
-      saveStudentAccounts(DEFAULT_STUDENT_ACCOUNTS);
-      return [...DEFAULT_STUDENT_ACCOUNTS];
-    }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [...DEFAULT_STUDENT_ACCOUNTS];
-  } catch {
-    return [...DEFAULT_STUDENT_ACCOUNTS];
-  }
-}
-
-function saveStudentAccounts(accounts: StudentAccount[]) {
-  try {
-    localStorage.setItem(STORAGE_STUDENTS_KEY, JSON.stringify(accounts));
-  } catch (e) {
-    console.error('Erreur sauvegarde comptes étudiants:', e);
-  }
-}
-
 export const authService = {
   removeStudentAccountByEmail(email: string): void {
-    const normalizedEmail = normalizeEmail(email);
-    const accounts = getStoredStudentAccounts();
-    saveStudentAccounts(accounts.filter(account => normalizeEmail(account.email) !== normalizedEmail));
-
-    const currentUser = this.getCurrentUser();
-    if (currentUser?.role === 'student' && normalizeEmail(currentUser.email) === normalizedEmail) {
+    if (currentUser?.role === 'student' && normalizeEmail(currentUser.email) === normalizeEmail(email)) {
       this.logout();
     }
   },
 
   removeStudentAccountsForClass(classId: string): void {
-    const accounts = getStoredStudentAccounts();
-    saveStudentAccounts(accounts.filter(account => account.class_id !== classId));
-
-    const currentUser = this.getCurrentUser();
     if (currentUser?.role === 'student' && currentUser.class_id === classId) {
-      try {
-        localStorage.removeItem(STORAGE_USER_KEY);
-      } catch (error) {
-        console.error('Impossible de fermer la session de l’élève supprimé :', error);
-      }
-      notifyAuthChange();
+      this.logout();
     }
   },
 
   clearStudentAccounts(): void {
-    saveStudentAccounts([]);
-    const currentUser = this.getCurrentUser();
     if (currentUser?.role === 'student') {
       this.logout();
     }
@@ -149,22 +70,6 @@ export const authService = {
   synchronizeStudentAccountsWithRoster(students: Student[], classes: ClassRoom[]): void {
     const studentsByEmail = new Map(students.map(student => [normalizeEmail(student.email), student]));
     const classNamesById = new Map(classes.map(classroom => [classroom.id, classroom.name]));
-    const accounts = getStoredStudentAccounts()
-      .flatMap(account => {
-        const student = studentsByEmail.get(normalizeEmail(account.email));
-        if (!student) return [];
-        return [{
-          ...account,
-          student_id: student.id,
-          first_name: student.first_name,
-          last_name: student.last_name,
-          student_number: student.student_number || '',
-          class_id: student.class_id
-        }];
-      });
-    saveStudentAccounts(accounts);
-
-    const currentUser = this.getCurrentUser();
     if (currentUser?.role === 'student') {
       const student = studentsByEmail.get(normalizeEmail(currentUser.email));
       if (!student) {
@@ -179,12 +84,8 @@ export const authService = {
         class_name: classNamesById.get(student.class_id) || currentUser.class_name,
         name: `${student.first_name} ${student.last_name}`
       };
-      try {
-        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
-        notifyAuthChange();
-      } catch (error) {
-        console.error('Impossible de synchroniser la session élève avec son adresse e-mail :', error);
-      }
+      currentUser = updatedUser;
+      notifyAuthChange();
     }
   },
 
@@ -201,83 +102,42 @@ export const authService = {
   },
 
   getAccessCode(): string {
-    try {
-      const stored = localStorage.getItem(STORAGE_CODE_KEY);
-      return stored && stored.trim() ? stored : DEFAULT_ACCESS_CODE;
-    } catch {
-      return DEFAULT_ACCESS_CODE;
-    }
+    return accessCode;
   },
 
   setAccessCode(newCode: string): boolean {
     if (!newCode || newCode.trim().length < 4) return false;
-    try {
-      localStorage.setItem(STORAGE_CODE_KEY, newCode.trim());
-      return true;
-    } catch {
-      return false;
-    }
+    accessCode = newCode.trim();
+    return true;
   },
 
   resetAccessCodeToDefault(): void {
-    try {
-      localStorage.removeItem(STORAGE_CODE_KEY);
-    } catch (e) {
-      console.warn('Could not reset access code', e);
-    }
+    accessCode = DEFAULT_ACCESS_CODE;
   },
 
   getLockoutStatus(): { isLocked: boolean; remainingSeconds: number } {
-    try {
-      const raw = localStorage.getItem(STORAGE_FAILED_KEY);
-      if (!raw) return { isLocked: false, remainingSeconds: 0 };
-      const data: { count: number; lockedUntil: number } = JSON.parse(raw);
-      const now = Date.now();
-      if (data.lockedUntil && data.lockedUntil > now) {
-        return { isLocked: true, remainingSeconds: Math.ceil((data.lockedUntil - now) / 1000) };
-      }
-      return { isLocked: false, remainingSeconds: 0 };
-    } catch {
-      return { isLocked: false, remainingSeconds: 0 };
+    const now = Date.now();
+    if (failedAttempts.lockedUntil > now) {
+      return { isLocked: true, remainingSeconds: Math.ceil((failedAttempts.lockedUntil - now) / 1000) };
     }
+    return { isLocked: false, remainingSeconds: 0 };
   },
 
   recordFailedAttempt(): { isLocked: boolean; remainingSeconds: number; attemptsLeft: number } {
-    try {
-      const raw = localStorage.getItem(STORAGE_FAILED_KEY);
-      let data: { count: number; lockedUntil: number } = raw ? JSON.parse(raw) : { count: 0, lockedUntil: 0 };
-      data.count += 1;
-      const now = Date.now();
-
-      if (data.count >= MAX_FAILED_ATTEMPTS) {
-        data.lockedUntil = now + LOCKOUT_DURATION_MS;
-        localStorage.setItem(STORAGE_FAILED_KEY, JSON.stringify(data));
-        return { isLocked: true, remainingSeconds: Math.ceil(LOCKOUT_DURATION_MS / 1000), attemptsLeft: 0 };
-      }
-
-      localStorage.setItem(STORAGE_FAILED_KEY, JSON.stringify(data));
-      return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS - data.count };
-    } catch {
-      return { isLocked: false, remainingSeconds: 0, attemptsLeft: 1 };
+    failedAttempts.count += 1;
+    if (failedAttempts.count >= MAX_FAILED_ATTEMPTS) {
+      failedAttempts.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+      return { isLocked: true, remainingSeconds: Math.ceil(LOCKOUT_DURATION_MS / 1000), attemptsLeft: 0 };
     }
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS - failedAttempts.count };
   },
 
   resetFailedAttempts(): void {
-    try {
-      localStorage.removeItem(STORAGE_FAILED_KEY);
-    } catch (e) {
-      console.warn('Could not reset failed attempts', e);
-    }
+    failedAttempts = { count: 0, lockedUntil: 0 };
   },
 
   getCurrentUser(): AuthUser | null {
-    try {
-      const stored = localStorage.getItem(STORAGE_USER_KEY);
-      if (!stored) return null;
-      return JSON.parse(stored);
-    } catch {
-      return null;
-    }
+    return currentUser;
   },
 
   isAuthenticated(): boolean {
@@ -315,65 +175,33 @@ export const authService = {
       return this.loginAdmin(cleanId, passwordOrCode.trim());
     }
 
-    // New student accounts authenticate through Supabase so they work across devices.
-    const accounts = getStoredStudentAccounts();
-    const matchedStudent = accounts.find(account => normalizeEmail(account.email) === cleanId);
-    let cloudError: string | undefined;
-    if (supabaseService.isConfigured()) {
-      try {
-        const student = await supabaseService.authenticateStudent(cleanId, passwordOrCode);
-        const user: AuthUser = {
-          id: `session_${student.id}`,
-          email: student.email,
-          name: `${student.first_name} ${student.last_name}`,
-          role: 'student',
-          student_id: student.id,
-          student_number: student.student_number,
-          class_id: student.class_id,
-          class_name: student.class_name,
-          avatar: student.avatar_url || undefined,
-          loginAt: new Date().toISOString()
-        };
-        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-        notifyAuthChange();
-        return { success: true, user };
-      } catch (error) {
-        cloudError = error instanceof Error ? error.message : 'Connexion Supabase impossible.';
-      }
+    if (!supabaseService.isConfigured()) {
+      return { success: false, error: 'Supabase n’est pas configuré. Vérifiez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.' };
     }
 
-    // Backward compatibility for accounts registered before Supabase Auth was enabled.
-    if (matchedStudent) {
-      if (matchedStudent.password_hash !== passwordOrCode.trim()) {
-        return { success: false, error: 'Mot de passe incorrect.' };
-      }
-
+    try {
+      const student = await supabaseService.authenticateStudent(cleanId, passwordOrCode);
       const user: AuthUser = {
-        id: matchedStudent.id,
-        email: matchedStudent.email,
-        name: `${matchedStudent.first_name} ${matchedStudent.last_name}`,
+        id: `session_${student.id}`,
+        email: student.email,
+        name: `${student.first_name} ${student.last_name}`,
         role: 'student',
-        student_id: matchedStudent.student_id,
-        student_number: matchedStudent.student_number,
-        class_id: matchedStudent.class_id,
-        avatar: matchedStudent.avatar,
+        student_id: student.id,
+        student_number: student.student_number,
+        class_id: student.class_id,
+        class_name: student.class_name,
+        avatar: student.avatar_url || undefined,
         loginAt: new Date().toISOString()
       };
-
-      try {
-        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-      } catch (e) {
-        console.warn('Erreur stockage session:', e);
-      }
-
+      currentUser = user;
       notifyAuthChange();
       return { success: true, user };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connexion Supabase impossible.'
+      };
     }
-
-    return {
-      success: false,
-      error: cloudError || 'Adresse e-mail ou mot de passe non reconnu. Veuillez vérifier ou créer un compte.'
-    };
   },
 
   /**
@@ -430,12 +258,7 @@ export const authService = {
       loginAt: new Date().toISOString()
     };
 
-    try {
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-    } catch (e) {
-      console.warn('Erreur stockage session admin:', e);
-    }
-
+    currentUser = user;
     notifyAuthChange();
     return { success: true, user };
   },
@@ -450,7 +273,6 @@ export const authService = {
     classId: string;
     className?: string;
     email: string;
-    phone?: string;
     password: string;
     existingStudentId?: string;
   }): Promise<{ success: boolean; error?: string; user?: AuthUser; confirmationRequired?: boolean }> {
@@ -459,7 +281,6 @@ export const authService = {
     const studentNumber = params.studentNumber.trim();
     const classId = params.classId.trim();
     const email = normalizeEmail(params.email);
-    const phone = params.phone ? params.phone.trim() : undefined;
     const password = params.password;
 
     if (!firstName || !lastName) {
@@ -502,7 +323,7 @@ export const authService = {
           class_name: params.className || 'Classe',
           loginAt: new Date().toISOString()
         };
-        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+        currentUser = user;
         notifyAuthChange();
         return { success: true, user };
       } catch (error) {
@@ -513,165 +334,21 @@ export const authService = {
       }
     }
 
-    const accounts = getStoredStudentAccounts();
-    const existing = accounts.find(account => normalizeEmail(account.email) === email);
-    if (existing) {
-      return { success: false, error: 'Cette adresse possède déjà un compte. Connectez-vous avec votre mot de passe.' };
-    }
-
-    const newAccount: StudentAccount = {
-      id: `acc_${Date.now()}`,
-      student_id: studentId,
-      first_name: firstName,
-      last_name: lastName,
-      student_number: studentNumber,
-      class_id: classId,
-      email,
-      phone,
-      password_hash: password, // Stockage local simple
-      created_at: new Date().toISOString()
-    };
-
-    accounts.push(newAccount);
-    saveStudentAccounts(accounts);
-
-    const user: AuthUser = {
-      id: newAccount.id,
-      email: newAccount.email,
-      name: `${firstName} ${lastName}`,
-      role: 'student',
-      student_id: studentId,
-      student_number: studentNumber,
-      class_id: classId,
-      class_name: params.className || 'Classe',
-      loginAt: new Date().toISOString()
-    };
-
-    try {
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-    } catch (e) {
-      console.warn('Erreur stockage session étudiant:', e);
-    }
-
-    notifyAuthChange();
-    return { success: true, user };
-  },
-
-  /**
-   * Connexion Étudiant par Adresse Email + Mot de passe
-   */
-  loginStudent(email: string, password: string): { success: boolean; error?: string; user?: AuthUser } {
-    const cleanEmail = normalizeEmail(email || '');
-    const cleanPass = (password || '').trim();
-
-    if (!cleanEmail) {
-      return { success: false, error: 'Veuillez saisir votre adresse email.' };
-    }
-
-    const accounts = getStoredStudentAccounts();
-    const matched = accounts.find(a => a.email.toLowerCase() === cleanEmail);
-
-    if (matched) {
-      if (cleanPass && matched.password_hash !== cleanPass) {
-        return { success: false, error: 'Mot de passe incorrect.' };
-      }
-
-      const user: AuthUser = {
-        id: matched.id,
-        email: matched.email,
-        name: `${matched.first_name} ${matched.last_name}`,
-        role: 'student',
-        student_id: matched.student_id,
-        student_number: matched.student_number,
-        class_id: matched.class_id,
-        avatar: matched.avatar,
-        loginAt: new Date().toISOString()
-      };
-
-      try {
-        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-      } catch (e) {
-        console.warn('Erreur stockage session étudiant:', e);
-      }
-
-      notifyAuthChange();
-      return { success: true, user };
-    }
-
     return {
       success: false,
-      error: 'Aucun compte étudiant associé à cette adresse email. Veuillez créer un compte ci-dessous.'
+      error: 'Supabase n’est pas configuré. La création de compte étudiant nécessite Supabase Auth.'
     };
   },
 
-  /**
-   * Connexion directe pour un élève existant de la base de données (Démo / Accès direct)
-   */
-  loginAsRosterStudent(student: { id: string; first_name: string; last_name: string; email: string; student_number?: string | null; class_id: string; class_name?: string }): AuthUser {
-    const user: AuthUser = {
-      id: `session_${student.id}`,
-      email: student.email,
-      name: `${student.first_name} ${student.last_name}`,
-      role: 'student',
-      student_id: student.id,
-      student_number: student.student_number || '1',
-      class_id: student.class_id,
-      class_name: student.class_name,
-      loginAt: new Date().toISOString()
-    };
+  updateStudentProfile(studentId: string, updates: { firstName?: string; lastName?: string; studentNumber?: string; avatar?: string }): boolean {
+    if (!currentUser || currentUser.role !== 'student' || currentUser.student_id !== studentId) return false;
 
-    try {
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
-    } catch (e) {
-      console.warn('Erreur stockage session:', e);
-    }
-
-    notifyAuthChange();
-    return user;
-  },
-
-  /**
-   * Mise à jour des identifiants par l'étudiant lui-même dans son espace
-   */
-  updateStudentProfile(studentId: string, updates: { firstName?: string; lastName?: string; studentNumber?: string; email?: string; phone?: string; avatar?: string }): boolean {
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || currentUser.role !== 'student') return false;
-
-    const accounts = getStoredStudentAccounts();
-    const idx = accounts.findIndex(a => a.student_id === studentId || a.id === currentUser.id);
-    if (updates.email) {
-      const normalizedEmail = normalizeEmail(updates.email);
-      if (!isValidEmail(normalizedEmail)) return false;
-      if (accounts.some(account =>
-        account.id !== currentUser.id &&
-        normalizeEmail(account.email) === normalizedEmail
-      )) return false;
-    }
-    if (idx !== -1) {
-      if (updates.firstName) accounts[idx].first_name = updates.firstName.trim();
-      if (updates.lastName) accounts[idx].last_name = updates.lastName.trim();
-      if (updates.studentNumber) accounts[idx].student_number = updates.studentNumber.trim();
-      if (updates.email) accounts[idx].email = normalizeEmail(updates.email);
-      if (updates.phone !== undefined) accounts[idx].phone = updates.phone.trim();
-      if (updates.avatar !== undefined) accounts[idx].avatar = updates.avatar.trim();
-      saveStudentAccounts(accounts);
-    }
-
-    // Mettre à jour l'utilisateur courant en session
-    const updatedUser: AuthUser = {
+    currentUser = {
       ...currentUser,
-      name: `${updates.firstName || accounts[idx]?.first_name || currentUser.name.split(' ')[0]} ${updates.lastName || accounts[idx]?.last_name || currentUser.name.split(' ')[1] || ''}`.trim(),
-      email: updates.email || currentUser.email,
+      name: `${updates.firstName || currentUser.name.split(' ')[0]} ${updates.lastName || currentUser.name.split(' ').slice(1).join(' ')}`.trim(),
       student_number: updates.studentNumber || currentUser.student_number,
-      avatar: updates.avatar !== undefined ? updates.avatar : (accounts[idx]?.avatar || currentUser.avatar)
+      avatar: updates.avatar !== undefined ? updates.avatar : currentUser.avatar
     };
-
-    try {
-      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
-    } catch (e) {
-      console.error(e);
-    }
-
     notifyAuthChange();
     return true;
   },
@@ -680,11 +357,7 @@ export const authService = {
     supabaseService.signOutStudent().catch(error => {
       console.error('Déconnexion Supabase impossible :', error);
     });
-    try {
-      localStorage.removeItem(STORAGE_USER_KEY);
-    } catch (e) {
-      console.warn('Could not clear auth session from localStorage', e);
-    }
+    currentUser = null;
     notifyAuthChange();
   },
 
