@@ -218,13 +218,13 @@ CREATE POLICY "Exam pass order full access" ON exam_pass_order FOR ALL USING (tr
 CREATE POLICY "Quizzes full access" ON quizzes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Quiz submissions full access" ON quiz_submissions FOR ALL USING (true) WITH CHECK (true);
 
--- Stockage public des photos de profil des élèves (taille maximale 2 Mo)
+-- Stockage public des photos de profil des élèves (taille maximale 500 Ko)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
     'student-avatars',
     'student-avatars',
     TRUE,
-    2097152,
+    512000,
     ARRAY['image/jpeg']::text[]
 )
 ON CONFLICT (id) DO UPDATE

@@ -35,6 +35,7 @@ import { StudentPublicReportView } from './StudentPublicReportView';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
+import { compressAvatarImage } from '../utils/avatarImage';
 
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
@@ -494,19 +495,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setProfileErrorMsg(null);
     const imageUrl = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => {
+    image.onload = async () => {
       try {
-        const maxDimension = 512;
-        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Canvas indisponible');
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        setEditAvatar(canvas.toDataURL('image/jpeg', 0.82));
-      } catch {
-        setProfileErrorMsg('Impossible de traiter cette image. Essayez un autre fichier.');
+        setEditAvatar(await compressAvatarImage(image));
+      } catch (error) {
+        setProfileErrorMsg(error instanceof Error ? error.message : 'Impossible de traiter cette image. Essayez un autre fichier.');
       } finally {
         URL.revokeObjectURL(imageUrl);
       }
@@ -1484,7 +1477,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     )}
                   </div>
                 </div>
-                <span className="text-[10px] text-slate-400">Formats image acceptés. Taille maximale : 5 Mo. La photo est redimensionnée avant son enregistrement.</span>
+                <span className="text-[10px] text-slate-400">Formats image acceptés. Fichier source jusqu’à 5 Mo ; la photo est compressée à 500 Ko maximum avant l’enregistrement.</span>
               </div>
 
               <div className="pt-2">

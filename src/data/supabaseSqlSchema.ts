@@ -173,7 +173,7 @@ VALUES (
     'student-avatars',
     'student-avatars',
     TRUE,
-    2097152,
+    512000,
     ARRAY['image/jpeg']::text[]
 )
 ON CONFLICT (id) DO UPDATE

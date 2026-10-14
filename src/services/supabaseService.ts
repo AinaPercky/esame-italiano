@@ -502,8 +502,8 @@ class SupabaseService {
       const imageResponse = await fetch(imageDataUrl);
       if (!imageResponse.ok) throw new Error("Impossible de préparer la photo sélectionnée.");
       const imageBlob = await imageResponse.blob();
-      if (imageBlob.size > 2 * 1024 * 1024) {
-        throw new Error('La photo redimensionnée dépasse la limite Supabase de 2 Mo.');
+      if (imageBlob.size > 500 * 1024) {
+        throw new Error('La photo dépasse la limite autorisée de 500 Ko. Sélectionnez-la à nouveau pour la compresser.');
       }
 
       const { error: uploadError } = await client.storage
