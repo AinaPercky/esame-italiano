@@ -3,7 +3,6 @@ import {
   Lock, 
   Mail, 
   KeyRound, 
-  ShieldCheck, 
   AlertCircle, 
   ArrowRight, 
   CheckCircle2, 
@@ -199,20 +198,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         <h1 className="sr-only">PerckyLingua</h1>
-        <p className="mt-1 text-xs sm:text-sm text-slate-700">
-          Le plaisir d’apprendre l’italien, à chaque étape
-        </p>
-
-        {/* Security Badge */}
-        <div className="mt-3 flex justify-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Portail Unique • Redirection Automatique selon le Profil</span>
-          </span>
-        </div>
       </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="bg-white py-6 sm:py-7 px-5 sm:px-10 shadow-xl rounded-3xl border border-slate-200">
           
           {/* Error Message */}
@@ -303,26 +291,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </button>
               </div>
 
-              {/* Notice explicative automatique */}
               <div className="pt-3 border-t border-slate-200 text-center space-y-2">
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Le système identifie automatiquement votre rôle (<strong>Enseignant</strong> ou <strong>Étudiant</strong>) et charge votre espace approprié.
-                </p>
-
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode('register');
-                      setErrorMessage(null);
-                      setSuccessMessage(null);
-                    }}
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline cursor-pointer inline-flex items-center gap-1"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>Nouvel élève ? Créer mon compte étudiant</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode('register');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Nouvel élève ? Créer mon compte étudiant</span>
+                </button>
               </div>
 
             </form>
