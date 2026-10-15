@@ -1181,14 +1181,20 @@ export const dataService = {
   getPublicQuiz(publicIdOrId: string): Quiz | null {
     this.checkAndApplyExpiredQuizzes();
     const clean = (publicIdOrId || '').trim();
+    if (!clean) return null;
+
+    // Chercher par public_id exact ou id exact parmi les quiz explicitement publics
     let q = (state.quizzes || []).find(x => 
-      (x.public_id === clean || x.id === clean) || (clean && x.public_id?.includes(clean))
+      (x.public_id === clean || x.id === clean) && Boolean(x.is_public)
     );
-    if (!q && (state.quizzes || []).length > 0) {
-      // Pick the first quiz as public fallback
-      q = { ...(state.quizzes || [])[0], is_public: true };
+
+    // Si non trouvé avec is_public strict, chercher par ID/public_id exact (au cas où l'état synchro met du temps)
+    if (!q) {
+      q = (state.quizzes || []).find(x => x.public_id === clean || x.id === clean);
     }
+
     if (!q) return null;
+
     const classIds = q.class_ids || [q.class_id];
     const firstClassId = classIds[0];
     const cls = state.classes.find(c => c.id === firstClassId);
