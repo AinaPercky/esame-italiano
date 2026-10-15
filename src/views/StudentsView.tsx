@@ -33,6 +33,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [classFilter, setClassFilter] = useState(initialClassFilter || '');
+  const [validationFilter, setValidationFilter] = useState<'pending' | 'approved' | 'rejected' | ''>('');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,12 +60,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   // Filtered Students
   const filteredStudents = students.filter(s => {
     const matchesClass = !classFilter || s.class_id === classFilter;
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.student_number && s.student_number.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesClass && matchesSearch;
+    const matchesValidationStatus = !validationFilter || s.validation_status === validationFilter;
+    return matchesClass && matchesSearch && matchesValidationStatus;
   });
 
   const handleOpenAdd = () => {
@@ -243,6 +245,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             ))}
           </select>
         </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs text-slate-500 whitespace-nowrap hidden xs:inline">Statut :</span>
+          <select
+            value={validationFilter}
+            onChange={(e) => setValidationFilter(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[40px]"
+          >
+            <option value="">Tous les statuts</option>
+            <option value="pending">En attente</option>
+            <option value="approved">Approuvé</option>
+            <option value="rejected">Rejeté</option>
+          </select>
+        </div>
       </div>
 
       {/* Mobile Card List (< sm) */}
@@ -265,6 +281,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     </span>
                     <span className="font-mono text-[11px] text-slate-400">
                       {s.student_number || 'Sans matricule'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      s.validation_status === 'pending'
+                        ? 'bg-amber-100 text-amber-800'
+                        : s.validation_status === 'rejected'
+                          ? 'bg-rose-100 text-rose-800'
+                          : s.validation_status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {s.validation_status === 'pending' ? 'En attente' : s.validation_status === 'approved' ? 'Approuvé' : s.validation_status === 'rejected' ? 'Rejeté' : 'Non défini'}
                     </span>
                   </div>
                 </div>
@@ -322,6 +349,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 <th className="py-3 px-4">Adresse e-mail</th>
                 <th className="py-3 px-4">Matricule</th>
                 <th className="py-3 px-4">Classe</th>
+                <th className="py-3 px-4">Statut</th>
                 <th className="py-3 px-4 text-center">Historique</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -345,6 +373,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     <td className="py-3 px-4">
                       <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                         {s.class_name}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        s.validation_status === 'pending'
+                          ? 'bg-amber-100 text-amber-800'
+                          : s.validation_status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800'
+                            : s.validation_status === 'approved'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {s.validation_status === 'pending' ? 'En attente' : s.validation_status === 'approved' ? 'Approuvé' : s.validation_status === 'rejected' ? 'Rejeté' : 'Non défini'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -381,7 +422,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 text-sm">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
                     Aucun élève ne correspond à vos critères de recherche.
                   </td>
                 </tr>

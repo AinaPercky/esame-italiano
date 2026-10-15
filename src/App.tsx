@@ -30,7 +30,13 @@ export default function App() {
   const [isPublicMode, setIsPublicMode] = useState<boolean>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
-    return view === 'student' || view === 'student-portal' || view === 'portal';
+    return view === 'student' || view === 'student-portal' || view === 'portal' || view === 'public-quiz';
+  });
+
+  // Public quiz state
+  const [publicQuizId, setPublicQuizId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('id') || null;
   });
   
   // App data state
@@ -89,8 +95,23 @@ export default function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const studentViewExamId = urlParams.get('exam') || '';
   const studentViewStudentId = urlParams.get('student') || '';
+  const publicQuizViewId = urlParams.get('id') || '';
 
   if (isPublicMode) {
+    // Public quiz view
+    if (urlParams.get('view') === 'public-quiz' && publicQuizViewId) {
+      return (
+        <PublicQuizView
+          quizId={publicQuizViewId}
+          onBackToApp={() => {
+            setIsPublicMode(false);
+            window.history.replaceState({}, '', window.location.pathname);
+          }}
+        />
+      );
+    }
+
+    // Student public report view (QR code scan)
     return (
       <StudentPublicReportView
         examId={studentViewExamId || undefined}

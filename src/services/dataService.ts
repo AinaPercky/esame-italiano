@@ -365,7 +365,8 @@ export const dataService = {
       email: normalizedEmail,
       student_number: studentNumber?.trim() || null,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      validation_status: 'pending' // Nouveaux inscrits en attente de validation
     };
     await supabaseService.saveStudent(newStudent);
     state.students.push(newStudent);
@@ -460,7 +461,8 @@ export const dataService = {
         email,
         student_number: studentNum || null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        validation_status: 'pending' // Nouveaux inscrits en attente de validation par défaut
       };
 
       imported.push(newStudent);
@@ -1118,10 +1120,18 @@ export const dataService = {
     this.checkAndApplyExpiredQuizzes();
     let list = state.quizzes || [];
     if (classId) {
-      list = list.filter(q => q.class_id === classId);
+      // Filter quizzes that belong to the specified class (check class_ids array, fallback to class_id)
+      list = list.filter(q => {
+        // Check new class_ids array first, then fall back to class_id for backward compatibility
+        const classIds = q.class_ids || [q.class_id];
+        return classIds.includes(classId);
+      });
     }
     return list.map(q => {
-      const cls = state.classes.find(c => c.id === q.class_id);
+      // For display, show the first class name (or we could show all)
+      const classIds = q.class_ids || [q.class_id];
+      const firstClassId = classIds[0];
+      const cls = state.classes.find(c => c.id === firstClassId);
       return {
         ...q,
         class_name: cls ? cls.name : 'Classe'
@@ -1133,7 +1143,10 @@ export const dataService = {
     this.checkAndApplyExpiredQuizzes();
     const q = (state.quizzes || []).find(x => x.id === id);
     if (!q) return null;
-    const cls = state.classes.find(c => c.id === q.class_id);
+    // For display, show the first class name (or we could show all)
+    const classIds = q.class_ids || [q.class_id];
+    const firstClassId = classIds[0];
+    const cls = state.classes.find(c => c.id === firstClassId);
     return {
       ...q,
       class_name: cls ? cls.name : 'Classe'
@@ -1144,16 +1157,25 @@ export const dataService = {
     title: string;
     description?: string;
     class_id: string;
+    class_ids?: string[];
     duration_minutes: number;
     questions: QuizQuestion[];
+    is_public?: boolean;
   }): Quiz {
     const totalPoints = (data.questions || []).reduce((acc, curr) => acc + (Number(curr.points) || 0), 0) || 20;
     const cls = state.classes.find(c => c.id === data.class_id);
+
+    // Handle class_ids for backward compatibility
+    const finalClassIds = data.class_ids || [data.class_id];
+
     const newQuiz: Quiz = {
       id: generateUUID(),
+      public_id: data.is_public ? generateUUID() : undefined,
+      is_public: data.is_public ?? false,
       title: data.title.trim(),
       description: data.description?.trim(),
-      class_id: data.class_id,
+      class_id: data.class_id, // Keep for backward compatibility (first class)
+      class_ids: finalClassIds,
       class_name: cls ? cls.name : 'Classe',
       created_at: new Date().toISOString(),
       duration_minutes: Number(data.duration_minutes) || 10,
@@ -1175,7 +1197,33 @@ export const dataService = {
     const idx = state.quizzes.findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
-    const totalPoints = updates.questions 
+    // Handle public_id generation when is_public is set to true
+    if (updates.is_public === true && (!state.quizzes[idx].public_id || state.quizzes[idx].public_id === '')) {
+      updates.public_id = generateUUID();
+    }
+    // Handle public_id removal when is_public is set to false
+    if (updates.is_public === false) {
+      updates.public_id = undefined;
+    }
+
+    // Handle class_ids updates for backward compatibility
+    if (updates.class_ids !== undefined) {
+      // Update class_id to first class in class_ids for backward compatibility
+      if (updates.class_ids.length > 0) {
+        updates.class_id = updates.class_ids[0];
+        // Update class_name to match the first class
+        const firstClass = state.classes.find(c => c.id === updates.class_ids[0]);
+        if (firstClass) {
+          updates.class_name = firstClass.name;
+        }
+      } else {
+        // If class_ids is empty, set defaults
+        updates.class_id = '';
+        updates.class_name = '';
+      }
+    }
+
+    const totalPoints = updates.questions
       ? updates.questions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0)
       : state.quizzes[idx].total_points;
 
@@ -1276,7 +1324,12 @@ export const dataService = {
 
   applyZeroForMissedStudents(quiz: Quiz): void {
     if (!state.quizSubmissions) state.quizSubmissions = [];
-    const classStudents = state.students.filter(s => s.class_id === quiz.class_id);
+
+    // Get all class IDs for this quiz (supporting both class_ids array and backward compatibility)
+    const classIds = quiz.class_ids || [quiz.class_id];
+
+    // Get all students who belong to any of the quiz's classes
+    const classStudents = state.students.filter(s => classIds.includes(s.class_id));
     const existingStudentIds = new Set(
       state.quizSubmissions.filter(sub => sub.quiz_id === quiz.id).map(sub => sub.student_id)
     );
@@ -1287,6 +1340,7 @@ export const dataService = {
     classStudents.forEach(st => {
       if (!existingStudentIds.has(st.id)) {
         // L'élève n'a pas composé dans l'heure : attribution automatique de la note 0 / 20
+        const studentClass = state.classes.find(c => c.id === st.class_id);
         const zeroSubmission: QuizSubmission = {
           id: `sub_missed_${quiz.id}_${st.id}`,
           quiz_id: quiz.id,
@@ -1294,8 +1348,8 @@ export const dataService = {
           student_id: st.id,
           student_name: `${st.first_name} ${st.last_name}`,
           student_number: st.student_number || '1',
-          class_id: quiz.class_id,
-          class_name: quiz.class_name,
+          class_id: st.class_id,
+          class_name: studentClass ? studentClass.name : 'Classe inconnue',
           started_at: quiz.launched_at || now,
           submitted_at: now,
           answers: {},
@@ -1329,6 +1383,19 @@ export const dataService = {
     if (!quiz) throw new Error('Quiz introuvable');
 
     if (!state.quizSubmissions) state.quizSubmissions = [];
+
+    // Vérifier si l'élève appartient à l'une des classes du quiz
+    const classIds = quiz.class_ids || [quiz.class_id];
+    const student = state.students.find(s => s.id === studentId);
+    if (!student) {
+      throw new Error('Élève introuvable');
+    }
+
+    // Vérifier si l'élève appartient à au moins une des classes du quiz
+    const isStudentInQuizClass = classIds.some(classId => student.class_id === classId);
+    if (!isStudentInQuizClass) {
+      throw new Error('Vous n\'êtes pas autorisé à passer ce quiz car vous n\'êtes pas inscrit dans une des classes concernées.');
+    }
 
     // Vérifier si l'élève a déjà soumis ce quiz
     const existingIdx = state.quizSubmissions.findIndex(s => {
@@ -1373,6 +1440,9 @@ export const dataService = {
     const now = new Date().toISOString();
     const today = now.split('T')[0];
 
+    // Déterminer la classe de l'élève pour l'enregistrement dans la soumission
+    const studentClass = state.classes.find(c => c.id === student.class_id);
+
     const submission: QuizSubmission = {
       id: generateUUID(),
       quiz_id: quizId,
@@ -1380,8 +1450,8 @@ export const dataService = {
       student_id: studentId,
       student_name: studentName,
       student_number: studentNumber || '1',
-      class_id: classId,
-      class_name: quiz.class_name,
+      class_id: student.class_id,
+      class_name: studentClass ? studentClass.name : 'Classe inconnue',
       started_at: now,
       submitted_at: now,
       answers,

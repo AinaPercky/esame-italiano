@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, 
-  Plus, 
-  Play, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  Users, 
-  Trash2, 
-  Edit3, 
-  Sparkles, 
-  Save, 
-  X, 
-  Award, 
-  Calendar, 
-  Flame, 
-  ListChecks, 
-  Check, 
+import QRCode from 'qrcode';
+import {
+  BookOpen,
+  Plus,
+  Play,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Users,
+  Trash2,
+  Edit3,
+  Sparkles,
+  Save,
+  X,
+  Award,
+  Calendar,
+  Flame,
+  ListChecks,
+  Check,
   RefreshCw,
   HelpCircle,
   Eye,
@@ -24,7 +25,11 @@ import {
   TrendingUp,
   FileText,
   BarChart3,
-  Trophy
+  Trophy,
+  Share2,
+  Lock,
+  Copy,
+  Download
 } from 'lucide-react';
 import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade } from '../types';
 import { dataService } from '../services/dataService';
@@ -67,6 +72,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
+  // Public Quiz State
+  const [publicLinkCopied, setPublicLinkCopied] = useState<boolean>(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
 
   // Form State
@@ -79,6 +87,31 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   // Vue détail / Suivi en direct d'un quiz
   const [activeTrackingQuizId, setActiveTrackingQuizId] = useState<string | null>(null);
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
+
+  // Generate QR code for public quiz
+  useEffect(() => {
+    if (activeAnalyticsQuizId) {
+      const quiz = quizzes.find(q => q.id === activeAnalyticsQuizId);
+      if (quiz && quiz.is_public && quiz.public_id) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        const publicUrl = `${baseUrl}?view=public-quiz&id=${quiz.public_id}`;
+
+        QRCode.toDataURL(publicUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#1e293b',
+            light: '#ffffff'
+          },
+          errorCorrectionLevel: 'H'
+        })
+          .then(url => setQrDataUrl(url))
+          .catch(err => console.error('Erreur génération QR public:', err));
+      } else {
+        setQrDataUrl('');
+      }
+    }
+  }, [activeAnalyticsQuizId, quizzes]);
 
   // JSON Import Modal State
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
@@ -96,7 +129,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         setJsonImportError('Format JSON invalide : le JSON doit contenir au moins "title" et un tableau "questions".');
         return;
       }
-      
+
       const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => ({
         id: `q_imported_${Date.now()}_${i}`,
         type: q.type === 'text' ? 'text' : 'qcm',
@@ -127,6 +160,26 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     } catch (err: any) {
       setJsonImportError('Erreur lors du décodage du JSON : ' + err.message);
     }
+  };
+
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setPublicLinkCopied(true);
+      setTimeout(() => setPublicLinkCopied(false), 2500);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDownloadQR = (qrData: string, filename: string) => {
+    if (!qrData) return;
+    const link = document.createElement('a');
+    link.href = qrData;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const loadData = () => {
@@ -227,7 +280,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         description: quizDescription,
         class_id: quizTargetClassId,
         duration_minutes: quizDuration,
-        questions
+        questions,
+        is_public: editingQuiz.is_public || false // Keep existing public status when editing
       });
     } else {
       dataService.createQuiz({
@@ -587,6 +641,68 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                               <span>Clôturer</span>
                             </button>
                           </>
+                        )}
+
+                        {/* Public Quiz Controls */}
+                        {quiz.status !== 'draft' && (
+                          <div className="flex items-center gap-2 space-x-3">
+                            {!quiz.is_public && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  dataService.updateQuiz(quiz.id, { is_public: true });
+                                  loadData();
+                                  if (onRefresh) onRefresh();
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                title="Publier ce quiz publiquement"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span>Publier</span>
+                              </button>
+                            )}
+                            {quiz.is_public && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    dataService.updateQuiz(quiz.id, { is_public: false });
+                                    loadData();
+                                    if (onRefresh) onRefresh();
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                  title="Rendre ce quiz privé"
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                  <span>Privé</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const baseUrl = window.location.origin + window.location.pathname;
+                                    const publicUrl = `${baseUrl}?view=public-quiz&id=${quiz.public_id}`;
+                                    handleCopyLink(publicUrl);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                  title="Copier le lien public"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Lien</span>
+                                </button>
+                                {qrDataUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadQR(qrDataUrl, `QRCode_Public_${quiz.title.replace(/\s+/g, '_')}.png`)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                    title="Télécharger le QR Code"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>QR Code</span>
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         )}
 
                         <button

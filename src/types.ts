@@ -20,6 +20,7 @@ export interface Student {
   avatar_url?: string | null;
   created_at: string;
   updated_at: string;
+  validation_status?: 'pending' | 'approved' | 'rejected'; // Statut de validation de l'inscription
   class_name?: string;
 }
 
@@ -146,9 +147,12 @@ export interface QuizQuestion {
 
 export interface Quiz {
   id: string;
+  public_id?: string; // UUID unique pour l'accès public via lien partageable
+  is_public: boolean; // Indique si le quiz est publié publiquement
   title: string;
   description?: string;
-  class_id: string;
+  class_id: string; // Primary class (backward compatibility)
+  class_ids?: string[]; // All classes this quiz belongs to (new feature)
   class_name?: string;
   created_at: string;
   duration_minutes: number; // Temps imparti pour composer (ex: 5, 10, 15 min)

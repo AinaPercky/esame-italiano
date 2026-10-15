@@ -2,6 +2,7 @@ import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { ClassRoom, Student } from '../types';
 import { supabaseService } from './supabaseService';
+import { dataService } from './dataService';
 
 /**
  * Service d'authentification et de contrôle d'accès multi-rôles pour Esame :
@@ -182,6 +183,23 @@ export const authService = {
 
     try {
       const student = await supabaseService.authenticateStudent(cleanId, passwordOrCode);
+
+      // Vérifier le statut de validation de l'étudiant
+      const studentData = dataService.getRawState().students.find(s => s.id === student.id);
+      if (studentData?.validation_status === 'pending') {
+        return {
+          success: false,
+          error: 'Votre inscription est en attente de validation par le professeur. Vous serez notifié lorsqu\'elle sera approuvée.'
+        };
+      }
+
+      if (studentData?.validation_status === 'rejected') {
+        return {
+          success: false,
+          error: 'Votre inscription a été refusée par le professeur. Veuillez contacter l\'administration pour plus d\'informations.'
+        };
+      }
+
       const user: AuthUser = {
         id: `session_${student.id}`,
         email: student.email,
