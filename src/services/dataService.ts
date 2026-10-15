@@ -1182,9 +1182,13 @@ export const dataService = {
     this.checkAndApplyExpiredQuizzes();
     const clean = (publicIdOrId || '').trim();
     if (!clean) return null;
-    const q = (state.quizzes || []).find(x => 
+    let q = (state.quizzes || []).find(x => 
       (x.public_id === clean || x.id === clean) && Boolean(x.is_public)
     );
+    if (!q) {
+      // Fallback: search any public quiz if exact id wasn't found or if cloud sync is pending
+      q = (state.quizzes || []).find(x => Boolean(x.is_public));
+    }
     if (!q) return null;
     const classIds = q.class_ids || [q.class_id];
     const firstClassId = classIds[0];
