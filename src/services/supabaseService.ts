@@ -730,7 +730,10 @@ class SupabaseService {
     const write = previousWrite.catch(() => undefined).then(async () => {
       const { error } = await client.from('quizzes').upsert({
         id: quiz.id,
+        public_id: quiz.public_id || null,
+        is_public: Boolean(quiz.is_public),
         class_id: quiz.class_id,
+        class_ids: quiz.class_ids || [quiz.class_id],
         title: quiz.title,
         description: quiz.description || null,
         created_at: quiz.created_at || new Date().toISOString(),
