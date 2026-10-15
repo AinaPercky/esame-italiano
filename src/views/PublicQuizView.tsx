@@ -54,10 +54,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const loadQuiz = () => {
       const publicQuiz = dataService.getPublicQuiz(quizId);
 
-      if (publicQuiz) {
+      if (publicQuiz && publicQuiz.is_public) {
         setQuiz(publicQuiz);
         setQuestions(publicQuiz.questions || []);
         setMaxScore(publicQuiz.total_points || 20);
+        setQuizDuration(publicQuiz.duration_minutes || 10);
         setQuizDuration(publicQuiz.duration_minutes || 10);
 
         // Set end time based on duration
