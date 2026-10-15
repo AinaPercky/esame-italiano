@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BookOpen,
   CheckCircle2,
@@ -24,6 +24,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { Quiz, QuizQuestion, QuizSubmission, ClassRoom } from '../types';
 
 interface PublicQuizViewProps {
@@ -36,8 +37,12 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   onBackToApp
 }) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const answersRef = useRef<Record<string, string>>({});
+  const quizRef = useRef<Quiz | null>(null);
   const [submitted, setSubmitted] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
@@ -51,71 +56,101 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [quizEndTime, setQuizEndTime] = useState<number | null>(null);
 
   useEffect(() => {
-    const loadQuiz = () => {
-      const publicQuiz = dataService.getPublicQuiz(quizId);
+    quizRef.current = quiz;
+  }, [quiz]);
 
-      if (publicQuiz && publicQuiz.is_public) {
-        setQuiz(publicQuiz);
-        setQuestions(publicQuiz.questions || []);
-        setMaxScore(publicQuiz.total_points || 20);
-        setQuizDuration(publicQuiz.duration_minutes || 10);
-        setQuizDuration(publicQuiz.duration_minutes || 10);
+  useEffect(() => {
+    let isActive = true;
 
-        // Set end time based on duration
-        const durationMinutes = publicQuiz.duration_minutes || 10;
-        const endTime = Date.now() + (durationMinutes * 60 * 1000);
-        setQuizEndTime(endTime);
-        setTimeLeft(durationMinutes * 60 * 1000);
+    const applyQuiz = (publicQuiz: Quiz) => {
+      setQuiz(publicQuiz);
+      setQuestions(publicQuiz.questions || []);
+      setMaxScore(publicQuiz.total_points || 20);
+      setQuizDuration(publicQuiz.duration_minutes || 10);
+    };
 
-        // Start timer
-        setStartTime(Date.now());
-        setTimerActive(true);
+    const loadQuiz = async () => {
+      setLoading(true);
+      setLoadError(null);
+      setSubmitted(false);
+      setSubmitting(false);
+      setAnswers({});
+      answersRef.current = {};
+      setFeedback({});
+      setScore(0);
+      setScore20(0);
 
-        // Start countdown
-        const timer = setInterval(() => {
-          const now = Date.now();
-          const left = Math.max(0, endTime - now);
-          setTimeLeft(left);
+      try {
+        const localQuiz = dataService.getPublicQuiz(quizId);
+        if (localQuiz && localQuiz.is_public) {
+          if (!isActive) return;
+          applyQuiz(localQuiz);
+          return;
+        }
 
-          if (left <= 0) {
-            setTimerActive(false);
-            clearInterval(timer);
-            // Auto-submit when time runs out
-            handleSubmitQuiz();
-          }
-        }, 1000);
+        const remoteQuiz = await supabaseService.fetchPublicQuiz(quizId);
+        if (!isActive) return;
 
-        return () => clearInterval(timer);
-      } else {
+        if (remoteQuiz) {
+          applyQuiz(remoteQuiz);
+        } else {
+          setQuiz(null);
+        }
+      } catch (e: any) {
+        if (!isActive) return;
         setQuiz(null);
+        setLoadError(e?.message || 'Erreur lors du chargement du quiz.');
+      } finally {
+        if (isActive) setLoading(false);
       }
     };
 
-    const cleanup = loadQuiz();
-    const unsub = dataService.subscribe(() => {
-      if (!submitted) {
-        const publicQuiz = dataService.getPublicQuiz(quizId);
-        if (!publicQuiz) {
-          setQuiz(null);
-        }
-      }
-    });
+    void loadQuiz();
 
     return () => {
-      if (cleanup) cleanup();
-      unsub();
+      isActive = false;
     };
   }, [quizId]);
 
+  useEffect(() => {
+    if (!quiz || submitted) return;
+
+    const durationMinutes = quiz.duration_minutes || 10;
+    const endTime = Date.now() + (durationMinutes * 60 * 1000);
+    setQuizEndTime(endTime);
+    setTimeLeft(durationMinutes * 60 * 1000);
+    setStartTime(Date.now());
+    setTimerActive(true);
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const left = Math.max(0, endTime - now);
+      setTimeLeft(left);
+
+      if (left <= 0) {
+        setTimerActive(false);
+        clearInterval(timer);
+        handleSubmitQuiz();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [quiz?.id, submitted]);
+
   const handleAnswerChange = (questionId: string, answer: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
-    }));
+    setAnswers(prev => {
+      const next = {
+        ...prev,
+        [questionId]: answer
+      };
+      answersRef.current = next;
+      return next;
+    });
   };
 
   const handleSubmitQuiz = () => {
-    if (!quiz) return;
+    const currentQuiz = quizRef.current;
+    if (!currentQuiz) return;
 
     setSubmitting(true);
 
@@ -123,8 +158,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     let rawScore = 0;
     const newFeedback: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }> = {};
 
-    quiz.questions.forEach(q => {
-      const studentAns = (answers[q.id] || '').trim();
+    const currentAnswers = answersRef.current || {};
+
+    currentQuiz.questions.forEach(q => {
+      const studentAns = (currentAnswers[q.id] || '').trim();
       const expectedAns = (q.correct_answer || '').trim();
       let isCorrect = false;
 
@@ -160,6 +197,26 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     // According to requirements: "les résultats des quiz publics ne doivent jamais être enregistrés dans la base de données"
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+        <div className="text-center bg-white rounded-xl p-8 shadow-lg w-full max-w-md">
+          <Loader2 className="w-12 h-12 text-gray-400 mb-4 animate-spin mx-auto" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Chargement du quiz…</h2>
+          <p className="text-gray-600 mb-6">
+            Connexion à la base de données en cours.
+          </p>
+          <button
+            onClick={onBackToApp}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Retour à l'application
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!quiz) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
@@ -169,6 +226,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
           <p className="text-gray-600 mb-6">
             Le quiz demandé n'existe pas, n'est pas publié publiquement ou le lien a expiré.
           </p>
+          {loadError && (
+            <div className="text-left bg-rose-50 border border-rose-200 text-rose-800 rounded-lg p-3 mb-6 text-sm">
+              {loadError}
+            </div>
+          )}
           <button
             onClick={onBackToApp}
             className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded"

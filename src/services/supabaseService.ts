@@ -758,6 +758,58 @@ class SupabaseService {
     }
   }
 
+  public async fetchPublicQuiz(publicIdOrId: string): Promise<Quiz | null> {
+    const client = this.getClient();
+    if (!client) throw new Error("Supabase n'est pas encore configuré.");
+
+    const clean = (publicIdOrId || '').trim();
+    if (!clean) return null;
+
+    const mapRowToQuiz = (q: any): Quiz => ({
+      id: q.id,
+      public_id: q.public_id || undefined,
+      is_public: Boolean(q.is_public),
+      class_id: q.class_id,
+      class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
+      title: q.title,
+      description: q.description || undefined,
+      created_at: q.created_at,
+      duration_minutes: Number(q.duration_minutes) || 10,
+      status: q.status,
+      launched_at: q.launched_at || undefined,
+      expires_at: q.expires_at || undefined,
+      questions: Array.isArray(q.questions) ? q.questions : [],
+      total_points: Number(q.total_points) || 20
+    });
+
+    const { data: byPublicId, error: errPublicId } = await client
+      .from('quizzes')
+      .select('*')
+      .eq('public_id', clean)
+      .eq('is_public', true)
+      .maybeSingle();
+
+    if (errPublicId) {
+      throw new Error(errPublicId.message);
+    }
+
+    if (byPublicId) return mapRowToQuiz(byPublicId);
+
+    const { data: byId, error: errId } = await client
+      .from('quizzes')
+      .select('*')
+      .eq('id', clean)
+      .eq('is_public', true)
+      .maybeSingle();
+
+    if (errId) {
+      throw new Error(errId.message);
+    }
+
+    if (byId) return mapRowToQuiz(byId);
+    return null;
+  }
+
   public async deleteQuiz(id: string): Promise<void> {
     const client = this.getClient();
     if (!client) return;
