@@ -1259,6 +1259,11 @@ export const dataService = {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
+    // Remove any automatic zero submissions from a previous expiration so students can attempt again
+    if (state.quizSubmissions) {
+      state.quizSubmissions = state.quizSubmissions.filter(sub => !(sub.quiz_id === id && sub.status === 'missed'));
+    }
+
     const now = new Date();
     const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 heure exacte
 
