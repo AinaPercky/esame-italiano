@@ -1106,7 +1106,10 @@ class SupabaseService {
 
       const quizzes: Quiz[] = (quizzesData || []).map(q => ({
         id: q.id,
+        public_id: q.public_id || undefined,
+        is_public: Boolean(q.is_public),
         class_id: q.class_id,
+        class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
         title: q.title,
         description: q.description || undefined,
         created_at: q.created_at,
