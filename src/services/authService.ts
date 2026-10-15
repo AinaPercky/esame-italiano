@@ -185,18 +185,21 @@ export const authService = {
       const student = await supabaseService.authenticateStudent(cleanId, passwordOrCode);
 
       // Vérifier le statut de validation de l'étudiant
-      const studentData = dataService.getRawState().students.find(s => s.id === student.id);
-      if (studentData?.validation_status === 'pending') {
+      const studentData = dataService.getRawState().students.find(s => s.id === student.id || normalizeEmail(s.email) === cleanId);
+      const valStatus = studentData?.validation_status ?? (student as any).validation_status;
+      if (valStatus === 'pending') {
+        await supabaseService.signOutStudent().catch(() => {});
         return {
           success: false,
-          error: 'Votre inscription est en attente de validation par le professeur. Vous serez notifié lorsqu\'elle sera approuvée.'
+          error: 'Votre inscription est en attente de validation par le professeur. Vous pourrez vous connecter dès son approbation.'
         };
       }
 
-      if (studentData?.validation_status === 'rejected') {
+      if (valStatus === 'rejected') {
+        await supabaseService.signOutStudent().catch(() => {});
         return {
           success: false,
-          error: 'Votre inscription a été refusée par le professeur. Veuillez contacter l\'administration pour plus d\'informations.'
+          error: 'Votre inscription a été refusée par le professeur. Veuillez contacter l\'enseignant pour plus d\'informations.'
         };
       }
 

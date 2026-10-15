@@ -344,7 +344,15 @@ export const dataService = {
     return state.students.find(student => normalizeEmail(student.email) === normalizedEmail) || null;
   },
 
-  async createStudent(firstName: string, lastName: string, classId: string, email: string, studentNumber?: string, id?: string): Promise<Student> {
+  async createStudent(
+    firstName: string,
+    lastName: string,
+    classId: string,
+    email: string,
+    studentNumber?: string,
+    id?: string,
+    avatarUrl?: string | null
+  ): Promise<Student> {
     const normalizedFirstName = normalizeFirstName(firstName);
     const normalizedLastName = normalizeLastName(lastName);
     if (!normalizedFirstName || !normalizedLastName || !classId) {
@@ -364,6 +372,8 @@ export const dataService = {
       last_name: normalizedLastName,
       email: normalizedEmail,
       student_number: studentNumber?.trim() || null,
+      avatar_url: avatarUrl || null,
+      avatar: avatarUrl || undefined,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       validation_status: 'pending' // Nouveaux inscrits en attente de validation
@@ -392,6 +402,21 @@ export const dataService = {
       updated_at: new Date().toISOString()
     };
     await supabaseService.assertStudentEmailAvailable(normalizedEmail, id);
+    await supabaseService.saveStudent(updatedStudent);
+    state.students[idx] = updatedStudent;
+    persistState();
+    notifySubscribers();
+    return updatedStudent;
+  },
+
+  async updateStudentValidationStatus(id: string, status: 'approved' | 'rejected' | 'pending'): Promise<Student> {
+    const idx = state.students.findIndex(s => s.id === id);
+    if (idx === -1) throw new Error('Élève introuvable');
+    const updatedStudent: Student = {
+      ...state.students[idx],
+      validation_status: status,
+      updated_at: new Date().toISOString()
+    };
     await supabaseService.saveStudent(updatedStudent);
     state.students[idx] = updatedStudent;
     persistState();
@@ -1153,6 +1178,23 @@ export const dataService = {
     };
   },
 
+  getPublicQuiz(publicIdOrId: string): Quiz | null {
+    this.checkAndApplyExpiredQuizzes();
+    const clean = (publicIdOrId || '').trim();
+    if (!clean) return null;
+    const q = (state.quizzes || []).find(x => 
+      (x.public_id === clean || x.id === clean) && Boolean(x.is_public)
+    );
+    if (!q) return null;
+    const classIds = q.class_ids || [q.class_id];
+    const firstClassId = classIds[0];
+    const cls = state.classes.find(c => c.id === firstClassId);
+    return {
+      ...q,
+      class_name: cls ? cls.name : 'Classe'
+    };
+  },
+
   createQuiz(data: {
     title: string;
     description?: string;
@@ -1212,7 +1254,7 @@ export const dataService = {
       if (updates.class_ids.length > 0) {
         updates.class_id = updates.class_ids[0];
         // Update class_name to match the first class
-        const firstClass = state.classes.find(c => c.id === updates.class_ids[0]);
+        const firstClass = state.classes.find(c => c.id === updates.class_ids?.[0]);
         if (firstClass) {
           updates.class_name = firstClass.name;
         }

@@ -11,10 +11,20 @@ import {
   CheckCircle,
   FileCode,
   Eye,
-  School
+  School,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  UserCheck,
+  UserX,
+  Clock
 } from 'lucide-react';
 import { Student, ClassRoom } from '../types';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
+import { StudentAvatar } from '../components/StudentAvatar';
+import { PhotoUploadInput } from '../components/PhotoUploadInput';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface StudentsViewProps {
   students: Student[];
@@ -47,7 +57,71 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [formEmail, setFormEmail] = useState('');
   const [formStudentNumber, setFormStudentNumber] = useState('');
   const [formClassId, setFormClassId] = useState(classes[0]?.id || '');
+  const [formAvatar, setFormAvatar] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Validation actions state & confirm dialog
+  const [validationSuccessMsg, setValidationSuccessMsg] = useState<string | null>(null);
+  const [confirmValidationDialog, setConfirmValidationDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'success' | 'danger' | 'warning' | 'primary';
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirmer',
+    variant: 'primary',
+    action: () => {}
+  });
+
+  const pendingCount = students.filter(s => s.validation_status === 'pending').length;
+  const approvedCount = students.filter(s => s.validation_status === 'approved' || !s.validation_status).length;
+  const rejectedCount = students.filter(s => s.validation_status === 'rejected').length;
+
+  const handleApproveStudent = (student: Student) => {
+    setConfirmValidationDialog({
+      isOpen: true,
+      title: "Approuver l'inscription",
+      message: `Confirmer la validation de l'inscription pour ${student.first_name} ${student.last_name} (${student.email}) ?\nL'élève aura immédiatement accès à son espace, ses quiz et ses résultats.`,
+      confirmLabel: "Valider l'inscription",
+      variant: 'success',
+      action: async () => {
+        try {
+          await dataService.updateStudentValidationStatus(student.id, 'approved');
+          setValidationSuccessMsg(`Inscription de ${student.first_name} ${student.last_name} approuvée avec succès.`);
+          setTimeout(() => setValidationSuccessMsg(null), 3500);
+          onRefresh();
+        } catch (err) {
+          alert(err instanceof Error ? err.message : 'Erreur lors de la validation.');
+        }
+      }
+    });
+  };
+
+  const handleRejectStudent = (student: Student) => {
+    setConfirmValidationDialog({
+      isOpen: true,
+      title: "Refuser l'inscription",
+      message: `Refuser l'inscription de ${student.first_name} ${student.last_name} (${student.email}) ?\nL'élève ne pourra pas accéder à la plateforme.`,
+      confirmLabel: "Refuser l'inscription",
+      variant: 'danger',
+      action: async () => {
+        try {
+          await dataService.updateStudentValidationStatus(student.id, 'rejected');
+          setValidationSuccessMsg(`Inscription de ${student.first_name} ${student.last_name} refusée.`);
+          setTimeout(() => setValidationSuccessMsg(null), 3500);
+          onRefresh();
+        } catch (err) {
+          alert(err instanceof Error ? err.message : 'Erreur lors du refus.');
+        }
+      }
+    });
+  };
 
   // Import State
   const [importType, setImportType] = useState<'csv' | 'json'>('csv');
@@ -65,7 +139,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.student_number && s.student_number.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesValidationStatus = !validationFilter || s.validation_status === validationFilter;
+    const effectiveStatus = s.validation_status || 'approved';
+    const matchesValidationStatus = !validationFilter || effectiveStatus === validationFilter;
     return matchesClass && matchesSearch && matchesValidationStatus;
   });
 
@@ -76,6 +151,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setFormEmail('');
     setFormStudentNumber('');
     setFormClassId(classFilter || classes[0]?.id || '');
+    setFormAvatar('');
     setFormError(null);
     setIsAddModalOpen(true);
   };
@@ -87,6 +163,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setFormEmail(student.email);
     setFormStudentNumber(student.student_number || '');
     setFormClassId(student.class_id);
+    setFormAvatar(student.avatar_url || student.avatar || '');
     setFormError(null);
     setIsAddModalOpen(true);
   };
@@ -95,29 +172,67 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     e.preventDefault();
     if (!formFirstName.trim() || !formLastName.trim() || !formClassId) return;
 
+    setIsSaving(true);
+    setFormError(null);
+
     try {
       if (editingStudent) {
+        let finalAvatar = formAvatar;
+        if (formAvatar && formAvatar.startsWith('data:image/')) {
+          try {
+            finalAvatar = (await supabaseService.saveStudentAvatar(editingStudent.id, formAvatar)) || formAvatar;
+          } catch (e) {
+            console.warn('Erreur téléversement cloud de la photo élève, sauvegarde locale:', e);
+          }
+        } else if (!formAvatar && (editingStudent.avatar_url || editingStudent.avatar)) {
+          try {
+            await supabaseService.saveStudentAvatar(editingStudent.id, null);
+          } catch (e) {
+            console.warn('Erreur suppression photo cloud:', e);
+          }
+        }
+
         await dataService.updateStudent(editingStudent.id, {
           first_name: formFirstName.trim(),
           last_name: formLastName.trim(),
           email: formEmail,
           student_number: formStudentNumber.trim() || null,
-          class_id: formClassId
+          class_id: formClassId,
+          avatar_url: finalAvatar || null,
+          avatar: finalAvatar || undefined
         });
       } else {
-        await dataService.createStudent(
+        const newStudent = await dataService.createStudent(
           formFirstName.trim(),
           formLastName.trim(),
           formClassId,
           formEmail,
-          formStudentNumber.trim() || undefined
+          formStudentNumber.trim() || undefined,
+          undefined,
+          formAvatar || null
         );
+
+        if (formAvatar && formAvatar.startsWith('data:image/') && newStudent?.id) {
+          try {
+            const uploadedUrl = await supabaseService.saveStudentAvatar(newStudent.id, formAvatar);
+            if (uploadedUrl) {
+              await dataService.updateStudent(newStudent.id, {
+                avatar_url: uploadedUrl,
+                avatar: uploadedUrl
+              });
+            }
+          } catch (e) {
+            console.warn('Erreur téléversement cloud de la photo pour nouvel élève:', e);
+          }
+        }
       }
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Impossible d’enregistrer cet élève.');
+      setIsSaving(false);
       return;
     }
 
+    setIsSaving(false);
     setIsAddModalOpen(false);
     onRefresh();
   };
@@ -219,6 +334,96 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         </div>
       </div>
 
+      {/* Alerte Inscriptions en attente */}
+      {pendingCount > 0 && validationFilter !== 'pending' && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-bold text-amber-950 text-sm">
+                {pendingCount} demande{pendingCount > 1 ? 's' : ''} d'inscription en attente de validation
+              </h4>
+              <p className="text-xs text-amber-800">
+                Ces élèves ne peuvent pas se connecter tant que vous n'avez pas approuvé leur inscription.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setValidationFilter('pending')}
+            className="px-3.5 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-lg transition-colors shrink-0 self-start sm:self-center cursor-pointer shadow-2xs"
+          >
+            Examiner les demandes ({pendingCount})
+          </button>
+        </div>
+      )}
+
+      {/* Message de succès d'action de validation */}
+      {validationSuccessMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-semibold text-emerald-900 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{validationSuccessMsg}</span>
+        </div>
+      )}
+
+      {/* Quick filter pills */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setValidationFilter('')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            validationFilter === ''
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          Tous les élèves ({students.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setValidationFilter('pending')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            validationFilter === 'pending'
+              ? 'bg-amber-800 text-white shadow-xs'
+              : 'bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>En attente ({pendingCount})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setValidationFilter('approved')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            validationFilter === 'approved'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'bg-emerald-50 border border-emerald-300 text-emerald-900 hover:bg-emerald-100'
+          }`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Approuvés ({approvedCount})</span>
+        </button>
+
+        {rejectedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setValidationFilter('rejected')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              validationFilter === 'rejected'
+                ? 'bg-rose-700 text-white shadow-xs'
+                : 'bg-rose-50 border border-rose-300 text-rose-900 hover:bg-rose-100'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Refusés ({rejectedCount})</span>
+          </button>
+        )}
+      </div>
+
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-3 bg-white border border-slate-200 rounded-lg shadow-2xs">
         <div className="relative w-full sm:w-80">
@@ -250,7 +455,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           <span className="text-xs text-slate-500 whitespace-nowrap hidden xs:inline">Statut :</span>
           <select
             value={validationFilter}
-            onChange={(e) => setValidationFilter(e.target.value)}
+            onChange={(e) => setValidationFilter(e.target.value as '' | 'approved' | 'pending' | 'rejected')}
             className="w-full sm:w-auto px-3 py-2 text-xs sm:text-sm border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[40px]"
           >
             <option value="">Tous les statuts</option>
@@ -270,11 +475,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
               className="p-3.5 bg-white border border-slate-200 rounded-lg shadow-2xs space-y-2.5"
             >
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h4 className="font-semibold text-slate-900 text-base">
-                    {s.first_name} {s.last_name}
-                  </h4>
-                  <div className="text-xs text-slate-500 break-all">{s.email}</div>
+                <div className="flex items-start gap-3">
+                  <StudentAvatar
+                    name={`${s.first_name} ${s.last_name}`}
+                    src={s.avatar_url || s.avatar}
+                    className="w-10 h-10 border border-slate-200 shrink-0 text-xs shadow-2xs mt-0.5"
+                  />
+                  <div>
+                    <h4 className="font-semibold text-slate-900 text-base">
+                      {s.first_name} {s.last_name}
+                    </h4>
+                    <div className="text-xs text-slate-500 break-all">{s.email}</div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs font-medium text-amber-900 bg-amber-50 px-2 py-0.5 rounded">
                       {s.class_name}
@@ -295,8 +506,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     </span>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(s)}
@@ -315,6 +527,41 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Actions de validation pour mobile */}
+              {s.validation_status === 'pending' && (
+                <div className="flex items-center gap-2 pt-2 border-t border-amber-200/60">
+                  <button
+                    type="button"
+                    onClick={() => handleApproveStudent(s)}
+                    className="flex-1 py-1.5 px-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Valider l'inscription</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRejectStudent(s)}
+                    className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>Refuser</span>
+                  </button>
+                </div>
+              )}
+
+              {s.validation_status === 'rejected' && (
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleApproveStudent(s)}
+                    className="flex-1 py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-300 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Ré-approuver l'inscription</span>
+                  </button>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <span className="text-[11px] text-slate-400">
@@ -359,11 +606,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 filteredStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900">
-                        {s.first_name} {s.last_name}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        Ajouté le {new Date(s.created_at).toLocaleDateString('fr-FR')}
+                      <div className="flex items-center gap-3">
+                        <StudentAvatar
+                          name={`${s.first_name} ${s.last_name}`}
+                          src={s.avatar_url || s.avatar}
+                          className="w-9 h-9 border border-slate-200 shrink-0 text-xs shadow-2xs"
+                        />
+                        <div>
+                          <div className="font-semibold text-slate-900">
+                            {s.first_name} {s.last_name}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            Ajouté le {new Date(s.created_at).toLocaleDateString('fr-FR')}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-xs text-slate-600">{s.email}</td>
@@ -399,11 +655,47 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                       </button>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
+                      <div className="inline-flex items-center justify-end gap-1.5">
+                        {/* Validation Actions */}
+                        {s.validation_status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleApproveStudent(s)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors cursor-pointer"
+                              title="Valider l'inscription"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span className="hidden md:inline">Valider</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectStudent(s)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                              title="Refuser l'inscription"
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                              <span className="hidden md:inline">Refuser</span>
+                            </button>
+                          </>
+                        )}
+
+                        {s.validation_status === 'rejected' && (
+                          <button
+                            type="button"
+                            onClick={() => handleApproveStudent(s)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-300 transition-colors cursor-pointer"
+                            title="Ré-approuver l'inscription"
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span className="hidden md:inline">Ré-approuver</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(s)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 min-h-[36px] min-w-[36px] inline-flex items-center justify-center cursor-pointer"
                           title="Modifier"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -411,7 +703,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setConfirmDeleteId(s.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 min-h-[36px] min-w-[36px] inline-flex items-center justify-center"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 min-h-[36px] min-w-[36px] inline-flex items-center justify-center cursor-pointer"
                           title="Supprimer"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -449,6 +741,17 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   {formError}
                 </div>
               )}
+
+              {/* Formulaire de téléchargement / remplacement de photo de profil */}
+              <PhotoUploadInput
+                value={formAvatar}
+                name={`${formFirstName} ${formLastName}`.trim() || 'Élève'}
+                onChange={(photo) => setFormAvatar(photo)}
+                onRemove={() => setFormAvatar('')}
+                label="Photo de profil"
+                helperText="Glissez une image ou cliquez pour télécharger/remplacer la photo (JPG, PNG, WebP)."
+              />
+
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -523,6 +826,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
               <div className="flex flex-col-reverse xs:flex-row justify-end gap-2 sm:gap-3 pt-3">
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => setIsAddModalOpen(false)}
                   className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
                 >
@@ -530,9 +834,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="w-full xs:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg min-h-[44px]"
+                  disabled={isSaving}
+                  className="w-full xs:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 disabled:opacity-50 rounded-lg min-h-[44px] inline-flex items-center justify-center gap-2"
                 >
-                  {editingStudent ? 'Enregistrer' : 'Ajouter l\'élève'}
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>{editingStudent ? 'Enregistrer' : 'Ajouter l\'élève'}</span>
                 </button>
               </div>
             </form>
@@ -733,6 +1039,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Dialogue de confirmation d'action de validation */}
+      <ConfirmDialog
+        isOpen={confirmValidationDialog.isOpen}
+        title={confirmValidationDialog.title}
+        message={confirmValidationDialog.message}
+        confirmLabel={confirmValidationDialog.confirmLabel}
+        variant={confirmValidationDialog.variant}
+        onConfirm={() => {
+          confirmValidationDialog.action();
+          setConfirmValidationDialog(prev => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => setConfirmValidationDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

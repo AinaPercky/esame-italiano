@@ -160,17 +160,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      if (!rosterStudent && result.user?.student_id) {
+      // Enregistrer l'élève avec le statut 'pending' en attente de validation
+      const createdStudentId = result.user?.student_id || rosterStudent?.id;
+      if (!rosterStudent && createdStudentId) {
         await dataService.createStudent(
           regFirstName,
           regLastName,
           regClassId,
           regEmail,
           regStudentNumber,
-          result.user.student_id
+          createdStudentId
         );
+      } else if (rosterStudent) {
+        await dataService.updateStudent(rosterStudent.id, {
+          validation_status: 'pending'
+        });
       }
-      onLoginSuccess();
+
+      // Déconnecter immédiatement l'étudiant pour empêcher l'accès tant qu'il n'est pas approuvé
+      authService.logout();
+
+      // Basculer vers l'écran de connexion avec message clair
+      setViewMode('login');
+      setEmail(regEmail.trim().toLowerCase());
+      setPassword('');
+      setSuccessMessage(
+        'Votre inscription a été enregistrée avec succès ! Votre compte est actuellement en attente de validation par le professeur. Vous pourrez vous connecter dès son approbation.'
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Impossible de créer le compte étudiant.');
     } finally {

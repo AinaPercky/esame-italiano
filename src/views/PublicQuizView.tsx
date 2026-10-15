@@ -19,7 +19,6 @@ import {
   Check,
   AlertCircle,
   Play,
-  StopWatch,
   Loader2,
   Circle,
   HelpCircle
@@ -52,42 +51,59 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [quizEndTime, setQuizEndTime] = useState<number | null>(null);
 
   useEffect(() => {
-    // Find quiz by public_id
-    const allQuizzes = dataService.getQuizzes();
-    const publicQuiz = allQuizzes.find(q => q.public_id === quizId && q.is_public);
+    const loadQuiz = () => {
+      const publicQuiz = dataService.getPublicQuiz(quizId);
 
-    if (publicQuiz) {
-      setQuiz(publicQuiz);
-      setQuestions(publicQuiz.questions);
-      setMaxScore(publicQuiz.total_points);
-      setQuizDuration(publicQuiz.duration_minutes);
+      if (publicQuiz) {
+        setQuiz(publicQuiz);
+        setQuestions(publicQuiz.questions || []);
+        setMaxScore(publicQuiz.total_points || 20);
+        setQuizDuration(publicQuiz.duration_minutes || 10);
 
-      // Set end time based on duration
-      const endTime = Date.now() + (publicQuiz.duration_minutes * 60 * 1000);
-      setQuizEndTime(endTime);
+        // Set end time based on duration
+        const durationMinutes = publicQuiz.duration_minutes || 10;
+        const endTime = Date.now() + (durationMinutes * 60 * 1000);
+        setQuizEndTime(endTime);
+        setTimeLeft(durationMinutes * 60 * 1000);
 
-      // Start timer
-      setStartTime(Date.now());
-      setTimerActive(true);
+        // Start timer
+        setStartTime(Date.now());
+        setTimerActive(true);
 
-      // Start countdown
-      const timer = setInterval(() => {
-        const now = Date.now();
-        const left = Math.max(0, quizEndTime! - now);
-        setTimeLeft(left);
+        // Start countdown
+        const timer = setInterval(() => {
+          const now = Date.now();
+          const left = Math.max(0, endTime - now);
+          setTimeLeft(left);
 
-        if (left <= 0) {
-          setTimerActive(false);
-          clearInterval(timer);
-          // Auto-submit when time runs out
-          handleSubmitQuiz();
+          if (left <= 0) {
+            setTimerActive(false);
+            clearInterval(timer);
+            // Auto-submit when time runs out
+            handleSubmitQuiz();
+          }
+        }, 1000);
+
+        return () => clearInterval(timer);
+      } else {
+        setQuiz(null);
+      }
+    };
+
+    const cleanup = loadQuiz();
+    const unsub = dataService.subscribe(() => {
+      if (!submitted) {
+        const publicQuiz = dataService.getPublicQuiz(quizId);
+        if (!publicQuiz) {
+          setQuiz(null);
         }
-      }, 1000);
+      }
+    });
 
-      return () => clearInterval(timer);
-    } else {
-      setQuiz(null);
-    }
+    return () => {
+      if (cleanup) cleanup();
+      unsub();
+    };
   }, [quizId]);
 
   const handleAnswerChange = (questionId: string, answer: string) => {
@@ -194,7 +210,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
         {timerActive && timeLeft !== null && (
           <div className="px-6 py-4 bg-amber-50 border-t">
             <div className="flex items-center justify-center gap-3">
-              <StopWatch className="w-5 h-5 text-amber-600" />
+              <Clock className="w-5 h-5 text-amber-600" />
               <span className="font-mono font-bold text-amber-800 text-xl">
                 {formatTimeLeft(timeLeft)}
               </span>
@@ -351,7 +367,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
                           </div>
                         </div>
                       </div>
-                    )}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -365,7 +382,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
                 </button>
               </div>
             </div>
-          )
+          </div>
         )}
       </div>
 

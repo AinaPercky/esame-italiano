@@ -18,6 +18,7 @@ import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
 import { StudentPublicReportView } from './views/StudentPublicReportView';
 import { QuizzesAdminView } from './views/QuizzesAdminView';
+import { PublicQuizView } from './views/PublicQuizView';
 import { StudentSpaceView } from './views/StudentSpaceView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { dataService } from './services/dataService';

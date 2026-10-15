@@ -67,20 +67,44 @@ class SupabaseService {
   private quizWriteQueues = new Map<string, Promise<void>>();
 
   public loadConfig(): SupabaseConfig {
+    let localUrl = '';
+    let localKey = '';
+    try {
+      localUrl = localStorage.getItem('percky_supabase_url') || '';
+      localKey = localStorage.getItem('percky_supabase_anon_key') || '';
+    } catch {
+      // ignore
+    }
     const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
     const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
     return {
-      url: cleanSupabaseUrl(envUrl),
-      anonKey: envKey.trim()
+      url: cleanSupabaseUrl(localUrl || envUrl),
+      anonKey: (localKey || envKey).trim()
     };
   }
 
   public saveConfig(config: SupabaseConfig): void {
+    const cleanedUrl = cleanSupabaseUrl(config.url);
+    const cleanedKey = config.anonKey.trim();
     this.currentConfig = {
-      url: cleanSupabaseUrl(config.url),
-      anonKey: config.anonKey.trim()
+      url: cleanedUrl,
+      anonKey: cleanedKey
     };
+    try {
+      if (cleanedUrl) {
+        localStorage.setItem('percky_supabase_url', cleanedUrl);
+      } else {
+        localStorage.removeItem('percky_supabase_url');
+      }
+      if (cleanedKey) {
+        localStorage.setItem('percky_supabase_anon_key', cleanedKey);
+      } else {
+        localStorage.removeItem('percky_supabase_anon_key');
+      }
+    } catch {
+      // ignore
+    }
     this.client = null; // Réinitialise l'instance client
   }
 
@@ -495,30 +519,38 @@ class SupabaseService {
     let avatarUrl: string | null = null;
 
     if (imageDataUrl) {
-      if (!imageDataUrl.startsWith('data:image/jpeg;base64,')) {
-        throw new Error("Le format de la photo est invalide. Sélectionnez à nouveau une image.");
-      }
+      if (imageDataUrl.startsWith('http://') || imageDataUrl.startsWith('https://')) {
+        avatarUrl = imageDataUrl;
+      } else if (imageDataUrl.startsWith('data:image/')) {
+        try {
+          const imageResponse = await fetch(imageDataUrl);
+          if (imageResponse.ok) {
+            const imageBlob = await imageResponse.blob();
+            const { error: uploadError } = await client.storage
+              .from('student-avatars')
+              .upload(path, imageBlob, {
+                cacheControl: '3600',
+                contentType: imageBlob.type || 'image/jpeg',
+                upsert: true
+              });
 
-      const imageResponse = await fetch(imageDataUrl);
-      if (!imageResponse.ok) throw new Error("Impossible de préparer la photo sélectionnée.");
-      const imageBlob = await imageResponse.blob();
-      if (imageBlob.size > 500 * 1024) {
-        throw new Error('La photo dépasse la limite autorisée de 500 Ko. Sélectionnez-la à nouveau pour la compresser.');
+            if (!uploadError) {
+              const { data } = client.storage.from('student-avatars').getPublicUrl(path);
+              avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+            } else {
+              console.warn("Storage upload warning (utilisation directe de l'image):", uploadError.message);
+              avatarUrl = imageDataUrl;
+            }
+          } else {
+            avatarUrl = imageDataUrl;
+          }
+        } catch (err) {
+          console.warn("Erreur upload storage, conservation de l'image:", err);
+          avatarUrl = imageDataUrl;
+        }
+      } else {
+        avatarUrl = imageDataUrl;
       }
-
-      const { error: uploadError } = await client.storage
-        .from('student-avatars')
-        .upload(path, imageBlob, {
-          cacheControl: '3600',
-          contentType: 'image/jpeg',
-          upsert: true
-        });
-      if (uploadError) {
-        throw new Error(`Envoi de la photo vers Supabase impossible : ${uploadError.message}`);
-      }
-
-      const { data } = client.storage.from('student-avatars').getPublicUrl(path);
-      avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
     }
 
     const { data: updatedStudent, error: updateError } = await client

@@ -35,6 +35,7 @@ import { StudentPublicReportView } from './StudentPublicReportView';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
+import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
 
 interface StudentSpaceViewProps {
@@ -530,6 +531,87 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayGrade = dailyGrades.find(dg => dg.date === todayStr);
+
+  // Vérification de la validation de l'inscription par le professeur
+  if (studentRecord && studentRecord.validation_status === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-amber-200 shadow-xl p-6 sm:p-8 text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center mx-auto text-amber-700">
+            <Clock className="w-8 h-8 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+              Inscription en attente
+            </span>
+            <h2 className="text-xl font-bold text-slate-900 font-display">
+              Compte en attente de validation
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Bonjour <strong>{currentUser.name}</strong>, votre inscription a bien été enregistrée. Votre professeur doit approuver votre compte avant que vous puissiez accéder à vos quiz, notes et évaluations.
+            </p>
+          </div>
+          <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200 text-left text-xs text-amber-900 space-y-1.5">
+            <div className="font-semibold flex items-center gap-1.5 text-amber-800">
+              <ShieldCheck className="w-4 h-4 text-amber-700" />
+              <span>Détails de votre inscription :</span>
+            </div>
+            <div>Classe : <strong>{studentRecord.class_name || currentUser.class_name || 'Non spécifiée'}</strong></div>
+            <div>Email : <strong>{currentUser.email}</strong></div>
+            <div>Matricule : <strong>{studentRecord.student_number || 'Non renseigné'}</strong></div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={loadData}
+              className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            >
+              Vérifier le statut
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            >
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (studentRecord && studentRecord.validation_status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-rose-200 shadow-xl p-6 sm:p-8 text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-rose-100 border border-rose-300 flex items-center justify-center mx-auto text-rose-700">
+            <XCircle className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+              Inscription refusée
+            </span>
+            <h2 className="text-xl font-bold text-slate-900 font-display">
+              Accès non autorisé
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Bonjour <strong>{currentUser.name}</strong>, votre demande d'inscription a été refusée par l'enseignant. Veuillez contacter votre professeur si vous pensez qu'il s'agit d'une erreur.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            >
+              Retour à la page de connexion
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white flex flex-col text-slate-900 pb-16">
@@ -1445,40 +1527,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <span className="text-[10px] text-slate-400">L'email sert d'identifiant de connexion unique.</span>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700">Photo de profil</label>
-                <div className="flex items-center gap-4">
-                  <StudentAvatar
-                    name={`${editFirstName} ${editLastName}`}
-                    src={editAvatar}
-                    className="w-16 h-16 border border-slate-300 text-base"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <label className="inline-flex items-center gap-2 px-3 py-2 bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors">
-                      <ImagePlus className="w-4 h-4" />
-                      <span>{editAvatar ? 'Remplacer la photo' : 'Ajouter une photo'}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarFileChange}
-                        className="sr-only"
-                        aria-label="Télécharger une photo de profil"
-                      />
-                    </label>
-                    {editAvatar && (
-                      <button
-                        type="button"
-                        onClick={() => setEditAvatar('')}
-                        className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Supprimer</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[10px] text-slate-400">Formats image acceptés. Fichier source jusqu’à 5 Mo ; la photo est compressée à 500 Ko maximum avant l’enregistrement.</span>
-              </div>
+              {/* Téléchargement / Remplacement de photo de profil */}
+              <PhotoUploadInput
+                value={editAvatar}
+                name={`${editFirstName} ${editLastName}`.trim() || 'Mon Profil'}
+                onChange={(photo) => setEditAvatar(photo)}
+                onRemove={() => setEditAvatar('')}
+                label="Photo de profil"
+                helperText="Glissez une image ou cliquez pour télécharger/remplacer votre photo (formats JPG, PNG, WebP acceptés)."
+              />
 
               <div className="pt-2">
                 <button

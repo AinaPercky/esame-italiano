@@ -29,7 +29,12 @@ import {
   Share2,
   Lock,
   Copy,
-  Download
+  Download,
+  Globe,
+  RotateCcw,
+  QrCode,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade } from '../types';
 import { dataService } from '../services/dataService';
@@ -80,38 +85,40 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   // Form State
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDescription, setQuizDescription] = useState('');
-  const [quizTargetClassId, setQuizTargetClassId] = useState(classes[0]?.id || '');
+  const [selectedQuizClassIds, setSelectedQuizClassIds] = useState<string[]>(classes[0] ? [classes[0].id] : []);
   const [quizDuration, setQuizDuration] = useState(10);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+
+  // Modal Partage & QR Code
+  const [sharingQuiz, setSharingQuiz] = useState<Quiz | null>(null);
+  const [sharingQrUrl, setSharingQrUrl] = useState<string>('');
+  const [shareLinkCopied, setShareLinkCopied] = useState<boolean>(false);
 
   // Vue détail / Suivi en direct d'un quiz
   const [activeTrackingQuizId, setActiveTrackingQuizId] = useState<string | null>(null);
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
 
-  // Generate QR code for public quiz
+  // Génération automatique du QR code lorsque sharingQuiz est ouvert
   useEffect(() => {
-    if (activeAnalyticsQuizId) {
-      const quiz = quizzes.find(q => q.id === activeAnalyticsQuizId);
-      if (quiz && quiz.is_public && quiz.public_id) {
-        const baseUrl = window.location.origin + window.location.pathname;
-        const publicUrl = `${baseUrl}?view=public-quiz&id=${quiz.public_id}`;
+    if (sharingQuiz && sharingQuiz.is_public && sharingQuiz.public_id) {
+      const baseUrl = window.location.origin + window.location.pathname;
+      const publicUrl = `${baseUrl}?view=public-quiz&id=${sharingQuiz.public_id}`;
 
-        QRCode.toDataURL(publicUrl, {
-          width: 256,
-          margin: 2,
-          color: {
-            dark: '#1e293b',
-            light: '#ffffff'
-          },
-          errorCorrectionLevel: 'H'
-        })
-          .then(url => setQrDataUrl(url))
-          .catch(err => console.error('Erreur génération QR public:', err));
-      } else {
-        setQrDataUrl('');
-      }
+      QRCode.toDataURL(publicUrl, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#1e293b',
+          light: '#ffffff'
+        },
+        errorCorrectionLevel: 'H'
+      })
+        .then(url => setSharingQrUrl(url))
+        .catch(err => console.error('Erreur génération QR code partage:', err));
+    } else {
+      setSharingQrUrl('');
     }
-  }, [activeAnalyticsQuizId, quizzes]);
+  }, [sharingQuiz]);
 
   // JSON Import Modal State
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
@@ -206,7 +213,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(null);
     setQuizTitle('');
     setQuizDescription('');
-    setQuizTargetClassId(selectedClassId || classes[0]?.id || '');
+    setSelectedQuizClassIds(selectedClassId ? [selectedClassId] : (classes[0] ? [classes[0].id] : []));
     setQuizDuration(10);
     setQuestions([
       {
@@ -226,7 +233,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(quiz);
     setQuizTitle(quiz.title);
     setQuizDescription(quiz.description || '');
-    setQuizTargetClassId(quiz.class_id);
+    const initialClassIds = quiz.class_ids && quiz.class_ids.length > 0 ? quiz.class_ids : (quiz.class_id ? [quiz.class_id] : []);
+    setSelectedQuizClassIds(initialClassIds.length > 0 ? initialClassIds : (selectedClassId ? [selectedClassId] : []));
     setQuizDuration(quiz.duration_minutes || 10);
     setQuestions(quiz.questions ? JSON.parse(JSON.stringify(quiz.questions)) : []);
     setIsEditorOpen(true);
@@ -256,6 +264,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       setFormError('Veuillez renseigner un titre pour le quiz.');
       return;
     }
+    if (selectedQuizClassIds.length === 0) {
+      setFormError('Veuillez sélectionner au moins une classe pour ce quiz.');
+      return;
+    }
     if (questions.length === 0) {
       setFormError('Veuillez ajouter au moins une question.');
       return;
@@ -274,11 +286,14 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       }
     }
 
+    const primaryClassId = selectedQuizClassIds[0] || selectedClassId || classes[0]?.id || '';
+
     if (editingQuiz) {
       dataService.updateQuiz(editingQuiz.id, {
         title: quizTitle,
         description: quizDescription,
-        class_id: quizTargetClassId,
+        class_id: primaryClassId,
+        class_ids: selectedQuizClassIds,
         duration_minutes: quizDuration,
         questions,
         is_public: editingQuiz.is_public || false // Keep existing public status when editing
@@ -287,7 +302,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.createQuiz({
         title: quizTitle,
         description: quizDescription,
-        class_id: quizTargetClassId,
+        class_id: primaryClassId,
+        class_ids: selectedQuizClassIds,
         duration_minutes: quizDuration,
         questions
       });
@@ -313,12 +329,14 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     });
   };
 
-  const handleLaunchQuiz = (quizId: string) => {
+  const handleLaunchQuiz = (quizId: string, isRelaunch = false) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Lancer le Quiz en Direct',
-      message: 'Lancer ce quiz dès maintenant pour tous les élèves de la classe ?\nIl sera accessible pendant exactement 1 heure pour les élèves.',
-      confirmLabel: 'Lancer le Quiz (1h)',
+      title: isRelaunch ? 'Relancer le Quiz en Direct' : 'Lancer le Quiz en Direct',
+      message: isRelaunch
+        ? 'Relancer ce quiz dès maintenant pour tous les élèves ?\nIl sera de nouveau accessible pendant exactement 1 heure pour les élèves qui ne l\'avaient pas encore complété.'
+        : 'Lancer ce quiz dès maintenant pour tous les élèves de la classe ?\nIl sera accessible pendant exactement 1 heure pour les élèves.',
+      confirmLabel: isRelaunch ? 'Relancer le Quiz (1h)' : 'Lancer le Quiz (1h)',
       variant: 'success',
       action: () => {
         dataService.launchQuiz(quizId);
@@ -551,9 +569,20 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
-                            {quiz.class_name || 'Classe'}
-                          </span>
+                          {quiz.class_ids && quiz.class_ids.length > 1 ? (
+                            quiz.class_ids.map(cid => {
+                              const c = classes.find(item => item.id === cid);
+                              return (
+                                <span key={cid} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
+                                  {c?.name || 'Classe'}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
+                              {quiz.class_name || 'Classe'}
+                            </span>
+                          )}
 
                           {isLive && (
                             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
@@ -564,13 +593,25 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
                           {isClosed && (
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
-                              Clôturé (Notes de 0 appliquées aux retardataires)
+                              Clôturé
                             </span>
                           )}
 
                           {quiz.status === 'draft' && (
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
                               Brouillon
+                            </span>
+                          )}
+
+                          {quiz.is_public ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              <Globe className="w-3 h-3 text-indigo-600" />
+                              <span>Public (Lien actif)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              <span>Privé</span>
                             </span>
                           )}
                         </div>
@@ -613,11 +654,23 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleLaunchQuiz(quiz.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
                             title="Lancer le quiz pour la classe pendant 1 heure"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Lancer le Quiz (1h)</span>
+                            <span>Lancer (1h)</span>
+                          </button>
+                        )}
+
+                        {isClosed && (
+                          <button
+                            type="button"
+                            onClick={() => handleLaunchQuiz(quiz.id, true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title="Relancer ce quiz pour 1 heure (accessible à tous les élèves n'ayant pas encore complété le test)"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Relancer (1h)</span>
                           </button>
                         )}
 
@@ -643,67 +696,53 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           </>
                         )}
 
-                        {/* Public Quiz Controls */}
-                        {quiz.status !== 'draft' && (
-                          <div className="flex items-center gap-2 space-x-3">
-                            {!quiz.is_public && (
+                        {/* Public Quiz Controls (accessible for any quiz status) */}
+                        <div className="flex items-center gap-1.5">
+                          {!quiz.is_public ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = dataService.updateQuiz(quiz.id, { is_public: true });
+                                loadData();
+                                if (onRefresh) onRefresh();
+                                setSharingQuiz(updated);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              title="Rendre ce quiz accessible publiquement via un lien direct sans connexion"
+                            >
+                              <Globe className="w-3.5 h-3.5" />
+                              <span>Publier</span>
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setSharingQuiz(quiz)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                title="Voir le lien public et télécharger le QR Code"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>Partager & QR</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  dataService.updateQuiz(quiz.id, { is_public: true });
+                                  dataService.updateQuiz(quiz.id, { is_public: false });
                                   loadData();
                                   if (onRefresh) onRefresh();
+                                  if (sharingQuiz?.id === quiz.id) {
+                                    setSharingQuiz(null);
+                                  }
                                 }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                                title="Publier ce quiz publiquement"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors cursor-pointer"
+                                title="Rendre ce quiz privé (dépublier le lien)"
                               >
-                                <Share2 className="w-3.5 h-3.5" />
-                                <span>Publier</span>
+                                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Rendre Privé</span>
                               </button>
-                            )}
-                            {quiz.is_public && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    dataService.updateQuiz(quiz.id, { is_public: false });
-                                    loadData();
-                                    if (onRefresh) onRefresh();
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                                  title="Rendre ce quiz privé"
-                                >
-                                  <Lock className="w-3.5 h-3.5" />
-                                  <span>Privé</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const baseUrl = window.location.origin + window.location.pathname;
-                                    const publicUrl = `${baseUrl}?view=public-quiz&id=${quiz.public_id}`;
-                                    handleCopyLink(publicUrl);
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                                  title="Copier le lien public"
-                                >
-                                  <Copy className="w-3.5 h-3.5" />
-                                  <span>Lien</span>
-                                </button>
-                                {qrDataUrl && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDownloadQR(qrDataUrl, `QRCode_Public_${quiz.title.replace(/\s+/g, '_')}.png`)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                                    title="Télécharger le QR Code"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span>QR Code</span>
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
 
                         <button
                           type="button"
@@ -908,17 +947,60 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Classe cible *</label>
-                  <select
-                    value={quizTargetClassId}
-                    onChange={(e) => setQuizTargetClassId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                  >
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700">Classes cibles (multi-classes supportées) *</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuizClassIds(classes.map(c => c.id))}
+                        className="text-[11px] font-semibold text-amber-600 hover:text-amber-700 underline cursor-pointer"
+                      >
+                        Toutes les classes
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuizClassIds([])}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                      >
+                        Désélectionner
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    {classes.map(c => {
+                      const isSelected = selectedQuizClassIds.includes(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedQuizClassIds(selectedQuizClassIds.filter(id => id !== c.id));
+                            } else {
+                              setSelectedQuizClassIds([...selectedQuizClassIds, c.id]);
+                            }
+                          }}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
+                            isSelected ? 'bg-amber-700 text-white' : 'border border-slate-300'
+                          }`}>
+                            {isSelected ? '✓' : ''}
+                          </span>
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedQuizClassIds.length === 0 && (
+                    <p className="text-[11px] text-rose-500">Sélectionnez au moins une classe pour le quiz.</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -1516,6 +1598,190 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           </div>
         );
       })()}
+
+      {/* Modal Partage & QR Code du Quiz Public */}
+      {sharingQuiz && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Partage & QR Code du Quiz Public</h3>
+                  <p className="text-xs text-indigo-200 truncate max-w-xs">{sharingQuiz.title}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSharingQuiz(null)}
+                className="p-1.5 text-indigo-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Publication Status Banner */}
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-3 h-3 rounded-full ${sharingQuiz.is_public ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">
+                      Statut : {sharingQuiz.is_public ? 'Publié (Accessible par lien)' : 'Privé (Lien désactivé)'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {sharingQuiz.is_public 
+                        ? 'Tout le monde avec le lien ou le QR code peut composer sans compte' 
+                        : 'Seuls les élèves de la classe connectés peuvent y accéder'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newStatus = !sharingQuiz.is_public;
+                    const updated = dataService.updateQuiz(sharingQuiz.id, { is_public: newStatus });
+                    setSharingQuiz(updated);
+                    loadData();
+                    if (onRefresh) onRefresh();
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    sharingQuiz.is_public
+                      ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs'
+                  }`}
+                >
+                  {sharingQuiz.is_public ? 'Rendre Privé' : 'Activer le lien'}
+                </button>
+              </div>
+
+              {sharingQuiz.is_public ? (
+                <>
+                  {/* Shareable Link Input with Copy button */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>Lien direct unique pour les participants :</span>
+                      {publicLinkCopied && (
+                        <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> Lien copié !
+                        </span>
+                      )}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${window.location.origin}${window.location.pathname}?view=public-quiz&id=${sharingQuiz.public_id}`}
+                        className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 select-all focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = `${window.location.origin}${window.location.pathname}?view=public-quiz&id=${sharingQuiz.public_id}`;
+                          handleCopyLink(url);
+                        }}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copier</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* QR Code Presentation */}
+                  <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs shrink-0 flex items-center justify-center">
+                      {sharingQrUrl ? (
+                        <img
+                          src={sharingQrUrl}
+                          alt="QR Code Quiz Public"
+                          className="w-36 h-36 object-contain rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-36 h-36 flex items-center justify-center text-xs text-slate-400">
+                          Génération QR...
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 text-center sm:text-left">
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-slate-800">
+                          QR Code à projeter ou imprimer
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Les participants scannent simplement ce QR code avec leur smartphone pour lancer l'évaluation instantanément.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadQR(sharingQrUrl, `QRCode_Quiz_${sharingQuiz.title.replace(/\s+/g, '_')}.png`)}
+                          disabled={!sharingQrUrl}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Télécharger le QR (.PNG)</span>
+                        </button>
+                        <a
+                          href={`${window.location.origin}${window.location.pathname}?view=public-quiz&id=${sharingQuiz.public_id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Tester le quiz</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Confidentialité garantie :</strong> Les réponses et scores des participants au quiz public sont calculés en temps réel côté client et <u>ne sont jamais enregistrés en base de données</u>.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="py-6 text-center space-y-3">
+                  <Lock className="w-10 h-10 text-slate-400 mx-auto" />
+                  <div className="font-bold text-slate-800 text-sm">Ce quiz est actuellement privé</div>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Activez la publication pour générer un lien partageable et un QR code utilisable par tous les participants.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = dataService.updateQuiz(sharingQuiz.id, { is_public: true });
+                      setSharingQuiz(updated);
+                      loadData();
+                      if (onRefresh) onRefresh();
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer"
+                  >
+                    Activer la publication
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setSharingQuiz(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -22,6 +22,7 @@ export interface Student {
   updated_at: string;
   validation_status?: 'pending' | 'approved' | 'rejected'; // Statut de validation de l'inscription
   class_name?: string;
+  avatar?: string;
 }
 
 export interface ExamRubric {
@@ -148,7 +149,7 @@ export interface QuizQuestion {
 export interface Quiz {
   id: string;
   public_id?: string; // UUID unique pour l'accès public via lien partageable
-  is_public: boolean; // Indique si le quiz est publié publiquement
+  is_public?: boolean; // Indique si le quiz est publié publiquement
   title: string;
   description?: string;
   class_id: string; // Primary class (backward compatibility)
