@@ -14,6 +14,7 @@ interface PublicQuizViewProps {
 export const PublicQuizView: React.FC<PublicQuizViewProps> = ({ quizId, onBackToApp }) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [studentName, setStudentName] = useState<string>('');
   const [started, setStarted] = useState<boolean>(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
