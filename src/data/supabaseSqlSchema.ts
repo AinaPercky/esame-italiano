@@ -229,7 +229,10 @@ COMMIT;
 export const QUIZ_SUPABASE_MIGRATION_SQL = `-- Ajout non destructif de la persistance des quiz et de leurs résultats
 CREATE TABLE IF NOT EXISTS public.quizzes (
     id TEXT PRIMARY KEY,
+    public_id TEXT,
+    is_public BOOLEAN NOT NULL DEFAULT false,
     class_id TEXT NOT NULL,
+    class_ids JSONB,
     title TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
