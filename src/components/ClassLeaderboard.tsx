@@ -40,8 +40,9 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     return dates.sort((a, b) => b.localeCompare(a));
   }, [dailyGrades]);
 
+  // En vue étudiant : toujours afficher toutes les dates (cumul global, sans filtre de période)
   const [selectedDate, setSelectedDate] = useState<string>(
-    availableDates[0] || new Date().toISOString().split('T')[0]
+    isStudentView ? ALL_DATES : (availableDates[0] || new Date().toISOString().split('T')[0])
   );
 
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
@@ -216,7 +217,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 <h3 className="font-display font-bold text-lg sm:text-xl text-white">
                   {effectiveQuizId
                     ? 'Classement du Quiz'
-                    : selectedDate === ALL_DATES
+                    : (isStudentView || selectedDate === ALL_DATES)
                       ? 'Classement Cumulé — Tous les Quiz'
                       : 'Classement Journalier Cumulé'}
                 </h3>
@@ -276,32 +277,34 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             </div>
           )}
 
-          {/* Date selector */}
-          <div className={isStudentView ? 'sm:col-span-2' : ''}>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-amber-200 block mb-1">
-              Période
-            </label>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-amber-300 shrink-0" />
-              <select
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setSelectedQuizId('');
-                }}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
-              >
-                <option value={ALL_DATES} className="bg-slate-900 text-white">
-                  Toutes les dates
-                </option>
-                {availableDates.map(d => (
-                  <option key={d} value={d} className="bg-slate-900 text-white">
-                    {d === todayFormatted ? `Aujourd'hui (${d})` : d}
+          {/* Date selector — masqué en vue étudiant (cumul global forcé) */}
+          {!isStudentView && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-amber-200 block mb-1">
+                Période
+              </label>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-300 shrink-0" />
+                <select
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setSelectedQuizId('');
+                  }}
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
+                >
+                  <option value={ALL_DATES} className="bg-slate-900 text-white">
+                    Toutes les dates
                   </option>
-                ))}
-              </select>
+                  {availableDates.map(d => (
+                    <option key={d} value={d} className="bg-slate-900 text-white">
+                      {d === todayFormatted ? `Aujourd'hui (${d})` : d}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className={isStudentView ? 'sm:col-span-2' : ''}>
             <label className="text-[10px] font-bold uppercase tracking-wider text-amber-200 block mb-1">
@@ -313,9 +316,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
               className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
             >
               <option value="" className="bg-slate-900 text-white">
-                {selectedDate === ALL_DATES
-                  ? 'Tous les quiz, toutes les dates'
-                  : 'Cumul journalier de tous les quiz'}
+                Cumul de tous les quiz
               </option>
               {availableQuizzes.map(quiz => (
                 <option key={quiz.id} value={quiz.id} className="bg-slate-900 text-white">
@@ -332,7 +333,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         <div className="p-5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
           <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>{effectiveQuizId ? 'Podium du quiz' : 'Podium de la journée'}</span>
+            <span>{effectiveQuizId ? 'Podium du quiz' : (isStudentView || selectedDate === ALL_DATES) ? 'Podium Général' : 'Podium de la journée'}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -477,12 +478,12 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
           <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
             <Users className="w-4 h-4 text-slate-400" />
             <span>
-              {effectiveQuizId ? 'Classement du quiz' : 'Classement général de la journée'}
+              {effectiveQuizId ? 'Classement du quiz' : (isStudentView || selectedDate === ALL_DATES) ? 'Classement général — Tous les quiz' : 'Classement général de la journée'}
               {' '}({leaderboardEntries.graded.length} élève(s) classé(s))
             </span>
           </div>
           <span className="text-[11px] text-slate-400 font-mono">
-            {selectedDate === ALL_DATES ? 'Toutes les dates' : selectedDate}
+            {(isStudentView || selectedDate === ALL_DATES) ? 'Toutes les dates' : selectedDate}
           </span>
         </div>
 
