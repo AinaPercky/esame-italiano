@@ -17,7 +17,6 @@ import {
 } from './publicQuiz/publicQuizUtils';
 import {
   parsePublicQuizConfig,
-  getPublicQuizDescription,
 } from './publicQuiz/publicQuizConfig';
 
 interface PublicQuizViewProps {
@@ -49,7 +48,7 @@ function saveToStorage(key: string, value: unknown) {
 }
 
 function clearStorage(quizId: string) {
-  ['studentName', 'answers', 'timeLeftMs', 'currentIndex', 'validated'].forEach(
+  ['studentName', 'answers', 'questionTimeLeftMs', 'currentIndex', 'validated'].forEach(
     (suffix) => localStorage.removeItem(storageKey(quizId, suffix))
   );
 }
@@ -71,7 +70,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [allowBackNavigation, setAllowBackNavigation] = useState<boolean>(true);
   const [showCorrectionAtEnd, setShowCorrectionAtEnd] = useState<boolean>(false);
 
-  // ── Active quiz ID (may change when user navigates from home list) ─────────
+  // ── Active quiz ID ─────────────────────────────────────────────────────────
   const [activeQuizId, setActiveQuizId] = useState<string | null>(quizId);
 
   // ── Student & quiz progress (persisted) ───────────────────────────────────
@@ -79,16 +78,101 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [validatedSet, setValidatedSet] = useState<Record<string, boolean>>({});
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(0);
+
+  // ── Per-question timer ─────────────────────────────────────────────────────
+  // timePerQuestionMs = (duration_minutes * 60 * 1000) / questions.length
+  const [timePerQuestionMs, setTimePerQuestionMs] = useState<number>(0);
+  // Current question time remaining
+  const [questionTimeLeftMs, setQuestionTimeLeftMs] = useState<number>(0);
 
   // ── Result ────────────────────────────────────────────────────────────────
   const [result, setResult] = useState<QuizEvaluationResult | null>(null);
 
-  // Use a ref for the timer so we can call handleSubmit without stale closures
+  // ── Per-question feedback (shown after validation) ─────────────────────────
+  const [perQuestionFeedback, setPerQuestionFeedback] = useState<
+    Record<string, QuizFeedbackEntry>
+  >({});
+
+  // Refs to avoid stale closures in timer callbacks
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isQuizActive = screen === 'quiz';
 
-  // ── Load quiz data ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helpers (stable refs so callbacks don't need them in deps)
+  // ─────────────────────────────────────────────────────────────────────────
+  const quizRef = useRef<Quiz | null>(null);
+  const answersRef = useRef<Record<string, string>>({});
+  const activeQuizIdRef = useRef<string | null>(null);
+  const currentIndexRef = useRef<number>(0);
+  const validatedSetRef = useRef<Record<string, boolean>>({});
+  const perQuestionFeedbackRef = useRef<Record<string, QuizFeedbackEntry>>({});
+  const timePerQuestionMsRef = useRef<number>(0);
+
+  // Keep refs in sync with state
+  useEffect(() => { quizRef.current = quiz; }, [quiz]);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { activeQuizIdRef.current = activeQuizId; }, [activeQuizId]);
+  useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
+  useEffect(() => { validatedSetRef.current = validatedSet; }, [validatedSet]);
+  useEffect(() => { perQuestionFeedbackRef.current = perQuestionFeedback; }, [perQuestionFeedback]);
+  useEffect(() => { timePerQuestionMsRef.current = timePerQuestionMs; }, [timePerQuestionMs]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Submit the entire quiz (all answers collected so far)
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleSubmit = useCallback(() => {
+    const q = quizRef.current;
+    const qId = activeQuizIdRef.current;
+    if (!q) return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const evaluation = evaluateQuizAnswers(q, answersRef.current);
+    setResult(evaluation);
+    if (qId) clearStorage(qId);
+    setScreen('result');
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Validate current question and compute feedback
+  // ─────────────────────────────────────────────────────────────────────────
+  const doValidate = useCallback((questionId: string) => {
+    const q = quizRef.current;
+    if (!q) return;
+
+    const currentAnswers = answersRef.current;
+    const evalResult = evaluateQuizAnswers(q, currentAnswers);
+    const entry = evalResult.feedback[questionId];
+
+    if (entry) {
+      setPerQuestionFeedback((prev) => ({ ...prev, [questionId]: entry }));
+      perQuestionFeedbackRef.current = { ...perQuestionFeedbackRef.current, [questionId]: entry };
+    }
+    setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
+    validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Advance to next question OR submit if last
+  // ─────────────────────────────────────────────────────────────────────────
+  const doAdvance = useCallback((fromIndex: number, total: number) => {
+    if (fromIndex < total - 1) {
+      const nextIdx = fromIndex + 1;
+      setCurrentIndex(nextIdx);
+      currentIndexRef.current = nextIdx;
+      // Reset per-question timer
+      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    } else {
+      handleSubmit();
+    }
+  }, [handleSubmit]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Load quiz data
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeQuizId) {
       setScreen('home');
@@ -125,39 +209,48 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setAllowBackNavigation(config.allowBackNavigation);
       setShowCorrectionAtEnd(config.showCorrectionAtEnd);
       setQuiz(q);
+      quizRef.current = q;
 
-      // Restore persisted state if any
+      // Compute per-question time
+      const totalMs = (q.duration_minutes || 10) * 60 * 1000;
+      const numQ = Math.max(1, (q.questions || []).length);
+      const perQ = Math.floor(totalMs / numQ);
+      setTimePerQuestionMs(perQ);
+      timePerQuestionMsRef.current = perQ;
+
+      // Restore persisted state
       const savedName = loadFromStorage<string>(storageKey(activeQuizId, 'studentName'), '');
       const savedAnswers = loadFromStorage<Record<string, string>>(
-        storageKey(activeQuizId, 'answers'),
-        {}
-      );
-      const savedTimeMs = loadFromStorage<number>(
-        storageKey(activeQuizId, 'timeLeftMs'),
-        (q.duration_minutes || 10) * 60 * 1000
+        storageKey(activeQuizId, 'answers'), {}
       );
       const savedIndex = loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
       const savedValidated = loadFromStorage<Record<string, boolean>>(
-        storageKey(activeQuizId, 'validated'),
-        {}
+        storageKey(activeQuizId, 'validated'), {}
+      );
+      // Restore per-question timer (if same question reloaded, keep remaining time)
+      const savedQTime = loadFromStorage<number>(
+        storageKey(activeQuizId, 'questionTimeLeftMs'), perQ
       );
 
       setStudentName(savedName);
       setAnswers(savedAnswers);
-      setTimeLeftMs(savedTimeMs);
+      answersRef.current = savedAnswers;
       setCurrentIndex(savedIndex);
+      currentIndexRef.current = savedIndex;
       setValidatedSet(savedValidated);
+      validatedSetRef.current = savedValidated;
+      setQuestionTimeLeftMs(savedQTime);
 
       setScreen('start');
     };
 
     void loadQuiz();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [activeQuizId]);
 
-  // ── Persist progress whenever it changes ──────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Persist progress
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
     saveToStorage(storageKey(activeQuizId, 'answers'), answers);
@@ -167,116 +260,151 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
-    saveToStorage(storageKey(activeQuizId, 'timeLeftMs'), timeLeftMs);
-  }, [activeQuizId, timeLeftMs, screen]);
+    saveToStorage(storageKey(activeQuizId, 'questionTimeLeftMs'), questionTimeLeftMs);
+  }, [activeQuizId, questionTimeLeftMs, screen]);
 
-  // ── Submit quiz ────────────────────────────────────────────────────────────
-  const handleSubmit = useCallback(() => {
-    if (!quiz) return;
+  // ─────────────────────────────────────────────────────────────────────────
+  // Per-question countdown timer
+  // Resets whenever currentIndex changes (new question) or quiz starts
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isQuizActive) return;
+
+    // Clear any previous timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    const evaluation = evaluateQuizAnswers(quiz, answers);
-    setResult(evaluation);
-    if (activeQuizId) clearStorage(activeQuizId);
-    setScreen('result');
-  }, [quiz, answers, activeQuizId]);
-
-  // ── Timer ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isQuizActive) return;
 
     timerRef.current = setInterval(() => {
-      setTimeLeftMs((prev) => {
+      setQuestionTimeLeftMs((prev) => {
         if (prev <= 100) {
-          // Will fire submit on next render tick to avoid setState-in-setState
-          return 0;
+          return 0; // Will trigger the zero-watcher effect below
         }
         return prev - 100;
       });
     }, 100);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [isQuizActive]);
+    // Re-run whenever currentIndex changes (resets timer for each question)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isQuizActive, currentIndex]);
 
-  // Watch for timer reaching 0 and auto-submit
-  const timeZeroRef = useRef(false);
+  // ─────────────────────────────────────────────────────────────────────────
+  // When per-question timer hits 0 → auto-validate & advance
+  // ─────────────────────────────────────────────────────────────────────────
+  const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
-    if (isQuizActive && timeLeftMs === 0 && !timeZeroRef.current) {
-      timeZeroRef.current = true;
-      handleSubmit();
+    if (!isQuizActive || questionTimeLeftMs !== 0) return;
+    if (timeZeroFiredRef.current === currentIndex) return; // already handled
+
+    const q = quizRef.current;
+    if (!q) return;
+
+    timeZeroFiredRef.current = currentIndex;
+
+    const question = q.questions[currentIndex];
+    if (!question) return;
+
+    // Stop timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-    if (!isQuizActive) {
-      timeZeroRef.current = false;
+
+    // Auto-validate if not already done
+    if (!validatedSetRef.current[question.id]) {
+      doValidate(question.id);
     }
-  }, [timeLeftMs, isQuizActive, handleSubmit]);
 
-  // ── Navigation handlers ────────────────────────────────────────────────────
-  const handleStart = useCallback(() => {
-    if (!quiz || !studentName.trim()) return;
-    saveToStorage(storageKey(activeQuizId!, 'studentName'), studentName.trim());
-    // Reset timer to full duration when starting fresh only if time was never persisted
-    const persisted = loadFromStorage<number | null>(storageKey(activeQuizId!, 'timeLeftMs'), null);
-    if (persisted === null) {
-      setTimeLeftMs((quiz.duration_minutes || 10) * 60 * 1000);
-    }
-    setScreen('quiz');
-  }, [quiz, studentName, activeQuizId]);
+    // Advance after a short delay so the student can see the correction briefly
+    setTimeout(() => {
+      const total = quizRef.current?.questions.length ?? 0;
+      doAdvance(currentIndexRef.current, total);
+    }, showCorrectionAtEnd ? 400 : 1500);
+  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, doAdvance, showCorrectionAtEnd]);
 
-  const currentQuestion = quiz?.questions[currentIndex];
-  const totalQuestions = quiz?.questions.length ?? 0;
-  const progressPercent = totalQuestions > 0 ? ((currentIndex + 1) / totalQuestions) * 100 : 0;
-  const currentAnswer = currentQuestion ? (answers[currentQuestion.id] ?? '') : '';
-  const isCurrentValidated = currentQuestion ? Boolean(validatedSet[currentQuestion.id]) : false;
-  const timeTone = getQuizTimeTone(timeLeftMs);
-
-  // Per-question feedback (only available after validation)
-  const [perQuestionFeedback, setPerQuestionFeedback] = useState<
-    Record<string, QuizFeedbackEntry>
-  >({});
-
-  const handleValidate = useCallback(() => {
-    if (!currentQuestion) return;
-    const evalResult = evaluateQuizAnswers(quiz!, { ...answers });
-    const entry = evalResult.feedback[currentQuestion.id];
-    setPerQuestionFeedback((prev) => ({
-      ...prev,
-      [currentQuestion.id]: entry,
-    }));
-    setValidatedSet((prev) => ({ ...prev, [currentQuestion.id]: true }));
-  }, [currentQuestion, quiz, answers]);
-
-  const handleNext = useCallback(() => {
-    if (currentIndex < totalQuestions - 1) {
-      setCurrentIndex((i) => i + 1);
-    } else {
-      handleSubmit();
-    }
-  }, [currentIndex, totalQuestions, handleSubmit]);
-
-  const handlePrevious = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
+  // Reset zero-fired tracker when question index changes (new question)
+  useEffect(() => {
+    if (timeZeroFiredRef.current !== currentIndex) {
+      // New question arrived — allow timer-zero to fire again for this index
+      // (we don't reset to -1 here because currentIndex IS the new question)
     }
   }, [currentIndex]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Start handler
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleStart = useCallback(() => {
+    if (!quizRef.current || !studentName.trim()) return;
+    const qId = activeQuizIdRef.current;
+    if (qId) saveToStorage(storageKey(qId, 'studentName'), studentName.trim());
+    // Reset timer to per-question duration
+    setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    setScreen('quiz');
+  }, [studentName]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // User-triggered validate
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleValidate = useCallback(() => {
+    const q = quizRef.current;
+    if (!q) return;
+    const question = q.questions[currentIndexRef.current];
+    if (!question) return;
+    doValidate(question.id);
+  }, [doValidate]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // User-triggered next
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleNext = useCallback(() => {
+    const q = quizRef.current;
+    if (!q) return;
+    doAdvance(currentIndexRef.current, q.questions.length);
+  }, [doAdvance]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentIndexRef.current > 0) {
+      const prev = currentIndexRef.current - 1;
+      setCurrentIndex(prev);
+      currentIndexRef.current = prev;
+      // Reset per-question timer when going back
+      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    }
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Retry
+  // ─────────────────────────────────────────────────────────────────────────
   const handleRetry = useCallback(() => {
-    if (!activeQuizId || !quiz) return;
-    clearStorage(activeQuizId);
+    const qId = activeQuizIdRef.current;
+    const q = quizRef.current;
+    if (!qId || !q) return;
+    clearStorage(qId);
     setAnswers({});
+    answersRef.current = {};
     setValidatedSet({});
+    validatedSetRef.current = {};
     setPerQuestionFeedback({});
+    perQuestionFeedbackRef.current = {};
     setCurrentIndex(0);
-    setTimeLeftMs((quiz.duration_minutes || 10) * 60 * 1000);
+    currentIndexRef.current = 0;
+    setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    timeZeroFiredRef.current = -1;
     setResult(null);
     setScreen('start');
-  }, [activeQuizId, quiz]);
+  }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Navigation between quizzes
+  // ─────────────────────────────────────────────────────────────────────────
   const handleOpenQuiz = useCallback((publicId: string) => {
-    // Update URL without reload
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'public-quiz');
     url.searchParams.set('id', publicId);
@@ -285,17 +413,22 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   }, []);
 
   const handleBackToList = useCallback(() => {
-    // Go back to home list
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'public-quiz');
     url.searchParams.delete('id');
     window.history.pushState({}, '', url.toString());
     setActiveQuizId(null);
     setQuiz(null);
+    quizRef.current = null;
     setScreen('home');
   }, []);
 
-  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Keyboard shortcuts
+  // ─────────────────────────────────────────────────────────────────────────
+  const currentQuestion = quiz?.questions[currentIndex];
+  const isCurrentValidated = currentQuestion ? Boolean(validatedSet[currentQuestion.id]) : false;
+
   useEffect(() => {
     if (screen !== 'quiz' || !currentQuestion) return;
 
@@ -313,7 +446,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
         const num = parseInt(e.key, 10);
         if (num >= 1 && num <= (currentQuestion.options?.length ?? 0)) {
           const opt = currentQuestion.options![num - 1];
-          setAnswers((prev) => ({ ...prev, [currentQuestion.id]: opt }));
+          setAnswers((prev) => {
+            const next = { ...prev, [currentQuestion.id]: opt };
+            answersRef.current = next;
+            return next;
+          });
         }
       }
     };
@@ -322,7 +459,17 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [screen, currentQuestion, isCurrentValidated, handleValidate, handleNext]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived display values
+  // ─────────────────────────────────────────────────────────────────────────
+  const totalQuestions = quiz?.questions.length ?? 0;
+  const progressPercent = totalQuestions > 0 ? ((currentIndex + 1) / totalQuestions) * 100 : 0;
+  const currentAnswer = currentQuestion ? (answers[currentQuestion.id] ?? '') : '';
+  const timeTone = getQuizTimeTone(questionTimeLeftMs);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
   if (screen === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -400,13 +547,17 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
             isValidated={isCurrentValidated}
             canGoBack={allowBackNavigation && currentIndex > 0}
             progressPercent={progressPercent}
-            timeLeft={timeLeftMs}
+            timeLeft={questionTimeLeftMs}
             timeTone={timeTone}
             feedback={feedback}
             showCorrection={!showCorrectionAtEnd}
-            onAnswerChange={(val) =>
-              setAnswers((prev) => ({ ...prev, [currentQuestion.id]: val }))
-            }
+            onAnswerChange={(val) => {
+              setAnswers((prev) => {
+                const next = { ...prev, [currentQuestion.id]: val };
+                answersRef.current = next;
+                return next;
+              });
+            }}
             onValidate={handleValidate}
             onNext={handleNext}
             onPrevious={handlePrevious}
@@ -434,7 +585,6 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     );
   }
 
-  // Fallback
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
