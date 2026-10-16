@@ -3,6 +3,7 @@ import {
   CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, BookOpen, AlertCircle, Loader2, Play
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { Quiz, QuizQuestion } from '../types';
 
 interface PublicQuizViewProps {
@@ -13,21 +14,34 @@ interface PublicQuizViewProps {
 export const PublicQuizView: React.FC<PublicQuizViewProps> = ({ quizId, onBackToApp }) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [studentName, setStudentName] = useState<string>('');
   const [started, setStarted] = useState<boolean>(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }>>({});
   const [timeLeft, setTimeLeft] = useState<number>(0);
   
   useEffect(() => {
-    const q = dataService.getPublicQuiz(quizId);
-    if (q) {
-      setQuiz(q);
-      setTimeLeft((q.duration_minutes || 10) * 60);
-    }
-    setLoading(false);
+    const loadQuiz = async () => {
+      setLoading(true);
+      // 1. Essayer d'abord avec le service local
+      let q = dataService.getPublicQuiz(quizId);
+      
+      // 2. Si non trouvé, essayer le service distant
+      if (!q) {
+        try {
+          q = await supabaseService.fetchPublicQuiz(quizId);
+        } catch (err) {
+          console.error("Erreur chargement quiz distant:", err);
+        }
+      }
+
+      if (q) {
+        setQuiz(q);
+        setTimeLeft((q.duration_minutes || 10) * 60);
+      }
+      setLoading(false);
+    };
+    loadQuiz();
   }, [quizId]);
 
   useEffect(() => {
