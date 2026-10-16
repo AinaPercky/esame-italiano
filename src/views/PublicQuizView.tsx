@@ -296,7 +296,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   }, [isQuizActive, currentIndex]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // When per-question timer hits 0 → auto-validate & advance
+  // When per-question timer hits 0 → no answer = 0 pts, advance immediately
+  // (no validation feedback shown — just skip to next question)
   // ─────────────────────────────────────────────────────────────────────────
   const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
@@ -308,26 +309,18 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
     timeZeroFiredRef.current = currentIndex;
 
-    const question = q.questions[currentIndex];
-    if (!question) return;
-
     // Stop timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    // Auto-validate if not already done
-    if (!validatedSetRef.current[question.id]) {
-      doValidate(question.id);
-    }
-
-    // Advance after a short delay so the student can see the correction briefly
+    // Advance directly — no validation, no feedback, answer counts as empty (0 pts)
     setTimeout(() => {
       const total = quizRef.current?.questions.length ?? 0;
       doAdvance(currentIndexRef.current, total);
-    }, showCorrectionAtEnd ? 400 : 1500);
-  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, doAdvance, showCorrectionAtEnd]);
+    }, 300);
+  }, [questionTimeLeftMs, isQuizActive, currentIndex, doAdvance]);
 
   // Reset zero-fired tracker when question index changes (new question)
   useEffect(() => {
@@ -369,15 +362,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     doAdvance(currentIndexRef.current, q.questions.length);
   }, [doAdvance]);
 
-  const handlePrevious = useCallback(() => {
-    if (currentIndexRef.current > 0) {
-      const prev = currentIndexRef.current - 1;
-      setCurrentIndex(prev);
-      currentIndexRef.current = prev;
-      // Reset per-question timer when going back
-      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
-    }
-  }, []);
+  // Précédent supprimé — navigation arrière désactivée
 
   // ─────────────────────────────────────────────────────────────────────────
   // Retry
@@ -545,7 +530,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
             totalQuestions={totalQuestions}
             answer={currentAnswer}
             isValidated={isCurrentValidated}
-            canGoBack={allowBackNavigation && currentIndex > 0}
+            canGoBack={false}
             progressPercent={progressPercent}
             timeLeft={questionTimeLeftMs}
             timeTone={timeTone}
@@ -560,7 +545,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
             }}
             onValidate={handleValidate}
             onNext={handleNext}
-            onPrevious={handlePrevious}
+            onPrevious={() => {}}
           />
         </div>
       </div>
