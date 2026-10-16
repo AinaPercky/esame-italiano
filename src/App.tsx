@@ -99,11 +99,11 @@ export default function App() {
   const publicQuizViewId = urlParams.get('id') || '';
 
   if (isPublicMode) {
-    // Public quiz view
-    if (urlParams.get('view') === 'public-quiz' && publicQuizViewId) {
+    // Public quiz view (with or without a specific quiz id)
+    if (urlParams.get('view') === 'public-quiz') {
       return (
         <PublicQuizView
-          quizId={publicQuizViewId}
+          quizId={publicQuizViewId || null}
           onBackToApp={() => {
             setIsPublicMode(false);
             window.history.replaceState({}, '', window.location.pathname);
