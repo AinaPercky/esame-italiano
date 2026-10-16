@@ -1,4 +1,4 @@
-const MAX_AVATAR_BYTES = 500 * 1024;
+const MAX_AVATAR_BYTES = 200 * 1024; // 200 Ko — seuil max absolu
 const MAX_AVATAR_DIMENSION = 512;
 
 function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
@@ -48,7 +48,7 @@ export async function compressAvatarImage(image: HTMLImageElement): Promise<stri
     canvas.height = height;
     context.drawImage(image, 0, 0, width, height);
 
-    for (const quality of [0.82, 0.7, 0.58, 0.46, 0.34]) {
+    for (const quality of [0.85, 0.75, 0.62, 0.50, 0.38, 0.25]) {
       const blob = await canvasToJpeg(canvas, quality);
       if (blob.size <= MAX_AVATAR_BYTES) return blobToDataUrl(blob);
     }
@@ -57,5 +57,5 @@ export async function compressAvatarImage(image: HTMLImageElement): Promise<stri
     height = Math.max(1, Math.floor(height * 0.8));
   }
 
-  throw new Error('La photo ne peut pas être compressée sous 500 Ko. Essayez une autre image.');
+  throw new Error('La photo ne peut pas être compressée sous 200 Ko. Essayez une autre image.');
 }

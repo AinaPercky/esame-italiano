@@ -11,64 +11,109 @@ interface PhotoUploadInputProps {
   helperText?: string;
 }
 
-/**
- * Compresse une image côté client via un canvas HTML5
- * Dimensions max: 400x400 (parfait pour avatar)
- * Sortie: data URL JPEG optimisée (< 200 Ko)
- */
-export async function compressAvatarFile(file: File, maxDim = 400, quality = 0.85): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('image/')) {
-      reject(new Error('Veuillez sélectionner un fichier image valide (JPG, PNG, WebP).'));
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      reject(new Error("L'image d'origine ne doit pas dépasser 8 Mo."));
-      return;
-    }
+const TARGET_MIN_BYTES = 50 * 1024;   //  50 Ko — seuil min pour garder une qualité acceptable
+const TARGET_MAX_BYTES = 200 * 1024;  // 200 Ko — seuil max absolu
 
+/**
+ * Compresse une image côté client via un canvas HTML5.
+ * Utilise une bisection sur la qualité JPEG (puis réduit les dimensions si nécessaire)
+ * pour cibler une taille finale entre 50 Ko et 200 Ko.
+ * @param file       Fichier image source (JPG, PNG, WebP…)
+ * @param maxDim     Dimension max en pixels (côté le plus long). Défaut : 512 px.
+ */
+export async function compressAvatarFile(file: File, maxDim = 512): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Veuillez sélectionner un fichier image valide (JPG, PNG, WebP).');
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error("L'image d'origine ne doit pas dépasser 8 Mo.");
+  }
+
+  // --- 1. Chargement de l'image ------------------------------------------
+  const dataUrl: string = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Erreur lors de la lecture du fichier.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Impossible de charger l'image."));
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Impossible de traiter le canvas graphique.'));
-          return;
-        }
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
-      };
-      img.src = reader.result as string;
-    };
+    reader.onload = () => resolve(reader.result as string);
     reader.readAsDataURL(file);
   });
+
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onerror = () => reject(new Error("Impossible de charger l'image."));
+    el.onload = () => resolve(el);
+    el.src = dataUrl;
+  });
+
+  // --- 2. Redimensionnement initial proportionnel -------------------------
+  const scaleFactor = Math.min(1, maxDim / Math.max(img.width, img.height));
+  let width  = Math.max(1, Math.round(img.width  * scaleFactor));
+  let height = Math.max(1, Math.round(img.height * scaleFactor));
+
+  // Helper : encode le canvas en blob JPEG à la qualité donnée
+  const encodeJpeg = (canvas: HTMLCanvasElement, quality: number): Promise<Blob> =>
+    new Promise((resolve, reject) =>
+      canvas.toBlob(
+        blob => (blob ? resolve(blob) : reject(new Error('Encodage JPEG impossible.'))),
+        'image/jpeg',
+        quality
+      )
+    );
+
+  // Helper : blob → data URL
+  const blobToDataUrl = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Impossible de lire la photo compressée.'));
+      reader.onload  = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+
+  // --- 3. Boucle externe : réduction dimensionnelle si nécessaire ----------
+  for (let dimPass = 0; dimPass < 6; dimPass++) {
+    const canvas = document.createElement('canvas');
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas indisponible.');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // --- 4. Bisection sur la qualité JPEG (≤ 10 itérations) ---------------
+    let qLow = 0.10, qHigh = 0.92;
+    let bestBlob: Blob | null = null;
+
+    for (let iter = 0; iter < 10; iter++) {
+      const qMid = (qLow + qHigh) / 2;
+      const blob = await encodeJpeg(canvas, qMid);
+
+      if (blob.size <= TARGET_MAX_BYTES) {
+        bestBlob = blob;     // candidat valide (≤ 200 Ko)
+        qLow = qMid;         // on peut monter la qualité
+      } else {
+        qHigh = qMid;        // trop lourd → baisser la qualité
+      }
+
+      // Convergence suffisante
+      if (qHigh - qLow < 0.01) break;
+    }
+
+    // Si on a un blob valide ≤ 200 Ko, on le retourne
+    if (bestBlob) {
+      // S'il est en-dessous du seuil min (image très légère de base), on accepte quand même
+      return blobToDataUrl(bestBlob);
+    }
+
+    // Pas de blob valide : réduire encore les dimensions de 20 % et réessayer
+    width  = Math.max(1, Math.floor(width  * 0.80));
+    height = Math.max(1, Math.floor(height * 0.80));
+  }
+
+  throw new Error(
+    `La photo ne peut pas être compressée sous ${TARGET_MAX_BYTES / 1024} Ko. Essayez une image plus petite.`
+  );
 }
+
 
 export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
   value,
@@ -76,7 +121,7 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
   onChange,
   onRemove,
   label = 'Photo de profil',
-  helperText = 'Glissez une image ou cliquez pour parcourir (JPG, PNG ou WebP, max 8 Mo).'
+  helperText = 'Glissez une image ou cliquez pour parcourir (JPG, PNG ou WebP, max 8 Mo). La photo sera automatiquement compressée entre 50 et 200 Ko.'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -92,8 +137,13 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
     try {
       const compressedDataUrl = await compressAvatarFile(file);
       onChange(compressedDataUrl);
-      setSuccess('Photo prête à être enregistrée');
-      setTimeout(() => setSuccess(null), 3000);
+
+      // Calculer la taille approximative du résultat (base64 → bytes)
+      const base64Data = compressedDataUrl.split(',')[1] ?? '';
+      const approxBytes = Math.round((base64Data.length * 3) / 4);
+      const approxKo = Math.round(approxBytes / 1024);
+      setSuccess(`Photo compressée (≈ ${approxKo} Ko) — prête à être enregistrée`);
+      setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de traitement de la photo');
     } finally {
