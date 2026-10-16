@@ -412,16 +412,63 @@ export const dataService = {
   async updateStudentValidationStatus(id: string, status: 'approved' | 'rejected' | 'pending'): Promise<Student> {
     const idx = state.students.findIndex(s => s.id === id);
     if (idx === -1) throw new Error('Élève introuvable');
+
+    // 1. Mise à jour prioritaire en ligne directement dans la table Supabase
+    if (supabaseService.isConfigured()) {
+      await supabaseService.updateStudentValidationStatus(id, status);
+    }
+
     const updatedStudent: Student = {
       ...state.students[idx],
       validation_status: status,
       updated_at: new Date().toISOString()
     };
-    await supabaseService.saveStudent(updatedStudent);
     state.students[idx] = updatedStudent;
     persistState();
     notifySubscribers();
     return updatedStudent;
+  },
+
+  async bulkUpdateStudentValidationStatus(ids: string[], status: 'approved' | 'rejected' | 'pending'): Promise<number> {
+    // 1. Mise à jour groupée en ligne directement dans Supabase
+    if (supabaseService.isConfigured()) {
+      await supabaseService.bulkUpdateStudentValidationStatus(ids, status);
+    }
+
+    let count = 0;
+    for (const id of ids) {
+      const idx = state.students.findIndex(s => s.id === id);
+      if (idx !== -1) {
+        state.students[idx] = {
+          ...state.students[idx],
+          validation_status: status,
+          updated_at: new Date().toISOString()
+        };
+        count++;
+      }
+    }
+    persistState();
+    notifySubscribers();
+    return count;
+  },
+
+  /**
+   * Récupère la liste des élèves directement depuis la base Supabase en ligne
+   */
+  async syncStudentsFromCloud(): Promise<Student[]> {
+    if (!supabaseService.isConfigured()) return state.students;
+    try {
+      const cloudStudents = await supabaseService.fetchStudentsDirect();
+      if (cloudStudents && cloudStudents.length > 0) {
+        state.students = cloudStudents;
+        persistState();
+        notifySubscribers();
+      }
+      return state.students;
+    } catch (err) {
+      console.warn('Sync students from cloud error:', err);
+      return state.students;
+    }
   },
 
   deleteStudent(id: string) {

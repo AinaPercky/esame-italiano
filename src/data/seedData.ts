@@ -13,7 +13,9 @@ export const SEED_STUDENTS: Student[] = [
   { id: '5b71efa8-4cb9-478e-95ba-2be41fa15ef1', class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae', first_name: 'Lucas', last_name: 'Martin', email: 'lucas.martin@eleve.esame.fr', student_number: '5', created_at: '2026-09-03T08:00:00Z', updated_at: '2026-09-03T08:00:00Z', validation_status: 'approved' },
   { id: '6c82f0b9-5dc0-489f-a6cb-3cf520b26f02', class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae', first_name: 'Giulia', last_name: 'Rossi', email: 'giulia.rossi@eleve.esame.fr', student_number: '6', created_at: '2026-09-03T08:00:00Z', updated_at: '2026-09-03T08:00:00Z', validation_status: 'approved' },
   { id: '7d9301ca-6ed1-49a0-b7dc-4da631c37013', class_id: '2f8d07e6-e4f5-5ede-aa59-ebe4ed99bdbf', first_name: 'Matteo', last_name: 'Conti', email: 'matteo.conti@eleve.esame.fr', student_number: '1', created_at: '2026-09-03T08:00:00Z', updated_at: '2026-09-03T08:00:00Z', validation_status: 'approved' },
-  { id: '8ea412db-7fe2-40b1-c8ed-5eb742d48124', class_id: '2f8d07e6-e4f5-5ede-aa59-ebe4ed99bdbf', first_name: 'Elena', last_name: 'Bernard', email: 'elena.bernard@eleve.esame.fr', student_number: '2', created_at: '2026-09-03T08:00:00Z', updated_at: '2026-09-03T08:00:00Z', validation_status: 'approved' }
+  { id: '8ea412db-7fe2-40b1-c8ed-5eb742d48124', class_id: '2f8d07e6-e4f5-5ede-aa59-ebe4ed99bdbf', first_name: 'Elena', last_name: 'Bernard', email: 'elena.bernard@eleve.esame.fr', student_number: '2', created_at: '2026-09-03T08:00:00Z', updated_at: '2026-09-03T08:00:00Z', validation_status: 'approved' },
+  { id: '9fa523ec-8fe3-41c2-d9fe-6fc853e59235', class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae', first_name: 'Alessio', last_name: 'Moretti', email: 'alessio.moretti@eleve.esame.fr', student_number: '7', created_at: '2026-10-15T09:20:00Z', updated_at: '2026-10-15T09:20:00Z', validation_status: 'pending' },
+  { id: 'a0b634fd-90f4-42d3-ea0f-70d964f6a346', class_id: '2f8d07e6-e4f5-5ede-aa59-ebe4ed99bdbf', first_name: 'Sofia', last_name: 'Ricci', email: 'sofia.ricci@eleve.esame.fr', student_number: '3', created_at: '2026-10-15T11:45:00Z', updated_at: '2026-10-15T11:45:00Z', validation_status: 'pending' }
 ];
 
 export const SEED_EXAMS: Exam[] = [
@@ -243,6 +245,66 @@ export const SEED_QUIZZES = [
         correct_answer: 'oggi',
         points: 5,
         explanation: '"Aujourd\'hui" se dit "Oggi" en italien.'
+      }
+    ]
+  },
+  {
+    id: 'quiz_economie_03',
+    public_id: 'eco-italia-2026',
+    is_public: true,
+    title: 'Economia & Commercio: Vocabolario dell\'Economia Italiana',
+    description: 'Niveau B1 • Thème : Économie & Entreprise. Quiz sur le lexique économique, bancaire et commercial en italien.',
+    class_id: '1e7c96f5-d3e4-4dcd-9948-dad3dc88acae',
+    class_name: 'Classe A1 - Débutants',
+    created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+    duration_minutes: 10,
+    status: 'launched' as const,
+    launched_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
+    total_points: 20,
+    questions: [
+      {
+        id: 'qe_1',
+        type: 'qcm' as const,
+        question: 'Qual è la moneta ufficiale utilizzata in Italia dal 2002 ?',
+        options: ['La Lira', "L'Euro", 'Il Franco', 'Il Marco'],
+        correct_answer: "L'Euro",
+        points: 4,
+        explanation: "L'Euro è la valuta ufficiale in Italia dal 1° gennaio 2002."
+      },
+      {
+        id: 'qe_2',
+        type: 'text' as const,
+        question: 'Come si chiama l\'istituto finanziario dove i clienti depositano denaro e richiedono prestiti ? (in italiano)',
+        correct_answer: 'banca',
+        points: 4,
+        explanation: 'La parola esatta è "banca" (la banca).'
+      },
+      {
+        id: 'qe_3',
+        type: 'qcm' as const,
+        question: 'In economia, come viene chiamato il fenomeno di aumento continuo e generale del livello dei prezzi ?',
+        options: ['Deflazione', 'Inflazione', 'Recessione', 'Stagflazione'],
+        correct_answer: 'Inflazione',
+        points: 4,
+        explanation: "L'inflazione corrisponde all'aumento generale dei prezzi al consumo."
+      },
+      {
+        id: 'qe_4',
+        type: 'text' as const,
+        question: 'Qual è il termine italiano più comune per indicare una "entreprise" commerciale o industriale ?',
+        correct_answer: 'azienda',
+        points: 4,
+        explanation: 'Il termine più utilizzato è "azienda" (oppure "impresa").'
+      },
+      {
+        id: 'qe_5',
+        type: 'qcm' as const,
+        question: 'Quale istituzione europea con sede a Francoforte stabilisce i tassi di interesse nell\'Eurozona ?',
+        options: ['La Banca Mondiale', 'La Banca Centrale Europea (BCE)', 'Il Fondo Monetario Internazionale', 'La Banca d\'Italia'],
+        correct_answer: 'La Banca Centrale Europea (BCE)',
+        points: 4,
+        explanation: 'La Banca Centrale Europea (BCE) è responsabile della politica monetaria europea.'
       }
     ]
   }

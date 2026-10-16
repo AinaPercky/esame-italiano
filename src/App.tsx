@@ -183,6 +183,7 @@ export default function App() {
   const totalStudents = sessionClassStudents.length;
   const evaluatedCount = Math.min(totalStudents, sessionEvaluations.length);
   const sessionLabel = activeExam ? `${activeExam.title} (${sessionClass?.name || 'Classe'})` : undefined;
+  const pendingStudentsCount = students.filter(s => s.validation_status === 'pending').length;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
@@ -193,6 +194,7 @@ export default function App() {
         onQuickEvaluate={() => handleQuickEvaluate(activeExamId || exams[0]?.id)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        pendingStudentsCount={pendingStudentsCount}
       />
 
       <div className="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto">
@@ -210,6 +212,7 @@ export default function App() {
           }}
           currentUser={currentUser}
           onLogout={handleLogout}
+          pendingStudentsCount={pendingStudentsCount}
         />
 
         {/* Main Content Area */}
@@ -218,6 +221,8 @@ export default function App() {
             <DashboardView
               exams={exams}
               classes={classes}
+              students={students}
+              onRefresh={reloadData}
               onNavigateToEvaluation={handleQuickEvaluate}
               onNavigateToPassOrder={handleSelectPassOrder}
               onNavigateToResults={() => setCurrentTab('results')}

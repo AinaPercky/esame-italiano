@@ -15,15 +15,18 @@ import {
   Sparkles,
   BookOpen,
   Award,
-  QrCode
+  QrCode,
+  UserCheck
 } from 'lucide-react';
-import { Exam, ClassRoom } from '../types';
+import { Exam, ClassRoom, Student } from '../types';
 import { dataService } from '../services/dataService';
 import heroImage from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 interface DashboardViewProps {
   exams: Exam[];
   classes: ClassRoom[];
+  students?: Student[];
+  onRefresh?: () => void;
   onNavigateToEvaluation: (examId?: string) => void;
   onNavigateToPassOrder: (examId?: string) => void;
   onNavigateToResults: () => void;
@@ -33,6 +36,8 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({ 
   exams, 
   classes, 
+  students = [],
+  onRefresh,
   onNavigateToEvaluation,
   onNavigateToPassOrder,
   onNavigateToResults,
@@ -43,6 +48,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const stats = selectedExamId ? dataService.getStatistics(selectedExamId) : null;
   const currentExam = exams.find(e => e.id === selectedExamId);
 
+  const pendingStudents = students.filter(s => s.validation_status === 'pending');
+
+  const handleQuickApproveAll = async () => {
+    if (pendingStudents.length === 0) return;
+    try {
+      const ids = pendingStudents.map(s => s.id);
+      await dataService.bulkUpdateStudentValidationStatus(ids, 'approved');
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erreur lors de la validation.');
+    }
+  };
+
   const navigate = (tab: string) => {
     if (onSelectTab) {
       onSelectTab(tab);
@@ -50,7 +68,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto">
+      {/* Alerte Inscriptions d'élèves en attente d'activation */}
+      {pendingStudents.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <UserCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                  {pendingStudents.length} inscription{pendingStudents.length > 1 ? 's' : ''} d'élève{pendingStudents.length > 1 ? 's' : ''} en attente d'activation
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-600 text-white animate-pulse">
+                  Action requise
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {pendingStudents.map(s => `${s.first_name} ${s.last_name}`).slice(0, 3).join(', ')}
+                {pendingStudents.length > 3 ? ` et ${pendingStudents.length - 3} autre(s)` : ''} — activez leurs accès pour leur permettre de participer aux cours et quiz.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+            <button
+              type="button"
+              onClick={handleQuickApproveAll}
+              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 min-h-[38px]"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Activer tous ({pendingStudents.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('students')}
+              className="px-3.5 py-2 bg-amber-800 hover:bg-amber-900 active:bg-amber-950 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1 min-h-[38px]"
+            >
+              <span>Examiner dans l'annuaire</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
       {/* Hero Banner with Editorial Style */}
       <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
         <div className="grid grid-cols-1 md:grid-cols-12 items-center">

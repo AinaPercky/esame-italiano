@@ -158,18 +158,46 @@ class SupabaseService {
     }
     if (!data.user) throw new Error('Supabase n’a retourné aucun compte étudiant.');
 
-    const { data: student, error: studentError } = await client
+    let student: any = null;
+    let studentError: any = null;
+
+    // Tentative de sélection avec validation_status directement depuis Supabase online
+    const res = await client
       .from('students')
-      .select('id, class_id, first_name, last_name, email, student_number, created_at, updated_at')
+      .select('id, class_id, first_name, last_name, email, student_number, avatar_url, validation_status, created_at, updated_at')
       .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
       .maybeSingle();
+
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('validation_status'))) {
+      const fallbackRes = await client
+        .from('students')
+        .select('id, class_id, first_name, last_name, email, student_number, avatar_url, created_at, updated_at')
+        .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
+        .maybeSingle();
+      student = fallbackRes.data ? { ...fallbackRes.data, validation_status: 'approved' } : null;
+      studentError = fallbackRes.error;
+    } else {
+      student = res.data;
+      studentError = res.error;
+    }
+
     if (studentError) {
       await client.auth.signOut();
-      throw new Error(`Impossible de charger la fiche élève : ${studentError.message}`);
+      throw new Error(`Impossible de charger la fiche élève depuis Supabase : ${studentError.message}`);
     }
     if (!student) {
       await client.auth.signOut();
-      throw new Error('Aucune fiche élève ne correspond à ce compte. Contactez votre enseignant.');
+      throw new Error('Aucune fiche élève ne correspond à ce compte dans Supabase. Contactez votre enseignant.');
+    }
+
+    // Vérification stricte en ligne du statut de validation de l'élève (sans local storage)
+    if (student.validation_status === 'pending') {
+      await client.auth.signOut();
+      throw new Error('Votre inscription est en attente de validation par le professeur dans la base de données. Vous pourrez vous connecter dès son approbation.');
+    }
+    if (student.validation_status === 'rejected') {
+      await client.auth.signOut();
+      throw new Error('Votre inscription a été refusée par le professeur dans la base de données. Veuillez contacter l’enseignant pour plus d’informations.');
     }
 
     const { data: classroom, error: classError } = await client
@@ -487,17 +515,123 @@ class SupabaseService {
         email: student.email.trim().toLowerCase(),
         student_number: student.student_number || null,
         avatar_url: student.avatar_url || null,
+        validation_status: student.validation_status || 'approved',
         created_at: student.created_at || new Date().toISOString(),
         updated_at: student.updated_at || new Date().toISOString()
       }));
     if (payload.length === 0) return;
-    const { error } = await client.from('students').upsert(payload, { onConflict: 'id' });
+
+    let { error } = await client.from('students').upsert(payload, { onConflict: 'id' });
+    if (error && (error.code === '42703' || error.message?.includes('validation_status'))) {
+      const fallbackPayload = payload.map(({ validation_status, ...rest }) => rest);
+      const res = await client.from('students').upsert(fallbackPayload, { onConflict: 'id' });
+      error = res.error;
+    }
     if (error) {
       if (error.code === '23505') {
         throw new Error('Cette adresse e-mail est déjà utilisée par un autre élève.');
       }
       throw new Error(`Enregistrement de l’élève dans Supabase impossible : ${error.message}`);
     }
+  }
+
+  /**
+   * Met à jour directement le statut de validation de l'élève en ligne dans la base de données Supabase (sans local storage)
+   */
+  public async updateStudentValidationStatus(id: string, status: 'approved' | 'rejected' | 'pending'): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+    if (!isUUID(id)) return;
+
+    const { error } = await client
+      .from('students')
+      .update({
+        validation_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('validation_status')) {
+        throw new Error("La colonne 'validation_status' n'existe pas encore dans la table Supabase 'students'. Veuillez copier et exécuter la migration SQL disponible dans les Paramètres.");
+      }
+      throw new Error(`Impossible de mettre à jour le statut dans la base de données Supabase : ${error.message}`);
+    }
+  }
+
+  /**
+   * Met à jour groupée directement le statut de validation des élèves en ligne dans Supabase (sans local storage)
+   */
+  public async bulkUpdateStudentValidationStatus(ids: string[], status: 'approved' | 'rejected' | 'pending'): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+    const validIds = ids.filter(id => isUUID(id));
+    if (validIds.length === 0) return;
+
+    const { error } = await client
+      .from('students')
+      .update({
+        validation_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .in('id', validIds);
+
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('validation_status')) {
+        throw new Error("La colonne 'validation_status' n'existe pas encore dans la table Supabase 'students'. Veuillez copier et exécuter la migration SQL disponible dans les Paramètres.");
+      }
+      throw new Error(`Impossible de mettre à jour les statuts dans la base de données Supabase : ${error.message}`);
+    }
+  }
+
+  /**
+   * Récupère le statut de validation directement en ligne depuis la base de données Supabase
+   */
+  public async fetchStudentValidationStatus(emailOrId: string): Promise<'approved' | 'rejected' | 'pending' | null> {
+    const client = this.getClient();
+    if (!client) return null;
+    const clean = emailOrId.trim().toLowerCase();
+
+    let query = client.from('students').select('validation_status');
+    if (isUUID(clean)) {
+      query = query.eq('id', clean);
+    } else {
+      query = query.ilike('email', clean.replace(/[\\%_]/g, '\\$&'));
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) return null;
+    return (data as any).validation_status || 'approved';
+  }
+
+  /**
+   * Charge tous les élèves directement depuis la base de données Supabase en ligne
+   */
+  public async fetchStudentsDirect(): Promise<Student[]> {
+    const client = this.getClient();
+    if (!client) return [];
+    const { data, error } = await client
+      .from('students')
+      .select('id, class_id, first_name, last_name, email, student_number, avatar_url, validation_status, created_at, updated_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('validation_status')) {
+        const fallback = await client
+          .from('students')
+          .select('id, class_id, first_name, last_name, email, student_number, avatar_url, created_at, updated_at')
+          .order('created_at', { ascending: false });
+        return (fallback.data || []).map(s => ({
+          ...s,
+          validation_status: 'approved'
+        })) as Student[];
+      }
+      throw new Error(`Erreur lors de la récupération des élèves depuis Supabase : ${error.message}`);
+    }
+    return (data || []).map(s => ({
+      ...s,
+      validation_status: s.validation_status || 'pending'
+    })) as Student[];
   }
 
   public async deleteStudent(id: string): Promise<void> {
@@ -902,11 +1036,17 @@ class SupabaseService {
             email: s.email.trim().toLowerCase(),
             student_number: s.student_number || null,
             avatar_url: s.avatar_url || null,
+            validation_status: s.validation_status || 'approved',
             created_at: s.created_at || new Date().toISOString(),
             updated_at: s.updated_at || new Date().toISOString()
           }));
         if (studentsPayload.length > 0) {
-          const { error: errStudents } = await client.from('students').upsert(studentsPayload, { onConflict: 'id' });
+          let { error: errStudents } = await client.from('students').upsert(studentsPayload, { onConflict: 'id' });
+          if (errStudents && (errStudents.code === '42703' || errStudents.message?.includes('validation_status'))) {
+            const fallbackPayload = studentsPayload.map(({ validation_status, ...rest }) => rest);
+            const fallbackRes = await client.from('students').upsert(fallbackPayload, { onConflict: 'id' });
+            errStudents = fallbackRes.error;
+          }
           if (errStudents) throw new Error(`Élèves: ${errStudents.message}`);
         }
       }
@@ -1100,6 +1240,7 @@ class SupabaseService {
         email: s.email,
         student_number: s.student_number,
         avatar_url: s.avatar_url || null,
+        validation_status: s.validation_status || 'pending',
         created_at: s.created_at,
         updated_at: s.updated_at
       }));

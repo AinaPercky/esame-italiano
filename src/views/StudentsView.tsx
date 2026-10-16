@@ -79,9 +79,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     action: () => {}
   });
 
-  const pendingCount = students.filter(s => s.validation_status === 'pending').length;
+  const pendingStudents = students.filter(s => s.validation_status === 'pending');
+  const pendingCount = pendingStudents.length;
   const approvedCount = students.filter(s => s.validation_status === 'approved' || !s.validation_status).length;
   const rejectedCount = students.filter(s => s.validation_status === 'rejected').length;
+
+  // Synchronisation directe depuis Supabase online à l'ouverture
+  React.useEffect(() => {
+    if (supabaseService.isConfigured()) {
+      dataService.syncStudentsFromCloud().catch(err => {
+        console.warn('Sync students from cloud error:', err);
+      });
+    }
+  }, []);
 
   const handleApproveStudent = (student: Student) => {
     setConfirmValidationDialog({
@@ -121,6 +131,41 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         }
       }
     });
+  };
+
+  const handleBulkApprove = () => {
+    const pendingList = students.filter(s => s.validation_status === 'pending');
+    if (pendingList.length === 0) return;
+
+    setConfirmValidationDialog({
+      isOpen: true,
+      title: "Activer tous les comptes en attente",
+      message: `Confirmer la validation de l'inscription pour les ${pendingList.length} élève(s) en attente ?\nIls pourront tous immédiatement se connecter à leur espace personnel et participer aux quiz.`,
+      confirmLabel: `Valider les ${pendingList.length} inscriptions`,
+      variant: 'success',
+      action: async () => {
+        try {
+          const ids = pendingList.map(s => s.id);
+          await dataService.bulkUpdateStudentValidationStatus(ids, 'approved');
+          setValidationSuccessMsg(`${pendingList.length} compte(s) élève(s) activé(s) avec succès !`);
+          setTimeout(() => setValidationSuccessMsg(null), 3500);
+          onRefresh();
+        } catch (err) {
+          alert(err instanceof Error ? err.message : 'Erreur lors de la validation groupée.');
+        }
+      }
+    });
+  };
+
+  const handleChangePendingStudentClass = async (studentId: string, newClassId: string) => {
+    try {
+      await dataService.updateStudent(studentId, { class_id: newClassId });
+      setValidationSuccessMsg(`Classe de l'élève mise à jour.`);
+      setTimeout(() => setValidationSuccessMsg(null), 2500);
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erreur lors de la mise à jour de la classe.');
+    }
   };
 
   // Import State
@@ -334,28 +379,126 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
         </div>
       </div>
 
-      {/* Alerte Inscriptions en attente */}
-      {pendingCount > 0 && validationFilter !== 'pending' && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-200 text-amber-900 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 animate-pulse" />
+      {/* SECTION ACTIVATION DES ÉLÈVES INSCRITS */}
+      {pendingCount > 0 && (
+        <div className="bg-gradient-to-br from-amber-50/90 via-white to-amber-50/40 border-2 border-amber-300 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3.5">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                    Activation des élèves inscrits
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-600 text-white animate-pulse">
+                    {pendingCount} en attente
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Ces élèves se sont inscrits en ligne et attendent votre validation pour accéder à l'espace étudiant, leurs quiz et leurs notes.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-bold text-amber-950 text-sm">
-                {pendingCount} demande{pendingCount > 1 ? 's' : ''} d'inscription en attente de validation
-              </h4>
-              <p className="text-xs text-amber-800">
-                Ces élèves ne peuvent pas se connecter tant que vous n'avez pas approuvé leur inscription.
-              </p>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleBulkApprove}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer min-h-[40px]"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Activer tous les {pendingCount} élèves</span>
+              </button>
             </div>
           </div>
+
+          {/* Cards for each pending student */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            {pendingStudents.map(student => (
+              <div
+                key={student.id}
+                className="bg-white border border-amber-200/90 rounded-xl p-4 shadow-2xs hover:shadow-xs transition-all space-y-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <StudentAvatar
+                      name={`${student.first_name} ${student.last_name}`}
+                      src={student.avatar_url || student.avatar}
+                      className="w-11 h-11 border-2 border-amber-200 shrink-0 text-sm shadow-2xs"
+                    />
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm leading-tight">
+                        {student.first_name} {student.last_name}
+                      </h4>
+                      <p className="text-xs text-slate-500 break-all">{student.email}</p>
+                      <p className="text-[11px] text-amber-900/80 font-medium mt-0.5">
+                        Inscrit le {new Date(student.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 shrink-0">
+                    En attente
+                  </span>
+                </div>
+
+                {/* Class selector allowing reassignment before activation */}
+                <div className="flex items-center gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <School className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span className="font-semibold text-slate-700 shrink-0">Classe :</span>
+                  <select
+                    value={student.class_id}
+                    onChange={(e) => handleChangePendingStudentClass(student.id, e.target.value)}
+                    className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-800"
+                  >
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleApproveStudent(student)}
+                    className="flex-1 py-2 px-3 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer min-h-[38px]"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>Valider l'accès</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRejectStudent(student)}
+                    className="py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 flex items-center justify-center gap-1 transition-colors cursor-pointer min-h-[38px]"
+                  >
+                    <UserX className="w-4 h-4" />
+                    <span>Refuser</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Message when filtered on pending but 0 pending */}
+      {validationFilter === 'pending' && pendingCount === 0 && (
+        <div className="p-8 text-center bg-white border border-slate-200 rounded-2xl shadow-2xs space-y-3">
+          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <h4 className="font-bold text-slate-900 text-base">Toutes les inscriptions sont activées !</h4>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Il n'y a actuellement aucun élève en attente de validation. Tous les comptes enregistrés sont approuvés et ont accès à la plateforme.
+          </p>
           <button
             type="button"
-            onClick={() => setValidationFilter('pending')}
-            className="px-3.5 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-lg transition-colors shrink-0 self-start sm:self-center cursor-pointer shadow-2xs"
+            onClick={() => setValidationFilter('')}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
           >
-            Examiner les demandes ({pendingCount})
+            Afficher tous les élèves
           </button>
         </div>
       )}

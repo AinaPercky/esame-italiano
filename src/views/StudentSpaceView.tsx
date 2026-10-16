@@ -132,6 +132,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return matchedBySubs || matchedByQuizSubs || mySubmissions.some(s => s.quiz_id === quizId);
   };
 
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+
+  const handleCheckStatus = async () => {
+    setIsCheckingStatus(true);
+    try {
+      if (supabaseService.isConfigured()) {
+        await dataService.syncStudentsFromCloud();
+      }
+      loadData();
+    } catch (e) {
+      console.warn('Check status error:', e);
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
   const loadData = () => {
     // Synchroniser avec dataService
     const stList = dataService.getStudents();
@@ -563,10 +579,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={loadData}
-              className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              onClick={handleCheckStatus}
+              disabled={isCheckingStatus}
+              className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
-              Vérifier le statut
+              {isCheckingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : null}
+              <span>{isCheckingStatus ? 'Vérification...' : 'Vérifier en ligne'}</span>
             </button>
             <button
               type="button"

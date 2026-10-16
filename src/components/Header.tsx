@@ -23,6 +23,7 @@ interface HeaderProps {
   onQuickEvaluate: () => void;
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  pendingStudentsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -30,7 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab, 
   onQuickEvaluate,
   currentUser,
-  onLogout 
+  onLogout,
+  pendingStudentsCount = 0
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -86,13 +88,18 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
-                className={`transition-colors py-1 relative ${
+                className={`transition-colors py-1 relative flex items-center gap-1.5 ${
                   currentTab === item.id
                     ? 'text-amber-800 font-semibold border-b-2 border-amber-700'
                     : 'hover:text-slate-900'
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.id === 'students' && pendingStudentsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-600 text-white animate-pulse">
+                    {pendingStudentsCount}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -210,8 +217,15 @@ export const Header: React.FC<HeaderProps> = ({
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-amber-800' : 'text-slate-400'}`} />
-                      <span>{item.label}</span>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Icon className={`w-5 h-5 ${isActive ? 'text-amber-800' : 'text-slate-400'}`} />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {item.id === 'students' && pendingStudentsCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-600 text-white animate-pulse">
+                          {pendingStudentsCount} en attente
+                        </span>
+                      )}
                     </button>
                   );
                 })}

@@ -25,6 +25,7 @@ interface SidebarProps {
   };
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  pendingStudentsCount?: number;
 }
 
 interface NavItem {
@@ -44,7 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab, 
   stats,
   currentUser,
-  onLogout
+  onLogout,
+  pendingStudentsCount = 0
 }) => {
   const groups: NavGroup[] = [
     {
@@ -118,11 +120,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   } ${item.highlight && !isActive ? 'hover:bg-amber-50/50' : ''}`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-amber-800' : 'text-slate-500'}`} />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-800' : 'text-slate-500'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
-                  {item.highlight ? (
+                  {item.id === 'students' && pendingStudentsCount > 0 ? (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 text-white animate-pulse shrink-0">
+                      {pendingStudentsCount}
+                    </span>
+                  ) : item.highlight ? (
                     <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse shrink-0" />
                   ) : isActive ? (
                     <ChevronRight className="w-3.5 h-3.5 text-amber-800 shrink-0" />

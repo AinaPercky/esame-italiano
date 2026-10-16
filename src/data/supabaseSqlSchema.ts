@@ -33,6 +33,7 @@ CREATE TABLE students (
     email TEXT NOT NULL CHECK (btrim(email) <> ''),
     student_number TEXT,
     avatar_url TEXT,
+    validation_status TEXT NOT NULL DEFAULT 'approved' CHECK (validation_status IN ('pending', 'approved', 'rejected')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
@@ -271,4 +272,13 @@ DROP POLICY IF EXISTS "Quizzes full access" ON public.quizzes;
 CREATE POLICY "Quizzes full access" ON public.quizzes FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Quiz submissions full access" ON public.quiz_submissions;
 CREATE POLICY "Quiz submissions full access" ON public.quiz_submissions FOR ALL USING (true) WITH CHECK (true);
+`;
+
+export const STUDENT_VALIDATION_STATUS_MIGRATION_SQL = `-- Migration pour ajouter le statut de validation des comptes étudiants dans Supabase
+ALTER TABLE public.students
+    ADD COLUMN IF NOT EXISTS validation_status TEXT NOT NULL DEFAULT 'approved'
+    CHECK (validation_status IN ('pending', 'approved', 'rejected'));
+
+CREATE INDEX IF NOT EXISTS idx_students_validation_status
+    ON public.students (validation_status);
 `;

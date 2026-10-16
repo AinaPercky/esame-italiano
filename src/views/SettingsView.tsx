@@ -26,6 +26,7 @@ import {
   QUIZ_SUPABASE_MIGRATION_SQL,
   STUDENT_AVATAR_MIGRATION_SQL,
   STUDENT_EMAIL_IDENTITY_MIGRATION_SQL,
+  STUDENT_VALIDATION_STATUS_MIGRATION_SQL,
   SUPABASE_SQL_SCHEMA
 } from '../data/supabaseSqlSchema';
 import { authService, AUTHORIZED_EMAIL, DEFAULT_ACCESS_CODE, AuthUser } from '../services/authService';
@@ -45,6 +46,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedQuizMigration, setCopiedQuizMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
+  const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -139,6 +141,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration identité e-mail:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration e-mail. Autorisez l’accès au presse-papiers puis réessayez.' });
+    }
+  };
+
+  const handleCopyValidationMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(STUDENT_VALIDATION_STATUS_MIGRATION_SQL);
+      setCopiedValidationMigration(true);
+      setTimeout(() => setCopiedValidationMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration validation status:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier le script SQL.' });
     }
   };
 
@@ -455,6 +468,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedQuizMigration ? '✓ Migration Quiz copiée !' : 'Copier la migration Quiz (sans effacer les données)'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyValidationMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 active:bg-teal-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedValidationMigration ? '✓ Migration Activation copiée !' : 'Copier migration Statut d\'activation élèves (SQL)'}</span>
             </button>
             <button
               type="button"
