@@ -182,36 +182,12 @@ export const dataService = {
         return false;
       }
       if (res.success && res.state) {
-        if (res.state.classes.length > 0 || res.state.exams.length > 0) {
-          const localState = this.getRawState();
-          const cloudQuizzes = res.state.quizzes || [];
-          const cloudSubmissions = res.state.quizSubmissions || [];
-          const cloudStudentIds = new Set(res.state.students.map(student => student.id));
-          const missingQuizzes = localState.quizzes.filter(
-            localQuiz => !cloudQuizzes.some(cloudQuiz => cloudQuiz.id === localQuiz.id)
-          );
-          const missingSubmissions = localState.quizSubmissions.filter(localSubmission =>
-            cloudStudentIds.has(localSubmission.student_id) &&
-            !cloudSubmissions.some(cloudSubmission => {
-              return cloudSubmission.quiz_id === localSubmission.quiz_id &&
-                cloudSubmission.student_id === localSubmission.student_id;
-            })
-          );
-
-          await supabaseService.syncQuizData(missingQuizzes, missingSubmissions);
-          this.setImportedState({
-            ...res.state,
-            quizzes: [...cloudQuizzes, ...missingQuizzes],
-            quizSubmissions: [...cloudSubmissions, ...missingSubmissions]
-          });
-          authService.synchronizeStudentAccountsWithRoster(res.state.students, res.state.classes);
-          return true;
-        } else {
-          // Si Supabase est vierge, envoyer l'état initial
-          const syncResult = await supabaseService.syncLocalToSupabase(this.getRawState());
-          if (!syncResult.success) throw new Error(syncResult.message);
-          return true;
-        }
+        // Supabase est la source de vérité. Ne fusionnez jamais les seeds locaux
+        // avec le cloud : un seed invalide (ex. public_id non-UUID) pouvait faire
+        // échouer l'import entier et laisser l'interface sur un état incohérent.
+        this.setImportedState(res.state);
+        authService.synchronizeStudentAccountsWithRoster(res.state.students, res.state.classes);
+        return true;
       }
     } catch (e) {
       console.warn('Initial cloud sync error:', e);
@@ -459,11 +435,11 @@ export const dataService = {
     if (!supabaseService.isConfigured()) return state.students;
     try {
       const cloudStudents = await supabaseService.fetchStudentsDirect();
-      if (cloudStudents && cloudStudents.length > 0) {
-        state.students = cloudStudents;
-        persistState();
-        notifySubscribers();
-      }
+      // Une réponse vide est significative : elle doit remplacer l'état affiché,
+      // et non laisser des données seed/locales à l'écran.
+      state.students = cloudStudents;
+      persistState();
+      notifySubscribers();
       return state.students;
     } catch (err) {
       console.warn('Sync students from cloud error:', err);

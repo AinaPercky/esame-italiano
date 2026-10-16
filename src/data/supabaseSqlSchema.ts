@@ -19,15 +19,15 @@ DROP TABLE IF EXISTS classes CASCADE;
 
 -- 1. Table : classes
 CREATE TABLE classes (
-    id TEXT PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
 -- 2. Table : students
 CREATE TABLE students (
-    id TEXT PRIMARY KEY,
-    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     email TEXT NOT NULL CHECK (btrim(email) <> ''),
@@ -40,8 +40,8 @@ CREATE TABLE students (
 
 -- 3. Table : exams
 CREATE TABLE exams (
-    id TEXT PRIMARY KEY,
-    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
     exam_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -51,8 +51,8 @@ CREATE TABLE exams (
 
 -- 4. Table : exam_rubrics
 CREATE TABLE exam_rubrics (
-    id TEXT PRIMARY KEY,
-    exam_id TEXT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     question TEXT NOT NULL,
     example_sentence TEXT NOT NULL,
@@ -63,9 +63,9 @@ CREATE TABLE exam_rubrics (
 
 -- 5. Table : evaluations
 CREATE TABLE evaluations (
-    id TEXT PRIMARY KEY,
-    exam_id TEXT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
-    student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     total_score NUMERIC(5,2) NOT NULL DEFAULT 0.0,
     status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('draft', 'completed')),
     max_duration_seconds INTEGER NOT NULL DEFAULT 180,
@@ -78,9 +78,9 @@ CREATE TABLE evaluations (
 
 -- 6. Table : evaluation_details
 CREATE TABLE evaluation_details (
-    id TEXT PRIMARY KEY,
-    evaluation_id TEXT NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
-    rubric_id TEXT NOT NULL REFERENCES exam_rubrics(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evaluation_id UUID NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
+    rubric_id UUID NOT NULL REFERENCES exam_rubrics(id) ON DELETE CASCADE,
     is_validated BOOLEAN NOT NULL DEFAULT FALSE,
     awarded_points NUMERIC(5,2) NOT NULL DEFAULT 0.0,
     error_note TEXT,
@@ -89,9 +89,9 @@ CREATE TABLE evaluation_details (
 
 -- 7. Table : exam_pass_order
 CREATE TABLE exam_pass_order (
-    id TEXT PRIMARY KEY,
-    exam_id TEXT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
-    student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'current', 'completed', 'absent')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -111,7 +111,10 @@ CREATE TABLE quizzes (
     launched_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-    total_points NUMERIC(7,2) NOT NULL DEFAULT 20
+    total_points NUMERIC(7,2) NOT NULL DEFAULT 20,
+    public_id UUID UNIQUE,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    class_ids TEXT[]
 );
 
 CREATE TABLE quiz_submissions (
@@ -235,7 +238,10 @@ CREATE TABLE IF NOT EXISTS public.quizzes (
     launched_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
     questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-    total_points NUMERIC(7,2) NOT NULL DEFAULT 20
+    total_points NUMERIC(7,2) NOT NULL DEFAULT 20,
+    public_id UUID UNIQUE,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    class_ids TEXT[]
 );
 
 CREATE TABLE IF NOT EXISTS public.quiz_submissions (
@@ -264,6 +270,11 @@ CREATE INDEX IF NOT EXISTS idx_quizzes_class_id ON public.quizzes (class_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_submissions_quiz_id ON public.quiz_submissions (quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student_date
     ON public.quiz_submissions (student_id, date);
+
+ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS public_id UUID;
+ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS class_ids TEXT[];
+CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_public_id ON public.quizzes(public_id) WHERE public_id IS NOT NULL;
 
 ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_submissions ENABLE ROW LEVEL SECURITY;

@@ -78,9 +78,12 @@ class SupabaseService {
     const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
     const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
+    // En production, la configuration du build est canonique. Le localStorage
+    // reste uniquement un fallback pour le panneau Paramètres et ne doit pas
+    // permettre à un ancien navigateur de pointer vers un autre projet.
     return {
-      url: cleanSupabaseUrl(localUrl || envUrl),
-      anonKey: (localKey || envKey).trim()
+      url: cleanSupabaseUrl(envUrl || localUrl),
+      anonKey: (envKey || localKey).trim()
     };
   }
 
@@ -862,9 +865,15 @@ class SupabaseService {
 
     const previousWrite = this.quizWriteQueues.get(quiz.id) || Promise.resolve();
     const write = previousWrite.catch(() => undefined).then(async () => {
+      // public_id est UUID dans Supabase. Certains anciens seeds contiennent
+      // encore un slug (ex. "eco-italia-2026") : ne l'envoyez jamais dans une
+      // colonne UUID, sinon tout le bootstrap cloud est interrompu.
+      const publicId = quiz.public_id && isUUID(quiz.public_id)
+        ? quiz.public_id
+        : (quiz.is_public ? generateUUID() : null);
       const { error } = await client.from('quizzes').upsert({
         id: quiz.id,
-        public_id: quiz.public_id || null,
+        public_id: publicId,
         is_public: Boolean(quiz.is_public),
         class_id: quiz.class_id,
         class_ids: quiz.class_ids || [quiz.class_id],
@@ -916,13 +925,16 @@ class SupabaseService {
       total_points: Number(q.total_points) || 20
     });
 
-    const { data: byPublicId } = await client
-      .from('quizzes')
-      .select('*')
-      .eq('public_id', clean)
-      .maybeSingle();
+    // Évite une comparaison UUID = slug qui provoque une 400 côté PostgREST.
+    if (isUUID(clean)) {
+      const { data: byPublicId } = await client
+        .from('quizzes')
+        .select('*')
+        .eq('public_id', clean)
+        .maybeSingle();
 
-    if (byPublicId) return mapRowToQuiz(byPublicId);
+      if (byPublicId) return mapRowToQuiz(byPublicId);
+    }
 
     const { data: byId } = await client
       .from('quizzes')
