@@ -296,8 +296,9 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   }, [isQuizActive, currentIndex]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // When per-question timer hits 0 → no answer = 0 pts, advance immediately
-  // (no validation feedback shown — just skip to next question)
+  // When per-question timer hits 0 → show correction (even if no answer) then advance
+  // Zero‑point answer is recorded automatically by doValidate (empty answer = 0 pts).
+  // The correction stays visible for ~8 seconds before moving on.
   // ─────────────────────────────────────────────────────────────────────────
   const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
@@ -315,12 +316,20 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       timerRef.current = null;
     }
 
-    // Advance directly — no validation, no feedback, answer counts as empty (0 pts)
+    const question = q.questions[currentIndex];
+    if (!question) return;
+
+    // Auto‑validate (creates feedback, records zero if answer empty)
+    if (!validatedSetRef.current[question.id]) {
+      doValidate(question.id);
+    }
+
+    // Show correction for 7‑9 s, then advance
     setTimeout(() => {
       const total = quizRef.current?.questions.length ?? 0;
       doAdvance(currentIndexRef.current, total);
-    }, 300);
-  }, [questionTimeLeftMs, isQuizActive, currentIndex, doAdvance]);
+    }, 8000); // 8 seconds display
+  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, doAdvance]);
 
   // Reset zero-fired tracker when question index changes (new question)
   useEffect(() => {
