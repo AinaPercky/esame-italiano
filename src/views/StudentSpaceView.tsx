@@ -1017,11 +1017,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           const totalProgressPercent = Math.round((safeIndex / Math.max(1, totalQuestions)) * 100);
 
           return (
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-10 space-y-6 animate-fade-in select-none">
+            <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
               
               {/* Anti-Screenshot Watermark Banner */}
-              <div className="bg-rose-900 text-rose-100 px-4 py-2 rounded-xl text-xs font-mono flex items-center justify-between gap-2 shadow-inner select-none border border-rose-700">
-                <span className="flex items-center gap-2 font-bold">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-rose-950 px-4 py-2.5 text-rose-100 shadow-inner sm:px-6">
+                <span className="flex min-w-0 items-center gap-2 truncate font-bold">
                   <ShieldCheck className="w-4 h-4 text-rose-300" />
                   <span>MODE SÉCURISÉ ANTI-TRICHE • Capture d'écran strictement interdite</span>
                 </span>
@@ -1031,24 +1031,25 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
               
               {/* Quiz Header Bar with Global & Question Timers */}
-              <div className="border-b border-slate-200 pb-5 space-y-3">
+              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-4 py-3 text-white shadow-lg sm:px-6 sm:py-4">
+                <div className="mx-auto max-w-7xl space-y-3 sm:space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">
+                      <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
                         Évaluation en cours • {activeQuiz.class_name || 'Classe'}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                        Question {safeIndex + 1} sur {totalQuestions}
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                        {safeIndex + 1}/{totalQuestions}
                       </span>
                     </div>
-                    <h2 className="font-display text-xl sm:text-2xl font-extrabold text-slate-900">
+                    <h2 className="truncate font-display text-base font-extrabold text-white sm:text-xl">
                       {activeQuiz.title}
                     </h2>
                   </div>
 
                   {/* Dual Timers Badge */}
-                  <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <div className="flex shrink-0 items-center gap-2 self-start sm:gap-3 sm:self-auto">
                     {/* Per-Question Countdown Timer */}
                     <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono font-extrabold text-sm border-2 shadow-xs transition-colors ${
                       questionSecondsRemaining <= 10 
@@ -1063,7 +1064,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     </div>
 
                     {/* Global Quiz Countdown Timer */}
-                    <div className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-slate-800 font-mono text-xs">
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-mono text-xs text-white sm:px-3.5">
                       <div className="flex flex-col text-right">
                         <span className="text-[9px] uppercase font-bold text-slate-400 font-sans leading-none">Total Quiz</span>
                         <span className="font-bold leading-tight">{formatTime(quizSecondsRemaining)}</span>
@@ -1074,16 +1075,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                 {/* Progress bar per question (Chrono de la question en cours) */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                  <div className="flex items-center justify-between text-[10px] font-semibold text-slate-300 sm:text-[11px]">
                     <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Chronomètre de la question {currentQuestionIndex + 1} :</span>
+                      <Clock className="h-3.5 w-3.5 text-amber-400" />
+                      <span>Temps de la question {currentQuestionIndex + 1}</span>
                     </span>
-                    <span className="font-mono font-bold text-amber-900">
+                    <span className="font-mono font-bold text-amber-300">
                       {questionSecondsRemaining}s restantes
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
                     <div 
                       className={`h-full transition-all duration-1000 ${
                         qProgressPercent <= 25 
@@ -1124,29 +1125,32 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     );
                   })}
                 </div>
+                </div>
               </div>
 
               {/* Single Active Question Card */}
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
+              <div className="mx-auto max-w-4xl">
               {currentQ ? (
-                <div className="space-y-6 animate-fade-in">
-                  <div className="p-6 bg-amber-50/40 rounded-2xl border border-amber-200 space-y-4">
+                <div className="space-y-5 animate-fade-in sm:space-y-6">
+                  <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl sm:space-y-5 sm:p-8">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3.5">
-                        <span className="w-9 h-9 rounded-2xl bg-amber-800 text-white font-mono font-extrabold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-800 font-mono text-sm font-extrabold text-white shadow-xs sm:h-12 sm:w-12 sm:text-base">
                           {currentQuestionIndex + 1}
                         </span>
                         <div>
-                          <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 sm:text-[11px]">
                             Question #{currentQuestionIndex + 1} • {currentQ.points} points
                           </span>
-                          <h3 className="font-display font-bold text-lg sm:text-xl text-slate-900 mt-0.5">
+                          <h3 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">
                             {currentQ.question}
                           </h3>
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-xs text-slate-500 italic pl-12">
+                    <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
                       {currentQ.type === 'qcm' 
                         ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
                         : '👉 Saisissez votre réponse au clavier dans le champ ci-dessous :'}
@@ -1154,7 +1158,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                     {/* QCM Options */}
                     {currentQ.type === 'qcm' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 pl-2 sm:pl-12">
+                      <div className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 sm:pl-16">
                         {(currentQ.options || []).map((opt, optIdx) => {
                           const isSelected = currentAnswer === opt;
                           return (
@@ -1162,7 +1166,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               key={optIdx}
                               type="button"
                               onClick={() => setQuizAnswers({ ...quizAnswers, [currentQ.id]: opt })}
-                              className={`p-4 rounded-2xl border-2 text-left text-sm font-semibold transition-all cursor-pointer flex items-center justify-between shadow-xs ${
+                              className={`flex min-h-[60px] items-center justify-between rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all cursor-pointer shadow-xs sm:min-h-[72px] ${
                                 isSelected
                                   ? 'bg-amber-800 text-white border-amber-900 shadow-md ring-2 ring-amber-400 scale-[1.01]'
                                   : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400 hover:bg-amber-50/50'
@@ -1182,27 +1186,27 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                     {/* Text input */}
                     {currentQ.type === 'text' && (
-                      <div className="pt-2 pl-2 sm:pl-12">
+                      <div className="pt-4 sm:pl-16">
                         <input
                           type="text"
                           autoFocus
                           value={currentAnswer}
                           onChange={(e) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: e.target.value })}
                           placeholder="Saisissez votre réponse ici..."
-                          className="w-full bg-white border-2 border-slate-300 focus:border-amber-700 rounded-2xl px-5 py-3.5 text-base font-semibold text-slate-900 focus:outline-hidden shadow-inner"
+                          className="w-full rounded-2xl border-2 border-slate-300 bg-slate-50 px-5 py-4 text-base font-semibold text-slate-900 shadow-inner focus:border-amber-700 focus:bg-white focus:outline-hidden sm:text-lg"
                         />
                       </div>
                     )}
                   </div>
 
                   {/* Navigation and Actions Footer */}
-                  <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="sticky bottom-0 -mx-3 flex flex-col gap-3 border-t border-slate-200 bg-slate-100/95 px-3 py-3 backdrop-blur sm:-mx-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-0">
                     {/* Skip button rule reminder */}
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleSkipQuestion}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-200 sm:text-sm"
                         title="Passer cette question (note : 0 pour cette question)"
                       >
                         <FastForward className="w-4 h-4 text-slate-500" />
@@ -1211,7 +1215,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     </div>
 
                     {/* Next / Submit Button */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
                       <button
                         type="button"
                         onClick={() => {
@@ -1226,7 +1230,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             }
                           });
                         }}
-                        className="px-4 py-2.5 text-slate-500 hover:text-slate-700 text-xs font-semibold cursor-pointer"
+                        className="px-2 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-700 sm:px-4"
                       >
                         Abandonner
                       </button>
@@ -1235,7 +1239,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         type="button"
                         disabled={isSubmitting}
                         onClick={handleAnswerAndNext}
-                        className="px-6 py-3 bg-amber-800 hover:bg-amber-900 active:bg-amber-950 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md cursor-pointer transition-transform active:scale-95 flex items-center gap-2"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-800 px-4 py-3.5 text-xs font-extrabold text-white shadow-md transition-transform hover:bg-amber-900 active:scale-95 sm:flex-none sm:px-6 sm:text-sm"
                       >
                         {currentQuestionIndex + 1 === totalQuestions ? (
                           <>
@@ -1371,6 +1375,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
               )}
 
+              </div>
+              </div>
             </div>
           );
         })()}
