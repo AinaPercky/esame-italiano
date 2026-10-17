@@ -316,6 +316,14 @@
   box-shadow: 0 3px 10px rgba(7, 42, 63, .12);
 }
 .student-header-avatar { padding: 2px; }
+.student-header-avatar-button {
+  border: 0;
+  appearance: none;
+  cursor: pointer;
+  transition: transform .18s ease;
+}
+.student-header-avatar-button:hover { transform: translateY(-1px); }
+.student-header-avatar-button:focus-visible { outline: 3px solid rgba(47, 163, 107, .65); outline-offset: 3px; }
 .student-logout {
   display: inline-flex;
   min-height: 40px;
@@ -378,7 +386,17 @@
   padding: 26px 30px 18px;
   padding-right: 40%;
 }
-.student-welcome-avatar { margin-top: 4px; }
+.student-welcome-avatar { width: 68px; height: 68px; margin-top: 4px; }
+.student-welcome-mascot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e6f0f7;
+  object-fit: cover;
+  object-position: center 32%;
+}
 .student-welcome-text { min-width: 0; }
 .student-learning-pill {
   display: inline-flex;
@@ -520,7 +538,7 @@
   .student-welcome { border-radius: 22px; }
   .student-welcome-photo { display: none; }
   .student-welcome-copy { min-height: 0; gap: 11px; padding: 17px 15px 13px; }
-  .student-welcome-avatar { padding: 2px; }
+  .student-welcome-avatar { width: 62px; height: 62px; padding: 2px; }
   .student-welcome h1 { margin-top: 9px; font-size: clamp(23px, 7vw, 30px); }
   .student-welcome-text > p { font-size: 12px; line-height: 1.55; }
   .student-learning-pill { min-height: 27px; gap: 7px; padding: 4px 8px; font-size: 8px; letter-spacing: .1em; }
@@ -532,7 +550,7 @@
   .student-daily-grade-score strong { font-size: 30px; }
   .student-daily-grade-score span { font-size: 14px; }
   .student-daily-grade-copy p { font-size: 9px; line-height: 1.35; }
-  .student-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; border-radius: 17px; padding: 4px; }
+  .student-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; border-radius: 17px; padding: 4px; }
   .student-tab { min-height: 58px; flex-direction: column; gap: 4px; border-radius: 12px; padding: 5px 2px; font-size: 9px; line-height: 1.1; }
   .student-tab-label-full { display: none; }
   .student-tab-label-short { display: block; }
