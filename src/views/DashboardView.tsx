@@ -68,16 +68,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-6xl mx-auto">
+    <div className="teacher-dashboard mx-auto w-full max-w-6xl space-y-5 sm:space-y-7">
       {/* Alerte Inscriptions d'élèves en attente d'activation */}
       {pendingStudents.length > 0 && (
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
-          <div className="flex items-center gap-3.5">
+        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm animate-fade-in sm:p-5 md:flex-row md:items-center">
+          <div className="flex min-w-0 items-start gap-3.5">
             <div className="w-11 h-11 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-xs">
               <UserCheck className="w-6 h-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-sm sm:text-base">
                   {pendingStudents.length} inscription{pendingStudents.length > 1 ? 's' : ''} d'élève{pendingStudents.length > 1 ? 's' : ''} en attente d'activation
                 </h3>
@@ -92,11 +92,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
+          <div className="flex w-full shrink-0 flex-col gap-2 self-start sm:flex-row md:w-auto md:self-center">
             <button
               type="button"
               onClick={handleQuickApproveAll}
-              className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 min-h-[38px]"
+              className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#2fa36b] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 active:bg-emerald-800 sm:flex-none"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Activer tous ({pendingStudents.length})</span>
@@ -104,7 +104,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button
               type="button"
               onClick={() => navigate('students')}
-              className="px-3.5 py-2 bg-amber-800 hover:bg-amber-900 active:bg-amber-950 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1 min-h-[38px]"
+              className="flex min-h-11 items-center justify-center gap-1 rounded-xl bg-[#072a3f] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] sm:flex-none"
             >
               <span>Examiner dans l'annuaire</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -113,23 +113,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
       {/* Hero Banner with Editorial Style */}
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+      <div className="relative overflow-hidden rounded-[28px] border border-[#d8e6ee] bg-white shadow-[0_16px_40px_rgba(7,42,63,.07)]">
         <div className="grid grid-cols-1 md:grid-cols-12 items-center">
-          <div className="p-6 md:p-8 md:col-span-7">
-            <span className="text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-1 rounded inline-block mb-3">
+          <div className="p-5 sm:p-6 md:col-span-7 md:p-8">
+            <span className="mb-3 inline-flex rounded-full border border-[#d1e1ec] bg-[#e6f0f7] px-3 py-1 text-xs font-semibold text-[#0b3c5d]">
               PerckyLingua • Imparare l’italiano insieme
             </span>
-            <h1 className="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-2">
+            <h1 className="mb-2 max-w-xl font-display text-2xl font-bold tracking-tight text-[#072a3f] sm:text-3xl md:text-[2.5rem] md:leading-[1.08]">
               Espace Professeur — Gestion et Évaluation
             </h1>
-            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+            <p className="mb-5 max-w-2xl text-sm leading-relaxed text-[#46657a] sm:mb-6">
               Organisez vos classes et élèves, créez et importez des quiz, gérez l'ordre de passage et évaluez vos examens oraux d'italien en temps réel.
             </p>
-            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
+            <div className="flex flex-col flex-wrap items-stretch gap-2.5 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={() => onNavigateToPassOrder(selectedExamId)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-amber-950 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 border border-amber-300 rounded-lg transition-colors shadow-xs min-h-[44px]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cfe1ec] bg-[#e6f0f7] px-4 py-2.5 text-xs font-bold text-[#072a3f] shadow-sm transition-colors hover:bg-[#d7e8f3] sm:text-sm"
               >
                 <Shuffle className="w-4 h-4 text-amber-900" />
                 <span>1. Ordre de passage</span>
@@ -137,22 +137,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateToEvaluation(selectedExamId)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg transition-colors shadow-xs min-h-[44px]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] sm:text-sm"
               >
-                <Mic className="w-4 h-4 text-amber-200" />
+                <Mic className="h-4 w-4 text-emerald-300" />
                 <span>2. Évaluer les élèves</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={onNavigateToResults}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors min-h-[44px]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d8e6ee] bg-white px-4 py-2.5 text-xs font-semibold text-[#315267] transition-colors hover:bg-[#f3f8fb] sm:text-sm"
               >
                 <span>3. Résultats</span>
               </button>
             </div>
           </div>
-          <div className="md:col-span-5 h-48 md:h-full relative overflow-hidden bg-slate-100 border-t md:border-t-0 md:border-l border-slate-200">
+          <div className="relative h-44 overflow-hidden border-t border-[#d8e6ee] bg-[#e6f0f7] md:col-span-5 md:h-full md:border-l md:border-t-0 sm:h-56">
             <img 
               src={heroImage}
               alt="Classe d'examen oral d'italien" 
@@ -175,9 +175,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Module 1: Classes & Étudiants */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
+          <div className="flex flex-col justify-between rounded-[22px] border border-[#d8e6ee] bg-white p-5 shadow-[0_8px_24px_rgba(7,42,63,.045)] transition-all hover:-translate-y-0.5 hover:border-[#b7d3e4]">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e6f0f7] font-bold text-[#0b3c5d]">
                 <School className="w-5 h-5" />
               </div>
               <div>
@@ -222,10 +222,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Module 2: Quiz & QCM */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
+          <div className="flex flex-col justify-between rounded-[22px] border border-[#d8e6ee] bg-white p-5 shadow-[0_8px_24px_rgba(7,42,63,.045)] transition-all hover:-translate-y-0.5 hover:border-[#b7d3e4]">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center font-bold">
-                <Sparkles className="w-5 h-5 text-amber-700" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e6f0f7] font-bold text-[#0b3c5d]">
+                <Sparkles className="h-5 w-5 text-[#0b3c5d]" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm mb-1">2. Quiz & QCM</h3>
@@ -259,9 +259,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Module 3: Examens Oraux */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between hover:border-amber-300 transition-colors">
+          <div className="flex flex-col justify-between rounded-[22px] border border-[#d8e6ee] bg-white p-5 shadow-[0_8px_24px_rgba(7,42,63,.045)] transition-all hover:-translate-y-0.5 hover:border-[#b7d3e4]">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 font-bold text-emerald-700">
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>

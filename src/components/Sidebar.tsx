@@ -87,12 +87,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="hidden lg:flex w-68 bg-white border-r border-slate-200 flex-col shrink-0 no-print min-h-[calc(100vh-60px)]">
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-        <div className="text-[10px] font-bold tracking-wider text-amber-900 uppercase mb-0.5">
+    <aside className="hidden min-h-[calc(100vh-60px)] w-[17rem] shrink-0 flex-col border-r border-[#d8e6ee] bg-white/85 no-print backdrop-blur-xl lg:flex">
+      <div className="border-b border-[#e2edf3] bg-[#f7fafc] p-4">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0b3c5d]">
           Espace Enseignant • PerckyLingua
         </div>
-        <div className="text-xs font-medium text-slate-800 flex items-center justify-between">
+        <div className="flex items-center justify-between text-xs font-medium text-[#072a3f]">
           <span>Session Italienne 2026</span>
           <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono font-bold">
             Actif
@@ -100,10 +100,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="p-3 space-y-4 flex-1 overflow-y-auto">
+      <nav aria-label="Navigation principale professeur" className="flex-1 space-y-4 overflow-y-auto p-3">
         {groups.map((group, idx) => (
           <div key={idx} className="space-y-1">
-            <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               {group.title}
             </div>
             {group.items.map((item) => {
@@ -114,14 +114,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={item.id}
                   type="button"
                   onClick={() => onSelectTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`group flex min-h-10 w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-amber-50 text-amber-950 shadow-xs font-bold ring-1 ring-amber-200'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  } ${item.highlight && !isActive ? 'hover:bg-amber-50/50' : ''}`}
+                      ? 'bg-[#e6f0f7] font-bold text-[#072a3f] shadow-sm ring-1 ring-[#d1e1ec]'
+                      : 'text-slate-600 hover:bg-[#f3f8fb] hover:text-[#072a3f]'
+                  } ${item.highlight && !isActive ? 'hover:bg-[#f3f8fb]' : ''}`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-800' : 'text-slate-500'}`} />
+                    <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-[#2fa36b]' : 'text-slate-500'}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                   {item.id === 'students' && pendingStudentsCount > 0 ? (
@@ -129,9 +129,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       {pendingStudentsCount}
                     </span>
                   ) : item.highlight ? (
-                    <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse shrink-0" />
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#2fa36b] motion-safe:animate-pulse" />
                   ) : isActive ? (
-                    <ChevronRight className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#0b3c5d]" />
                   ) : null}
                 </button>
               );
@@ -142,10 +142,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Progress stats */}
       {stats && (
-        <div className="p-3 m-3 mb-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+        <div className="m-3 mb-2 rounded-2xl border border-[#d8e6ee] bg-[#f3f8fb] p-3 text-xs">
           <div className="text-slate-500 mb-0.5 font-medium text-[11px]">Progression session</div>
           {stats.sessionLabel && (
-            <div className="text-[11px] text-amber-900 font-semibold truncate mb-1" title={stats.sessionLabel}>
+            <div className="mb-1 truncate text-[11px] font-semibold text-[#0b3c5d]" title={stats.sessionLabel}>
               {stats.sessionLabel}
             </div>
           )}
@@ -155,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
             <div 
-              className="bg-amber-700 h-full transition-all duration-300"
+              className="h-full bg-[#2fa36b] transition-all duration-300"
               style={{ width: `${stats.totalStudents > 0 ? Math.min(100, (stats.evaluatedCount / stats.totalStudents) * 100) : 0}%` }}
             />
           </div>
@@ -164,16 +164,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User Session Footer Card */}
       {currentUser && (
-        <div className="p-3 m-3 mt-1 bg-amber-50/80 border border-amber-200/90 rounded-lg flex items-center justify-between gap-2">
+        <div className="m-3 mt-1 flex items-center justify-between gap-2 rounded-2xl border border-[#d8e6ee] bg-white p-3 shadow-sm">
           <div className="flex items-center gap-2 overflow-hidden">
-            <div className="w-7 h-7 rounded-full bg-amber-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              A
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#072a3f] text-xs font-bold text-white ring-2 ring-[#e6f0f7]">
+              {(currentUser.name.trim()[0] || 'P').toUpperCase()}
             </div>
             <div className="overflow-hidden">
               <div className="text-xs font-bold text-slate-900 truncate">
                 {currentUser.name}
               </div>
-              <div className="text-[10px] font-mono text-amber-900 truncate" title={currentUser.email}>
+              <div className="truncate font-mono text-[10px] text-[#46657a]" title={currentUser.email}>
                 {currentUser.email}
               </div>
             </div>

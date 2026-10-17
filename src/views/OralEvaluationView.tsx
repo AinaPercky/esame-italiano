@@ -515,7 +515,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
           {/* Sélection Élève - Strictement classé selon l'ordre de passage (Participants uniquement) */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
               <label className="block text-xs font-semibold text-slate-600">
                 3. Candidat ({orderedStudents.length} participant{orderedStudents.length > 1 ? 's' : ''}) :
               </label>
@@ -738,7 +738,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
               <input
                 type="text"
                 value={presentedAnimal}
@@ -747,12 +747,12 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                   setIsSaved(false);
                 }}
                 placeholder="ex: Il lupo, L'aquila, Il leone..."
-                className="px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-800/30 w-full sm:w-60 shadow-2xs"
+                className="w-full min-w-0 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:outline-none focus:ring-2 focus:ring-amber-800/30 sm:w-60 sm:text-sm"
               />
               <button
                 type="button"
                 onClick={() => setIsQRModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer min-h-[38px]"
+                className="inline-flex min-h-11 w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-amber-800 px-3 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-amber-900 sm:w-auto"
                 title="Afficher et imprimer le Code QR de cet élève"
               >
                 <QrCode className="w-3.5 h-3.5 text-amber-200" />

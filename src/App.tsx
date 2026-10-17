@@ -186,7 +186,7 @@ export default function App() {
   const pendingStudentsCount = students.filter(s => s.validation_status === 'pending').length;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+    <div className="teacher-space min-h-screen flex flex-col text-slate-900">
       {/* Top Bar Contract (3 zones) */}
       <Header
         currentTab={currentTab}
@@ -216,7 +216,7 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-x-hidden pb-24 lg:pb-8">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-3 pb-24 sm:p-6 lg:p-8 lg:pb-8">
           {currentTab === 'dashboard' && (
             <DashboardView
               exams={exams}

@@ -129,14 +129,14 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-5 sm:space-y-7 max-w-6xl mx-auto w-full min-w-0">
       {/* Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#072a3f] tracking-tight">
             Gestion des Examens & Grilles de Rubriques
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <p className="text-sm leading-relaxed text-slate-600">
             Configurez les épreuves orales, définissez les critères en italien et personnalisez les barèmes.
           </p>
         </div>
@@ -148,7 +148,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             setUseZebuTemplate(true);
             setIsCreateModalOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-2xs transition-colors self-stretch sm:self-auto min-h-[44px]"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-2xs transition-colors self-stretch sm:self-auto min-h-[44px]"
         >
           <Plus className="w-4 h-4" />
           <span>Créer un examen</span>
@@ -156,15 +156,22 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       </div>
 
       {/* Grid of Exams */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+      {exams.length === 0 ? (
+        <div className="rounded-[22px] border border-dashed border-[#b7d3e4] bg-white/80 px-5 py-12 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e6f0f7] text-[#0b3c5d]"><BookOpen className="h-7 w-7" /></div>
+          <h3 className="text-lg font-bold text-[#072a3f]">Aucun examen créé</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">Créez une épreuve orale pour configurer ses rubriques et commencer les évaluations.</p>
+          <button type="button" onClick={() => { setNewTitle('Présentation orale — Lo zébu'); setNewDescription('Évaluation de la description du zébu en 10 rubriques prédéfinies.'); setUseZebuTemplate(true); setIsCreateModalOpen(true); }} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" />Créer un examen</button>
+        </div>
+      ) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {exams.map((exam) => (
           <div
             key={exam.id}
-            className="p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-amber-200 transition-all flex flex-col justify-between"
+            className="p-5 sm:p-6 bg-white border border-slate-200 rounded-[22px] shadow-sm hover:border-[#b7d3e4] hover:shadow-md transition-all flex flex-col justify-between"
           >
             <div>
               <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-xs font-semibold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded">
+                <span className="text-xs font-semibold text-[#0b3c5d] bg-[#e6f0f7] px-2.5 py-0.5 rounded">
                   {exam.class_name}
                 </span>
                 <span className={`text-[11px] font-medium px-2 py-0.5 rounded font-mono ${
@@ -196,7 +203,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] sm:text-[11px]">Barème max</span>
-                  <span className="font-semibold text-amber-800 font-mono text-[11px] sm:text-xs">
+                  <span className="font-semibold text-[#0b3c5d] font-mono text-[11px] sm:text-xs">
                     {exam.max_score || 10} pts
                   </span>
                 </div>
@@ -215,16 +222,16 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectExamForPassOrder(exam.id)}
-                  className="flex-1 py-2.5 px-3 text-xs font-semibold text-amber-950 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 border border-amber-300/80 rounded-lg transition-colors text-center min-h-[44px] flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 px-3 text-xs font-semibold text-[#072a3f] bg-[#e6f0f7] hover:bg-[#d7e8f3] active:bg-[#b7d3e4] border border-[#b7d3e4] rounded-lg transition-colors text-center min-h-[44px] flex items-center justify-center gap-1.5"
                 >
-                  <Shuffle className="w-3.5 h-3.5 text-amber-900" />
+                  <Shuffle className="w-3.5 h-3.5 text-[#0b3c5d]" />
                   <span>Ordre de passage</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => onSelectExamForEvaluation(exam.id)}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-xs transition-colors min-h-[44px]"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-xs transition-colors min-h-[44px]"
               >
                 <span>Évaluer</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -232,12 +239,12 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Modal Créer Examen */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="font-display text-lg font-bold text-slate-900 mb-1">
               Créer un nouvel examen oral
             </h3>
@@ -248,7 +255,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             <form onSubmit={handleCreateExam} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Titre de l'examen <span className="text-rose-500">*</span>
+                  Titre de l'examen <span className="text-[#0b3c5d]">*</span>
                 </label>
                 <input
                   type="text"
@@ -256,14 +263,14 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ex: Présentation orale — Lo zébu"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3c5d]/20 focus:border-[#0b3c5d] min-h-[44px]"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Classe concernée <span className="text-rose-500">*</span>
+                    Classe concernée <span className="text-[#0b3c5d]">*</span>
                   </label>
                   <select
                     value={newClassId}
@@ -302,7 +309,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
 
               {/* Template Choice */}
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2">
+              <div className="p-3 bg-[#e6f0f7] border border-[#b7d3e4] rounded-2xl space-y-2">
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -311,27 +318,27 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     className="mt-0.5 rounded text-amber-800 focus:ring-amber-800 w-4 h-4"
                   />
                   <div>
-                    <span className="text-xs font-semibold text-amber-950 block">
+                    <span className="text-xs font-semibold text-[#072a3f] block">
                       Appliquer le modèle officiel « Lo zébu » (10 rubriques)
                     </span>
-                    <span className="text-[11px] text-amber-800/90 block leading-tight">
+                    <span className="text-[11px] text-[#315267] block leading-tight">
                       Charge automatiquement les 10 critères standardisés (Identificazione, Nome scientifico, Aspetto fisico, Habitat, ecc.) notés 1 point chacun (Note max : 10).
                     </span>
                   </div>
                 </label>
               </div>
 
-              <div className="flex flex-col-reverse xs:flex-row justify-end gap-2 sm:gap-3 pt-3">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="w-full xs:w-auto px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="w-full xs:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg min-h-[44px]"
+                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
                 >
                   Créer l'examen
                 </button>
@@ -344,8 +351,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       {/* Modal Gestion des Rubriques d'un Examen */}
       {selectedExamForDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full p-4 sm:p-6 max-h-[90vh] flex flex-col">
-            <div className="flex flex-col xs:flex-row xs:items-start justify-between pb-3 border-b border-slate-100 mb-3 gap-2">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-3xl w-full p-4 sm:p-6 max-h-[90vh] flex flex-col">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-3 border-b border-slate-100 mb-3 gap-2">
               <div>
                 <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
                   Grille d'évaluation en italien
@@ -360,7 +367,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleDeleteExam(selectedExamForDetails.id)}
-                className="text-xs text-rose-600 hover:text-rose-800 inline-flex items-center gap-1 p-2 rounded hover:bg-rose-50 self-start xs:self-auto min-h-[36px]"
+                className="text-xs text-[#0b3c5d] hover:text-[#072a3f] inline-flex items-center gap-1 p-2 rounded hover:bg-[#e6f0f7] self-start sm:self-auto min-h-[36px]"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Supprimer</span>
@@ -372,7 +379,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               {rubricsDraft.map((r, idx) => (
                 <div
                   key={r.id || idx}
-                  className="p-3 border border-slate-200 rounded-lg bg-slate-50/50 space-y-2 text-xs"
+                  className="p-3 sm:p-4 border border-slate-200 rounded-2xl bg-[#f7fafc] space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono font-semibold text-slate-500">
@@ -398,7 +405,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveRubricFromDraft(idx)}
-                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        className="text-slate-400 hover:text-[#0b3c5d] p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center"
                         title="Supprimer cette rubrique"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -406,7 +413,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[11px] text-slate-600 font-medium mb-0.5">
                         Titre en italien :
@@ -465,7 +472,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </button>
             </div>
 
-            <div className="flex flex-col-reverse xs:flex-row items-stretch xs:items-center justify-between pt-3 border-t border-slate-100 mt-3 gap-2">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 mt-3 gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedExamForDetails(null)}
@@ -476,7 +483,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <button
                 type="button"
                 onClick={handleSaveRubrics}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg min-h-[44px]"
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
               >
                 Enregistrer les modifications
               </button>

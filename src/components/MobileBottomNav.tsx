@@ -21,7 +21,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
   return (
     <nav 
       aria-label="Navigation mobile"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 lg:hidden px-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-lg no-print"
+      className="fixed bottom-[calc(6px+env(safe-area-inset-bottom,0px))] left-2 right-2 z-40 rounded-2xl border border-[#d8e6ee] bg-white/95 px-2 pt-1.5 pb-1.5 shadow-[0_12px_36px_rgba(7,42,63,.14)] backdrop-blur-xl lg:hidden no-print"
     >
       <div className="flex items-center justify-around max-w-md mx-auto">
         {items.map((item) => {
@@ -34,11 +34,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
                 key={item.id}
                 type="button"
                 onClick={() => onSelectTab(item.id)}
-                className="flex flex-col items-center justify-center -mt-5 bg-amber-800 text-white rounded-full w-14 h-14 shadow-lg active:bg-amber-950 transition-transform active:scale-95 border-2 border-white ring-2 ring-amber-800/20"
+                className="-mt-4 flex h-12 w-12 flex-col items-center justify-center rounded-full border-2 border-white bg-[#072a3f] text-white shadow-lg ring-2 ring-[#2fa36b]/20 transition-transform active:scale-95 active:bg-[#0b3c5d]"
                 aria-label="Évaluer en direct"
               >
-                <Icon className="w-6 h-6 text-amber-200" />
-                <span className="text-[9px] font-bold text-amber-100 tracking-tight mt-0.5">Noter</span>
+                <Icon className="h-5 w-5 text-emerald-300" />
+                <span className="mt-0.5 text-[8px] font-bold tracking-tight text-white">Noter</span>
               </button>
             );
           }
@@ -48,14 +48,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
               key={item.id}
               type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-lg min-w-[56px] min-h-[44px] transition-colors ${
+              className={`flex min-h-11 min-w-[54px] flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-colors ${
                 isActive 
-                  ? 'text-amber-900 font-bold bg-amber-50/80' 
-                  : 'text-slate-500 hover:text-slate-900 active:bg-slate-100'
+                  ? 'bg-[#e6f0f7] font-bold text-[#072a3f]'
+                  : 'text-slate-500 hover:text-[#072a3f] active:bg-[#f3f8fb]'
               }`}
             >
-              <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'text-amber-800 stroke-[2.5]' : 'text-slate-400'}`} />
-              <span className="text-[10px] leading-tight">{item.label}</span>
+              <Icon className={`mb-0.5 h-5 w-5 ${isActive ? 'text-[#2fa36b] stroke-[2.5]' : 'text-slate-400'}`} />
+              <span className="text-[9px] leading-tight">{item.label}</span>
             </button>
           );
         })}

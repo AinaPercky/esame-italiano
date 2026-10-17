@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Database, 
-  FileSpreadsheet, 
-  FileCode, 
-  Printer, 
-  RotateCcw, 
-  CheckCircle2, 
+import {
+  Settings,
+  Database,
+  FileSpreadsheet,
+  FileCode,
+  Printer,
+  RotateCcw,
+  CheckCircle2,
   AlertCircle,
   Copy,
   ExternalLink,
@@ -65,7 +65,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     title: '',
     message: ''
   });
-  
+
   // Gestion du code d'accès
   const [currentCode, setCurrentCode] = useState<string>(authService.getAccessCode());
   const [newCodeInput, setNewCodeInput] = useState<string>('');
@@ -253,7 +253,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const isConfigured = supabaseService.isConfigured();
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12 min-w-0 w-full">
       <div>
         <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight">
           Paramètres & Base de Données
@@ -267,15 +267,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
       <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-5 h-5 text-amber-800" />
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-slate-800" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
                   Compte Examinateur Agréé
                 </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 uppercase font-mono tracking-wider">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-900 uppercase font-mono tracking-wider">
                   Accès Restreint
                 </span>
               </div>
@@ -292,7 +292,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <button
               type="button"
               onClick={onLogout}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors shrink-0 min-h-[40px] cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors shrink-0 min-h-[40px] cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Verrouiller / Déconnexion</span>
@@ -305,9 +305,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
             <div>
               <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-800" />
+                <KeyRound className="w-4 h-4 text-slate-800" />
                 <span className="text-xs font-semibold text-slate-800">Code d'accès actuel :</span>
-                <span className="font-mono font-bold text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded">
+                <span className="font-mono font-bold text-xs bg-slate-100 text-slate-900 px-2 py-0.5 rounded">
                   {currentCode}
                 </span>
               </div>
@@ -316,17 +316,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               </p>
             </div>
 
-            <form onSubmit={handleUpdateCode} className="flex items-center gap-2">
+            <form onSubmit={handleUpdateCode} className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"
                 value={newCodeInput}
                 onChange={(e) => setNewCodeInput(e.target.value)}
                 placeholder="Nouveau code..."
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-800 max-w-[140px]"
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-800 w-full sm:w-auto sm:max-w-[140px]"
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-slate-950 hover:bg-slate-950 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
               >
                 Modifier
               </button>
@@ -351,7 +351,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           )}
 
           {codeErrorMessage && (
-            <p className="text-xs text-rose-700 font-medium mt-2 flex items-center gap-1">
+            <p className="text-xs text-slate-700 font-medium mt-2 flex items-center gap-1">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{codeErrorMessage}</span>
             </p>
@@ -364,12 +364,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
         isConfigured && testResult?.success
           ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
           : isConfigured && testResult && !testResult.success
-            ? 'bg-rose-50/80 border-rose-200 text-rose-950'
-            : 'bg-amber-50/80 border-amber-200 text-amber-950'
+            ? 'bg-slate-100/80 border-slate-200 text-slate-950'
+            : 'bg-slate-100/80 border-slate-200 text-slate-950'
       }`}>
         <div className="flex items-start gap-3">
           <Database className={`w-5 h-5 shrink-0 mt-0.5 ${
-            isConfigured && testResult?.success ? 'text-emerald-700' : isConfigured && testResult && !testResult.success ? 'text-rose-700' : 'text-amber-800'
+            isConfigured && testResult?.success ? 'text-emerald-700' : isConfigured && testResult && !testResult.success ? 'text-slate-700' : 'text-slate-800'
           }`} />
           <div>
             <div className="font-semibold text-sm flex items-center gap-2">
@@ -377,7 +377,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
                 isConfigured && testResult?.success
                   ? 'bg-emerald-200 text-emerald-900'
-                  : 'bg-amber-200 text-amber-900'
+                  : 'bg-slate-200 text-slate-900'
               }`}>
                 {isConfigured && testResult?.success ? 'Supabase PostgreSQL + Cache Local' : 'Stockage Local Sécurisé (Navigateur)'}
               </span>
@@ -395,23 +395,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           onClick={() => setShowSqlGuide(!showSqlGuide)}
           className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 self-start sm:self-auto shrink-0 shadow-2xs cursor-pointer min-h-[36px]"
         >
-          <HelpCircle className="w-3.5 h-3.5 text-amber-800" />
+          <HelpCircle className="w-3.5 h-3.5 text-slate-800" />
           <span>{showSqlGuide ? 'Masquer le guide' : 'Guide de configuration Supabase'}</span>
         </button>
       </div>
 
       {/* Guide Pas à Pas pour configurer Supabase */}
       {showSqlGuide && (
-        <div className="p-4 sm:p-5 bg-white border border-amber-200 rounded-xl shadow-xs space-y-3.5 animate-in fade-in duration-200">
+        <div className="p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3.5 animate-in fade-in duration-200">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
             <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
               <span>🚀 Comment connecter Supabase en 3 étapes simples :</span>
             </h4>
             <a
-              href="https://supabase.com/dashboard" 
-              target="_blank" 
+              href="https://supabase.com/dashboard"
+              target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-semibold text-amber-800 hover:text-amber-900 inline-flex items-center gap-1"
+              className="text-xs font-semibold text-slate-800 hover:text-slate-900 inline-flex items-center gap-1"
             >
               <span>Ouvrir Supabase</span>
               <ExternalLink className="w-3 h-3" />
@@ -421,7 +421,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-600">
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
               <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-mono text-[11px]">1</span>
+                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center font-mono text-[11px]">1</span>
                 <span>Créer un projet</span>
               </div>
               <p>Connectez-vous sur <strong>supabase.com</strong> et créez un nouveau projet PostgreSQL gratuit.</p>
@@ -429,7 +429,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
 
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
               <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-mono text-[11px]">2</span>
+                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center font-mono text-[11px]">2</span>
                 <span>Exécuter le script SQL</span>
               </div>
               <p>Pour un projet déjà utilisé, exécutez la migration d’identité e-mail ci-dessous : elle supprime les anciens élèves, leurs évaluations orales, ordres de passage et soumissions de quiz. Le script complet réinitialise davantage de tables.</p>
@@ -437,7 +437,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
 
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
               <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-mono text-[11px]">3</span>
+                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-900 flex items-center justify-center font-mono text-[11px]">3</span>
                 <span>Copier URL & Clé API</span>
               </div>
               <p>Dans <strong>Project Settings &gt; API</strong>, copiez l'<strong>URL</strong> et la clé <strong>anon public</strong> dans les champs ci-dessous.</p>
@@ -448,7 +448,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <button
               type="button"
               onClick={handleCopyStudentEmailMigration}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-rose-700 hover:bg-rose-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedStudentEmailMigration ? '✓ Migration e-mail copiée !' : 'Migration e-mail (efface les anciens élèves)'}</span>
@@ -456,7 +456,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <button
               type="button"
               onClick={handleCopyAvatarMigration}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-700 hover:bg-indigo-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedAvatarMigration ? '✓ Migration photo copiée !' : 'Copier la migration Photo (sans effacer les données)'}</span>
@@ -472,7 +472,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <button
               type="button"
               onClick={handleCopyValidationMigration}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 active:bg-teal-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedValidationMigration ? '✓ Migration Activation copiée !' : 'Copier migration Statut d\'activation élèves (SQL)'}</span>
@@ -480,7 +480,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <button
               type="button"
               onClick={handleCopyFullSql}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-950 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedSql ? '✓ Script SQL copié dans le presse-papier !' : 'Copier le script SQL complet (schema.sql)'}</span>
@@ -520,7 +520,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               value={supabaseUrl}
               onChange={(e) => setSupabaseUrl(e.target.value)}
               placeholder="https://votre-projet.supabase.co"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-800/20 focus:border-slate-800"
             />
           </div>
 
@@ -533,7 +533,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               value={supabaseKey}
               onChange={(e) => setSupabaseKey(e.target.value)}
               placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-800/20 focus:border-slate-800"
             />
           </div>
 
@@ -551,7 +551,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               type="button"
               onClick={handleTestConnection}
               disabled={isTesting}
-              className="px-4 py-2 text-xs font-semibold text-amber-950 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 rounded-lg min-h-[40px] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-semibold text-slate-950 bg-slate-100 hover:bg-slate-200 active:bg-amber-300 rounded-lg min-h-[40px] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
               <span>{isTesting ? 'Test en cours...' : 'Tester la connexion'}</span>
@@ -572,13 +572,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <div className={`p-3.5 rounded-lg border text-xs space-y-1.5 ${
               testResult.success
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-slate-100 border-slate-200 text-slate-900'
             }`}>
               <div className="flex items-start gap-2 font-semibold">
                 {testResult.success ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
                 )}
                 <span>{testResult.message}</span>
               </div>
@@ -621,14 +621,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
 
           {actionMessage && (
             <div className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
-              actionMessage.type === 'success' 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
-                : 'bg-rose-50 border-rose-200 text-rose-900'
+              actionMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-slate-100 border-slate-200 text-slate-900'
             }`}>
               {actionMessage.type === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-slate-600 shrink-0" />
               )}
               <span>{actionMessage.text}</span>
             </div>
@@ -668,7 +668,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               link.download = `export_oral_exams_${new Date().toISOString().split('T')[0]}.csv`;
               link.click();
             }}
-            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-amber-50/30 text-left transition-all cursor-pointer"
+            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-slate-100/30 text-left transition-all cursor-pointer"
           >
             <FileSpreadsheet className="w-5 h-5 text-emerald-700 mb-2" />
             <div className="font-semibold text-slate-900 text-xs">Format CSV</div>
@@ -685,9 +685,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               link.download = `export_oral_exams_${new Date().toISOString().split('T')[0]}.json`;
               link.click();
             }}
-            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-amber-50/30 text-left transition-all cursor-pointer"
+            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-slate-100/30 text-left transition-all cursor-pointer"
           >
-            <FileCode className="w-5 h-5 text-amber-800 mb-2" />
+            <FileCode className="w-5 h-5 text-slate-800 mb-2" />
             <div className="font-semibold text-slate-900 text-xs">Format JSON</div>
             <div className="text-[11px] text-slate-500 mt-0.5">Structure complète avec détail des rubriques</div>
           </button>
@@ -695,7 +695,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           <button
             type="button"
             onClick={() => window.print()}
-            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-amber-50/30 text-left transition-all cursor-pointer"
+            className="p-4 border border-slate-200 rounded-lg hover:border-amber-700 bg-slate-50/50 hover:bg-slate-100/30 text-left transition-all cursor-pointer"
           >
             <Printer className="w-5 h-5 text-slate-700 mb-2" />
             <div className="font-semibold text-slate-900 text-xs">Impression / PDF</div>
@@ -733,7 +733,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               }
             });
           }}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-200 rounded-lg transition-colors min-h-[44px] shrink-0 cursor-pointer"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-100 active:bg-rose-200 border border-slate-200 rounded-lg transition-colors min-h-[44px] shrink-0 cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Réinitialiser</span>
