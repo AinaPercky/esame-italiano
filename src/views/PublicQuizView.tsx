@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { Quiz } from '../types';
+import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 
 import { PublicQuizzesHomeView } from './publicQuiz/PublicQuizzesHomeView';
 import { PublicQuizStartScreen } from './publicQuiz/PublicQuizStartScreen';
@@ -48,7 +49,7 @@ function saveToStorage(key: string, value: unknown) {
 }
 
 function clearStorage(quizId: string) {
-  ['studentName', 'answers', 'questionTimeLeftMs', 'currentIndex', 'validated'].forEach(
+  ['studentName', 'answers', 'questionTimeLeftMs', 'totalTimeLeftMs', 'currentIndex', 'validated'].forEach(
     (suffix) => localStorage.removeItem(storageKey(quizId, suffix))
   );
 }
@@ -84,6 +85,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [timePerQuestionMs, setTimePerQuestionMs] = useState<number>(0);
   // Current question time remaining
   const [questionTimeLeftMs, setQuestionTimeLeftMs] = useState<number>(0);
+  // Global quiz time remaining, distinct from the per-question timer
+  const [totalTimeLeftMs, setTotalTimeLeftMs] = useState<number>(0);
 
   // ── Result ────────────────────────────────────────────────────────────────
   const [result, setResult] = useState<QuizEvaluationResult | null>(null);
@@ -96,6 +99,15 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // Refs to avoid stale closures in timer callbacks
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isQuizActive = screen === 'quiz';
+  const hasSubmittedRef = useRef(false);
+  const timerCueRef = useRef<{ quizId: string; played: Set<number> }>({ quizId: '', played: new Set() });
+  const correctionAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const questionForCorrection = quiz?.questions[currentIndex];
+  const isCorrectionModalOpen = Boolean(
+    !showCorrectionAtEnd && questionForCorrection && validatedSet[questionForCorrection.id] &&
+    perQuestionFeedback[questionForCorrection.id]
+  );
+  const totalQuizDurationMs = Math.max(1, (quiz?.duration_minutes || 10) * 60 * 1000);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers (stable refs so callbacks don't need them in deps)
@@ -121,15 +133,21 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // Submit the entire quiz (all answers collected so far)
   // ─────────────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(() => {
+    if (hasSubmittedRef.current) return;
     const q = quizRef.current;
     const qId = activeQuizIdRef.current;
     if (!q) return;
+    hasSubmittedRef.current = true;
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
+    if (correctionAdvanceTimeoutRef.current) {
+      clearTimeout(correctionAdvanceTimeoutRef.current);
+      correctionAdvanceTimeoutRef.current = null;
+    }
     const evaluation = evaluateQuizAnswers(q, answersRef.current);
     setResult(evaluation);
     if (qId) clearStorage(qId);
@@ -159,6 +177,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // Advance to next question OR submit if last
   // ─────────────────────────────────────────────────────────────────────────
   const doAdvance = useCallback((fromIndex: number, total: number) => {
+    if (correctionAdvanceTimeoutRef.current) {
+      clearTimeout(correctionAdvanceTimeoutRef.current);
+      correctionAdvanceTimeoutRef.current = null;
+    }
     if (fromIndex < total - 1) {
       const nextIdx = fromIndex + 1;
       setCurrentIndex(nextIdx);
@@ -169,6 +191,14 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       handleSubmit();
     }
   }, [handleSubmit]);
+
+  const scheduleAdvanceAfterCorrection = useCallback((fromIndex: number, total: number) => {
+    if (correctionAdvanceTimeoutRef.current) clearTimeout(correctionAdvanceTimeoutRef.current);
+    correctionAdvanceTimeoutRef.current = setTimeout(() => {
+      correctionAdvanceTimeoutRef.current = null;
+      if (currentIndexRef.current === fromIndex) doAdvance(fromIndex, total);
+    }, 8000);
+  }, [doAdvance]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Load quiz data
@@ -231,6 +261,9 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       const savedQTime = loadFromStorage<number>(
         storageKey(activeQuizId, 'questionTimeLeftMs'), perQ
       );
+      const savedTotalTime = loadFromStorage<number>(
+        storageKey(activeQuizId, 'totalTimeLeftMs'), totalMs
+      );
 
       setStudentName(savedName);
       setAnswers(savedAnswers);
@@ -240,6 +273,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setValidatedSet(savedValidated);
       validatedSetRef.current = savedValidated;
       setQuestionTimeLeftMs(savedQTime);
+      setTotalTimeLeftMs(Number.isFinite(savedTotalTime) ? Math.max(0, Math.min(totalMs, savedTotalTime)) : totalMs);
+      hasSubmittedRef.current = false;
 
       setScreen('start');
     };
@@ -263,12 +298,44 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     saveToStorage(storageKey(activeQuizId, 'questionTimeLeftMs'), questionTimeLeftMs);
   }, [activeQuizId, questionTimeLeftMs, screen]);
 
+  useEffect(() => {
+    if (!activeQuizId || screen !== 'quiz') return;
+    saveToStorage(storageKey(activeQuizId, 'totalTimeLeftMs'), totalTimeLeftMs);
+  }, [activeQuizId, totalTimeLeftMs, screen]);
+
+  // Compte à rebours global, suspendu pendant la correction pédagogique.
+  useEffect(() => {
+    if (!isQuizActive || !quiz || isCorrectionModalOpen) return;
+    const interval = setInterval(() => {
+      setTotalTimeLeftMs((previous) => Math.max(0, previous - 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isQuizActive, quiz?.id, isCorrectionModalOpen]);
+
+  useEffect(() => {
+    if (isQuizActive && totalTimeLeftMs <= 0) handleSubmit();
+  }, [isQuizActive, totalTimeLeftMs, handleSubmit]);
+
+  // Bips à mi-parcours, à 5 secondes, puis à chacune des 3 dernières secondes.
+  useEffect(() => {
+    if (!isQuizActive || !quiz || totalTimeLeftMs <= 0) return;
+    if (timerCueRef.current.quizId !== quiz.id) {
+      timerCueRef.current = { quizId: quiz.id, played: new Set() };
+    }
+    const remainingSeconds = Math.ceil(totalTimeLeftMs / 1000);
+    const totalSeconds = Math.ceil(totalQuizDurationMs / 1000);
+    const cueSeconds = new Set([Math.ceil(totalSeconds / 2), 5, 3, 2, 1]);
+    if (!cueSeconds.has(remainingSeconds) || timerCueRef.current.played.has(remainingSeconds)) return;
+    timerCueRef.current.played.add(remainingSeconds);
+    playTimerBeep();
+  }, [isQuizActive, quiz, totalTimeLeftMs, totalQuizDurationMs]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Per-question countdown timer
   // Resets whenever currentIndex changes (new question) or quiz starts
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isQuizActive) return;
+    if (!isQuizActive || isCorrectionModalOpen) return;
 
     // Clear any previous timer
     if (timerRef.current) {
@@ -293,7 +360,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     };
     // Re-run whenever currentIndex changes (resets timer for each question)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isQuizActive, currentIndex]);
+  }, [isQuizActive, currentIndex, isCorrectionModalOpen]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // When per-question timer hits 0 → show correction (even if no answer) then advance
@@ -324,12 +391,14 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       doValidate(question.id);
     }
 
-    // Show correction for 7‑9 s, then advance
-    setTimeout(() => {
-      const total = quizRef.current?.questions.length ?? 0;
-      doAdvance(currentIndexRef.current, total);
-    }, 8000); // 8 seconds display
-  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, doAdvance]);
+    // The modal handles its own eight-second pause; retain the old delay when
+    // corrections are configured to appear only at the end (or unavailable).
+    const correction = perQuestionFeedbackRef.current[question.id]
+      || evaluateQuizAnswers(q, answersRef.current).feedback[question.id];
+    if (showCorrectionAtEnd || !correction) {
+      scheduleAdvanceAfterCorrection(currentIndex, q.questions.length);
+    }
+  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, scheduleAdvanceAfterCorrection, showCorrectionAtEnd]);
 
   // Reset zero-fired tracker when question index changes (new question)
   useEffect(() => {
@@ -344,6 +413,9 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   const handleStart = useCallback(() => {
     if (!quizRef.current || !studentName.trim()) return;
+    hasSubmittedRef.current = false;
+    timerCueRef.current = { quizId: quizRef.current.id, played: new Set() };
+    primeTimerAudio();
     const qId = activeQuizIdRef.current;
     if (qId) saveToStorage(storageKey(qId, 'studentName'), studentName.trim());
     // Reset timer to per-question duration
@@ -368,6 +440,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const handleNext = useCallback(() => {
     const q = quizRef.current;
     if (!q) return;
+    if (correctionAdvanceTimeoutRef.current) {
+      clearTimeout(correctionAdvanceTimeoutRef.current);
+      correctionAdvanceTimeoutRef.current = null;
+    }
     doAdvance(currentIndexRef.current, q.questions.length);
   }, [doAdvance]);
 
@@ -390,7 +466,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     setCurrentIndex(0);
     currentIndexRef.current = 0;
     setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    setTotalTimeLeftMs((q.duration_minutes || 10) * 60 * 1000);
     timeZeroFiredRef.current = -1;
+    hasSubmittedRef.current = false;
+    timerCueRef.current = { quizId: q.id, played: new Set() };
     setResult(null);
     setScreen('start');
   }, []);
@@ -427,6 +506,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     if (screen !== 'quiz' || !currentQuestion) return;
 
     const onKey = (e: KeyboardEvent) => {
+      if (isCorrectionModalOpen) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -451,7 +531,12 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [screen, currentQuestion, isCurrentValidated, handleValidate, handleNext]);
+  }, [screen, currentQuestion, isCurrentValidated, isCorrectionModalOpen, handleValidate, handleNext]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (correctionAdvanceTimeoutRef.current) clearTimeout(correctionAdvanceTimeoutRef.current);
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Derived display values
@@ -536,6 +621,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
           <PublicQuizQuestionScreen
             question={currentQuestion}
             quizTitle={quiz.title}
+            totalTimeLeftMs={totalTimeLeftMs}
+            totalTimeDurationMs={totalQuizDurationMs}
             questionIndex={currentIndex}
             totalQuestions={totalQuestions}
             answer={currentAnswer}

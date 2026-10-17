@@ -37,6 +37,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
+import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 const STUDENT_TABS = [
@@ -83,6 +84,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [skippedQuestions, setSkippedQuestions] = useState<Record<string, boolean>>({});
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
+  const quizTimerCueRef = useRef<{ quizId: string; played: Set<number> }>({ quizId: '', played: new Set() });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
 
@@ -250,6 +252,19 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(timer);
   }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
 
+  // Alerte sonore du temps total : moitié, cinq secondes puis les trois dernières secondes.
+  useEffect(() => {
+    if (!activeQuiz || quizSecondsRemaining <= 0) return;
+    if (quizTimerCueRef.current.quizId !== activeQuiz.id) {
+      quizTimerCueRef.current = { quizId: activeQuiz.id, played: new Set() };
+    }
+    const totalSeconds = (activeQuiz.duration_minutes || 10) * 60;
+    const cueSeconds = new Set([Math.ceil(totalSeconds / 2), 5, 3, 2, 1]);
+    if (!cueSeconds.has(quizSecondsRemaining) || quizTimerCueRef.current.played.has(quizSecondsRemaining)) return;
+    quizTimerCueRef.current.played.add(quizSecondsRemaining);
+    playTimerBeep();
+  }, [activeQuiz, quizSecondsRemaining]);
+
   // 2. Chronomètre dédié par Question (en pause pendant l'affichage de l'explication)
   useEffect(() => {
     if (!activeQuiz || questionSecondsRemaining <= 0 || incorrectFeedback?.isOpen) return;
@@ -308,6 +323,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       return;
     }
 
+    primeTimerAudio();
+    quizTimerCueRef.current = { quizId: quiz.id, played: new Set() };
     setActiveQuiz(quiz);
     setQuizAnswers({});
     setSkippedQuestions({});
