@@ -662,7 +662,6 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
             score20={result.score20}
             feedback={result.feedback}
             onRetry={handleRetry}
-            onBackToList={handleBackToList}
           />
         </div>
       </div>
