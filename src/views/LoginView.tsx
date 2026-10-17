@@ -181,28 +181,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <section className="auth-visual" aria-label="PerckyLingua, apprendre l’italien avec confiance">
         <div className="auth-orb auth-orb-one" />
         <div className="auth-orb auth-orb-two" />
-        <div className="auth-deco auth-deco-green" />
-        <div className="auth-deco auth-deco-red" />
-        <div className="auth-brand-lockup">
-          <img src="/percky-lingua-logo.png" alt="" className="auth-brand-logo" />
-          <div>
-            <p className="auth-wordmark">PerckyLingua</p>
-            <div className="auth-tricolour" aria-hidden="true"><i /><i /><i /></div>
-            <p className="auth-tagline">Lingua e Cultura Italiana</p>
-          </div>
-        </div>
         <div className="auth-illustration-wrap">
           <div className="auth-illustration-glow" />
-          <span className="auth-spark auth-spark-left">✦</span>
-          <span className="auth-spark auth-spark-right">✦</span>
+          <span className="auth-spark auth-spark-left" aria-hidden="true">✦</span>
+          <span className="auth-spark auth-spark-right" aria-hidden="true">✦</span>
           <img src="/student-learning-sticker.png" alt="Un élève souriant avec ses livres d’italien" className="auth-illustration" draggable={false} />
         </div>
-        <div className="auth-visual-copy">
-          <span className="auth-eyebrow"><span /> IMPARA · PARLA · PROGREDISCI</span>
-          <h2>La lingua italiana,<br /><em>un passo alla volta.</em></h2>
-          <p>Apprenez, entraînez-vous et suivez vos progrès avec confiance.</p>
+        <div className="auth-brand-copy">
+          <p className="auth-brand-overline">IMPARA <i /> PARLA <i /> PROGREDISCI</p>
+          <h2>PerckyLingua</h2>
+          <div className="auth-tricolour" aria-hidden="true"><i /><i /><i /></div>
+          <p className="auth-tagline">Lingua e Cultura Italiana</p>
         </div>
-        <p className="auth-visual-footer">Fatto con passione per la lingua italiana <span>•</span> Dal Madagascar</p>
+        <p className="auth-visual-footer">Imparare l’italiano, un passo alla volta.</p>
       </section>
     )
   );
@@ -283,6 +274,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Retour à la connexion
           </button>
           <form onSubmit={handleStudentRegister} className="auth-form auth-register-form" aria-label="Inscription élève">
+            <div className="auth-section-heading">
+              <span>01</span><div><strong>Votre profil</strong><p>Les informations de votre classe.</p></div>
+            </div>
             <div className="auth-form-row">
               <div className="auth-field-group">
                 <label htmlFor="register-first-name" className="auth-label">Prénom <span>*</span></label>
@@ -306,6 +300,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </select>
               </div>
             </div>
+            <div className="auth-section-heading auth-section-heading-account">
+              <span>02</span><div><strong>Votre compte</strong><p>Vos identifiants de connexion.</p></div>
+            </div>
             <div className="auth-field-group">
               <label htmlFor="register-email" className="auth-label">Adresse e-mail <span>*</span></label>
               <div className="auth-input-wrap">
@@ -313,25 +310,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <input id="register-email" type="email" required value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="votre.email@ecole.fr" className={`${inputSmCls} auth-input-icon-space`} autoComplete="email" inputMode="email" autoCapitalize="none" />
               </div>
             </div>
-            <div className="auth-field-group">
-              <label htmlFor="register-password" className="auth-label">Mot de passe <span>*</span></label>
-              <div className="auth-input-wrap">
-                <KeyRound className="auth-input-icon" aria-hidden="true" />
-                <input id="register-password" type={showRegPassword ? 'text' : 'password'} required minLength={4} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="4 caractères minimum" className={`${inputSmCls} auth-input-icon-space auth-input-action-space`} autoComplete="new-password" />
-                <button type="button" onClick={() => setShowRegPassword(!showRegPassword)} className="auth-visibility" aria-label={showRegPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} aria-pressed={showRegPassword}>
-                  {showRegPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                </button>
+            <div className="auth-form-row auth-password-row">
+              <div className="auth-field-group">
+                <label htmlFor="register-password" className="auth-label">Mot de passe <span>*</span></label>
+                <div className="auth-input-wrap">
+                  <KeyRound className="auth-input-icon" aria-hidden="true" />
+                  <input id="register-password" type={showRegPassword ? 'text' : 'password'} required minLength={4} value={regPassword} onChange={e => setRegPassword(e.target.value)} placeholder="4 caractères min." className={`${inputSmCls} auth-input-icon-space auth-input-action-space`} autoComplete="new-password" />
+                  <button type="button" onClick={() => setShowRegPassword(!showRegPassword)} className="auth-visibility" aria-label={showRegPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} aria-pressed={showRegPassword}>
+                    {showRegPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                  </button>
+                </div>
+                <p className="auth-hint">4 caractères minimum</p>
               </div>
-              <p className="auth-hint">Utilisez au moins 4 caractères.</p>
-            </div>
-            <div className="auth-field-group">
-              <label htmlFor="register-confirm-password" className="auth-label">Confirmer le mot de passe <span>*</span></label>
-              <div className="auth-input-wrap">
-                <KeyRound className="auth-input-icon" aria-hidden="true" />
-                <input id="register-confirm-password" type={showRegConfirmPassword ? 'text' : 'password'} required minLength={4} value={regConfirmPassword} onChange={e => setRegConfirmPassword(e.target.value)} placeholder="Saisissez-le à nouveau" className={`${inputSmCls} auth-input-icon-space auth-input-action-space`} autoComplete="new-password" />
-                <button type="button" onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)} className="auth-visibility" aria-label={showRegConfirmPassword ? 'Masquer la confirmation' : 'Afficher la confirmation'} aria-pressed={showRegConfirmPassword}>
-                  {showRegConfirmPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-                </button>
+              <div className="auth-field-group">
+                <label htmlFor="register-confirm-password" className="auth-label">Confirmation <span>*</span></label>
+                <div className="auth-input-wrap">
+                  <KeyRound className="auth-input-icon" aria-hidden="true" />
+                  <input id="register-confirm-password" type={showRegConfirmPassword ? 'text' : 'password'} required minLength={4} value={regConfirmPassword} onChange={e => setRegConfirmPassword(e.target.value)} placeholder="Répétez-le ici" className={`${inputSmCls} auth-input-icon-space auth-input-action-space`} autoComplete="new-password" />
+                  <button type="button" onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)} className="auth-visibility" aria-label={showRegConfirmPassword ? 'Masquer la confirmation' : 'Afficher la confirmation'} aria-pressed={showRegConfirmPassword}>
+                    {showRegConfirmPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                  </button>
+                </div>
               </div>
             </div>
             <button type="submit" disabled={isLoading || classes.length === 0} className="auth-submit auth-register-submit">
@@ -352,8 +351,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="auth-layout">
         <div className="auth-desktop-brand">{renderBrandingPanel()}</div>
         <section className="auth-main" aria-label={viewMode === 'login' ? 'Se connecter à PerckyLingua' : 'Créer un compte élève'}>
-          <div className="auth-card">{renderFormContent()}</div>
-          <footer className="auth-footer"><span>PerckyLingua</span><i aria-hidden="true">•</i> Lingua e Cultura Italiana</footer>
+          <div className="auth-main-content">
+            <div className="auth-portal-mark" aria-hidden="true">
+              <img src="/percky-lingua-logo.png" alt="" />
+              <span>Espace élève</span>
+            </div>
+            <div className="auth-card">{renderFormContent()}</div>
+            <footer className="auth-footer"><span>PerckyLingua</span><i aria-hidden="true">•</i> Lingua e Cultura Italiana</footer>
+          </div>
         </section>
       </div>
     </main>

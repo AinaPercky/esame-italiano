@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"PerckyLingua"},{"path":"/?view=student","title":"Portail étudiant"},{"path":"/?view=student-portal","title":"Portail étudiant"},{"path":"/?view=portal","title":"Portail étudiant"},{"path":"/?view=public-quiz","title":"Quiz public"},{"path":"/?exam=:exam&student=:student","title":"Fiche élève"}]}
