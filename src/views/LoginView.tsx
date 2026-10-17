@@ -160,7 +160,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const inputCls = 'auth-input w-full';
   const inputSmCls = 'auth-input w-full';
 
-  const BrandingPanel = ({ mobile = false }: { mobile?: boolean }) => (
+  // Keep these as render helpers, not nested React components: each keystroke
+  // updates LoginView, and remounting a nested component would drop input focus.
+  const renderBrandingPanel = ({ mobile = false }: { mobile?: boolean } = {}) => (
     mobile ? (
       <header className="auth-mobile-brand">
         <div className="auth-mobile-lockup">
@@ -205,7 +207,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     )
   );
 
-  const FormContent = () => (
+  const renderFormContent = () => (
     <div className="auth-form-content">
       <div className="auth-form-heading">
         <p className="auth-kicker">{viewMode === 'login' ? 'VOTRE ESPACE D’APPRENTISSAGE' : 'REJOIGNEZ LA CLASSE'}</p>
@@ -346,11 +348,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   return (
     <main className="auth-page">
-      <div className="auth-mobile-top"><BrandingPanel mobile /></div>
+      <div className="auth-mobile-top">{renderBrandingPanel({ mobile: true })}</div>
       <div className="auth-layout">
-        <div className="auth-desktop-brand"><BrandingPanel /></div>
+        <div className="auth-desktop-brand">{renderBrandingPanel()}</div>
         <section className="auth-main" aria-label={viewMode === 'login' ? 'Se connecter à PerckyLingua' : 'Créer un compte élève'}>
-          <div className="auth-card"><FormContent /></div>
+          <div className="auth-card">{renderFormContent()}</div>
           <footer className="auth-footer"><span>PerckyLingua</span><i aria-hidden="true">•</i> Lingua e Cultura Italiana</footer>
         </section>
       </div>
