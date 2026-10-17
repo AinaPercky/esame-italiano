@@ -179,21 +179,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       </header>
     ) : (
       <section className="auth-visual" aria-label="PerckyLingua, apprendre l’italien avec confiance">
-        <div className="auth-orb auth-orb-one" />
-        <div className="auth-orb auth-orb-two" />
         <div className="auth-illustration-wrap">
           <div className="auth-illustration-glow" />
-          <span className="auth-spark auth-spark-left" aria-hidden="true">✦</span>
-          <span className="auth-spark auth-spark-right" aria-hidden="true">✦</span>
           <img src="/student-learning-sticker.png" alt="Un élève souriant avec ses livres d’italien" className="auth-illustration" draggable={false} />
         </div>
         <div className="auth-brand-copy">
-          <p className="auth-brand-overline">IMPARA <i /> PARLA <i /> PROGREDISCI</p>
+          <p className="auth-brand-overline">QUIZ <i /> ÉVALUATIONS À CHAUD <i /> NOTES DU JOUR</p>
           <h2>PerckyLingua</h2>
           <div className="auth-tricolour" aria-hidden="true"><i /><i /><i /></div>
           <p className="auth-tagline">Lingua e Cultura Italiana</p>
         </div>
-        <p className="auth-visual-footer">Imparare l’italiano, un passo alla volta.</p>
+        <p className="auth-visual-footer">Quiz, évaluations et suivi des notes au même endroit.</p>
       </section>
     )
   );
@@ -201,12 +197,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const renderFormContent = () => (
     <div className="auth-form-content">
       <div className="auth-form-heading">
-        <p className="auth-kicker">{viewMode === 'login' ? 'VOTRE ESPACE D’APPRENTISSAGE' : 'REJOIGNEZ LA CLASSE'}</p>
-        <h1>{viewMode === 'login' ? 'Ravi de vous revoir.' : 'Votre aventure italienne commence ici.'}</h1>
+        <p className="auth-kicker">{viewMode === 'login' ? 'QUIZ, ÉVALUATIONS & NOTES' : 'INSCRIPTION ÉLÈVE'}</p>
+        <h1>{viewMode === 'login' ? 'Vos progrès en italien, ici.' : 'Créez votre espace élève.'}</h1>
         <p className="auth-subtitle">
           {viewMode === 'login'
-            ? 'Connectez-vous pour retrouver vos cours et votre progression.'
-            : 'Créez votre compte élève pour apprendre et progresser en italien.'}
+            ? 'Accédez à vos quiz, évaluations à chaud et notes journalières.'
+            : 'Participez aux quiz d’italien et retrouvez vos évaluations à chaud et notes journalières.'}
         </p>
       </div>
 
@@ -275,7 +271,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </button>
           <form onSubmit={handleStudentRegister} className="auth-form auth-register-form" aria-label="Inscription élève">
             <div className="auth-section-heading">
-              <span>01</span><div><strong>Votre profil</strong><p>Les informations de votre classe.</p></div>
+              <span>01</span><div><strong>Votre profil</strong><p>Reliez votre compte à votre classe.</p></div>
             </div>
             <div className="auth-form-row">
               <div className="auth-field-group">
@@ -301,7 +297,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
             <div className="auth-section-heading auth-section-heading-account">
-              <span>02</span><div><strong>Votre compte</strong><p>Vos identifiants de connexion.</p></div>
+              <span>02</span><div><strong>Votre compte</strong><p>Accédez à vos quiz et à vos résultats.</p></div>
             </div>
             <div className="auth-field-group">
               <label htmlFor="register-email" className="auth-label">Adresse e-mail <span>*</span></label>
