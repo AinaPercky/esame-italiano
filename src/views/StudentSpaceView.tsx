@@ -721,7 +721,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           <div className="student-welcome-copy">
             <div className="student-avatar-ring student-welcome-avatar">
               <img
-                src="/student-learning-sticker.png"
+                src="/student-space-welcome-avatar.png"
                 alt="Avatar étudiant PerckyLingua"
                 className="student-welcome-mascot"
                 draggable={false}
