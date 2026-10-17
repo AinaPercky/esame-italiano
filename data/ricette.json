@@ -1,0 +1,165 @@
+{
+  "title": "La cucina e il cibo",
+  "description": "Test sul vocabolario, il presente indicativo, l'accento tonico e la comprensione della ricetta del ragù alla bolognese",
+  "duration_minutes": 9,
+  "questions": [
+    {
+      "type": "qcm",
+      "question": "Come si dice \"la casserole\" in italiano?",
+      "options": ["La padella", "La pentola", "La ciotola", "Il coperchio"],
+      "correct_answer": "La pentola",
+      "points": 1,
+      "explanation": "La pentola est la casserole. La padella est la poêle."
+    },
+    {
+      "type": "text",
+      "question": "Qual è il verbo italiano (all'infinito) che significa \"éplucher\"?",
+      "correct_answer": "Sbucciare",
+      "points": 1,
+      "explanation": "Sbucciare significa togliere la buccia, per esempio alle patate."
+    },
+    {
+      "type": "qcm",
+      "question": "Che cosa significa \"q.b.\" in una ricetta italiana?",
+      "options": ["Quanto basta", "Quasi bollito", "Quattro bicchieri", "Qualche bacca"],
+      "correct_answer": "Quanto basta",
+      "points": 1,
+      "explanation": "q.b. = quanto basta, cioè \"selon besoin\". Esempio: Sale q.b."
+    },
+    {
+      "type": "qcm",
+      "question": "Come si dice \"le bœuf\" in italiano?",
+      "options": ["Il maiale", "Il pollo", "Il manzo", "Il pesce"],
+      "correct_answer": "Il manzo",
+      "points": 1,
+      "explanation": "Il manzo è le bœuf. Il maiale è le porc, il pollo è le poulet e il pesce è le poisson."
+    },
+    {
+      "type": "text",
+      "question": "Completa con il presente indicativo (noi) del verbo \"cuocere\": \"Noi ______ la pasta al dente.\"",
+      "correct_answer": "Cuociamo",
+      "points": 1,
+      "explanation": "Il presente di cuocere con \"noi\" è cuociamo (nous faisons cuire)."
+    },
+    {
+      "type": "qcm",
+      "question": "Secondo la ricetta, per quanto tempo cuoce il ragù lentamente?",
+      "options": ["Per cinque minuti", "Per circa dieci minuti", "Per almeno due ore", "Per tutta la notte"],
+      "correct_answer": "Per almeno due ore",
+      "points": 1,
+      "explanation": "Nella ricetta: \"Lascia cuocere il ragù lentamente per almeno due ore.\""
+    },
+    {
+      "type": "qcm",
+      "question": "Quando si aggiunge il latte nella ricetta del ragù?",
+      "options": ["All'inizio, insieme all'olio", "Dopo il soffritto", "Verso la fine della cottura", "Quando si serve la pasta"],
+      "correct_answer": "Verso la fine della cottura",
+      "points": 1,
+      "explanation": "Il latte si aggiunge verso la fine, poi si continua la cottura per altri 10–15 minuti."
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è l'ordine corretto delle azioni?",
+      "options": [
+        "Tagliamo la cipolla → Scaldiamo l'olio → Aggiungiamo la cipolla → Aggiungiamo i pomodori → Serviamo la pasta",
+        "Scaldiamo l'olio → Serviamo la pasta → Tagliamo la cipolla → Aggiungiamo i pomodori → Aggiungiamo la cipolla",
+        "Aggiungiamo i pomodori → Tagliamo la cipolla → Scaldiamo l'olio → Aggiungiamo la cipolla → Serviamo la pasta",
+        "Serviamo la pasta → Tagliamo la cipolla → Scaldiamo l'olio → Aggiungiamo la cipolla → Aggiungiamo i pomodori"
+      ],
+      "correct_answer": "Tagliamo la cipolla → Scaldiamo l'olio → Aggiungiamo la cipolla → Aggiungiamo i pomodori → Serviamo la pasta",
+      "points": 1,
+      "explanation": "Prima si prepara e si cuoce, alla fine si serve."
+    },
+    {
+      "type": "qcm",
+      "question": "Come si dice \"l'oignon\" in italiano?",
+      "options": ["L'aglio", "Il sedano", "La cipolla", "La carota"],
+      "correct_answer": "La cipolla",
+      "points": 1,
+      "explanation": "La cipolla è l'oignon. L'aglio è l'ail, il sedano è le céleri e la carota è la carotte."
+    },
+    {
+      "type": "text",
+      "question": "Completa con il connettore giusto: \"______ preparo il soffritto, poi aggiungo la carne.\" (d'abord)",
+      "correct_answer": "Prima",
+      "points": 1,
+      "explanation": "I connettori in ordine sono: Prima, Poi, Dopo, Nel frattempo, Infine."
+    },
+    {
+      "type": "text",
+      "question": "Coniuga il verbo \"cuocere\" al presente (loro): \"Loro ______ la carne per due ore.\"",
+      "correct_answer": "Cuociono",
+      "points": 1,
+      "explanation": "Cuocere : io cuocio, tu cuoci, lui/lei cuoce, noi cuociamo, voi cuocete, loro cuociono (ils font cuire)."
+    },
+    {
+      "type": "text",
+      "question": "Coniuga il verbo \"condire\" al presente (io): \"Io ______ l'insalata con olio, sale e limone.\"",
+      "correct_answer": "Condisco",
+      "points": 1,
+      "explanation": "Condire è un verbo in -ire con -isc- : io condisco, tu condisci, lui/lei condisce, noi condiamo, voi condite, loro condiscono. Attention : noi et voi n'ont pas -isc-."
+    },
+    {
+      "type": "text",
+      "question": "Coniuga il verbo \"togliere\" al presente (loro): \"Loro ______ la pentola dal fuoco.\"",
+      "correct_answer": "Tolgono",
+      "points": 1,
+      "explanation": "Togliere est irrégulier : io tolgo, tu togli, lui/lei toglie, noi togliamo, voi togliete, loro tolgono (ils retirent)."
+    },
+    {
+      "type": "text",
+      "question": "Coniuga il verbo \"sbucciare\" al presente (tu): \"Tu ______ le patate con il coltello.\"",
+      "correct_answer": "Sbucci",
+      "points": 1,
+      "explanation": "Sbucciare : io sbuccio, tu sbucci, lui/lei sbuccia, noi sbucciamo, voi sbucciate, loro sbucciano. Attention : à la 2e personne on écrit sbucci (un seul i), pas sbuccii."
+    },
+    {
+      "type": "qcm",
+      "question": "Dov'è l'accento tonico nella parola \"pomodoro\"?",
+      "options": ["PO-mo-do-ro", "po-MO-do-ro", "po-mo-DO-ro", "po-mo-do-RO"],
+      "correct_answer": "po-mo-DO-ro",
+      "points": 1,
+      "explanation": "Pomodoro è una parola piana : l'accento tonico cade sulla penultima sillaba (po-mo-DÒ-ro)."
+    },
+    {
+      "type": "qcm",
+      "question": "In quale parola l'accento tonico cade sulla prima sillaba?",
+      "options": ["melanzana", "tagliatelle", "zucchero", "farina"],
+      "correct_answer": "zucchero",
+      "points": 1,
+      "explanation": "ZUC-che-ro : l'accent est sur la première syllabe. Les autres : me-lan-ZA-na, ta-glia-TEL-le, fa-RI-na."
+    },
+    {
+      "type": "qcm",
+      "question": "Dov'è l'accento tonico nella parola \"frigorifero\"?",
+      "options": ["FRI-go-ri-fe-ro", "fri-GO-ri-fe-ro", "fri-go-RI-fe-ro", "fri-go-ri-FE-ro"],
+      "correct_answer": "fri-go-RI-fe-ro",
+      "points": 1,
+      "explanation": "Frigorifero : l'accent tonique est sur la troisième syllabe (fri-go-RÌ-fe-ro), pas sur la dernière ni sur l'avant-dernière."
+    },
+    {
+      "type": "qcm",
+      "question": "Trova l'intruso (cottura): quale verbo NON implica il calore?",
+      "options": ["friggere", "arrostire", "infornare", "impastare"],
+      "correct_answer": "impastare",
+      "points": 1,
+      "explanation": "Friggere (frire), arrostire (rôtir) et infornare (mettre au four) utilisent la chaleur. Impastare (pétrir) est une préparation à froid, avant la cuisson."
+    },
+    {
+      "type": "qcm",
+      "question": "Trova l'intruso (botanica): quale ortaggio NON è un frutto della pianta?",
+      "options": ["la melanzana", "la zucchina", "il peperone", "la patata"],
+      "correct_answer": "la patata",
+      "points": 1,
+      "explanation": "Melanzana, zucchina et peperone sont des fruits de la plante. La patata est un tubercule (une partie souterraine)."
+    },
+    {
+      "type": "qcm",
+      "question": "Trova l'intruso (connettori): quale espressione NON serve a ordinare le tappe di una ricetta?",
+      "options": ["prima", "successivamente", "infine", "di tanto in tanto"],
+      "correct_answer": "di tanto in tanto",
+      "points": 1,
+      "explanation": "Prima (d'abord), successivamente (par la suite) et infine (enfin) donnent l'ordre des étapes. Di tanto in tanto (de temps en temps) indique la fréquence, pas l'ordre."
+    }
+  ]
+}
