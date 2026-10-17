@@ -2,11 +2,9 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   CheckCircle2,
   Clock3,
   Send,
-  TextCursorInput,
   XCircle
 } from 'lucide-react';
 import { QuizQuestion } from '../../types';
@@ -17,6 +15,8 @@ interface PublicQuizQuestionScreenProps {
   quizTitle: string;
   questionIndex: number;
   totalQuestions: number;
+  totalTimeLeftMs: number;
+  totalTimeDurationMs: number;
   answer: string;
   isValidated: boolean;
   canGoBack: boolean;
@@ -36,6 +36,8 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   quizTitle,
   questionIndex,
   totalQuestions,
+  totalTimeLeftMs,
+  totalTimeDurationMs,
   answer,
   isValidated,
   canGoBack,
@@ -49,7 +51,15 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   onNext,
   onPrevious
 }) => {
+  const [correctionCountdown, setCorrectionCountdown] = React.useState(8);
   const isLastQuestion = questionIndex === totalQuestions - 1;
+  const totalTimeRatio = totalTimeDurationMs > 0 ? totalTimeLeftMs / totalTimeDurationMs : 1;
+  const totalTimeRemainingPercent = Math.max(0, Math.min(100, totalTimeRatio * 100));
+  const totalTimeBarTone = totalTimeRatio <= 0.25
+    ? 'bg-rose-600 animate-pulse'
+    : totalTimeRatio <= 0.5
+      ? 'bg-orange-500'
+      : 'bg-[#2fa36b]';
   const timerClasses = {
     normal: 'border-slate-600 bg-slate-800 text-white',
     warning: 'border-amber-300 bg-amber-50 text-amber-900',
@@ -62,18 +72,61 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
       ? 'Terminer le quiz'
       : 'Question suivante';
 
+  React.useEffect(() => {
+    if (!showCorrection || !feedback) return;
+    setCorrectionCountdown(8);
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      const next = Math.max(0, 8 - Math.floor((Date.now() - startedAt) / 1000));
+      setCorrectionCountdown(next);
+      if (next === 0) {
+        clearInterval(interval);
+        onNext();
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [question.id, showCorrection, feedback, onNext]);
+
   return (
     <>
-      <div className="-mx-4 -mt-4 mb-4 border-b border-slate-800 bg-[#072a3f] px-4 pb-4 pt-4 text-white shadow-lg sm:-mx-6 sm:px-6 sm:pt-5">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-slate-800 bg-[#072a3f] px-4 pb-4 pt-4 text-white shadow-lg sm:-mx-6 sm:px-6 sm:pt-5">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <span className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-300 sm:text-xs">Quiz public · Italien</span>
               <h1 className="mt-1 truncate font-display text-base font-extrabold sm:text-xl">{quizTitle}</h1>
             </div>
-            <div className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${timerClasses[timeTone]}`}>
-              <Clock3 className="h-4 w-4" />
-              <span className="font-mono">{formatQuizTime(timeLeft)}</span>
+            <div className="flex flex-wrap gap-2">
+              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 ${totalTimeRatio <= 0.25 ? 'border-rose-300 bg-rose-50 text-rose-800' : totalTimeRatio <= 0.5 ? 'border-orange-300 bg-orange-50 text-orange-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
+                <Clock3 className="h-4 w-4" />
+                <span className="flex flex-col text-left">
+                  <span className="text-[9px] font-bold uppercase leading-none">Temps total</span>
+                  <span className="font-mono text-sm font-extrabold">{formatQuizTime(totalTimeLeftMs)}</span>
+                </span>
+              </div>
+              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${timerClasses[timeTone]}`}>
+                <Clock3 className="h-4 w-4" />
+                <span className="flex flex-col text-left">
+                  <span className="text-[9px] font-bold uppercase leading-none">Temps question</span>
+                  <span className="font-mono">{formatQuizTime(timeLeft)}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-[10px] font-semibold text-slate-300 sm:text-[11px]">
+              <span>Temps restant sur la durée allouée</span>
+              <span className="font-mono font-bold text-white">{formatQuizTime(totalTimeLeftMs)}</span>
+            </div>
+            <div
+              className="h-2.5 overflow-hidden rounded-full bg-slate-700"
+              role="progressbar"
+              aria-label="Temps restant pour le quiz"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(totalTimeRemainingPercent)}
+            >
+              <div className={`h-full rounded-full transition-all duration-1000 ${totalTimeBarTone}`} style={{ width: `${totalTimeRemainingPercent}%` }} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-200">
@@ -152,36 +205,6 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
             </div>
           )}
 
-          {showCorrection && feedback && (
-            <div className={`rounded-2xl border p-4 text-sm animate-fade-in ${
-              feedback.correct
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
-                : 'border-rose-200 bg-rose-50 text-rose-950'
-            }`}>
-              <div className="flex items-start gap-3">
-                {feedback.correct ? (
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-                ) : (
-                  <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
-                )}
-                <div className="min-w-0 space-y-2">
-                  <p className="font-semibold">
-                    {feedback.correct ? 'Bonne réponse.' : 'Réponse incorrecte.'}
-                  </p>
-                  {!feedback.correct && (
-                    <p>
-                      <span className="font-semibold">Bonne réponse :</span> {feedback.expected}
-                    </p>
-                  )}
-                  {question.explanation && (
-                    <p>
-                      <span className="font-semibold">Explication :</span> {question.explanation}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -210,6 +233,79 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           </button>
         </div>
       </div>
+
+      {showCorrection && feedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm animate-fade-in">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="public-quiz-correction-title"
+            className={`flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border-2 bg-white shadow-2xl animate-scale-in ${feedback.correct ? 'border-emerald-300' : 'border-rose-300'}`}
+          >
+            <div className={`flex items-center justify-between gap-3 p-4 text-white sm:p-5 ${feedback.correct ? 'bg-gradient-to-r from-[#072a3f] to-[#0b3c5d]' : 'bg-gradient-to-r from-rose-700 to-rose-900'}`}>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                  {feedback.correct ? <CheckCircle2 className="h-6 w-6 text-emerald-200" /> : <XCircle className="h-6 w-6 text-rose-200" />}
+                </div>
+                <div className="min-w-0">
+                  <span className={`block text-[10px] font-extrabold uppercase tracking-widest ${feedback.correct ? 'text-emerald-200' : 'text-rose-200'}`}>Correction pédagogique</span>
+                  <h2 id="public-quiz-correction-title" className="truncate font-display text-base font-extrabold sm:text-lg">
+                    {feedback.correct ? 'Bonne réponse !' : feedback.studentAnswer ? 'Réponse incorrecte' : 'Question non répondue'}
+                  </h2>
+                </div>
+              </div>
+              <div className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/20 bg-black/20 px-3 py-1.5 font-mono text-sm font-black">
+                <Clock3 className="h-4 w-4 text-amber-300" />
+                <span aria-live="polite">{correctionCountdown}s</span>
+              </div>
+            </div>
+
+            <div className="h-2 w-full overflow-hidden bg-slate-100">
+              <div className="h-full bg-[#2fa36b] transition-[width] duration-300" style={{ width: `${(correctionCountdown / 8) * 100}%` }} />
+            </div>
+
+            <div className="space-y-4 overflow-y-auto p-4 sm:p-6">
+              <div className="rounded-xl border border-slate-200 bg-[#e6f0f7]/50 p-3">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Question {questionIndex + 1}</span>
+                <p className="text-sm font-semibold text-[#072a3f]">{question.question}</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div className={`rounded-xl border p-3 ${feedback.correct ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+                  <span className={`mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase ${feedback.correct ? 'text-emerald-800' : 'text-rose-700'}`}>
+                    {feedback.correct ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                    Votre réponse
+                  </span>
+                  <p className="break-words font-semibold text-slate-900">{feedback.studentAnswer || 'Aucune réponse saisie'}</p>
+                  <span className="mt-1 block text-xs font-bold text-slate-600">{feedback.points} / {question.points} point{question.points === 1 ? '' : 's'}</span>
+                </div>
+                {!feedback.correct && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <span className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase text-emerald-800"><CheckCircle2 className="h-3.5 w-3.5" />Bonne réponse</span>
+                    <p className="break-words font-bold text-emerald-950">{feedback.expected || '—'}</p>
+                  </div>
+                )}
+              </div>
+
+              {question.explanation && (
+                <div className="space-y-1 rounded-2xl border border-[#d5e4ed] bg-[#e6f0f7]/60 p-4">
+                  <p className="text-xs font-bold text-[#0b3c5d]">Explication</p>
+                  <p className="text-sm leading-relaxed text-[#072a3f]">{question.explanation}</p>
+                </div>
+              )}
+              <p className="text-center text-[11px] italic text-slate-500">Cette pause pédagogique n’est pas décomptée du temps du quiz.</p>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 p-4">
+              <span className="text-xs text-slate-500">Passage automatique dans {correctionCountdown}s…</span>
+              <button type="button" onClick={onNext} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#0b3c5d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2fa36b]">
+                Continuer tout de suite
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 };
