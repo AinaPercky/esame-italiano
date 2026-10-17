@@ -38,7 +38,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
 
   return (
     <div className="rounded-[28px] bg-white shadow-xl shadow-slate-200/70 ring-1 ring-slate-200 overflow-hidden">
-      <div className="border-b border-slate-100 bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-800 px-6 py-8 text-white sm:px-8">
+      <div className="border-b border-slate-100 bg-gradient-to-br from-[#072a3f] via-[#0b3c5d] to-[#072a3f] px-6 py-8 text-white sm:px-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]">
@@ -46,7 +46,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
               Résultat
             </div>
             <h1 className="mt-4 font-display text-3xl font-bold">Quiz terminé</h1>
-            <p className="mt-2 text-sm sm:text-base text-emerald-50/90">{getEncouragementMessage(percentage)}</p>
+            <p className="mt-2 text-sm text-sky-50/90 sm:text-base">{getEncouragementMessage(percentage)}</p>
           </div>
 
           <div className="mx-auto sm:mx-0">
@@ -58,7 +58,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
                   cy="66"
                   r="52"
                   fill="none"
-                  stroke="#86efac"
+                  stroke="#2fa36b"
                   strokeWidth="12"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -68,7 +68,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
               </svg>
               <div className="absolute text-center">
                 <div className="text-3xl font-bold">{percentage}%</div>
-                <div className="text-xs uppercase tracking-wide text-emerald-50/80">Réussite</div>
+                <div className="text-xs uppercase tracking-wide text-sky-50/80">Réussite</div>
               </div>
             </div>
           </div>
@@ -149,7 +149,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-5 text-sm font-semibold text-white hover:bg-emerald-900"
+            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#072a3f] px-5 text-sm font-semibold text-white hover:bg-[#0b3c5d]"
           >
             <RotateCcw className="h-4 w-4" />
             Refaire le quiz
@@ -157,7 +157,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
           <button
             type="button"
             onClick={onBackToList}
-            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-5 text-sm font-semibold text-slate-900 hover:bg-slate-200"
+            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#e6f0f7] px-5 text-sm font-semibold text-[#072a3f] hover:bg-[#d5e4ed]"
           >
             <ArrowLeft className="h-4 w-4" />
             Retour à la liste des quiz

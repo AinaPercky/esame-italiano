@@ -14,6 +14,7 @@ import { QuizFeedbackEntry, formatQuizTime } from './publicQuizUtils';
 
 interface PublicQuizQuestionScreenProps {
   question: QuizQuestion;
+  quizTitle: string;
   questionIndex: number;
   totalQuestions: number;
   answer: string;
@@ -32,6 +33,7 @@ interface PublicQuizQuestionScreenProps {
 
 export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> = ({
   question,
+  quizTitle,
   questionIndex,
   totalQuestions,
   answer,
@@ -49,8 +51,8 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 }) => {
   const isLastQuestion = questionIndex === totalQuestions - 1;
   const timerClasses = {
-    normal: 'border-slate-200 bg-white text-slate-700',
-    warning: 'border-amber-300 bg-amber-50 text-amber-800',
+    normal: 'border-slate-600 bg-slate-800 text-white',
+    warning: 'border-amber-300 bg-amber-50 text-amber-900',
     danger: 'border-rose-300 bg-rose-50 text-rose-700'
   };
 
@@ -62,46 +64,50 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 
   return (
     <>
-      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-slate-200/70 bg-[#f4f7f7]/95 px-4 pb-4 pt-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="mx-auto flex w-full max-w-[720px] items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-700">
-                Question {questionIndex + 1} sur {totalQuestions}
-              </p>
-              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${timerClasses[timeTone]}`}>
-                <Clock3 className="h-4 w-4" />
-                <span className="font-mono">{formatQuizTime(timeLeft)}</span>
-              </div>
+      <div className="-mx-4 -mt-4 mb-4 border-b border-slate-800 bg-[#072a3f] px-4 pb-4 pt-4 text-white shadow-lg sm:-mx-6 sm:px-6 sm:pt-5">
+        <div className="mx-auto w-full max-w-4xl space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-300 sm:text-xs">Quiz public · Italien</span>
+              <h1 className="mt-1 truncate font-display text-base font-extrabold sm:text-xl">{quizTitle}</h1>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-700 to-emerald-500 transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
+            <div className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${timerClasses[timeTone]}`}>
+              <Clock3 className="h-4 w-4" />
+              <span className="font-mono">{formatQuizTime(timeLeft)}</span>
             </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-200">
+            <span>Question {questionIndex + 1} sur {totalQuestions}</span>
+            <span>{Math.round(progressPercent)} %</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-700">
+            <div className="h-full rounded-full bg-[#2fa36b] transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto" aria-label="Progression du quiz">
+            {Array.from({ length: totalQuestions }, (_, index) => (
+              <span key={index} className={`h-1.5 min-w-4 flex-1 rounded-full ${index < questionIndex ? 'bg-[#2fa36b]' : index === questionIndex ? 'bg-white' : 'bg-slate-600'}`} />
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="rounded-[28px] bg-white p-6 shadow-xl shadow-slate-200/70 ring-1 ring-slate-200 sm:p-8">
-        <div className="space-y-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-900">
-              {question.type === 'qcm' ? <Check className="h-5 w-5" /> : <TextCursorInput className="h-5 w-5" />}
+      <div className="mx-auto w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-4 shadow-xl sm:p-8">
+        <div className="space-y-5 sm:space-y-6">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0b3c5d] font-mono text-sm font-extrabold text-white shadow-sm sm:h-12 sm:w-12">
+              {questionIndex + 1}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                {question.type === 'qcm' ? 'Choix unique' : 'Réponse écrite'}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#0b3c5d] sm:text-[11px]">
+                {question.type === 'qcm' ? 'Choix unique' : 'Réponse écrite'} · {question.points} point{question.points > 1 ? 's' : ''}
               </p>
-              <h2 className="mt-2 font-display text-2xl font-bold leading-snug text-slate-900">
-                {question.question}
-              </h2>
-              <p className="mt-2 text-sm text-slate-500">
-                {question.points} point{question.points > 1 ? 's' : ''}
-              </p>
+              <h2 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">{question.question}</h2>
             </div>
           </div>
+
+          <p className="pl-0 text-xs italic text-slate-500 sm:pl-14">
+            {question.type === 'qcm' ? 'Sélectionnez la bonne réponse parmi les choix proposés :' : 'Saisissez votre réponse dans le champ ci-dessous :'}
+          </p>
 
           {question.type === 'qcm' ? (
             <div className="space-y-3">
@@ -113,14 +119,14 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
                     type="button"
                     onClick={() => !isValidated && onAnswerChange(option)}
                     disabled={isValidated}
-                    className={`flex min-h-12 w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left text-[16px] transition-all ${
-                      selected
-                        ? 'border-emerald-700 bg-emerald-50 text-emerald-950 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-slate-50'
-                    } ${isValidated ? 'cursor-default opacity-90' : 'cursor-pointer'}`}
+                  className={`flex min-h-14 w-full items-center gap-4 rounded-2xl border-2 px-4 py-4 text-left text-[16px] font-semibold transition-all ${
+                    selected
+                      ? 'border-[#0b3c5d] bg-[#0b3c5d] text-white shadow-md ring-2 ring-[#e6f0f7]'
+                      : 'border-slate-200 bg-white text-slate-800 hover:border-[#2fa36b] hover:bg-[#e6f0f7]/50'
+                  } ${isValidated ? 'cursor-default opacity-90' : 'cursor-pointer'}`}
                   >
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
-                      selected ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-500'
+                    selected ? 'bg-white text-[#0b3c5d]' : 'bg-[#e6f0f7] text-[#0b3c5d]'
                     }`}>
                       {optionIndex + 1}
                     </span>
@@ -141,7 +147,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
                 onChange={(e) => onAnswerChange(e.target.value)}
                 disabled={isValidated}
                 placeholder="Écrivez votre réponse ici…"
-                className="h-14 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 text-[16px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/40 focus:border-emerald-700 disabled:cursor-default disabled:bg-slate-100"
+                className="h-14 w-full rounded-2xl border-2 border-slate-300 bg-slate-50 px-4 text-[16px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2fa36b]/40 focus:border-[#0b3c5d] disabled:cursor-default disabled:bg-slate-100"
               />
             </div>
           )}
@@ -182,12 +188,12 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
       <div className="h-28 sm:h-24" />
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[720px] gap-3">
+        <div className="mx-auto flex w-full max-w-4xl gap-3">
           {canGoBack && (
             <button
               type="button"
               onClick={onPrevious}
-              className="inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              className="inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50"
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Précédent</span>
@@ -197,7 +203,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           <button
             type="button"
             onClick={isValidated ? onNext : onValidate}
-            className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-800 px-6 text-base font-semibold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-900"
+            className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-6 text-base font-extrabold text-white shadow-md transition hover:bg-[#0b3c5d] active:scale-[.99]"
           >
             {!isValidated ? <CheckCircle2 className="h-5 w-5" /> : isLastQuestion ? <Send className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
             {primaryLabel}

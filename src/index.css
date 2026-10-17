@@ -315,9 +315,25 @@
   background: linear-gradient(135deg, #2fa36b 0%, #0b3c5d 55%, #e6f0f7 100%);
   box-shadow: 0 3px 10px rgba(7, 42, 63, .12);
 }
-.student-header-avatar { padding: 2px; }
+.student-header-avatar {
+  position: relative;
+  padding: 2px;
+  border: 1px solid #d6e3eb;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(7, 42, 63, .08);
+}
+.student-header-avatar::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #2fa36b;
+  content: '';
+}
 .student-header-avatar-button {
-  border: 0;
   appearance: none;
   cursor: pointer;
   transition: transform .18s ease;
