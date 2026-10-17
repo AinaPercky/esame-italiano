@@ -510,8 +510,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     }
 
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <div className="mx-auto w-full max-w-[720px] px-4 py-8">
+      <div className="min-h-screen bg-[#f4f8fb] text-slate-900">
+        <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-8">
           <PublicQuizStartScreen
             quiz={quiz}
             description={cleanDescription}
@@ -531,10 +531,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       : perQuestionFeedback[currentQuestion.id];
 
     return (
-      <div className="min-h-screen bg-[#f4f7f7] text-slate-900">
-        <div className="mx-auto w-full max-w-[720px] px-4 py-0">
+      <div className="min-h-screen bg-slate-950 text-slate-900">
+        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-6">
           <PublicQuizQuestionScreen
             question={currentQuestion}
+            quizTitle={quiz.title}
             questionIndex={currentIndex}
             totalQuestions={totalQuestions}
             answer={currentAnswer}
@@ -563,8 +564,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
   if (screen === 'result' && quiz && result) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <div className="mx-auto w-full max-w-[720px] px-4 py-8">
+      <div className="min-h-screen bg-[#f4f8fb] text-slate-900">
+        <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:py-8">
           <PublicQuizResultScreen
             quiz={quiz}
             score={result.rawScore}
