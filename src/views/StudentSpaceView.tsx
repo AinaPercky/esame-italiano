@@ -84,7 +84,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [skippedQuestions, setSkippedQuestions] = useState<Record<string, boolean>>({});
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
-  const quizTimerCueRef = useRef<{ quizId: string; played: Set<number> }>({ quizId: '', played: new Set() });
+  const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
 
@@ -252,18 +252,19 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(timer);
   }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
 
-  // Alerte sonore du temps total : moitié, cinq secondes puis les trois dernières secondes.
+  // Alerte sonore du temps de chaque question : moitié, cinq secondes puis les trois dernières secondes.
   useEffect(() => {
-    if (!activeQuiz || quizSecondsRemaining <= 0) return;
-    if (quizTimerCueRef.current.quizId !== activeQuiz.id) {
-      quizTimerCueRef.current = { quizId: activeQuiz.id, played: new Set() };
+    if (!activeQuiz || questionSecondsRemaining <= 0) return;
+    const questionKey = `${activeQuiz.id}:${currentQuestionIndex}`;
+    if (questionTimerCueRef.current.questionKey !== questionKey) {
+      questionTimerCueRef.current = { questionKey, played: new Set() };
     }
-    const totalSeconds = (activeQuiz.duration_minutes || 10) * 60;
-    const cueSeconds = new Set([Math.ceil(totalSeconds / 2), 5, 3, 2, 1]);
-    if (!cueSeconds.has(quizSecondsRemaining) || quizTimerCueRef.current.played.has(quizSecondsRemaining)) return;
-    quizTimerCueRef.current.played.add(quizSecondsRemaining);
+    const questionSeconds = getTimePerQuestion(activeQuiz);
+    const cueSeconds = new Set([Math.ceil(questionSeconds / 2), 5, 3, 2, 1]);
+    if (!cueSeconds.has(questionSecondsRemaining) || questionTimerCueRef.current.played.has(questionSecondsRemaining)) return;
+    questionTimerCueRef.current.played.add(questionSecondsRemaining);
     playTimerBeep();
-  }, [activeQuiz, quizSecondsRemaining]);
+  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining]);
 
   // 2. Chronomètre dédié par Question (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -324,7 +325,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }
 
     primeTimerAudio();
-    quizTimerCueRef.current = { quizId: quiz.id, played: new Set() };
+    questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
     setActiveQuiz(quiz);
     setQuizAnswers({});
     setSkippedQuestions({});

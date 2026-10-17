@@ -100,7 +100,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isQuizActive = screen === 'quiz';
   const hasSubmittedRef = useRef(false);
-  const timerCueRef = useRef<{ quizId: string; played: Set<number> }>({ quizId: '', played: new Set() });
+  const timerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
   const correctionAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionForCorrection = quiz?.questions[currentIndex];
   const isCorrectionModalOpen = Boolean(
@@ -316,19 +316,20 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     if (isQuizActive && totalTimeLeftMs <= 0) handleSubmit();
   }, [isQuizActive, totalTimeLeftMs, handleSubmit]);
 
-  // Bips à mi-parcours, à 5 secondes, puis à chacune des 3 dernières secondes.
+  // Bips selon le temps alloué à la question courante, jamais sur le temps global du quiz.
   useEffect(() => {
-    if (!isQuizActive || !quiz || totalTimeLeftMs <= 0) return;
-    if (timerCueRef.current.quizId !== quiz.id) {
-      timerCueRef.current = { quizId: quiz.id, played: new Set() };
+    if (!isQuizActive || !quiz || isCorrectionModalOpen || questionTimeLeftMs <= 0) return;
+    const questionKey = `${quiz.id}:${currentIndex}`;
+    if (timerCueRef.current.questionKey !== questionKey) {
+      timerCueRef.current = { questionKey, played: new Set() };
     }
-    const remainingSeconds = Math.ceil(totalTimeLeftMs / 1000);
-    const totalSeconds = Math.ceil(totalQuizDurationMs / 1000);
-    const cueSeconds = new Set([Math.ceil(totalSeconds / 2), 5, 3, 2, 1]);
+    const remainingSeconds = Math.ceil(questionTimeLeftMs / 1000);
+    const questionSeconds = Math.ceil(timePerQuestionMs / 1000);
+    const cueSeconds = new Set([Math.ceil(questionSeconds / 2), 5, 3, 2, 1]);
     if (!cueSeconds.has(remainingSeconds) || timerCueRef.current.played.has(remainingSeconds)) return;
     timerCueRef.current.played.add(remainingSeconds);
     playTimerBeep();
-  }, [isQuizActive, quiz, totalTimeLeftMs, totalQuizDurationMs]);
+  }, [isQuizActive, quiz, currentIndex, isCorrectionModalOpen, questionTimeLeftMs, timePerQuestionMs]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Per-question countdown timer
@@ -414,7 +415,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const handleStart = useCallback(() => {
     if (!quizRef.current || !studentName.trim()) return;
     hasSubmittedRef.current = false;
-    timerCueRef.current = { quizId: quizRef.current.id, played: new Set() };
+    timerCueRef.current = { questionKey: `${quizRef.current.id}:${currentIndexRef.current}`, played: new Set() };
     primeTimerAudio();
     const qId = activeQuizIdRef.current;
     if (qId) saveToStorage(storageKey(qId, 'studentName'), studentName.trim());
@@ -469,7 +470,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     setTotalTimeLeftMs((q.duration_minutes || 10) * 60 * 1000);
     timeZeroFiredRef.current = -1;
     hasSubmittedRef.current = false;
-    timerCueRef.current = { quizId: q.id, played: new Set() };
+    timerCueRef.current = { questionKey: `${q.id}:0`, played: new Set() };
     setResult(null);
     setScreen('start');
   }, []);
