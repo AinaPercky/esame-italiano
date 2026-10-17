@@ -37,6 +37,15 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
+import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
+
+const STUDENT_TABS = [
+  { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
+  { id: 'daily_grades', label: 'Notes journalières', shortLabel: 'Notes', icon: TrendingUp },
+  { id: 'leaderboard', label: 'Classement de classe', shortLabel: 'Classe', icon: Trophy },
+  { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award },
+  { id: 'profile', label: 'Mon profil', shortLabel: 'Profil', icon: User }
+] as const;
 
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
@@ -547,6 +556,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayGrade = dailyGrades.find(dg => dg.date === todayStr);
+  const greetingName = studentRecord?.first_name || currentUser.name.trim().split(/\s+/)[0] || currentUser.name;
 
   // Vérification de la validation de l'inscription par le professeur
   if (studentRecord && studentRecord.validation_status === 'pending') {
@@ -632,169 +642,101 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col text-slate-900 pb-16">
-      
-      {/* Top Header Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-2xs px-4 sm:px-8 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/percky-lingua-logo.png"
-              alt=""
-              className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-contain bg-white shadow-xs"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display font-bold text-base sm:text-xl text-slate-900 tracking-tight">
-                  PerckyLingua
-                </span>
-                <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                  Espace Étudiant
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 hidden sm:block">
-                Portail d'évaluation & quiz de langue italienne
-              </p>
+    <div className="student-space min-h-svh flex flex-col text-slate-900">
+      <header className="student-topbar sticky top-0 z-20 px-3 py-2.5 sm:px-6 sm:py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <img src="/percky-lingua-logo.png" alt="" className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11" />
+            <div className="min-w-0">
+              <div className="font-display truncate text-base font-bold tracking-tight text-slate-900 sm:text-xl">PerckyLingua</div>
+              <p className="hidden text-[9px] font-bold tracking-[0.16em] text-slate-500 sm:block">APPRENDRE · PROGRESSER · RÉUSSIR</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <StudentAvatar
-              name={currentUser.name}
-              src={studentRecord?.avatar_url || currentUser.avatar}
-              className="w-9 h-9 border-2 border-amber-200 text-xs"
-            />
-            <div className="text-right hidden sm:block">
-              <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
-              <div className="text-[11px] text-slate-500 font-mono">
-                N° {currentUser.student_number || '1'} • {currentUser.class_name || 'Classe'}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="student-avatar-ring student-header-avatar">
+              <StudentAvatar
+                name={currentUser.name}
+                src={studentRecord?.avatar_url || currentUser.avatar}
+                className="h-8 w-8 border-2 border-white text-[10px] sm:h-9 sm:w-9 sm:text-xs"
+              />
+            </div>
+            <div className="hidden text-right sm:block">
+              <div className="max-w-48 truncate text-xs font-bold text-slate-900">{currentUser.name}</div>
+              <div className="text-[11px] text-slate-500">
+                N° {currentUser.student_number || '1'} <span aria-hidden="true">·</span> {currentUser.class_name || 'Classe'}
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
-              title="Se déconnecter"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Déconnexion</span>
+            <button type="button" onClick={onLogout} className="student-logout" title="Se déconnecter" aria-label="Se déconnecter">
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6 flex-1">
-        
-        {/* Student Welcome Banner & Cumulative Grade Card */}
-        <div className="bg-gradient-to-r from-amber-900 via-amber-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-amber-800/40 relative overflow-hidden">
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4 space-y-2">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6">
+        <section className="student-welcome" aria-labelledby="student-welcome-title">
+          <div className="student-welcome-photo" aria-hidden="true">
+            <img src={studentHeroPhoto} alt="" />
+            <div className="student-welcome-photo-fade" />
+            <div className="student-welcome-flag" />
+          </div>
+
+          <div className="student-welcome-copy">
+            <div className="student-avatar-ring student-welcome-avatar">
               <StudentAvatar
                 name={currentUser.name}
                 src={studentRecord?.avatar_url || currentUser.avatar}
-                className="w-16 h-16 border-2 border-amber-300 text-lg"
+                className="h-14 w-14 border-2 border-white text-base sm:h-16 sm:w-16 sm:text-lg"
               />
-              <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/20 text-amber-300 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-400/30">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Session Active • Année Scolaire 2026-2027</span>
-              </div>
-              <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
-                Benvenuto, {currentUser.name} !
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-lg">
-                Consultez les quiz lancés par le professeur, passez vos évaluations en direct dans la fenêtre d'une heure et suivez votre note journalière.
-              </p>
-              </div>
             </div>
-
-            {/* Daily Grade Showcase Box */}
-            <div className="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 text-center sm:text-right shrink-0">
-              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider block mb-1">
-                Note Journalière Aujourd'hui
-              </span>
-              <div className="flex items-baseline justify-center sm:justify-end gap-1 font-mono">
-                <span className="text-3xl sm:text-4xl font-extrabold text-amber-300">
-                  {todayGrade ? todayGrade.average_score_20 : '--'}
-                </span>
-                <span className="text-lg text-slate-400 font-bold">/ 20</span>
+            <div className="student-welcome-text">
+              <div className="student-learning-pill">
+                <span className="student-italian-flag" aria-hidden="true"><i /><i /><i /></span>
+                <span>APPRENTISSAGE <span aria-hidden="true">·</span> ITALIEN</span>
               </div>
-              <span className="text-[11px] text-slate-300 block mt-1">
-                {todayGrade ? `${todayGrade.quizzes_count} quiz cumulé(s) aujourd'hui` : 'Aucun quiz validé aujourd\'hui'}
-              </span>
+              <h1 id="student-welcome-title">Benvenuto, {greetingName}!</h1>
+              <p>Retrouvez les quiz de votre professeur, passez vos évaluations pendant leur disponibilité et suivez vos progrès jour après jour.</p>
+              <div className="student-class-meta">
+                <span>{currentUser.class_name || studentRecord?.class_name || 'Espace étudiant'}</span>
+                <span aria-hidden="true">·</span>
+                <span>Matricule {currentUser.student_number || studentRecord?.student_number || '—'}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab('quizzes')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'quizzes'
-                ? 'bg-amber-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Quiz du Professeur</span>
-          </button>
+          <div className="student-daily-grade">
+            <div className="student-daily-grade-icon"><Calendar className="h-6 w-6 sm:h-7 sm:w-7" /></div>
+            <div className="student-daily-grade-copy">
+              <span className="student-daily-grade-label">Votre note journalière aujourd’hui</span>
+              <div className="student-daily-grade-score">
+                <strong>{todayGrade ? todayGrade.average_score_20 : '--'}</strong>
+                <span>/ 20</span>
+              </div>
+              <p>{todayGrade ? `${todayGrade.quizzes_count} quiz pris en compte aujourd’hui` : 'Aucun quiz validé aujourd’hui'}</p>
+            </div>
+            <div className="student-daily-grade-trend" aria-hidden="true"><TrendingUp className="h-6 w-6 sm:h-7 sm:w-7" /></div>
+          </div>
+        </section>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('daily_grades')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'daily_grades'
-                ? 'bg-amber-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Mes Notes Journalières</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('leaderboard')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'leaderboard'
-                ? 'bg-amber-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span>Leaderboard Classe</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('oral_exam')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'oral_exam'
-                ? 'bg-amber-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>Examen Oral (Grille)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'profile'
-                ? 'bg-amber-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>Mes Identifiants</span>
-          </button>
-        </div>
+        <nav className="student-tabs" aria-label="Navigation de l’espace étudiant">
+          {STUDENT_TABS.map(({ id, label, shortLabel, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              aria-current={activeTab === id ? 'page' : undefined}
+              title={label}
+              className={`student-tab ${activeTab === id ? 'is-active' : ''}`}
+            >
+              <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              <span className="student-tab-label-full">{label}</span>
+              <span className="student-tab-label-short">{shortLabel}</span>
+            </button>
+          ))}
+        </nav>
 
         {/* TAB 1: QUIZZES EN DIRECT & HISTORIQUE */}
         {activeTab === 'quizzes' && !activeQuiz && (
@@ -874,7 +816,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
             {/* Quizzes List */}
             <div className="space-y-4">
-              <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <h2 className="student-section-title">
                 <BookOpen className="w-4 h-4 text-amber-800" />
                 <span>Quiz assignés à votre classe</span>
               </h2>
@@ -884,7 +826,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   Aucun quiz n'a encore été créé pour votre classe par le professeur.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {quizzes.map(quiz => {
                     const done = hasCompletedQuiz(quiz.id);
                     const { stId, stName, stNum, classId } = getStudentQueryInfo();
@@ -897,14 +839,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     return (
                       <div
                         key={quiz.id}
-                        className={`bg-white rounded-2xl p-5 border transition-all space-y-4 ${
-                          isLive && !done && !isCompleted
-                            ? 'border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
-                            : 'border-slate-200 shadow-2xs'
-                        }`}
+                        className={`student-quiz-card ${isLive && !done && !isCompleted ? 'is-live' : ''}`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
+                        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               {isLive && !done && !isCompleted && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
@@ -934,21 +872,21 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               )}
                             </div>
 
-                            <h3 className="font-bold text-slate-900 text-base">{quiz.title}</h3>
+                            <h3 className="student-quiz-title">{quiz.title}</h3>
                             {quiz.description && (
-                              <p className="text-xs text-slate-500 line-clamp-2">{quiz.description}</p>
+                              <p className="student-quiz-description">{quiz.description}</p>
                             )}
                           </div>
 
-                          <div className="text-right text-xs font-mono text-slate-500 shrink-0">
+                          <div className="student-quiz-meta">
                             <div>{quiz.questions?.length || 0} questions</div>
                             <div>{quiz.duration_minutes || 10} min</div>
                           </div>
                         </div>
 
                         {/* Card Action footer */}
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                          <div className="text-xs text-slate-500">
+                        <div className="student-quiz-footer">
+                          <div className="student-quiz-points">
                             Barème : <strong>{quiz.total_points || 20} pts</strong>
                           </div>
 
@@ -956,7 +894,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleStartQuiz(quiz)}
-                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition-transform active:scale-95 cursor-pointer"
+                              className="student-quiz-start"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
                               <span>Commencer le Quiz ({quiz.duration_minutes}m)</span>
@@ -964,7 +902,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                           )}
 
                           {isCompleted && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
                               <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>Note définitive : {sub?.score_20 ?? '—'} / 20</span>
@@ -977,7 +915,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                           )}
 
                           {isMissed && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
                               <span className="text-xs font-mono font-bold text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-300 flex items-center gap-1.5 shadow-2xs">
                                 <XCircle className="w-3.5 h-3.5 text-rose-600" />
                                 <span>Note définitive : 0 / 20</span>
@@ -1383,7 +1321,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
         {/* TAB 2: NOTES JOURNALIÈRES */}
         {activeTab === 'daily_grades' && (
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xs space-y-6">
+          <div className="student-content-panel space-y-6">
             <div>
               <h2 className="font-display font-bold text-xl text-slate-900">
                 Notes Journalières Cumulées
@@ -1400,8 +1338,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             ) : (
               <div className="space-y-4">
                 {dailyGrades.map((dg, idx) => (
-                  <div key={idx} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between">
+                  <div key={idx} className="student-grade-row">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
                         <Calendar className="w-4 h-4 text-amber-800" />
                         <span>Date : {dg.date}</span>
@@ -1577,7 +1515,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
       </main>
 
-      <footer className="text-center text-xs text-slate-400 py-4">
+      <footer className="student-footer">
         PerckyLingua • Apprendre et progresser en italien
       </footer>
 
