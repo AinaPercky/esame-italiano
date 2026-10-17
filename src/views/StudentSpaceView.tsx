@@ -43,8 +43,7 @@ const STUDENT_TABS = [
   { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
   { id: 'daily_grades', label: 'Notes journalières', shortLabel: 'Notes', icon: TrendingUp },
   { id: 'leaderboard', label: 'Classement de classe', shortLabel: 'Classe', icon: Trophy },
-  { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award },
-  { id: 'profile', label: 'Mon profil', shortLabel: 'Profil', icon: User }
+  { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award }
 ] as const;
 
 interface StudentSpaceViewProps {
@@ -554,8 +553,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayGrade = dailyGrades.find(dg => dg.date === todayStr);
+  const cumulativeSubmissions = dailyGrades
+    .flatMap(grade => grade.submissions)
+    .filter(submission =>
+      Number.isFinite(submission.score) && Number.isFinite(submission.max_score) && submission.max_score > 0
+    );
+  const cumulativeMaxScore = cumulativeSubmissions.reduce((total, submission) => total + submission.max_score, 0);
+  const cumulativeScore = cumulativeSubmissions.reduce((total, submission) => total + submission.score, 0);
+  const cumulativeGrade = cumulativeMaxScore > 0
+    ? Number(((cumulativeScore / cumulativeMaxScore) * 20).toFixed(2))
+    : null;
   const greetingName = studentRecord?.first_name || currentUser.name.trim().split(/\s+/)[0] || currentUser.name;
 
   // Vérification de la validation de l'inscription par le professeur
@@ -584,7 +591,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             </div>
             <div>Classe : <strong>{studentRecord.class_name || currentUser.class_name || 'Non spécifiée'}</strong></div>
             <div>Email : <strong>{currentUser.email}</strong></div>
-            <div>Matricule : <strong>{studentRecord.student_number || 'Non renseigné'}</strong></div>
+            <div>Numéro : <strong>{studentRecord.student_number || 'Non renseigné'}</strong></div>
           </div>
           <div className="flex gap-3 pt-2">
             <button
@@ -654,13 +661,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-            <div className="student-avatar-ring student-header-avatar">
+            <button
+              type="button"
+              className="student-avatar-ring student-header-avatar student-header-avatar-button"
+              onClick={() => {
+                setActiveTab('profile');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              title={`Accéder au profil de ${currentUser.name}`}
+              aria-label={`Accéder au profil de ${currentUser.name}`}
+            >
               <StudentAvatar
                 name={currentUser.name}
                 src={studentRecord?.avatar_url || currentUser.avatar}
                 className="h-8 w-8 border-2 border-white text-[10px] sm:h-9 sm:w-9 sm:text-xs"
               />
-            </div>
+            </button>
             <div className="hidden text-right sm:block">
               <div className="max-w-48 truncate text-xs font-bold text-slate-900">{currentUser.name}</div>
               <div className="text-[11px] text-slate-500">
@@ -686,10 +702,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
           <div className="student-welcome-copy">
             <div className="student-avatar-ring student-welcome-avatar">
-              <StudentAvatar
-                name={currentUser.name}
-                src={studentRecord?.avatar_url || currentUser.avatar}
-                className="h-14 w-14 border-2 border-white text-base sm:h-16 sm:w-16 sm:text-lg"
+              <img
+                src="/student-learning-sticker.png"
+                alt="Avatar étudiant PerckyLingua"
+                className="student-welcome-mascot"
+                draggable={false}
               />
             </div>
             <div className="student-welcome-text">
@@ -702,20 +719,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <div className="student-class-meta">
                 <span>{currentUser.class_name || studentRecord?.class_name || 'Espace étudiant'}</span>
                 <span aria-hidden="true">·</span>
-                <span>Matricule {currentUser.student_number || studentRecord?.student_number || '—'}</span>
+                <span>Numéro {currentUser.student_number || studentRecord?.student_number || '—'}</span>
               </div>
             </div>
           </div>
 
           <div className="student-daily-grade">
-            <div className="student-daily-grade-icon"><Calendar className="h-6 w-6 sm:h-7 sm:w-7" /></div>
+            <div className="student-daily-grade-icon"><Award className="h-6 w-6 sm:h-7 sm:w-7" /></div>
             <div className="student-daily-grade-copy">
-              <span className="student-daily-grade-label">Votre note journalière aujourd’hui</span>
+              <span className="student-daily-grade-label">Votre note journalière cumulée</span>
               <div className="student-daily-grade-score">
-                <strong>{todayGrade ? todayGrade.average_score_20 : '--'}</strong>
+                <strong>{cumulativeGrade ?? '--'}</strong>
                 <span>/ 20</span>
               </div>
-              <p>{todayGrade ? `${todayGrade.quizzes_count} quiz pris en compte aujourd’hui` : 'Aucun quiz validé aujourd’hui'}</p>
+              <p>{cumulativeSubmissions.length > 0
+                ? `${cumulativeSubmissions.length} quiz pris en compte, toutes dates confondues`
+                : 'Aucun quiz pris en compte pour le moment'}</p>
             </div>
             <div className="student-daily-grade-trend" aria-hidden="true"><TrendingUp className="h-6 w-6 sm:h-7 sm:w-7" /></div>
           </div>
@@ -1405,13 +1424,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               />
             ) : (
               <div className="bg-white p-5 rounded-xl border border-amber-200 text-sm text-slate-700">
-                Votre compte n'est pas associé à une fiche élève unique. Contactez votre professeur pour vérifier votre matricule.
+                Votre compte n'est pas associé à une fiche élève unique. Contactez votre professeur pour vérifier votre numéro d'étudiant.
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 4: MON PROFIL & IDENTIFIANTS */}
+        {/* Profil et identifiants, accessible via l’avatar de l’en-tête */}
         {activeTab === 'profile' && (
           <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-2xs max-w-xl mx-auto space-y-6">
             <div className="flex items-center gap-3">
@@ -1423,7 +1442,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   Mes Identifiants Étudiant
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Vérifiez ou mettez à jour votre nom, prénom et numéro de matricule.
+                  Vérifiez ou mettez à jour votre nom, prénom et numéro d’étudiant.
                 </p>
               </div>
             </div>
@@ -1468,7 +1487,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Numéro d'étudiant / Matricule (ex: 1, 2, 3)</label>
+                <label className="text-xs font-bold text-slate-700">Numéro d’étudiant (ex. : 1, 2, 3)</label>
                 <input
                   type="text"
                   required
