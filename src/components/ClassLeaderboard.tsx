@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Trophy, Calendar, Users, Sparkles } from 'lucide-react';
+import { Trophy, Calendar, Users, Crown, Medal } from 'lucide-react';
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
 
@@ -336,8 +336,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
       {/* Podium Top 3 (if at least 1 student graded) */}
       {leaderboardEntries.graded.length > 0 && (
         <div className="p-5 bg-[#F5F9FC] border-b border-slate-200">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center sm:text-left flex items-center justify-center sm:justify-start gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+          <div className="mb-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400 sm:text-left">
             <span>{effectiveQuizId ? 'Podium du quiz' : (isStudentView || selectedDate === ALL_DATES) ? 'Podium Général' : 'Podium de la journée'}</span>
           </div>
 
@@ -346,11 +345,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             {leaderboardEntries.graded[0] && (
               <div className={`rounded-2xl border p-3 transition-all sm:p-4 ${
                 currentStudentId === leaderboardEntries.graded[0].student_id
-                  ? 'bg-[#E6F0F7] border-[#0B3C5D] shadow-md ring-2 ring-[#0B3C5D]/10'
-                  : 'bg-gradient-to-br from-[#EAF8F0] via-white to-[#E6F0F7] border-[#B7E2CA] shadow-sm'
-              } flex min-w-0 items-center gap-2 order-1 sm:gap-3 xl:order-2 xl:-translate-y-1`}>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-[#2FA36B] text-lg font-extrabold text-white shadow-sm">
-                  1
+                  ? 'shadow-md ring-2 ring-[#0B3C5D]/20'
+                  : 'shadow-sm'
+              } flex min-w-0 items-center gap-2 order-1 border-[#87C99D] bg-gradient-to-br from-[#EAF8F0] via-[#D4EFDE] to-[#9DDAAF] sm:gap-3 xl:order-2 xl:-translate-y-1`}>
+                <div aria-label="Premier rang" role="img" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-[#2FA36B] text-white shadow-sm">
+                  <Crown className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[0].student_name}
@@ -390,11 +389,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             {leaderboardEntries.graded[1] && (
               <div className={`rounded-2xl border p-3 transition-all sm:p-3.5 ${
                 currentStudentId === leaderboardEntries.graded[1].student_id
-                  ? 'bg-[#E6F0F7] border-[#0B3C5D] shadow-sm ring-1 ring-[#0B3C5D]/10'
-                  : 'bg-white border-slate-200 shadow-xs'
-              } flex min-w-0 items-center gap-2 order-2 sm:gap-3 xl:order-1`}>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white bg-[#DCEAF3] text-base font-extrabold text-[#0B3C5D]">
-                  2
+                  ? 'shadow-md ring-2 ring-[#0B3C5D]/20'
+                  : 'shadow-sm'
+              } flex min-w-0 items-center gap-2 order-2 border-[#8DB6CC] bg-gradient-to-br from-[#EDF6FB] via-[#CFE3F0] to-[#A7C9DD] sm:gap-3 xl:order-1`}>
+                <div aria-label="Deuxième rang" role="img" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white bg-[#0B3C5D] text-white shadow-sm">
+                  <Trophy className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[1].student_name}
@@ -434,11 +433,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             {leaderboardEntries.graded[2] && (
               <div className={`rounded-2xl border p-3 transition-all sm:p-3.5 ${
                 currentStudentId === leaderboardEntries.graded[2].student_id
-                  ? 'bg-[#E6F0F7] border-[#0B3C5D] shadow-sm ring-1 ring-[#0B3C5D]/10'
-                  : 'bg-gradient-to-br from-[#F6FAFC] to-white border-slate-200 shadow-xs'
-              } flex min-w-0 items-center gap-2 order-3 sm:gap-3`}>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white bg-[#EAF1F6] text-base font-extrabold text-[#315267]">
-                  3
+                  ? 'shadow-md ring-2 ring-[#0B3C5D]/20'
+                  : 'shadow-sm'
+              } flex min-w-0 items-center gap-2 order-3 border-[#E4C358] bg-gradient-to-br from-[#FFFCF0] via-[#FFF0BE] to-[#F5D76F] sm:gap-3`}>
+                <div aria-label="Troisième rang" role="img" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white bg-[#F2C94C] text-[#072A3F] shadow-sm">
+                  <Medal className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <StudentAvatar
                   name={leaderboardEntries.graded[2].student_name}
@@ -510,12 +509,20 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
               const rankBadge = (
                 <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-xs font-extrabold ${
                   rank === 1
-                    ? 'bg-[#2FA36B] text-white shadow-sm'
-                    : rank <= 3
+                    ? 'bg-[#DDF2E6] text-[#176B45]'
+                    : rank === 2
                       ? 'bg-[#E6F0F7] text-[#0B3C5D]'
+                      : rank === 3
+                        ? 'bg-[#FFF2C6] text-[#8A6500]'
                       : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {rank}
+                  {rank === 1
+                    ? <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+                    : rank === 2
+                      ? <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+                      : rank === 3
+                        ? <Medal className="h-3.5 w-3.5" aria-hidden="true" />
+                        : rank}
                 </span>
               );
 
@@ -552,7 +559,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-1">
+                  <div className="flex shrink-0 items-center">
                     <span className={`whitespace-nowrap rounded-xl border px-2.5 py-1.5 font-mono text-xs font-extrabold sm:text-sm ${
                       dg.average_score_20 >= 16
                         ? 'bg-[#E8F5EE] text-[#176B45] border-[#B7E2CA]'
@@ -563,9 +570,6 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                             : 'bg-rose-100 text-rose-900 border-rose-300'
                     }`}>
                       {dg.average_score_20}<span className="ml-0.5 text-[9px] font-semibold opacity-65">/20</span>
-                    </span>
-                    <span className="h-1 w-12 overflow-hidden rounded-full bg-slate-100 sm:w-16">
-                      <span className={`block h-full rounded-full ${dg.average_score_20 >= 16 ? 'bg-[#2FA36B]' : dg.average_score_20 >= 10 ? 'bg-[#0B3C5D]' : 'bg-rose-400'}`} style={{ width: `${Math.min(100, Math.max(0, dg.average_score_20 / 20 * 100))}%` }} />
                     </span>
                   </div>
                 </div>
