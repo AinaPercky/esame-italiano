@@ -312,7 +312,7 @@
   justify-content: center;
   padding: 2.5px;
   border-radius: 999px;
-  background: conic-gradient(from 210deg, #009246 0 33.33%, #fff 33.33% 66.66%, #ce2b37 66.66% 100%);
+  background: linear-gradient(135deg, #2fa36b 0%, #0b3c5d 55%, #e6f0f7 100%);
   box-shadow: 0 3px 10px rgba(7, 42, 63, .12);
 }
 .student-header-avatar { padding: 2px; }
