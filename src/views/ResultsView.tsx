@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Award, 
-  Search, 
-  Download, 
-  Printer, 
-  Eye, 
-  Edit3, 
-  Check, 
-  X, 
-  ArrowUpDown, 
-  ChevronUp, 
+import {
+  Award,
+  Search,
+  Download,
+  Printer,
+  Eye,
+  Edit3,
+  Check,
+  X,
+  ArrowUpDown,
+  ChevronUp,
   ChevronDown,
   Calendar,
   FileSpreadsheet,
@@ -73,7 +73,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   const filtered = evaluations.filter(ev => {
     const student = students.find(s => s.id === ev.student_id);
     const fullName = `${student?.first_name || ''} ${student?.last_name || ''}`.toLowerCase();
-    
+
     if (searchTerm && !fullName.includes(searchTerm.toLowerCase())) return false;
     if (classFilter && ev.class_id !== classFilter) return false;
     if (examFilter && ev.exam_id !== examFilter) return false;
@@ -147,7 +147,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto min-w-0 w-full">
       {/* Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div>
@@ -167,12 +167,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             onClick={() => setIsClassQRModalOpen(true)}
             disabled={students.length === 0}
             title="Générer et imprimer les badges Codes QR pour toute la classe"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 hover:bg-amber-100 active:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-all min-h-[44px] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-slate-100 border border-slate-300 hover:bg-slate-100 active:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-all min-h-[44px] cursor-pointer"
           >
-            <QrCode className="w-4 h-4 text-amber-800 shrink-0" />
+            <QrCode className="w-4 h-4 text-slate-800 shrink-0" />
             <span className="flex items-center gap-1.5">
               <span>Codes QR Classe</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 font-mono font-bold">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-900 font-mono font-bold">
                 {students.length}
               </span>
             </span>
@@ -201,12 +201,12 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             onClick={handleExportPDF}
             disabled={sorted.length === 0}
             title="Générer un relevé officiel complet au format PDF avec statistiques pour archivage ou consultation hors ligne"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-all min-h-[44px] cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-950 active:bg-slate-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-all min-h-[44px] cursor-pointer"
           >
             <FileText className="w-4 h-4 text-amber-200 shrink-0" />
             <span className="flex items-center gap-1.5">
               <span>Télécharger PDF</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-900/80 text-amber-100 font-mono font-bold">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950/80 text-amber-100 font-mono font-bold">
                 {sorted.length}
               </span>
             </span>
@@ -243,7 +243,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       )}
 
       {/* Filter Bar (Section 7.1) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-white border border-slate-200 rounded-lg shadow-2xs no-print">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-sm min-w-0 no-print">
         {/* Search */}
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -252,7 +252,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             placeholder="Rechercher par élève..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-800"
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-800"
           />
         </div>
 
@@ -300,13 +300,13 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       </div>
 
       {/* Main Results: Desktop Table + Mobile Cards */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-w-0">
         {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="hidden md:block overflow-x-auto touch-scroll">
+          <table className="w-full min-w-[900px] text-left border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-600 select-none">
-                <th 
+                <th
                   onClick={() => toggleSort('name')}
                   className="py-3 px-4 cursor-pointer hover:text-slate-900"
                 >
@@ -316,7 +316,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   </div>
                 </th>
                 <th className="py-3 px-4">Classe & Examen</th>
-                <th 
+                <th
                   onClick={() => toggleSort('score')}
                   className="py-3 px-4 text-center cursor-pointer hover:text-slate-900"
                 >
@@ -328,7 +328,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 <th className="py-3 px-4 text-center">Note Max</th>
                 <th className="py-3 px-4 text-center">Pourcentage</th>
                 <th className="py-3 px-4 text-center">Temps de parole</th>
-                <th 
+                <th
                   onClick={() => toggleSort('date')}
                   className="py-3 px-4 cursor-pointer hover:text-slate-900"
                 >
@@ -349,8 +349,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 
                   return (
-                    <tr 
-                      key={ev.id} 
+                    <tr
+                      key={ev.id}
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                       onClick={() => setActiveStudentId(ev.student_id)}
                     >
@@ -362,7 +362,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                           {ev.student_number || 'Sans matricule'}
                         </span>
                         {ev.presented_animal && (
-                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200/70 px-1.5 py-0.2 rounded">
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-1.5 py-0.2 rounded">
                             <span>🐾 {ev.presented_animal}</span>
                           </div>
                         )}
@@ -377,11 +377,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       </td>
                       <td className="py-3 px-4 text-center font-mono font-bold text-base">
                         <span className={
-                          ev.total_score >= 8 
-                            ? 'text-emerald-700' 
-                            : ev.total_score >= 5 
-                              ? 'text-amber-800' 
-                              : 'text-rose-700'
+                          ev.total_score >= 8
+                            ? 'text-emerald-700'
+                            : ev.total_score >= 5
+                              ? 'text-slate-800'
+                              : 'text-slate-700'
                         }>
                           {ev.total_score}
                         </span>
@@ -391,11 +391,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className={`inline-block font-mono text-xs font-semibold px-2 py-0.5 rounded ${
-                          (ev.percentage || 0) >= 80 
-                            ? 'bg-emerald-50 text-emerald-800' 
-                            : (ev.percentage || 0) >= 50 
-                              ? 'bg-amber-50 text-amber-800' 
-                              : 'bg-rose-50 text-rose-800'
+                          (ev.percentage || 0) >= 80
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : (ev.percentage || 0) >= 50
+                              ? 'bg-slate-100 text-slate-800'
+                              : 'bg-slate-100 text-slate-800'
                         }`}>
                           {ev.percentage} %
                         </span>
@@ -403,8 +403,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       <td className="py-3 px-4 text-center font-mono text-xs">
                         <div className="text-slate-800 font-semibold">{timeStr} <span className="text-slate-400 font-normal">/ 03:00</span></div>
                         <span className={`text-[10px] px-1.5 py-0.2 rounded font-sans ${
-                          ev.timer_status === 'completed' 
-                            ? 'bg-rose-50 text-rose-700' 
+                          ev.timer_status === 'completed'
+                            ? 'bg-slate-100 text-slate-700'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
                           {ev.timer_status === 'completed' ? '3 min atteintes' : 'Arrêté manuellement'}
@@ -424,10 +424,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                                 setQrModalStudent({ student: st, exam: ex, evaluation: ev });
                               }
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-900 bg-slate-100 hover:bg-slate-100 border border-slate-200 rounded transition-colors cursor-pointer"
                             title="Afficher le Code QR personnel de cet élève"
                           >
-                            <QrCode className="w-3.5 h-3.5 text-amber-800" />
+                            <QrCode className="w-3.5 h-3.5 text-slate-800" />
                             <span className="hidden xl:inline">Code QR</span>
                           </button>
 
@@ -465,8 +465,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               const timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 
               return (
-                <div 
-                  key={ev.id} 
+                <div
+                  key={ev.id}
                   className="p-4 space-y-2.5 active:bg-slate-50 transition-colors"
                   onClick={() => setActiveStudentId(ev.student_id)}
                 >
@@ -481,16 +481,16 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                     </div>
 
                     <div className="text-right">
-                      <div className="flex items-baseline justify-end gap-1 font-mono font-bold text-xl text-amber-900">
+                      <div className="flex items-baseline justify-end gap-1 font-mono font-bold text-xl text-slate-900">
                         <span>{ev.total_score}</span>
                         <span className="text-slate-400 text-xs font-normal">/{ev.max_score || 10}</span>
                       </div>
                       <span className={`inline-block font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded ${
-                        (ev.percentage || 0) >= 80 
-                          ? 'bg-emerald-50 text-emerald-800' 
-                          : (ev.percentage || 0) >= 50 
-                            ? 'bg-amber-50 text-amber-800' 
-                            : 'bg-rose-50 text-rose-800'
+                        (ev.percentage || 0) >= 80
+                          ? 'bg-emerald-50 text-emerald-800'
+                          : (ev.percentage || 0) >= 50
+                            ? 'bg-slate-100 text-slate-800'
+                            : 'bg-slate-100 text-slate-800'
                       }`}>
                         {ev.percentage} %
                       </span>
@@ -513,7 +513,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       e.stopPropagation();
                       setActiveStudentId(ev.student_id);
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 rounded-lg min-h-[44px] transition-colors"
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-slate-900 bg-slate-100 hover:bg-slate-100 active:bg-slate-200 rounded-lg min-h-[44px] transition-colors"
                   >
                     <Eye className="w-4 h-4" />
                     <span>Consulter la fiche individuelle</span>
@@ -536,7 +536,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             {/* Header Fiche */}
             <div className="flex flex-col xs:flex-row xs:items-start justify-between pb-3 sm:pb-4 border-b border-slate-200 mb-3 sm:mb-4 gap-2">
               <div>
-                <span className="text-[10px] sm:text-xs font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded uppercase tracking-wider">
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-wider">
                   Fiche Individuelle d'Évaluation
                 </span>
                 <h3 className="font-display text-xl sm:text-2xl font-bold text-slate-900 mt-1">
@@ -549,7 +549,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
               <div className="text-left xs:text-right bg-slate-50 xs:bg-transparent p-2.5 xs:p-0 rounded-lg border xs:border-0 border-slate-100">
                 <span className="text-xs text-slate-400 block">Note finale</span>
-                <div className="font-mono text-2xl sm:text-3xl font-bold text-amber-900">
+                <div className="font-mono text-2xl sm:text-3xl font-bold text-slate-900">
                   {selectedStudentExamEval ? `${selectedStudentExamEval.total_score} / ${selectedStudentExamEval.max_score || 10}` : 'Non noté'}
                 </div>
                 {selectedStudentExamEval && (
@@ -570,7 +570,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block">Animal présenté</span>
-                    <span className="font-bold text-amber-900 flex items-center gap-1">
+                    <span className="font-bold text-slate-900 flex items-center gap-1">
                       <span>🐾 {selectedStudentExamEval.presented_animal || 'Non renseigné'}</span>
                     </span>
                   </div>
@@ -582,19 +582,19 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block">Temps de parole</span>
-                    <span className="font-mono font-semibold text-amber-900">
+                    <span className="font-mono font-semibold text-slate-900">
                       {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0')}s / 3m 00s
                     </span>
                   </div>
                 </div>
 
                 {/* Encadré détaillé du Temps de Parole (Section 5.3) */}
-                <div className="p-3 bg-amber-50/50 border border-amber-200/70 rounded-lg text-xs space-y-1">
+                <div className="p-3 bg-slate-100/50 border border-slate-200/70 rounded-lg text-xs space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-amber-950 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-950 flex items-center gap-1.5">
                       <span>⏱️ Analyse du Temps de Parole (3 minutes / 180s)</span>
                     </span>
-                    <span className="font-mono font-medium text-amber-900 bg-amber-100 px-2 py-0.5 rounded text-[11px]">
+                    <span className="font-mono font-medium text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
                       Statut : {selectedStudentExamEval.timer_status === 'completed' ? 'Terminé (3 min écoulées)' : 'Arrêté manuellement'}
                     </span>
                   </div>
@@ -639,7 +639,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                                   Phrase attendue : {r.example_sentence}
                                 </div>
                                 {detail?.error_note && (
-                                  <div className="mt-1.5 p-1.5 bg-rose-50 border border-rose-200 rounded text-[11px] text-rose-800 flex items-start gap-1 font-sans">
+                                  <div className="mt-1.5 p-1.5 bg-slate-100 border border-slate-200 rounded text-[11px] text-slate-800 flex items-start gap-1 font-sans">
                                     <span className="font-bold shrink-0">⚠️ Erreur saisie :</span>
                                     <span className="italic">{detail.error_note}</span>
                                   </div>
@@ -652,7 +652,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                                     <span>Oui</span>
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-rose-600 font-semibold">
+                                  <span className="inline-flex items-center gap-1 text-slate-600 font-semibold">
                                     <X className="w-4 h-4 stroke-[2]" />
                                     <span>Non</span>
                                   </span>
@@ -681,7 +681,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       {selectedStudentData.evaluations.slice(1).map(other => (
                         <div key={other.id} className="p-2 bg-slate-50 rounded border border-slate-200 text-xs flex justify-between">
                           <span>{other.exam_title} ({other.exam_date})</span>
-                          <strong className="font-mono text-amber-900">{other.total_score} / 10</strong>
+                          <strong className="font-mono text-slate-900">{other.total_score} / 10</strong>
                         </div>
                       ))}
                     </div>
@@ -718,10 +718,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         evaluation: selectedStudentExamEval
                       });
                     }}
-                    className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-amber-950 bg-amber-50 border border-amber-300 hover:bg-amber-100 active:bg-amber-200 rounded-lg min-h-[44px] cursor-pointer"
+                    className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-slate-950 bg-slate-100 border border-slate-300 hover:bg-slate-100 active:bg-slate-200 rounded-lg min-h-[44px] cursor-pointer"
                     title="Afficher et générer le Code QR de cette évaluation"
                   >
-                    <QrCode className="w-4 h-4 text-amber-800" />
+                    <QrCode className="w-4 h-4 text-slate-800" />
                     <span>Code QR Élève</span>
                   </button>
                 )}
@@ -731,7 +731,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 rounded-lg min-h-[44px] cursor-pointer"
                   title="Télécharger cette fiche individuelle au format PDF pour consultation hors ligne"
                 >
-                  <Download className="w-4 h-4 text-amber-800" />
+                  <Download className="w-4 h-4 text-slate-800" />
                   <span>Télécharger fiche (PDF)</span>
                 </button>
                 <button
@@ -749,7 +749,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                       onEditEvaluation(selectedStudentExamEval.exam_id, activeStudentId!);
                       setActiveStudentId(null);
                     }}
-                    className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-xs min-h-[44px]"
+                    className="w-full xs:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-slate-950 hover:bg-slate-950 active:bg-slate-950 rounded-lg shadow-xs min-h-[44px]"
                   >
                     <Edit3 className="w-4 h-4" />
                     <span>Modifier l'évaluation</span>

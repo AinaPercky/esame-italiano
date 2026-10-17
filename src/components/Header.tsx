@@ -56,42 +56,45 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-3 sm:px-8 py-2.5 sm:py-3.5 no-print">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      <header className="teacher-topbar sticky top-0 z-30 border-b border-[#d8e6ee] bg-white/90 px-3 py-2.5 backdrop-blur-xl sm:px-6 sm:py-3 no-print">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2">
           {/* Zone 1: Brand Wordmark & Mobile Menu Trigger */}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center -ml-1"
-              aria-label="Ouvrir le menu de navigation"
+              className="-ml-1 flex min-h-10 min-w-10 items-center justify-center rounded-xl text-[#315267] transition-colors hover:bg-[#e6f0f7] hover:text-[#072a3f] sm:min-h-11 sm:min-w-11 lg:hidden"
+              aria-label={mobileMenuOpen ? 'Fermer le menu de navigation' : 'Ouvrir le menu de navigation'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls={mobileMenuOpen ? 'teacher-mobile-drawer' : undefined}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
             <button 
               onClick={() => onSelectTab('dashboard')} 
-              className="text-left font-display text-base sm:text-2xl font-bold tracking-tight text-slate-900 hover:text-amber-800 transition-colors flex items-center gap-1.5 sm:gap-2"
+              type="button"
+              className="flex min-w-0 items-center gap-1.5 text-left font-display text-sm font-bold tracking-tight text-[#072a3f] transition-colors hover:text-[#0b3c5d] xs:text-base sm:gap-2 sm:text-2xl"
             >
               <img
                 src="/percky-lingua-logo.png"
                 alt=""
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain bg-white shadow-xs"
+                className="h-8 w-8 shrink-0 rounded-xl bg-white object-contain shadow-sm sm:h-10 sm:w-10"
               />
               <span>PerckyLingua</span>
             </button>
           </div>
 
           {/* Zone 2: Desktop 4-6 text navigation links */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600">
+          <nav className="hidden items-center gap-5 text-sm font-medium text-slate-600">
             {navItems.slice(0, 6).map((item) => (
               <button
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
                 className={`transition-colors py-1 relative flex items-center gap-1.5 ${
                   currentTab === item.id
-                    ? 'text-amber-800 font-semibold border-b-2 border-amber-700'
-                    : 'hover:text-slate-900'
+                    ? 'border-b-2 border-[#2fa36b] font-semibold text-[#072a3f]'
+                    : 'hover:text-[#072a3f]'
                 }`}
               >
                 <span>{item.label}</span>
@@ -119,11 +122,11 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Connected Examiner Badge */}
             {currentUser && (
               <div 
-                className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200/80 rounded-lg text-xs text-amber-950 font-medium"
+                className="hidden items-center gap-1.5 rounded-xl border border-[#d1e1ec] bg-[#e6f0f7] px-2.5 py-1.5 text-xs font-medium text-[#072a3f] md:flex"
                 title={`Connecté en tant que ${currentUser.email} (${currentUser.role})`}
               >
-                <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold text-[10px]">
-                  A
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#072a3f] text-[9px] font-bold text-white">
+                  {(currentUser.name.trim()[0] || 'P').toUpperCase()}
                 </span>
                 <span className="font-mono text-[11px] truncate max-w-[140px]">
                   {currentUser.email}
@@ -133,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onSelectTab('results')}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors min-h-[40px]"
+              className="hidden min-h-10 items-center gap-1.5 rounded-xl border border-[#d8e6ee] bg-white px-3 py-2 text-xs font-semibold text-[#315267] transition-colors hover:bg-[#f3f8fb] sm:inline-flex"
               title="Consulter les notes et exporter"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -142,9 +145,9 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={onQuickEvaluate}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-sm transition-colors whitespace-nowrap min-h-[44px]"
+              className="inline-flex min-h-10 items-center gap-1 whitespace-nowrap rounded-xl bg-[#072a3f] px-2.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] active:bg-[#062438] sm:min-h-11 sm:gap-2 sm:px-4 sm:text-sm"
             >
-              <Mic className="w-4 h-4 text-amber-200 shrink-0" />
+              <Mic className="h-4 w-4 shrink-0 text-emerald-300" />
               <span className="hidden xs:inline">Évaluer</span>
               <span className="xs:hidden">Noter</span>
             </button>
@@ -154,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onLogout}
-                className="p-2 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer"
+                className="flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-700 sm:min-h-10 sm:min-w-10"
                 title="Déconnexion de la session"
                 aria-label="Se déconnecter"
               >
@@ -167,43 +170,45 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Drawer Backdrop & Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div className="fixed inset-0 z-50 flex lg:hidden">
           <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
+            className="fixed inset-0 bg-[#072a3f]/40 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
           />
 
-          <div className="relative w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between z-10 p-4">
+          <div id="teacher-mobile-drawer" role="dialog" aria-modal="true" aria-label="Navigation professeur" className="relative z-10 flex h-dvh w-[min(84vw,22rem)] flex-col justify-between overflow-y-auto rounded-r-3xl border-r border-[#d8e6ee] bg-white p-4 shadow-2xl">
             <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                <span className="font-display font-bold text-slate-900 text-base">
+              <div className="mb-3 flex items-center justify-between border-b border-[#e2edf3] pb-3">
+                <span className="font-display text-base font-bold text-[#072a3f]">
                   Menu Principal
                 </span>
                 <button
+                  type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-700 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-2 text-slate-400 hover:bg-[#e6f0f7] hover:text-[#072a3f]"
+                  aria-label="Fermer le menu"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {currentUser && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3 flex items-center gap-2.5">
-                  <span className="w-8 h-8 rounded-full bg-amber-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    A
+                <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-[#d1e1ec] bg-[#f3f8fb] p-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#072a3f] text-xs font-bold text-white">
+                    {(currentUser.name.trim()[0] || 'P').toUpperCase()}
                   </span>
                   <div className="overflow-hidden">
                     <p className="text-xs font-bold text-slate-900 truncate">
                       {currentUser.name}
                     </p>
-                    <p className="text-[11px] font-mono text-amber-900 truncate">
+                    <p className="truncate font-mono text-[11px] text-[#46657a]">
                       {currentUser.email}
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="space-y-1">
+              <div className="max-h-[calc(100dvh-14rem)] space-y-1 overflow-y-auto overscroll-contain">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentTab === item.id;
@@ -213,12 +218,12 @@ export const Header: React.FC<HeaderProps> = ({
                       onClick={() => handleMobileNav(item.id)}
                       className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors min-h-[48px] ${
                         isActive
-                          ? 'bg-amber-50 text-amber-900 font-semibold'
+                        ? 'bg-[#e6f0f7] font-semibold text-[#072a3f] ring-1 ring-[#d1e1ec]'
                           : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Icon className={`w-5 h-5 ${isActive ? 'text-amber-800' : 'text-slate-400'}`} />
+                        <Icon className={`h-5 w-5 ${isActive ? 'text-[#2fa36b]' : 'text-slate-400'}`} />
                         <span className="truncate">{item.label}</span>
                       </div>
                       {item.id === 'students' && pendingStudentsCount > 0 && (
@@ -232,15 +237,15 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 space-y-2">
+            <div className="space-y-2 border-t border-[#e2edf3] pt-4">
               <button
                 onClick={() => {
                   onQuickEvaluate();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-amber-800 text-white font-medium text-sm rounded-lg shadow-sm min-h-[48px]"
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"
               >
-                <Mic className="w-4 h-4 text-amber-200" />
+                <Mic className="h-4 w-4 text-emerald-300" />
                 <span>Démarrer une évaluation</span>
               </button>
 
@@ -251,7 +256,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setMobileMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 text-rose-700 hover:bg-rose-50 font-medium text-xs rounded-lg border border-rose-200 min-h-[40px] cursor-pointer"
+                  className="flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-rose-200 py-2.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Se déconnecter</span>

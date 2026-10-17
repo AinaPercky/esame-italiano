@@ -52,21 +52,21 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-5 sm:space-y-7 max-w-5xl mx-auto w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#072a3f] tracking-tight">
             Gestion des Classes
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <p className="text-sm leading-relaxed text-slate-600">
             Créez et organisez vos groupes d'élèves pour les sessions d'examens oraux.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg transition-colors self-stretch sm:self-auto shadow-xs min-h-[44px]"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl transition-colors self-stretch sm:self-auto shadow-xs min-h-[44px]"
         >
           <Plus className="w-4 h-4" />
           <span>Nouvelle classe</span>
@@ -74,15 +74,22 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
       </div>
 
       {/* Grid of Classes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+      {classes.length === 0 ? (
+        <div className="rounded-[22px] border border-dashed border-[#b7d3e4] bg-white/80 px-5 py-12 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e6f0f7] text-[#0b3c5d]"><School className="h-7 w-7" /></div>
+          <h3 className="text-lg font-bold text-[#072a3f]">Aucune classe pour le moment</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">Créez votre premier groupe pour organiser vos élèves et vos examens.</p>
+          <button type="button" onClick={openCreateModal} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" />Créer une classe</button>
+        </div>
+      ) : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {classes.map((cls) => (
           <div
             key={cls.id}
-            className="p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs hover:border-amber-200 transition-all flex flex-col justify-between"
+            className="p-5 sm:p-6 bg-white border border-slate-200 rounded-[22px] shadow-sm hover:border-[#b7d3e4] hover:shadow-md transition-all flex flex-col justify-between"
           >
             <div>
               <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="p-2.5 bg-amber-50 text-amber-900 rounded-lg">
+                <div className="p-3 bg-[#e6f0f7] text-[#0b3c5d] rounded-2xl">
                   <School className="w-5 h-5" />
                 </div>
                 <div className="flex items-center gap-1">
@@ -97,7 +104,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setConfirmDeleteId(cls.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 active:bg-rose-50 rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
+                    className="p-2 text-slate-400 hover:text-[#0b3c5d] active:bg-[#e6f0f7] rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
                     title="Supprimer la classe"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -133,18 +140,18 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
             <button
               type="button"
               onClick={() => onSelectClassStudents(cls.id)}
-              className="w-full text-center text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 py-2.5 rounded-lg transition-colors min-h-[44px] flex items-center justify-center"
+              className="w-full text-center text-xs font-semibold text-amber-900 bg-[#e6f0f7] hover:bg-[#d7e8f3] active:bg-[#b7d3e4] py-2.5 rounded-lg transition-colors min-h-[44px] flex items-center justify-center"
             >
               Voir les élèves de la classe &rarr;
             </button>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Modal Créer / Modifier */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="font-display text-lg font-bold text-slate-900 mb-1">
               {editingClass ? 'Modifier la classe' : 'Créer une nouvelle classe'}
             </h3>
@@ -155,7 +162,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nom de la classe <span className="text-rose-500">*</span>
+                  Nom de la classe <span className="text-[#0b3c5d]">*</span>
                 </label>
                 <input
                   type="text"
@@ -163,22 +170,22 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                   placeholder="Ex: Classe A1 - Débutants"
                   value={classNameInput}
                   onChange={(e) => setClassNameInput(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-800/20 focus:border-amber-800 min-h-[44px]"
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3c5d]/20 focus:border-[#0b3c5d] min-h-[44px]"
                   autoFocus
                 />
               </div>
 
-              <div className="flex flex-col-reverse xs:flex-row justify-end gap-2 sm:gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="w-full xs:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg min-h-[44px]"
+                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
                 >
                   {editingClass ? 'Enregistrer' : 'Créer la classe'}
                 </button>
@@ -191,8 +198,8 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
       {/* Confirmation Suppression Modal */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 sm:p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-sm w-full p-5 sm:p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#e6f0f7] text-[#0b3c5d] flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-6 h-6" />
             </div>
             <h3 className="font-semibold text-slate-900 text-base mb-2">
@@ -202,12 +209,12 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
               Cette action supprimera définitivement la classe, ses élèves, leurs photos et notes, les résultats de quiz, ainsi que les examens et données associés. Les comptes d’élèves enregistrés dans ce navigateur seront aussi supprimés.
             </p>
             {deleteError && (
-              <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-left text-xs text-rose-800">
+              <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-[#b7d3e4] bg-[#e6f0f7] p-3 text-left text-xs text-[#072a3f]">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{deleteError}</span>
               </div>
             )}
-            <div className="flex flex-col-reverse xs:flex-row justify-center gap-2 sm:gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-center gap-2 sm:gap-3">
               <button
                 type="button"
                 disabled={isDeletingClass}
@@ -215,7 +222,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                   setConfirmDeleteId(null);
                   setDeleteError(null);
                 }}
-                className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
               >
                 Annuler
               </button>
@@ -235,7 +242,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                     setIsDeletingClass(false);
                   }
                 }}
-                className="w-full xs:w-auto px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:cursor-wait disabled:opacity-60 rounded-lg min-h-[44px]"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#0b3c5d] hover:bg-[#072a3f] active:bg-[#072a3f] disabled:cursor-wait disabled:opacity-60 rounded-lg min-h-[44px]"
               >
                 {isDeletingClass ? 'Suppression en cours…' : 'Confirmer la suppression'}
               </button>

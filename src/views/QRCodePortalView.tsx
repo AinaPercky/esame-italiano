@@ -208,11 +208,11 @@ export const QRCodePortalView: React.FC<QRCodePortalViewProps> = ({
         </div>
 
         {/* Tab switcher: Common QR vs Individual QRs */}
-        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 sm:w-auto">
           <button
             type="button"
             onClick={() => setActiveMode('common')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`min-h-10 min-w-0 flex-1 rounded-lg px-2 py-1.5 text-center text-[11px] font-bold leading-tight transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
               activeMode === 'common'
                 ? 'bg-amber-800 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -223,7 +223,7 @@ export const QRCodePortalView: React.FC<QRCodePortalViewProps> = ({
           <button
             type="button"
             onClick={() => setActiveMode('individual')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`min-h-10 min-w-0 flex-1 rounded-lg px-2 py-1.5 text-center text-[11px] font-bold leading-tight transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
               activeMode === 'individual'
                 ? 'bg-amber-800 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
