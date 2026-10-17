@@ -217,15 +217,15 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
         </div>
       </div>
 
-      <div className="h-28 sm:h-24" />
+      <div className="h-16 sm:h-24" />
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2 backdrop-blur sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:pt-3">
         <div className="mx-auto flex w-full max-w-4xl gap-3">
           {canGoBack && (
             <button
               type="button"
               onClick={onPrevious}
-              className="inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              className="inline-flex h-11 min-w-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 sm:h-12"
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Précédent</span>
@@ -235,7 +235,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           <button
             type="button"
             onClick={isValidated ? onNext : onValidate}
-            className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-6 text-base font-extrabold text-white shadow-md transition hover:bg-[#0b3c5d] active:scale-[.99]"
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 text-sm font-extrabold text-white shadow-md transition hover:bg-[#0b3c5d] active:scale-[.99] sm:h-14 sm:px-6 sm:text-base"
           >
             {!isValidated ? <CheckCircle2 className="h-5 w-5" /> : isLastQuestion ? <Send className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
             {primaryLabel}
