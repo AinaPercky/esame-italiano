@@ -22,26 +22,26 @@ export function primeTimerAudio(): void {
   }
 }
 
-/** Joue deux bips très courts, sans fichier externe ni dépendance audio. */
+/** Joue une alerte brève en trois notes, sans fichier externe ni dépendance audio. */
 export function playTimerBeep(): void {
   const context = getAudioContext();
   if (!context) return;
 
   const scheduleBeeps = () => {
     const startAt = context.currentTime + 0.015;
-    [880, 660].forEach((frequency, index) => {
-      const onset = startAt + index * 0.17;
+    [880, 660, 880].forEach((frequency, index) => {
+      const onset = startAt + index * 0.15;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
-      oscillator.type = 'sine';
+      oscillator.type = 'triangle';
       oscillator.frequency.setValueAtTime(frequency, onset);
       gain.gain.setValueAtTime(0.0001, onset);
-      gain.gain.exponentialRampToValueAtTime(0.12, onset + 0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001, onset + 0.11);
+      gain.gain.exponentialRampToValueAtTime(0.18, onset + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, onset + 0.13);
       oscillator.connect(gain);
       gain.connect(context.destination);
       oscillator.start(onset);
-      oscillator.stop(onset + 0.12);
+      oscillator.stop(onset + 0.14);
     });
   };
 

@@ -618,12 +618,13 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
     return (
       <div className="min-h-screen bg-slate-950 text-slate-900">
-        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-2 sm:px-6 sm:py-6">
           <PublicQuizQuestionScreen
             question={currentQuestion}
             quizTitle={quiz.title}
             totalTimeLeftMs={totalTimeLeftMs}
             totalTimeDurationMs={totalQuizDurationMs}
+            questionTimeDurationMs={timePerQuestionMs}
             questionIndex={currentIndex}
             totalQuestions={totalQuestions}
             answer={currentAnswer}

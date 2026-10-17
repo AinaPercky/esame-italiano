@@ -1002,10 +1002,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
               
               {/* Anti-Screenshot Watermark Banner */}
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-3 py-1.5 text-[10px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-2.5 py-1 text-[9px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
                 <span className="flex min-w-0 items-center gap-1.5 truncate font-bold sm:gap-2">
                   <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-rose-300 sm:h-4 sm:w-4" />
-                  <span>MODE SÉCURISÉ ANTI-TRICHE • Capture d'écran strictement interdite</span>
+                  <span className="sm:hidden">MODE SÉCURISÉ ANTI-TRICHE</span>
+                  <span className="hidden sm:inline">MODE SÉCURISÉ ANTI-TRICHE • Capture d'écran strictement interdite</span>
                 </span>
                 <span className="hidden shrink-0 truncate opacity-90 sm:block">
                   {currentUser.name} • {currentUser.student_number || 'N°1'} • Session officielle
@@ -1013,10 +1014,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
               
               {/* Quiz Header Bar with Global & Question Timers */}
-              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-3 py-2 text-white shadow-lg sm:px-6 sm:py-4">
-                <div className="mx-auto max-w-7xl space-y-2 sm:space-y-4">
-                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  <div>
+              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-2.5 py-1.5 text-white shadow-lg sm:px-6 sm:py-4">
+                <div className="mx-auto max-w-7xl space-y-1.5 sm:space-y-4">
+                <div className="flex flex-row items-center justify-between gap-1.5 sm:gap-4">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
                         Évaluation en cours • {activeQuiz.class_name || 'Classe'}
@@ -1031,24 +1032,24 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   </div>
 
                   {/* Dual Timers Badge */}
-                  <div className="flex shrink-0 items-center gap-1.5 self-start sm:gap-3 sm:self-auto">
+                  <div className="flex shrink-0 items-center gap-1 self-center sm:gap-3">
                     {/* Per-Question Countdown Timer */}
-                    <div className={`flex items-center gap-1.5 rounded-lg border-2 px-2 py-1 font-mono text-xs font-extrabold shadow-xs transition-colors sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-sm ${
+                    <div className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-extrabold shadow-xs transition-colors sm:gap-2 sm:rounded-xl sm:border-2 sm:px-3.5 sm:py-1.5 sm:text-sm ${
                       questionSecondsRemaining <= 10 
                         ? 'bg-rose-50 border-rose-400 text-rose-700 animate-pulse' 
                         : 'bg-amber-50 border-amber-300 text-amber-950'
                     }`}>
-                      <Clock className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${questionSecondsRemaining <= 10 ? 'text-rose-600 animate-spin' : 'text-amber-800'}`} />
+                      <Clock className={`h-3 w-3 sm:h-4 sm:w-4 ${questionSecondsRemaining <= 10 ? 'text-rose-600 motion-safe:animate-pulse' : 'text-amber-800'}`} />
                       <div className="flex flex-col text-left">
-                        <span className="text-[8px] uppercase font-bold text-slate-500 font-sans leading-none sm:text-[9px]">Temps Question</span>
-                        <span className="leading-tight">{formatTime(questionSecondsRemaining)}</span>
+                        <span className="text-[6px] uppercase font-bold text-slate-500 font-sans leading-none sm:text-[9px]">Question</span>
+                        <span className={`leading-tight ${questionSecondsRemaining <= 5 ? 'motion-safe:animate-pulse text-rose-700' : ''}`}>{formatTime(questionSecondsRemaining)}</span>
                       </div>
                     </div>
 
                     {/* Global Quiz Countdown Timer */}
-                    <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 font-mono text-[11px] text-white sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-xs">
+                    <div className="flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-white sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-xs">
                       <div className="flex flex-col text-right">
-                        <span className="text-[8px] uppercase font-bold text-slate-400 font-sans leading-none sm:text-[9px]">Total Quiz</span>
+                        <span className="text-[6px] uppercase font-bold text-slate-400 font-sans leading-none sm:text-[9px]">Total</span>
                         <span className="font-bold leading-tight">{formatTime(quizSecondsRemaining)}</span>
                       </div>
                     </div>
@@ -1056,21 +1057,21 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
 
                 {/* Progress bar per question (Chrono de la question en cours) */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[9px] font-semibold text-slate-300 sm:text-[11px]">
+                <div className="space-y-0.5 sm:space-y-1">
+                  <div className="flex items-center justify-between text-[8px] font-semibold text-slate-300 sm:text-[11px]">
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3 w-3 text-amber-400 sm:h-3.5 sm:w-3.5" />
-                      <span>Temps de la question {currentQuestionIndex + 1}</span>
+                      <span>Question {currentQuestionIndex + 1} · temps restant</span>
                     </span>
-                    <span className="font-mono font-bold text-amber-300">
+                    <span className={`font-mono font-bold ${qProgressPercent <= 25 ? 'text-rose-300 motion-safe:animate-pulse' : 'text-amber-300'}`}>
                       {questionSecondsRemaining}s restantes
                     </span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
                     <div 
                       className={`h-full transition-all duration-1000 ${
                         qProgressPercent <= 25 
-                          ? 'bg-rose-600 animate-pulse' 
+                          ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,.7)] motion-safe:animate-pulse'
                           : qProgressPercent <= 50 
                             ? 'bg-orange-500' 
                             : 'bg-emerald-600'
@@ -1081,7 +1082,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
 
                 {/* Stepper Dots (Questions progress) */}
-                <div className="flex items-center gap-1 overflow-x-auto pt-0.5 sm:gap-1.5 sm:pt-1">
+                <div className="hidden items-center gap-1 overflow-x-auto pt-0.5 sm:flex sm:gap-1.5 sm:pt-1">
                   {questions.map((q, idx) => {
                     const isPassed = idx < currentQuestionIndex;
                     const isCurrent = idx === currentQuestionIndex;
