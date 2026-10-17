@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ChevronDown, RotateCcw, Trophy, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, RotateCcw, Trophy, XCircle } from 'lucide-react';
 import { Quiz } from '../../types';
 import { QuizFeedbackEntry } from './publicQuizUtils';
 
@@ -10,7 +10,6 @@ interface PublicQuizResultScreenProps {
   score20: number;
   feedback: Record<string, QuizFeedbackEntry>;
   onRetry: () => void;
-  onBackToList: () => void;
 }
 
 function getEncouragementMessage(percentage: number): string {
@@ -26,8 +25,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
   maxScore,
   score20,
   feedback,
-  onRetry,
-  onBackToList
+  onRetry
 }) => {
   const [openQuestions, setOpenQuestions] = useState<Record<string, boolean>>({});
   const percentage = useMemo(() => {
@@ -145,22 +143,14 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
           })}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex">
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#072a3f] px-5 text-sm font-semibold text-white hover:bg-[#0b3c5d]"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#072a3f] px-5 text-sm font-semibold text-white hover:bg-[#0b3c5d]"
           >
             <RotateCcw className="h-4 w-4" />
             Refaire le quiz
-          </button>
-          <button
-            type="button"
-            onClick={onBackToList}
-            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#e6f0f7] px-5 text-sm font-semibold text-[#072a3f] hover:bg-[#d5e4ed]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour à la liste des quiz
           </button>
         </div>
       </div>
