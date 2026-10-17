@@ -1001,53 +1001,53 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
               
               {/* Anti-Screenshot Watermark Banner */}
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-rose-950 px-4 py-2.5 text-rose-100 shadow-inner sm:px-6">
-                <span className="flex min-w-0 items-center gap-2 truncate font-bold">
-                  <ShieldCheck className="w-4 h-4 text-rose-300" />
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-3 py-1.5 text-[10px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
+                <span className="flex min-w-0 items-center gap-1.5 truncate font-bold sm:gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-rose-300 sm:h-4 sm:w-4" />
                   <span>MODE SÉCURISÉ ANTI-TRICHE • Capture d'écran strictement interdite</span>
                 </span>
-                <span className="truncate opacity-90">
+                <span className="hidden shrink-0 truncate opacity-90 sm:block">
                   {currentUser.name} • {currentUser.student_number || 'N°1'} • Session officielle
                 </span>
               </div>
               
               {/* Quiz Header Bar with Global & Question Timers */}
-              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-4 py-3 text-white shadow-lg sm:px-6 sm:py-4">
-                <div className="mx-auto max-w-7xl space-y-3 sm:space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-3 py-2 text-white shadow-lg sm:px-6 sm:py-4">
+                <div className="mx-auto max-w-7xl space-y-2 sm:space-y-4">
+                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center sm:gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
+                      <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
                         Évaluation en cours • {activeQuiz.class_name || 'Classe'}
                       </span>
-                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-200 sm:px-2 sm:text-[10px]">
                         {safeIndex + 1}/{totalQuestions}
                       </span>
                     </div>
-                    <h2 className="truncate font-display text-base font-extrabold text-white sm:text-xl">
+                    <h2 className="truncate font-display text-sm font-extrabold leading-tight text-white sm:text-xl">
                       {activeQuiz.title}
                     </h2>
                   </div>
 
                   {/* Dual Timers Badge */}
-                  <div className="flex shrink-0 items-center gap-2 self-start sm:gap-3 sm:self-auto">
+                  <div className="flex shrink-0 items-center gap-1.5 self-start sm:gap-3 sm:self-auto">
                     {/* Per-Question Countdown Timer */}
-                    <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-mono font-extrabold text-sm border-2 shadow-xs transition-colors ${
+                    <div className={`flex items-center gap-1.5 rounded-lg border-2 px-2 py-1 font-mono text-xs font-extrabold shadow-xs transition-colors sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-sm ${
                       questionSecondsRemaining <= 10 
                         ? 'bg-rose-50 border-rose-400 text-rose-700 animate-pulse' 
                         : 'bg-amber-50 border-amber-300 text-amber-950'
                     }`}>
-                      <Clock className={`w-4 h-4 ${questionSecondsRemaining <= 10 ? 'text-rose-600 animate-spin' : 'text-amber-800'}`} />
+                      <Clock className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${questionSecondsRemaining <= 10 ? 'text-rose-600 animate-spin' : 'text-amber-800'}`} />
                       <div className="flex flex-col text-left">
-                        <span className="text-[9px] uppercase font-bold text-slate-500 font-sans leading-none">Temps Question</span>
+                        <span className="text-[8px] uppercase font-bold text-slate-500 font-sans leading-none sm:text-[9px]">Temps Question</span>
                         <span className="leading-tight">{formatTime(questionSecondsRemaining)}</span>
                       </div>
                     </div>
 
                     {/* Global Quiz Countdown Timer */}
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-mono text-xs text-white sm:px-3.5">
+                    <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 font-mono text-[11px] text-white sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-xs">
                       <div className="flex flex-col text-right">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 font-sans leading-none">Total Quiz</span>
+                        <span className="text-[8px] uppercase font-bold text-slate-400 font-sans leading-none sm:text-[9px]">Total Quiz</span>
                         <span className="font-bold leading-tight">{formatTime(quizSecondsRemaining)}</span>
                       </div>
                     </div>
@@ -1056,16 +1056,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                 {/* Progress bar per question (Chrono de la question en cours) */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] font-semibold text-slate-300 sm:text-[11px]">
+                  <div className="flex items-center justify-between text-[9px] font-semibold text-slate-300 sm:text-[11px]">
                     <span className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-amber-400" />
+                      <Clock className="h-3 w-3 text-amber-400 sm:h-3.5 sm:w-3.5" />
                       <span>Temps de la question {currentQuestionIndex + 1}</span>
                     </span>
                     <span className="font-mono font-bold text-amber-300">
                       {questionSecondsRemaining}s restantes
                     </span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
                     <div 
                       className={`h-full transition-all duration-1000 ${
                         qProgressPercent <= 25 
@@ -1080,7 +1080,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
 
                 {/* Stepper Dots (Questions progress) */}
-                <div className="flex items-center gap-1.5 pt-1 overflow-x-auto">
+                <div className="flex items-center gap-1 overflow-x-auto pt-0.5 sm:gap-1.5 sm:pt-1">
                   {questions.map((q, idx) => {
                     const isPassed = idx < currentQuestionIndex;
                     const isCurrent = idx === currentQuestionIndex;
@@ -1090,7 +1090,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     return (
                       <div
                         key={q.id}
-                        className={`h-2 rounded-full transition-all flex-1 min-w-[20px] ${
+                        className={`h-1.5 rounded-full transition-all flex-1 min-w-[14px] sm:h-2 sm:min-w-[20px] ${
                           isCurrent
                             ? 'bg-amber-800 ring-2 ring-amber-400 scale-105'
                             : isPassed

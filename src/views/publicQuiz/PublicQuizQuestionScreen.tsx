@@ -89,37 +89,37 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 
   return (
     <>
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-slate-800 bg-[#072a3f] px-4 pb-4 pt-4 text-white shadow-lg sm:-mx-6 sm:px-6 sm:pt-5">
-        <div className="mx-auto w-full max-w-4xl space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-3 border-b border-slate-800 bg-[#072a3f] px-3 pb-2 pt-2 text-white shadow-lg sm:-mx-6 sm:mb-4 sm:px-6 sm:pb-4 sm:pt-5">
+        <div className="mx-auto w-full max-w-4xl space-y-2 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2 sm:items-start sm:gap-3">
             <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-300 sm:text-xs">Quiz public · Italien</span>
-              <h1 className="mt-1 truncate font-display text-base font-extrabold sm:text-xl">{quizTitle}</h1>
+              <span className="text-[8px] font-bold uppercase tracking-[.12em] text-emerald-300 sm:text-xs sm:tracking-[.18em]">Quiz public · Italien</span>
+              <h1 className="mt-0.5 truncate font-display text-sm font-extrabold leading-tight sm:mt-1 sm:text-xl">{quizTitle}</h1>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 ${totalTimeRatio <= 0.25 ? 'border-rose-300 bg-rose-50 text-rose-800' : totalTimeRatio <= 0.5 ? 'border-orange-300 bg-orange-50 text-orange-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
-                <Clock3 className="h-4 w-4" />
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 ${totalTimeRatio <= 0.25 ? 'border-rose-300 bg-rose-50 text-rose-800' : totalTimeRatio <= 0.5 ? 'border-orange-300 bg-orange-50 text-orange-900' : 'border-emerald-300 bg-emerald-50 text-emerald-900'}`}>
+                <Clock3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="flex flex-col text-left">
-                  <span className="text-[9px] font-bold uppercase leading-none">Temps total</span>
-                  <span className="font-mono text-sm font-extrabold">{formatQuizTime(totalTimeLeftMs)}</span>
+                  <span className="text-[7px] font-bold uppercase leading-none sm:text-[9px]">Total</span>
+                  <span className="font-mono text-xs font-extrabold sm:text-sm">{formatQuizTime(totalTimeLeftMs)}</span>
                 </span>
               </div>
-              <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${timerClasses[timeTone]}`}>
-                <Clock3 className="h-4 w-4" />
+              <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-sm font-bold sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 ${timerClasses[timeTone]}`}>
+                <Clock3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="flex flex-col text-left">
-                  <span className="text-[9px] font-bold uppercase leading-none">Temps question</span>
-                  <span className="font-mono">{formatQuizTime(timeLeft)}</span>
+                  <span className="text-[7px] font-bold uppercase leading-none sm:text-[9px]">Question</span>
+                  <span className="font-mono text-xs sm:text-sm">{formatQuizTime(timeLeft)}</span>
                 </span>
               </div>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3 text-[10px] font-semibold text-slate-300 sm:text-[11px]">
-              <span>Temps restant sur la durée allouée</span>
+          <div className="space-y-1 sm:space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-[9px] font-semibold text-slate-300 sm:text-[11px]">
+              <span>Temps restant</span>
               <span className="font-mono font-bold text-white">{formatQuizTime(totalTimeLeftMs)}</span>
             </div>
             <div
-              className="h-2.5 overflow-hidden rounded-full bg-slate-700"
+              className="h-1.5 overflow-hidden rounded-full bg-slate-700 sm:h-2.5"
               role="progressbar"
               aria-label="Temps restant pour le quiz"
               aria-valuemin={0}
@@ -129,16 +129,16 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
               <div className={`h-full rounded-full transition-all duration-1000 ${totalTimeBarTone}`} style={{ width: `${totalTimeRemainingPercent}%` }} />
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-200">
+          <div className="flex items-center justify-between gap-3 text-[10px] font-semibold text-slate-200 sm:text-xs">
             <span>Question {questionIndex + 1} sur {totalQuestions}</span>
             <span>{Math.round(progressPercent)} %</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-700">
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-700 sm:h-2">
             <div className="h-full rounded-full bg-[#2fa36b] transition-all duration-500" style={{ width: `${progressPercent}%` }} />
           </div>
-          <div className="flex gap-1.5 overflow-x-auto" aria-label="Progression du quiz">
+          <div className="flex gap-1 overflow-x-auto sm:gap-1.5" aria-label="Progression du quiz">
             {Array.from({ length: totalQuestions }, (_, index) => (
-              <span key={index} className={`h-1.5 min-w-4 flex-1 rounded-full ${index < questionIndex ? 'bg-[#2fa36b]' : index === questionIndex ? 'bg-white' : 'bg-slate-600'}`} />
+              <span key={index} className={`h-1 min-w-3 flex-1 rounded-full sm:h-1.5 sm:min-w-4 ${index < questionIndex ? 'bg-[#2fa36b]' : index === questionIndex ? 'bg-white' : 'bg-slate-600'}`} />
             ))}
           </div>
         </div>
