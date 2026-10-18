@@ -167,14 +167,14 @@ class SupabaseService {
     // Tentative de sélection avec validation_status directement depuis Supabase online
     const res = await client
       .from('students')
-      .select('id, class_id, first_name, last_name, email, student_number, avatar_url, validation_status, created_at, updated_at')
+      .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, validation_status, created_at, updated_at')
       .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
       .maybeSingle();
 
     if (res.error && (res.error.code === '42703' || res.error.message?.includes('validation_status'))) {
       const fallbackRes = await client
         .from('students')
-        .select('id, class_id, first_name, last_name, email, student_number, avatar_url, created_at, updated_at')
+        .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, created_at, updated_at')
         .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
         .maybeSingle();
       student = fallbackRes.data ? { ...fallbackRes.data, validation_status: 'approved' } : null;
@@ -515,6 +515,7 @@ class SupabaseService {
         class_id: student.class_id,
         first_name: student.first_name,
         last_name: student.last_name,
+        gender: student.gender || 'homme',
         email: student.email.trim().toLowerCase(),
         student_number: student.student_number || null,
         avatar_url: student.avatar_url || null,
@@ -615,14 +616,14 @@ class SupabaseService {
     if (!client) return [];
     const { data, error } = await client
       .from('students')
-      .select('id, class_id, first_name, last_name, email, student_number, avatar_url, validation_status, created_at, updated_at')
+      .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, validation_status, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('validation_status')) {
         const fallback = await client
           .from('students')
-          .select('id, class_id, first_name, last_name, email, student_number, avatar_url, created_at, updated_at')
+          .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, created_at, updated_at')
           .order('created_at', { ascending: false });
         return (fallback.data || []).map(s => ({
           ...s,
@@ -633,6 +634,7 @@ class SupabaseService {
     }
     return (data || []).map(s => ({
       ...s,
+      gender: s.gender || 'homme',
       validation_status: s.validation_status || 'pending'
     })) as Student[];
   }

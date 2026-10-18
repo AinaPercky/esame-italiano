@@ -29,6 +29,7 @@ CREATE TABLE students (
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
+    gender TEXT NOT NULL DEFAULT 'homme' CHECK (gender IN ('homme', 'femme')),
     email TEXT NOT NULL CHECK (btrim(email) <> ''),
     student_number TEXT,
     avatar_url TEXT,

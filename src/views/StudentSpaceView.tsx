@@ -583,6 +583,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     ? Number(((cumulativeScore / cumulativeMaxScore) * 20).toFixed(2))
     : null;
   const greetingName = studentRecord?.first_name || currentUser.name.trim().split(/\s+/)[0] || currentUser.name;
+  const studentGender = studentRecord?.gender || currentUser.gender || 'homme';
+  const welcomePhoto = studentGender === 'femme' ? '/student-space-welcome-female.webp' : studentHeroPhoto;
 
   // Vérification de la validation de l'inscription par le professeur
   if (studentRecord && studentRecord.validation_status === 'pending') {
@@ -714,7 +716,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6">
         <section className="student-welcome" aria-labelledby="student-welcome-title">
           <div className="student-welcome-photo" aria-hidden="true">
-            <img src={studentHeroPhoto} alt="" />
+            <img src={welcomePhoto} alt="" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = studentHeroPhoto; }} />
             <div className="student-welcome-photo-fade" />
             <div className="student-welcome-flag" />
           </div>
@@ -733,7 +735,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <span className="student-italian-flag" aria-hidden="true"><i /><i /><i /></span>
                 <span>APPRENTISSAGE <span aria-hidden="true">·</span> ITALIEN</span>
               </div>
-              <h1 id="student-welcome-title">Benvenuto, {greetingName}!</h1>
+              <h1 id="student-welcome-title">{studentGender === 'femme' ? 'Benvenuta' : 'Benvenuto'}, {greetingName}!</h1>
               <p>Retrouvez les quiz de votre professeur, passez vos évaluations pendant leur disponibilité et suivez vos progrès jour après jour.</p>
               <div className="student-class-meta">
                 <span>{currentUser.class_name || studentRecord?.class_name || 'Espace étudiant'}</span>

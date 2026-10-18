@@ -23,6 +23,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  gender?: 'homme' | 'femme';
   role: 'admin' | 'student';
   student_id?: string;
   student_number?: string | null;
@@ -84,7 +85,8 @@ export const authService = {
         student_number: student.student_number,
         class_id: student.class_id,
         class_name: classNamesById.get(student.class_id) || currentUser.class_name,
-        name: `${student.first_name} ${student.last_name}`
+        name: `${student.first_name} ${student.last_name}`,
+        gender: student.gender || 'homme'
       };
       currentUser = updatedUser;
       notifyAuthChange();
@@ -206,6 +208,7 @@ export const authService = {
         id: `session_${student.id}`,
         email: student.email,
         name: `${student.first_name} ${student.last_name}`,
+        gender: student.gender || 'homme',
         role: 'student',
         student_id: student.id,
         student_number: student.student_number,
@@ -290,6 +293,7 @@ export const authService = {
   async registerStudent(params: {
     firstName: string;
     lastName: string;
+    gender: 'homme' | 'femme';
     studentNumber: string;
     classId: string;
     className?: string;
@@ -299,6 +303,7 @@ export const authService = {
   }): Promise<{ success: boolean; error?: string; user?: AuthUser; confirmationRequired?: boolean }> {
     const firstName = normalizeFirstName(params.firstName);
     const lastName = normalizeLastName(params.lastName);
+    const gender = params.gender === 'femme' ? 'femme' : 'homme';
     const studentNumber = params.studentNumber.trim();
     const classId = params.classId.trim();
     const email = normalizeEmail(params.email);
@@ -337,6 +342,7 @@ export const authService = {
           id: `session_${studentId}`,
           email,
           name: `${firstName} ${lastName}`,
+          gender,
           role: 'student',
           student_id: studentId,
           student_number: studentNumber || null,
