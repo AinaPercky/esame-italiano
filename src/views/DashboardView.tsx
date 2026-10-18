@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Exam, ClassRoom, Student } from '../types';
 import { dataService } from '../services/dataService';
-import heroImage from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
+import heroImage from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 interface DashboardViewProps {
   exams: Exam[];

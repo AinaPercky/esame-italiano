@@ -631,7 +631,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-amber-50">
               <img 
-                src="/src/assets/images/zebu_study_illustration_1790527533886.jpg" 
+                src="/src/assets/images/zebu_study_illustration_1790527533886.webp" 
                 alt="Illustration du sujet d'examen oral" 
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
