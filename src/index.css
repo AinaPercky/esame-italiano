@@ -381,7 +381,7 @@
 .student-welcome-photo-fade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, #fff 0%, rgba(255, 255, 255, .89) 14%, rgba(255, 255, 255, .48) 45%, rgba(255, 255, 255, .06) 100%), linear-gradient(0deg, #fff 0%, rgba(255, 255, 255, .06) 55%);
+  background: linear-gradient(90deg, #fff 0%, rgba(255, 255, 255, .87) 14%, rgba(255, 255, 255, .44) 45%, rgba(255, 255, 255, .05) 100%), linear-gradient(0deg, #fff 0%, rgba(255, 255, 255, .05) 55%);
 }
 .student-welcome-flag {
   position: absolute;
@@ -555,7 +555,7 @@
   .student-welcome { border-radius: 22px; }
   .student-welcome-photo { top: 0; right: 0; bottom: auto; left: 0; width: auto; height: 228px; border-top-left-radius: 0; }
   .student-welcome-photo img { object-position: 52% center; }
-  .student-welcome-photo-fade { background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,.92) 15%, rgba(255,255,255,.70) 44%, rgba(255,255,255,.16) 100%), linear-gradient(0deg, #fff 0%, rgba(255,255,255,.06) 72%); }
+  .student-welcome-photo-fade { background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,.90) 15%, rgba(255,255,255,.67) 44%, rgba(255,255,255,.14) 100%), linear-gradient(0deg, #fff 0%, rgba(255,255,255,.05) 72%); }
   .student-welcome-flag { display: none; }
   .student-welcome-copy { display: grid; min-height: 0; grid-template-columns: 62px minmax(0, 1fr); align-items: start; gap: 11px; padding: 47px 15px 13px; }
   .student-welcome-avatar { width: 62px; height: 62px; padding: 2px; }
