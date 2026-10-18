@@ -30,6 +30,8 @@ import {
   Lock,
   Copy,
   Download,
+  Upload,
+  FileCode,
   Globe,
   RotateCcw,
   QrCode,
@@ -92,6 +94,167 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [selectedQuizClassIds, setSelectedQuizClassIds] = useState<string[]>(classes[0] ? [classes[0].id] : []);
   const [quizDuration, setQuizDuration] = useState(10);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+
+  // JSON Export / Import in Quiz Editor modal
+  const [isEditorExportOpen, setIsEditorExportOpen] = useState(false);
+  const [isEditorImportOpen, setIsEditorImportOpen] = useState(false);
+  const [editorJsonInput, setEditorJsonInput] = useState('');
+  const [editorJsonError, setEditorJsonError] = useState<string | null>(null);
+  const [editorExportCopied, setEditorExportCopied] = useState(false);
+
+  // Helper pour les variantes de réponses saisies (type text)
+  const getQuestionTextVariants = (answerStr: string | undefined): string[] => {
+    if (!answerStr) return [''];
+    const parts = answerStr.split(/\s*[\/;|]\s*/);
+    return parts.length > 0 ? parts : [''];
+  };
+
+  const handleUpdateTextVariant = (qIdx: number, vIdx: number, val: string) => {
+    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
+    const nextVariants = [...currentVariants];
+    nextVariants[vIdx] = val;
+    const updated = [...questions];
+    updated[qIdx] = {
+      ...updated[qIdx],
+      correct_answer: nextVariants.join(' / ')
+    };
+    setQuestions(updated);
+  };
+
+  const handleAddTextVariant = (qIdx: number) => {
+    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
+    const updated = [...questions];
+    updated[qIdx] = {
+      ...updated[qIdx],
+      correct_answer: [...currentVariants, ''].join(' / ')
+    };
+    setQuestions(updated);
+  };
+
+  const handleRemoveTextVariant = (qIdx: number, vIdx: number) => {
+    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
+    const nextVariants = currentVariants.filter((_, i) => i !== vIdx);
+    const updated = [...questions];
+    updated[qIdx] = {
+      ...updated[qIdx],
+      correct_answer: (nextVariants.length > 0 ? nextVariants : ['']).join(' / ')
+    };
+    setQuestions(updated);
+  };
+
+  // Génération du JSON complet pour le quiz en cours d'édition
+  const getCurrentQuizJsonString = (): string => {
+    const exportData = {
+      title: quizTitle || 'Sans titre',
+      description: quizDescription || '',
+      duration_minutes: quizDuration || 10,
+      questions: questions.map((q) => {
+        const item: any = {
+          type: q.type,
+          question: q.question,
+          points: Number(q.points) || 1,
+          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+        };
+        if (q.type === 'qcm') {
+          item.options = q.options || ['', '', '', ''];
+          item.correct_answer = q.correct_answer || '';
+        } else if (q.type === 'reorder') {
+          item.items = q.items || [];
+          item.correct_answer = q.correct_answer || '';
+        } else {
+          item.correct_answer = q.correct_answer || '';
+        }
+        if (q.explanation) {
+          item.explanation = q.explanation;
+        }
+        return item;
+      })
+    };
+    return JSON.stringify(exportData, null, 2);
+  };
+
+  const handleDownloadEditorJson = () => {
+    const jsonStr = getCurrentQuizJsonString();
+    const slug = (quizTitle || 'quiz').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug || 'quiz'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyEditorJson = async () => {
+    try {
+      await navigator.clipboard.writeText(getCurrentQuizJsonString());
+      setEditorExportCopied(true);
+      setTimeout(() => setEditorExportCopied(false), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleApplyJsonToCurrentQuiz = () => {
+    setEditorJsonError(null);
+    try {
+      if (!editorJsonInput.trim()) {
+        throw new Error('Veuillez coller du code JSON.');
+      }
+      const parsed = parseJsonWithComments<any>(editorJsonInput);
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Le code JSON fourni n\'est pas un objet valide.');
+      }
+      if (!parsed.title && !Array.isArray(parsed.questions)) {
+        throw new Error('Le JSON doit comporter au moins un titre ("title") ou une liste de questions ("questions").');
+      }
+
+      if (parsed.title) {
+        setQuizTitle(String(parsed.title));
+      }
+      if (typeof parsed.description === 'string') {
+        setQuizDescription(parsed.description);
+      }
+      if (parsed.duration_minutes) {
+        setQuizDuration(Number(parsed.duration_minutes) || 10);
+      }
+
+      if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+        const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => {
+          const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
+          const sourceItems = type === 'reorder'
+            ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
+            : [];
+          const items = sourceItems.map((item: unknown) => {
+            if (item && typeof item === 'object' && 'id' in item && 'text' in item) {
+              const record = item as { id: unknown; text: unknown };
+              return { id: String(record.id), text: String(record.text) };
+            }
+            return createQuizReorderItem(String(item ?? ''));
+          });
+          return {
+            id: `q_imported_${Date.now()}_${i}`,
+            type,
+            question: q.question || '',
+            options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
+            items: type === 'reorder' ? items : undefined,
+            correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : (q.correct_answer || ''),
+            points: Number(q.points) || 1,
+            explanation: q.explanation || '',
+            time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+          };
+        });
+        setQuestions(importedQuestions);
+      }
+
+      setIsEditorImportOpen(false);
+      setEditorJsonInput('');
+    } catch (err: any) {
+      setEditorJsonError(err.message || 'Erreur lors du traitement du JSON.');
+    }
+  };
 
   // Modal Partage & QR Code
   const [sharingQuiz, setSharingQuiz] = useState<Quiz | null>(null);
@@ -953,21 +1116,199 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
             
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between z-10">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-800" />
-                <h2 className="font-display font-bold text-lg text-slate-900">
+            <div className="sticky top-0 bg-white px-4 sm:px-6 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between z-10 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <BookOpen className="w-5 h-5 text-amber-800 shrink-0" />
+                <h2 className="font-display font-bold text-base sm:text-lg text-slate-900 truncate">
                   {editingQuiz ? 'Modifier le Quiz' : 'Créer un Nouveau Quiz'}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsEditorOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditorExportOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-colors cursor-pointer"
+                  title="Exporter ce quiz au format JSON"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  <span className="hidden sm:inline">Exporter JSON</span>
+                  <span className="sm:hidden">Export</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorJsonError(null);
+                    setEditorJsonInput('');
+                    setIsEditorImportOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-xl border border-amber-300 transition-colors cursor-pointer"
+                  title="Importer ou remplacer le contenu par un JSON"
+                >
+                  <Upload className="w-3.5 h-3.5 text-amber-800" />
+                  <span className="hidden sm:inline">Importer JSON</span>
+                  <span className="sm:hidden">Import</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditorOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+
+            {/* SOUS-MODALE EXPORT JSON */}
+            {isEditorExportOpen && (
+              <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+                  <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <FileCode className="w-4 h-4 text-amber-800" />
+                      <h3 className="font-bold text-sm text-slate-900">Exportation JSON du Quiz</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditorExportOpen(false)}
+                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3 overflow-y-auto">
+                    <p className="text-xs text-slate-600">
+                      Voici le code JSON du quiz dans son état actuel. Vous pouvez le copier ou le télécharger pour le sauvegarder ou le réimporter plus tard.
+                    </p>
+                    <pre className="bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-72 select-all border border-slate-800">
+                      {getCurrentQuizJsonString()}
+                    </pre>
+                  </div>
+                  <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditorExportOpen(false)}
+                      className="px-3 py-1.5 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-white cursor-pointer"
+                    >
+                      Fermer
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyEditorJson}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl shadow-2xs cursor-pointer"
+                      >
+                        {editorExportCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-700">Copié !</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-600" />
+                            <span>Copier le JSON</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadEditorJson}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-amber-200" />
+                        <span>Télécharger .json</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SOUS-MODALE IMPORT JSON DANS L'ÉDITEUR */}
+            {isEditorImportOpen && (
+              <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
+                  <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-amber-800" />
+                      <h3 className="font-bold text-sm text-slate-900">Importer / Remplacer par un JSON</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditorImportOpen(false)}
+                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3 overflow-y-auto">
+                    <p className="text-xs text-slate-600">
+                      Chargez un fichier <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-800">.json</code> ou collez son contenu ci-dessous. Le titre, les consignes et les questions du quiz en cours d'édition seront actualisés directement dans cette fenêtre.
+                    </p>
+
+                    {editorJsonError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                        <span>{editorJsonError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl shadow-2xs cursor-pointer">
+                        <Upload className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Charger un fichier .json</span>
+                        <input
+                          type="file"
+                          accept=".json,.jsonc"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const content = ev.target?.result as string;
+                              if (content) setEditorJsonInput(content);
+                            };
+                            reader.readAsText(file);
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditorJsonInput(quizImportTemplate)}
+                        className="text-xs font-bold text-amber-800 hover:underline cursor-pointer"
+                      >
+                        Utiliser le modèle type
+                      </button>
+                    </div>
+
+                    <textarea
+                      rows={9}
+                      value={editorJsonInput}
+                      onChange={(e) => setEditorJsonInput(e.target.value)}
+                      placeholder="Collez votre code JSON ici..."
+                      className="w-full bg-slate-900 text-slate-100 border border-slate-800 rounded-xl p-3 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditorImportOpen(false)}
+                      className="px-3 py-1.5 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-white cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyJsonToCurrentQuiz}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                      <span>Appliquer au quiz en cours</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modal Form */}
             <form onSubmit={handleSaveQuiz} className="p-6 space-y-6">
@@ -1220,27 +1561,74 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       </div>
                     )}
 
-                    {/* Text Expected Answer if type === 'text' */}
-                    {q.type === 'text' && (
-                      <div className="space-y-1 pt-1">
-                        <label className="text-[11px] font-bold text-slate-600">Réponse(s) attendue(s) :</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="ex: cuocio / io cuocio (séparez plusieurs réponses acceptées par '/')"
-                          value={q.correct_answer}
-                          onChange={(e) => {
-                            const updated = [...questions];
-                            updated[idx].correct_answer = e.target.value;
-                            setQuestions(updated);
-                          }}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-slate-900"
-                        />
-                        <p className="text-[10px] text-slate-500">
-                          💡 Vous pouvez saisir plusieurs réponses acceptées en les séparant par <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">/</code> (ex : <span className="font-mono text-slate-700 font-semibold">cuocio / io cuocio</span>). Insensible à la casse.
-                        </p>
-                      </div>
-                    )}
+                    {/* Text Expected Answers (Multiples réponses acceptées) */}
+                    {q.type === 'text' && (() => {
+                      const variants = getQuestionTextVariants(q.correct_answer);
+                      return (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-blue-950">
+                                  Réponses correctes acceptées
+                                </span>
+                                <span className="text-[10px] bg-blue-200 text-blue-900 font-extrabold px-2 py-0.5 rounded-full font-mono">
+                                  {variants.filter(v => v.trim() !== '').length || 1} acceptée{variants.filter(v => v.trim() !== '').length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-blue-800 mt-0.5">
+                                L'élève valide la question s'il saisit l'une quelconque de ces réponses (insensible à la casse et aux espaces).
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleAddTextVariant(idx)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ Ajouter une réponse possible</span>
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {variants.map((variant, vIdx) => (
+                              <div key={vIdx} className="flex items-center gap-2">
+                                <span className={`w-6 h-6 shrink-0 rounded-lg text-[10px] font-bold flex items-center justify-center font-mono ${
+                                  vIdx === 0 ? 'bg-blue-800 text-white shadow-2xs' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                }`}>
+                                  {vIdx + 1}
+                                </span>
+                                <div className="flex-1 relative">
+                                  <input
+                                    type="text"
+                                    required={vIdx === 0}
+                                    placeholder={vIdx === 0 ? "Réponse principale (ex: cuocio)" : `Autre réponse acceptée n°${vIdx + 1} (ex: io cuocio)`}
+                                    value={variant}
+                                    onChange={(e) => handleUpdateTextVariant(idx, vIdx, e.target.value)}
+                                    className="w-full bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-blue-300"
+                                  />
+                                </div>
+                                {vIdx === 0 && variants.length > 1 && (
+                                  <span className="hidden sm:inline-block text-[10px] uppercase font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2 py-1 rounded-md">
+                                    Principale
+                                  </span>
+                                )}
+                                {variants.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTextVariant(idx, vIdx)}
+                                    title="Supprimer cette réponse possible"
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {q.type === 'reorder' && (
                       <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 pt-3">
