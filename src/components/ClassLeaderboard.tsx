@@ -359,7 +359,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     leaderboardEntries.graded[0].student_number,
                     leaderboardEntries.graded[0].student_name
                   )?.avatar_url || undefined}
-                  className="w-10 h-10 border-2 border-white text-xs"
+                  className="w-11 h-11 border-2 border-white text-xs"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -403,7 +403,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     leaderboardEntries.graded[1].student_number,
                     leaderboardEntries.graded[1].student_name
                   )?.avatar_url || undefined}
-                  className="w-9 h-9 border-2 border-white text-[10px]"
+                  className="w-10 h-10 border-2 border-white text-[10px]"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -447,7 +447,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     leaderboardEntries.graded[2].student_number,
                     leaderboardEntries.graded[2].student_name
                   )?.avatar_url || undefined}
-                  className="w-9 h-9 border-2 border-white text-[10px]"
+                  className="w-10 h-10 border-2 border-white text-[10px]"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -540,7 +540,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                     <StudentAvatar
                       name={dg.student_name}
                       src={getStudent(dg.student_id, dg.class_id, dg.student_number, dg.student_name)?.avatar_url || undefined}
-                      className="w-9 h-9 border border-slate-200 text-[10px]"
+                      className="w-10 h-10 border border-slate-200 text-[10px]"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
@@ -602,7 +602,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                           <StudentAvatar
                             name={pen.student_name}
                             src={getStudent(pen.student_id, pen.class_id, pen.student_number, pen.student_name)?.avatar_url || undefined}
-                            className="w-8 h-8 border border-slate-200 text-[9px]"
+                            className="w-9 h-9 border border-slate-200 text-[9px]"
                           />
                           <span className="truncate font-semibold text-slate-700">
                             {pen.student_name}

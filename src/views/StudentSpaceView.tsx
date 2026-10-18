@@ -702,7 +702,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <StudentAvatar
                 name={currentUser.name}
                 src={studentRecord?.avatar_url || currentUser.avatar}
-                className="h-9 w-9 border-2 border-white text-[11px] sm:h-10 sm:w-10 sm:text-sm"
+                className="h-10 w-10 border-2 border-white text-xs sm:h-11 sm:w-11 sm:text-sm"
               />
             </button>
             <div className="hidden text-right sm:block">
