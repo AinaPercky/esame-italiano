@@ -30,6 +30,7 @@ CREATE TABLE students (
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
+    gender TEXT NOT NULL DEFAULT 'homme' CHECK (gender IN ('homme', 'femme')),
     email TEXT NOT NULL CHECK (btrim(email) <> ''),
     student_number TEXT,
     avatar_url TEXT,
@@ -292,4 +293,10 @@ ALTER TABLE public.students
 
 CREATE INDEX IF NOT EXISTS idx_students_validation_status
     ON public.students (validation_status);
+`;
+
+export const STUDENT_GENDER_MIGRATION_SQL = `-- Migration non destructive : sexe et accord du message de bienvenue
+ALTER TABLE public.students
+    ADD COLUMN IF NOT EXISTS gender TEXT NOT NULL DEFAULT 'homme'
+    CHECK (gender IN ('homme', 'femme'));
 `;

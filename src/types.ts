@@ -15,6 +15,7 @@ export interface Student {
   class_id: string;
   first_name: string;
   last_name: string;
+  gender?: 'homme' | 'femme';
   email: string;
   student_number?: string | null;
   avatar_url?: string | null;

@@ -330,7 +330,8 @@ export const dataService = {
     email: string,
     studentNumber?: string,
     id?: string,
-    avatarUrl?: string | null
+    avatarUrl?: string | null,
+    gender: Student['gender'] = 'homme'
   ): Promise<Student> {
     const normalizedFirstName = normalizeFirstName(firstName);
     const normalizedLastName = normalizeLastName(lastName);
@@ -349,6 +350,7 @@ export const dataService = {
       class_id: classId,
       first_name: normalizedFirstName,
       last_name: normalizedLastName,
+      gender,
       email: normalizedEmail,
       student_number: studentNumber?.trim() || null,
       avatar_url: avatarUrl || null,

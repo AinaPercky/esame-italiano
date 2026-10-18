@@ -30,6 +30,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   const [regFirstName, setRegFirstName] = useState<string>('');
   const [regLastName, setRegLastName] = useState<string>('');
+  const [regGender, setRegGender] = useState<'homme' | 'femme'>('homme');
   const [regStudentNumber, setRegStudentNumber] = useState<string>('');
   const [regClassId, setRegClassId] = useState<string>('');
   const [regEmail, setRegEmail] = useState<string>('');
@@ -109,13 +110,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       if (!rosterStudent && supabaseService.isConfigured()) {
         rosterStudent = await dataService.createStudent(
-          regFirstName, regLastName, regClassId, regEmail, regStudentNumber
+          regFirstName, regLastName, regClassId, regEmail, regStudentNumber, undefined, undefined, regGender
         );
+      }
+
+      if (rosterStudent) {
+        rosterStudent = await dataService.updateStudent(rosterStudent.id, { gender: regGender });
       }
 
       const result = await authService.registerStudent({
         firstName: rosterStudent?.first_name || regFirstName,
         lastName: rosterStudent?.last_name || regLastName,
+        gender: regGender,
         studentNumber: rosterStudent?.student_number || regStudentNumber,
         classId: rosterStudent?.class_id || regClassId,
         className: targetClass?.name,
@@ -138,7 +144,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       const createdStudentId = result.user?.student_id || rosterStudent?.id;
       if (!rosterStudent && createdStudentId) {
-        await dataService.createStudent(regFirstName, regLastName, regClassId, regEmail, regStudentNumber, createdStudentId);
+        await dataService.createStudent(regFirstName, regLastName, regClassId, regEmail, regStudentNumber, createdStudentId, undefined, regGender);
       } else if (rosterStudent) {
         await dataService.updateStudent(rosterStudent.id, { validation_status: 'pending' });
       }
@@ -284,6 +290,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
             <div className="auth-form-row">
+              <div className="auth-field-group">
+                <label htmlFor="register-gender" className="auth-label">Sexe <span>*</span></label>
+                <select id="register-gender" required value={regGender} onChange={e => setRegGender(e.target.value as 'homme' | 'femme')} className={`${inputSmCls} auth-select`}>
+                  <option value="homme">Homme</option>
+                  <option value="femme">Femme</option>
+                </select>
+              </div>
               <div className="auth-field-group">
                 <label htmlFor="register-student-number" className="auth-label">N° élève</label>
                 <input id="register-student-number" type="text" value={regStudentNumber} onChange={e => setRegStudentNumber(e.target.value)} placeholder="Ex. : 3" className={inputSmCls} />

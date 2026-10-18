@@ -27,6 +27,7 @@ import {
   STUDENT_AVATAR_MIGRATION_SQL,
   STUDENT_EMAIL_IDENTITY_MIGRATION_SQL,
   STUDENT_VALIDATION_STATUS_MIGRATION_SQL,
+  STUDENT_GENDER_MIGRATION_SQL,
   SUPABASE_SQL_SCHEMA
 } from '../data/supabaseSqlSchema';
 import { authService, AUTHORIZED_EMAIL, DEFAULT_ACCESS_CODE, AuthUser } from '../services/authService';
@@ -47,6 +48,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
+  const [copiedGenderMigration, setCopiedGenderMigration] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -151,6 +153,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
       setTimeout(() => setCopiedValidationMigration(false), 2500);
     } catch (e) {
       console.error('Erreur copie migration validation status:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier le script SQL.' });
+    }
+  };
+
+  const handleCopyGenderMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(STUDENT_GENDER_MIGRATION_SQL);
+      setCopiedGenderMigration(true);
+      setTimeout(() => setCopiedGenderMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration sexe:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier le script SQL.' });
     }
   };
@@ -479,6 +492,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyGenderMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-700 hover:bg-indigo-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedGenderMigration ? '✓ Migration Sexe copiée !' : 'Copier migration Sexe (sans effacer les données)'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyFullSql}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-950 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -486,7 +507,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
               <span>{copiedSql ? '✓ Script SQL copié dans le presse-papier !' : 'Copier le script SQL complet (schema.sql)'}</span>
             </button>
             <span className="text-[11px] text-slate-500 italic">
-              La migration Photo ajoute le bucket et la colonne nécessaires sans supprimer les données existantes.
+              Les migrations Photo et Sexe ajoutent leurs colonnes sans supprimer les données existantes. Exécutez la migration Sexe avant les nouvelles inscriptions.
             </span>
           </div>
         </div>
