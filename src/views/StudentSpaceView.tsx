@@ -41,6 +41,8 @@ import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
+import { isQuestionAnswerCorrect } from '../utils/quizAnswerMatcher';
+import { QuizReorderList } from '../components/QuizReorderList';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 const STUDENT_TABS = [
@@ -341,22 +343,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Fonction utilitaire pour tester si une réponse est correcte
   const isAnswerCorrect = (q: QuizQuestion, studentAns: string) => {
-    const sAns = (studentAns || '').trim();
-    const expected = (q.correct_answer || '').trim();
-    if (!sAns) return false;
-
-    if (q.type === 'reorder') {
-      return isReorderAnswerCorrect(q, sAns);
-    }
-
-    if (q.type === 'qcm') {
-      return sAns.toLowerCase() === expected.toLowerCase();
-    } else {
-      const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      const normStudent = normalize(sAns);
-      const normExpected = normalize(expected);
-      return normStudent === normExpected || normStudent.includes(normExpected) || normExpected.includes(normStudent);
-    }
+    return isQuestionAnswerCorrect(q, studentAns);
   };
 
   // Passage à la question suivante ou soumission finale
@@ -1142,7 +1129,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                       {currentQ.type === 'qcm' 
                         ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
                         : currentQ.type === 'reorder'
-                          ? '👉 Replacez les éléments dans l’ordre correct avec les flèches :'
+                          ? '👉 Glissez-déposez les éléments dans l’ordre correct :'
                           : '👉 Saisissez votre réponse au clavier dans le champ ci-dessous :'}
                     </div>
 
@@ -1174,35 +1161,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                       </div>
                     )}
 
-                    {currentQ.type === 'reorder' && (() => {
-                      const orderedIds = getReorderAnswerIds(currentQ, currentAnswer);
-                      const itemsById = new Map((currentQ.items || []).map((item) => [item.id, item]));
-                      return (
-                        <ol className="space-y-2 pt-4 sm:pl-16" aria-label="Éléments à réorganiser">
-                          {orderedIds.map((itemId, itemIndex) => {
-                            const item = itemsById.get(itemId);
-                            if (!item) return null;
-                            const moveItem = (direction: -1 | 1) => {
-                              const nextIndex = itemIndex + direction;
-                              if (nextIndex < 0 || nextIndex >= orderedIds.length) return;
-                              const nextOrder = [...orderedIds];
-                              [nextOrder[itemIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[itemIndex]];
-                              setQuizAnswers({ ...quizAnswers, [currentQ.id]: JSON.stringify(nextOrder) });
-                            };
-                            return (
-                              <li key={item.id} className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs sm:gap-3 sm:p-3">
-                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#e6f0f7] font-mono text-xs font-extrabold text-[#0b3c5d]">{itemIndex + 1}</span>
-                                <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-slate-800">{item.text}</span>
-                                <div className="flex shrink-0 gap-1">
-                                  <button type="button" aria-label={`Monter ${item.text}`} disabled={itemIndex === 0} onClick={() => moveItem(-1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↑</button>
-                                  <button type="button" aria-label={`Descendre ${item.text}`} disabled={itemIndex === orderedIds.length - 1} onClick={() => moveItem(1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↓</button>
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ol>
-                      );
-                    })()}
+                    {currentQ.type === 'reorder' && (
+                      <div className="pt-4 sm:pl-16">
+                        <QuizReorderList
+                          question={currentQ}
+                          answer={currentAnswer}
+                          onChange={(newOrderJson) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newOrderJson })}
+                          theme="amber"
+                        />
+                      </div>
+                    )}
 
                     {/* Text input */}
                     {currentQ.type === 'text' && (

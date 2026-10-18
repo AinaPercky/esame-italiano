@@ -1,5 +1,8 @@
 import { Quiz, QuizQuestion } from '../../types';
-import { formatCorrectReorderAnswer, formatReorderAnswer, isReorderAnswerCorrect } from '../../utils/quizReorder';
+import { formatCorrectReorderAnswer, formatReorderAnswer } from '../../utils/quizReorder';
+import { isTextAnswerCorrect, isQuestionAnswerCorrect } from '../../utils/quizAnswerMatcher';
+
+export { isTextAnswerCorrect, isQuestionAnswerCorrect };
 
 export interface QuizFeedbackEntry {
   correct: boolean;
@@ -13,68 +16,6 @@ export interface QuizEvaluationResult {
   maxScore: number;
   score20: number;
   feedback: Record<string, QuizFeedbackEntry>;
-}
-
-const LEADING_ARTICLES = /^(l|la|le|les|il|lo|gli|i|un|uno|una|the)\s+/;
-
-function normalizeQuizText(value: string): string {
-  return (value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, ' ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeQuizTextCompact(value: string): string {
-  return normalizeQuizText(value).replace(/\s+/g, '');
-}
-
-function stripLeadingArticle(value: string): string {
-  return value.replace(LEADING_ARTICLES, '').trim();
-}
-
-export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: string): boolean {
-  const normalizedStudent = normalizeQuizText(studentAnswer);
-  const normalizedExpected = normalizeQuizText(expectedAnswer);
-
-  if (!normalizedStudent || !normalizedExpected) {
-    return false;
-  }
-
-  const studentNoArticle = stripLeadingArticle(normalizedStudent);
-  const expectedNoArticle = stripLeadingArticle(normalizedExpected);
-  const compactStudent = normalizeQuizTextCompact(studentAnswer);
-  const compactExpected = normalizeQuizTextCompact(expectedAnswer);
-
-  return (
-    normalizedStudent === normalizedExpected ||
-    studentNoArticle === normalizedExpected ||
-    normalizedStudent === expectedNoArticle ||
-    studentNoArticle === expectedNoArticle ||
-    compactStudent === compactExpected ||
-    normalizedStudent.includes(normalizedExpected) ||
-    normalizedExpected.includes(normalizedStudent) ||
-    studentNoArticle.includes(expectedNoArticle) ||
-    expectedNoArticle.includes(studentNoArticle)
-  );
-}
-
-export function isQuestionAnswerCorrect(question: QuizQuestion, answer: string): boolean {
-  const studentAnswer = (answer || '').trim();
-  const expectedAnswer = (question.correct_answer || '').trim();
-
-  if (question.type === 'qcm') {
-    return studentAnswer.toLowerCase() === expectedAnswer.toLowerCase();
-  }
-
-  if (question.type === 'reorder') {
-    return isReorderAnswerCorrect(question, studentAnswer);
-  }
-
-  return isTextAnswerCorrect(studentAnswer, expectedAnswer);
 }
 
 export function evaluateQuizAnswers(

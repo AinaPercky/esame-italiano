@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { QuizQuestion } from '../../types';
 import { QuizFeedbackEntry, formatQuizTime } from './publicQuizUtils';
-import { getReorderAnswerIds } from '../../utils/quizReorder';
+import { QuizReorderList } from '../../components/QuizReorderList';
 
 interface PublicQuizQuestionScreenProps {
   question: QuizQuestion;
@@ -169,7 +169,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           </div>
 
           <p className="pl-0 text-xs italic text-slate-500 sm:pl-14">
-            {question.type === 'qcm' ? 'Sélectionnez la bonne réponse parmi les choix proposés :' : question.type === 'reorder' ? 'Replacez les éléments dans l’ordre correct avec les flèches :' : 'Saisissez votre réponse dans le champ ci-dessous :'}
+            {question.type === 'qcm' ? 'Sélectionnez la bonne réponse parmi les choix proposés :' : question.type === 'reorder' ? 'Glissez-déposez les éléments dans l’ordre correct :' : 'Saisissez votre réponse dans le champ ci-dessous :'}
           </p>
 
           {question.type === 'qcm' ? (
@@ -199,33 +199,13 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
               })}
             </div>
           ) : question.type === 'reorder' ? (
-            <ol className="space-y-2" aria-label="Éléments à réorganiser">
-              {(() => {
-                const orderedIds = getReorderAnswerIds(question, answer);
-                const itemsById = new Map((question.items || []).map((item) => [item.id, item]));
-                return orderedIds.map((itemId, itemIndex) => {
-                  const item = itemsById.get(itemId);
-                  if (!item) return null;
-                  const moveItem = (direction: -1 | 1) => {
-                    const nextIndex = itemIndex + direction;
-                    if (nextIndex < 0 || nextIndex >= orderedIds.length) return;
-                    const nextOrder = [...orderedIds];
-                    [nextOrder[itemIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[itemIndex]];
-                    onAnswerChange(JSON.stringify(nextOrder));
-                  };
-                  return (
-                    <li key={item.id} className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs sm:gap-3 sm:p-3">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#e6f0f7] font-mono text-xs font-extrabold text-[#0b3c5d]">{itemIndex + 1}</span>
-                      <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-slate-800">{item.text}</span>
-                      <div className="flex shrink-0 gap-1">
-                        <button type="button" aria-label={`Monter ${item.text}`} disabled={isValidated || itemIndex === 0} onClick={() => moveItem(-1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↑</button>
-                        <button type="button" aria-label={`Descendre ${item.text}`} disabled={isValidated || itemIndex === orderedIds.length - 1} onClick={() => moveItem(1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↓</button>
-                      </div>
-                    </li>
-                  );
-                });
-              })()}
-            </ol>
+            <QuizReorderList
+              question={question}
+              answer={answer}
+              onChange={onAnswerChange}
+              disabled={isValidated}
+              theme="navy"
+            />
           ) : (
             <div className="space-y-2">
               <label htmlFor={`answer-${question.id}`} className="text-sm font-semibold text-slate-700">

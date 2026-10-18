@@ -28,6 +28,7 @@ import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, isReorderAnswerCorrect } from '../utils/quizReorder';
+import { isQuestionAnswerCorrect } from '../utils/quizAnswerMatcher';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1510,19 +1511,7 @@ export const dataService = {
     quiz.questions.forEach(q => {
       const studentAns = (answers[q.id] || '').trim();
       const expectedAns = (q.correct_answer || '').trim();
-      let isCorrect = false;
-
-      if (q.type === 'reorder') {
-        isCorrect = isReorderAnswerCorrect(q, studentAns);
-      } else if (q.type === 'qcm') {
-        isCorrect = studentAns.toLowerCase() === expectedAns.toLowerCase();
-      } else {
-        // Question texte saisie : comparaison tolérante (insensible à la casse, accents retirés)
-        const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-        const normStudent = normalize(studentAns);
-        const normExpected = normalize(expectedAns);
-        isCorrect = normStudent === normExpected || normStudent.includes(normExpected) || normExpected.includes(normStudent);
-      }
+      const isCorrect = isQuestionAnswerCorrect(q, studentAns);
 
       const awarded = isCorrect ? (Number(q.points) || 1) : 0;
       rawScore += awarded;
