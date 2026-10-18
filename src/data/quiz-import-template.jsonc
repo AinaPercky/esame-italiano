@@ -6,11 +6,15 @@
 //
 // Types de question :
 // - qcm : options (tableau de choix) et correct_answer (texte exact du bon choix).
-// - text : correct_answer (mot, expression ou phrase attendue).
-//   PLUSIEURS RÉPONSES POSSIBLES : Vous pouvez déclarer plusieurs variantes acceptées
-//   en les séparant par un slash '/' ou un point-virgule ';' (ex: "cuocio / io cuocio" ou "lui / lei").
-//   La correction valide dès que l’élève saisit l’une des variantes (insensible à la casse
-//   majuscules/minuscules et aux espaces superflus).
+// - text : 
+//   1. MONO-TROU & VARIANTES : 
+//      correct_answer (mot, expression ou phrase attendue). Vous pouvez déclarer plusieurs variantes 
+//      acceptées en les séparant par un slash '/' (ex: "cuocio / io cuocio"). 
+//      La correction valide dès que l’élève saisit l’une des variantes (insensible à la casse et aux espaces).
+//   2. MULTI-TROUS (ex: conjuguer plusieurs verbes à la fois dans une phrase) :
+//      Utilisez le champ "answers" (tableau de chaînes) ou séparez les réponses de chaque trou par un pipe '|' 
+//      dans "correct_answer" (ex: "parlo | scrivi | legge | dormiamo").
+//      Vous pouvez également autoriser des variantes par trou en séparant avec un slash '/' (ex: "parlo / io parlo").
 // - reorder : items (au moins deux éléments DISTINCTS, déjà rangés dans l’ordre correct).
 //   L’application mélange ces éléments pour l’élève; la correction vérifie la séquence exacte.
 //
@@ -85,6 +89,24 @@
       "time_limit_seconds": 32
     },
     {
+      // EXEMPLE DE QUESTION MULTI-TROUS : Conjuguer 4 verbes à la fois dans une même phrase.
+      // La phrase contient 4 trous (représentés par ____ ou des tirets bas).
+      "type": "text",
+      "question": "Coniuga i verbi al presente: Io ______ (parlare), tu ______ (scrivere), lui ______ (leggere), noi ______ (dormire).",
+      // Option A : Utiliser le champ "answers" avec un tableau de réponses pour chaque trou (avec variantes possibles via '/')
+      "answers": [
+        "parlo / io parlo",
+        "scrivi / tu scrivi",
+        "legge / lui legge",
+        "dormiamo / noi dormiamo"
+      ],
+      // Option B (alternative) : "correct_answer": "parlo | scrivi | legge | dormiamo"
+      "correct_answer": "parlo | scrivi | legge | dormiamo",
+      "points": 2,
+      "explanation": "Conjugaison correcte des quatre verbes aux personnes correspondantes.",
+      "time_limit_seconds": 45
+    },
+    {
       "type": "qcm",
       "question": "Secondo la ricetta, per quanto tempo cuoce il ragù lentamente?",
       "options": [
@@ -138,131 +160,7 @@
       ],
       "correct_answer": "La cipolla",
       "points": 1,
-      "explanation": "La cipolla è l'oignon. L'aglio è l'ail, il sedano è le céleri e la carota è la carotte.",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "text",
-      "question": "Completa con il connettore giusto: \"______ preparo il soffritto, poi aggiungo la carne.\" (d'abord)",
-      "correct_answer": "Prima",
-      "points": 1,
-      "explanation": "I connettori in ordine sono: Prima, Poi, Dopo, Nel frattempo, Infine.",
-      "time_limit_seconds": 32
-    },
-    {
-      "type": "text",
-      "question": "Coniuga il verbo \"cuocere\" al presente (loro): \"Loro ______ la carne per due ore.\"",
-      "correct_answer": "Cuociono",
-      "points": 1,
-      "explanation": "Cuocere : io cuocio, tu cuoci, lui/lei cuoce, noi cuociamo, voi cuocete, loro cuociono (ils font cuire).",
-      "time_limit_seconds": 32
-    },
-    {
-      "type": "text",
-      "question": "Coniuga il verbo \"condire\" al presente (io): \"Io ______ l'insalata con olio, sale e limone.\"",
-      "correct_answer": "Condisco",
-      "points": 1,
-      "explanation": "Condire è un verbo in -ire con -isc- : io condisco, tu condisci, lui/lei condisce, noi condiamo, voi condite, loro condiscono. Attention : noi et voi n'ont pas -isc-.",
-      "time_limit_seconds": 32
-    },
-    {
-      "type": "text",
-      "question": "Coniuga il verbo \"togliere\" al presente (loro): \"Loro ______ la pentola dal fuoco.\"",
-      "correct_answer": "Tolgono",
-      "points": 1,
-      "explanation": "Togliere est irrégulier : io tolgo, tu togli, lui/lei toglie, noi togliamo, voi togliete, loro tolgono (ils retirent).",
-      "time_limit_seconds": 32
-    },
-    {
-      "type": "text",
-      "question": "Coniuga il verbo \"sbucciare\" al presente (tu): \"Tu ______ le patate con il coltello.\"",
-      "correct_answer": "Sbucci",
-      "points": 1,
-      "explanation": "Sbucciare : io sbuccio, tu sbucci, lui/lei sbuccia, noi sbucciamo, voi sbucciate, loro sbucciano. Attention : à la 2e personne on écrit sbucci (un seul i), pas sbuccii.",
-      "time_limit_seconds": 32
-    },
-    {
-      "type": "qcm",
-      "question": "Dov'è l'accento tonico nella parola \"pomodoro\"?",
-      "options": [
-        "PO-mo-do-ro",
-        "po-MO-do-ro",
-        "po-mo-DO-ro",
-        "po-mo-do-RO"
-      ],
-      "correct_answer": "po-mo-DO-ro",
-      "points": 1,
-      "explanation": "Pomodoro è una parola piana : l'accento tonico cade sulla penultima sillaba (po-mo-DÒ-ro).",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "qcm",
-      "question": "In quale parola l'accento tonico cade sulla prima sillaba?",
-      "options": [
-        "melanzana",
-        "tagliatelle",
-        "zucchero",
-        "farina"
-      ],
-      "correct_answer": "zucchero",
-      "points": 1,
-      "explanation": "ZUC-che-ro : l'accent est sur la première syllabe. Les autres : me-lan-ZA-na, ta-glia-TEL-le, fa-RI-na.",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "qcm",
-      "question": "Dov'è l'accento tonico nella parola \"frigorifero\"?",
-      "options": [
-        "FRI-go-ri-fe-ro",
-        "fri-GO-ri-fe-ro",
-        "fri-go-RI-fe-ro",
-        "fri-go-ri-FE-ro"
-      ],
-      "correct_answer": "fri-go-RI-fe-ro",
-      "points": 1,
-      "explanation": "Frigorifero : l'accent tonique est sur la troisième syllabe (fri-go-RÌ-fe-ro), pas sur la dernière ni sur l'avant-dernière.",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "qcm",
-      "question": "Trova l'intruso (cottura): quale verbo NON implica il calore?",
-      "options": [
-        "friggere",
-        "arrostire",
-        "infornare",
-        "impastare"
-      ],
-      "correct_answer": "impastare",
-      "points": 1,
-      "explanation": "Friggere (frire), arrostire (rôtir) et infornare (mettre au four) utilisent la chaleur. Impastare (pétrir) est une préparation à froid, avant la cuisson.",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "qcm",
-      "question": "Trova l'intruso (botanica): quale ortaggio NON è un frutto della pianta?",
-      "options": [
-        "la melanzana",
-        "la zucchina",
-        "il peperone",
-        "la patata"
-      ],
-      "correct_answer": "la patata",
-      "points": 1,
-      "explanation": "Melanzana, zucchina et peperone sont des fruits de la plante. La patata est un tubercule (une partie souterraine).",
-      "time_limit_seconds": 17
-    },
-    {
-      "type": "qcm",
-      "question": "Trova l'intruso (connettori): quale espressione NON serve a ordinare le tappe di una ricetta?",
-      "options": [
-        "prima",
-        "successivamente",
-        "infine",
-        "di tanto in tanto"
-      ],
-      "correct_answer": "di tanto in tanto",
-      "points": 1,
-      "explanation": "Prima (d'abord), successivamente (par la suite) et infine (enfin) donnent l'ordre des étapes. Di tanto in tanto (de temps en temps) indique la fréquence, pas l'ordre.",
+      "explanation": "La cipolla est l'oignon. L'aglio est l'ail, il sedano le céleri, et la carota la carotte.",
       "time_limit_seconds": 17
     }
   ]

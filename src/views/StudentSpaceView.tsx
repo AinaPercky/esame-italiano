@@ -41,8 +41,9 @@ import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
-import { isQuestionAnswerCorrect } from '../utils/quizAnswerMatcher';
+import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { QuizReorderList } from '../components/QuizReorderList';
+import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 const STUDENT_TABS = [
@@ -381,8 +382,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
         questionText: currentQ.question,
-        studentAnswer: currentQ.type === 'reorder' ? formatReorderAnswer(currentQ, studentAns) : studentAns,
-        correctAnswer: currentQ.type === 'reorder' ? formatCorrectReorderAnswer(currentQ) : currentQ.correct_answer,
+        studentAnswer: currentQ.type === 'reorder'
+          ? formatReorderAnswer(currentQ, studentAns)
+          : currentQ.type === 'text'
+          ? formatTextAnswerForDisplay(currentQ, studentAns)
+          : studentAns,
+        correctAnswer: currentQ.type === 'reorder'
+          ? formatCorrectReorderAnswer(currentQ)
+          : currentQ.type === 'text'
+          ? formatCorrectTextAnswerForDisplay(currentQ)
+          : currentQ.correct_answer,
         explanation: currentQ.explanation,
         countdown: 8,
         pendingNextAnswers: updatedAnswers,
@@ -1109,82 +1118,89 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               {currentQ ? (
                 <div className="space-y-5 animate-fade-in sm:space-y-6">
                   <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl sm:space-y-5 sm:p-8">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3.5">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-800 font-mono text-sm font-extrabold text-white shadow-xs sm:h-12 sm:w-12 sm:text-base">
-                          {currentQuestionIndex + 1}
-                        </span>
-                        <div>
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 sm:text-[11px]">
-                            Question #{currentQuestionIndex + 1} • {currentQ.points} points
-                          </span>
-                          <h3 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">
-                            {currentQ.question}
-                          </h3>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
-                      {currentQ.type === 'qcm' 
-                        ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
-                        : currentQ.type === 'reorder'
-                          ? '👉 Glissez-déposez les éléments dans l’ordre correct :'
-                          : '👉 Saisissez votre réponse au clavier dans le champ ci-dessous :'}
-                    </div>
-
-                    {/* QCM Options */}
-                    {currentQ.type === 'qcm' && (
-                      <div className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 sm:pl-16">
-                        {(currentQ.options || []).map((opt, optIdx) => {
-                          const isSelected = currentAnswer === opt;
-                          return (
-                            <button
-                              key={optIdx}
-                              type="button"
-                              onClick={() => setQuizAnswers({ ...quizAnswers, [currentQ.id]: opt })}
-                              className={`flex min-h-[60px] items-center justify-between rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all cursor-pointer shadow-xs sm:min-h-[72px] ${
-                                isSelected
-                                  ? 'bg-amber-800 text-white border-amber-900 shadow-md ring-2 ring-amber-400 scale-[1.01]'
-                                  : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400 hover:bg-amber-50/50'
-                              }`}
-                            >
-                              <span className="pr-3 leading-snug">{opt}</span>
-                              <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                isSelected ? 'border-white bg-white text-amber-900' : 'border-slate-300'
-                              }`}>
-                                {isSelected && <span className="w-2.5 h-2.5 rounded-full bg-amber-900" />}
+                    {(() => {
+                      const clozeInfo = currentQ.type === 'text' ? parseQuestionClozePrompt(currentQ.question) : null;
+                      return (
+                        <>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3.5">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-800 font-mono text-sm font-extrabold text-white shadow-xs sm:h-12 sm:w-12 sm:text-base">
+                                {currentQuestionIndex + 1}
                               </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                              <div>
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 sm:text-[11px]">
+                                  Question #{currentQuestionIndex + 1} • {currentQ.points} points
+                                </span>
+                                <h3 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">
+                                  {clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
+                                </h3>
+                              </div>
+                            </div>
+                          </div>
 
-                    {currentQ.type === 'reorder' && (
-                      <div className="pt-4 sm:pl-16">
-                        <QuizReorderList
-                          question={currentQ}
-                          answer={currentAnswer}
-                          onChange={(newOrderJson) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newOrderJson })}
-                          theme="amber"
-                        />
-                      </div>
-                    )}
+                          <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
+                            {currentQ.type === 'qcm' 
+                              ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
+                              : currentQ.type === 'reorder'
+                                ? '👉 Glissez-déposez les éléments dans l’ordre correct :'
+                                : '👉 Complétez directement les cases vides dans la phrase ci-dessous :'}
+                          </div>
 
-                    {/* Text input */}
-                    {currentQ.type === 'text' && (
-                      <div className="pt-4 sm:pl-16">
-                        <input
-                          type="text"
-                          autoFocus
-                          value={currentAnswer}
-                          onChange={(e) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: e.target.value })}
-                          placeholder="Saisissez votre réponse ici..."
-                          className="w-full rounded-2xl border-2 border-slate-300 bg-slate-50 px-5 py-4 text-base font-semibold text-slate-900 shadow-inner focus:border-amber-700 focus:bg-white focus:outline-hidden sm:text-lg"
-                        />
-                      </div>
-                    )}
+                          {/* QCM Options */}
+                          {currentQ.type === 'qcm' && (
+                            <div className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 sm:pl-16">
+                              {(currentQ.options || []).map((opt, optIdx) => {
+                                const isSelected = currentAnswer === opt;
+                                return (
+                                  <button
+                                    key={optIdx}
+                                    type="button"
+                                    onClick={() => setQuizAnswers({ ...quizAnswers, [currentQ.id]: opt })}
+                                    className={`flex min-h-[60px] items-center justify-between rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all cursor-pointer shadow-xs sm:min-h-[72px] ${
+                                      isSelected
+                                        ? 'bg-amber-800 text-white border-amber-900 shadow-md ring-2 ring-amber-400 scale-[1.01]'
+                                        : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400 hover:bg-amber-50/50'
+                                    }`}
+                                  >
+                                    <span className="pr-3 leading-snug">{opt}</span>
+                                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                      isSelected ? 'border-white bg-white text-amber-900' : 'border-slate-300'
+                                    }`}>
+                                      {isSelected && <span className="w-2.5 h-2.5 rounded-full bg-amber-900" />}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {currentQ.type === 'reorder' && (
+                            <div className="pt-4 sm:pl-16">
+                              <QuizReorderList
+                                question={currentQ}
+                                answer={currentAnswer}
+                                onChange={(newOrderJson) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newOrderJson })}
+                                theme="amber"
+                              />
+                            </div>
+                          )}
+
+                          {/* Text input / Duolingo-style cloze text */}
+                          {currentQ.type === 'text' && (
+                            <div className="pt-4 sm:pl-16">
+                              <QuizClozeInput
+                                question={currentQ}
+                                customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
+                                answer={currentAnswer}
+                                onChange={(newAnswer) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newAnswer })}
+                                theme="amber"
+                                onEnterPress={handleAnswerAndNext}
+                              />
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Navigation and Actions Footer */}

@@ -76,20 +76,121 @@ export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: strin
 }
 
 /**
+ * Récupère la liste des réponses attendues pour une question de type saisie.
+ * - S'il y a 1 seul trou : renvoie [reponse]
+ * - S'il y a plusieurs trous (ex: 2, 3, 4 verbes) : renvoie le tableau des réponses pour chaque trou.
+ */
+export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
+  if (Array.isArray(question.answers) && question.answers.length > 0) {
+    return question.answers.map(a => {
+      if (Array.isArray(a)) {
+        return a.map(String).join(' / ');
+      }
+      return String(a || '').trim();
+    });
+  }
+
+  const raw = (question.correct_answer || '').trim();
+  if (raw.startsWith('[') && raw.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item: any) => {
+          if (Array.isArray(item)) return item.map(String).join(' / ');
+          return String(item || '').trim();
+        });
+      }
+    } catch {}
+  }
+
+  // Délimiteur pipe pour les réponses multi-trous (ex: "parlo | scrivi | legge | dormiamo" ou "parlo|scrivi|legge|dormiamo")
+  if (raw.includes('|')) {
+    const parts = raw.split(/\s*\|\s*/).filter(Boolean);
+    if (parts.length > 1) return parts;
+  }
+
+  if (raw.includes(' // ')) {
+    const parts = raw.split(/\s*\/\/\s*/).filter(Boolean);
+    if (parts.length > 1) return parts;
+  }
+
+  return [raw];
+}
+
+/**
+ * Décode la réponse saisie par l'élève, qu'il s'agisse d'un texte simple ou d'un JSON multi-trous.
+ */
+export function parseStudentAnswers(answerStr: string, expectedCount: number): string[] {
+  if (!answerStr) return Array(expectedCount).fill('');
+  try {
+    const parsed = JSON.parse(answerStr);
+    if (Array.isArray(parsed)) {
+      return Array.from({ length: expectedCount }, (_, i) => String(parsed[i] ?? '').trim());
+    }
+  } catch {}
+
+  if (answerStr.includes(' | ')) {
+    const parts = answerStr.split(/\s*\|\s*/);
+    return Array.from({ length: expectedCount }, (_, i) => String(parts[i] ?? '').trim());
+  }
+
+  return [answerStr.trim(), ...Array(Math.max(0, expectedCount - 1)).fill('')];
+}
+
+/**
+ * Formate la réponse saisie par l'élève pour un affichage lisible dans la modale de correction.
+ */
+export function formatTextAnswerForDisplay(question: QuizQuestion, answerStr: string): string {
+  const expectedAnswers = getQuestionExpectedAnswers(question);
+  if (expectedAnswers.length <= 1) {
+    const parts = parseStudentAnswers(answerStr, 1);
+    return parts[0] || answerStr;
+  }
+
+  const studentParts = parseStudentAnswers(answerStr, expectedAnswers.length);
+  return studentParts.map((p, i) => `Case ${i + 1}: ${p || '—'}`).join(' · ');
+}
+
+/**
+ * Formate la réponse attendue pour un affichage lisible dans la modale de correction.
+ */
+export function formatCorrectTextAnswerForDisplay(question: QuizQuestion): string {
+  const expectedAnswers = getQuestionExpectedAnswers(question);
+  if (expectedAnswers.length <= 1) {
+    return expectedAnswers[0] || question.correct_answer || '';
+  }
+
+  return expectedAnswers.map((p, i) => `Case ${i + 1}: ${p}`).join(' · ');
+}
+
+/**
  * Vérifie si la réponse à une question d'un quiz (QCM, texte ou réordonnancement) est correcte.
+ * Prend en charge les questions à trou unique et à trous multiples (ex: 4 verbes dans une phrase).
  */
 export function isQuestionAnswerCorrect(question: QuizQuestion, studentAnswer: string): boolean {
   const sAns = (studentAnswer || '').trim();
-  const expected = (question.correct_answer || '').trim();
 
   if (question.type === 'reorder') {
     return isReorderAnswerCorrect(question, sAns);
   }
 
   if (question.type === 'qcm') {
+    const expected = (question.correct_answer || '').trim();
     return normalizeAnswerText(sAns) === normalizeAnswerText(expected);
   }
 
-  // Type texte : mot unique, groupe de mots ou phrase complète
-  return isTextAnswerCorrect(sAns, expected);
+  // Type texte : trou unique ou trous multiples
+  const expectedAnswers = getQuestionExpectedAnswers(question);
+
+  if (expectedAnswers.length <= 1) {
+    const expectedSingle = expectedAnswers[0] || (question.correct_answer || '').trim();
+    const studentSingle = parseStudentAnswers(sAns, 1)[0] || sAns;
+    return isTextAnswerCorrect(studentSingle, expectedSingle);
+  }
+
+  // Multiples cases vides à remplir (ex: 2, 3, 4 verbes)
+  const studentParts = parseStudentAnswers(sAns, expectedAnswers.length);
+  return expectedAnswers.every((expectedPart, idx) => {
+    return isTextAnswerCorrect(studentParts[idx] || '', expectedPart);
+  });
 }

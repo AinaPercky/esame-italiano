@@ -1,6 +1,6 @@
 import { Quiz, QuizQuestion } from '../../types';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../../utils/quizReorder';
-import { isTextAnswerCorrect, isQuestionAnswerCorrect } from '../../utils/quizAnswerMatcher';
+import { isTextAnswerCorrect, isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../../utils/quizAnswerMatcher';
 
 export { isTextAnswerCorrect, isQuestionAnswerCorrect };
 
@@ -35,8 +35,16 @@ export function evaluateQuizAnswers(
     feedback[question.id] = {
       correct,
       points,
-      expected: question.type === 'reorder' ? formatCorrectReorderAnswer(question) : expectedAnswer,
-      studentAnswer: question.type === 'reorder' ? formatReorderAnswer(question, studentAnswer) : studentAnswer
+      expected: question.type === 'reorder'
+        ? formatCorrectReorderAnswer(question)
+        : question.type === 'text'
+        ? formatCorrectTextAnswerForDisplay(question)
+        : expectedAnswer,
+      studentAnswer: question.type === 'reorder'
+        ? formatReorderAnswer(question, studentAnswer)
+        : question.type === 'text'
+        ? formatTextAnswerForDisplay(question, studentAnswer)
+        : studentAnswer
     };
   });
 

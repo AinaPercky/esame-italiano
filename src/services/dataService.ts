@@ -26,9 +26,9 @@ import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
+import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
+import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
-import { formatCorrectReorderAnswer, formatReorderAnswer, isReorderAnswerCorrect } from '../utils/quizReorder';
-import { isQuestionAnswerCorrect } from '../utils/quizAnswerMatcher';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1518,8 +1518,16 @@ export const dataService = {
       feedback[q.id] = {
         correct: isCorrect,
         points: awarded,
-        expected: q.type === 'reorder' ? formatCorrectReorderAnswer(q) : expectedAns,
-        studentAnswer: q.type === 'reorder' ? formatReorderAnswer(q, studentAns) : studentAns
+        expected: q.type === 'reorder'
+          ? formatCorrectReorderAnswer(q)
+          : q.type === 'text'
+          ? formatCorrectTextAnswerForDisplay(q)
+          : expectedAns,
+        studentAnswer: q.type === 'reorder'
+          ? formatReorderAnswer(q, studentAns)
+          : q.type === 'text'
+          ? formatTextAnswerForDisplay(q, studentAns)
+          : studentAns
       };
     });
 

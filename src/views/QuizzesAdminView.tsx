@@ -102,44 +102,77 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [editorJsonError, setEditorJsonError] = useState<string | null>(null);
   const [editorExportCopied, setEditorExportCopied] = useState(false);
 
-  // Helper pour les variantes de réponses saisies (type text)
-  const getQuestionTextVariants = (answerStr: string | undefined): string[] => {
-    if (!answerStr) return [''];
-    const parts = answerStr.split(/\s*[\/;|]\s*/);
-    return parts.length > 0 ? parts : [''];
+  // Helpers pour les questions de type text (mono-trou ou multi-trous ex: 4 verbes)
+  const getQuestionBlankAnswers = (q: QuizQuestion): string[] => {
+    if (Array.isArray(q.answers) && q.answers.length > 0) {
+      return q.answers;
+    }
+    const raw = (q.correct_answer || '').trim();
+    if (raw.includes('|')) {
+      const parts = raw.split(/\s*\|\s*/).filter(Boolean);
+      if (parts.length > 1) return parts;
+    }
+    return [raw];
   };
 
-  const handleUpdateTextVariant = (qIdx: number, vIdx: number, val: string) => {
-    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
-    const nextVariants = [...currentVariants];
-    nextVariants[vIdx] = val;
+  const handleUpdateBlankAnswer = (qIdx: number, blankIdx: number, val: string) => {
+    const blanks = [...getQuestionBlankAnswers(questions[qIdx])];
+    while (blanks.length <= blankIdx) blanks.push('');
+    blanks[blankIdx] = val;
     const updated = [...questions];
     updated[qIdx] = {
       ...updated[qIdx],
-      correct_answer: nextVariants.join(' / ')
+      answers: blanks.length > 1 ? blanks : undefined,
+      correct_answer: blanks.join(' | ')
     };
     setQuestions(updated);
   };
 
-  const handleAddTextVariant = (qIdx: number) => {
-    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
+  const handleAddBlank = (qIdx: number) => {
+    const blanks = [...getQuestionBlankAnswers(questions[qIdx])];
+    blanks.push('');
     const updated = [...questions];
     updated[qIdx] = {
       ...updated[qIdx],
-      correct_answer: [...currentVariants, ''].join(' / ')
+      answers: blanks,
+      correct_answer: blanks.join(' | ')
     };
     setQuestions(updated);
   };
 
-  const handleRemoveTextVariant = (qIdx: number, vIdx: number) => {
-    const currentVariants = getQuestionTextVariants(questions[qIdx].correct_answer);
-    const nextVariants = currentVariants.filter((_, i) => i !== vIdx);
+  const handleRemoveBlank = (qIdx: number, blankIdx: number) => {
+    const blanks = getQuestionBlankAnswers(questions[qIdx]).filter((_, i) => i !== blankIdx);
     const updated = [...questions];
-    updated[qIdx] = {
-      ...updated[qIdx],
-      correct_answer: (nextVariants.length > 0 ? nextVariants : ['']).join(' / ')
-    };
+    if (blanks.length <= 1) {
+      updated[qIdx] = {
+        ...updated[qIdx],
+        answers: undefined,
+        correct_answer: blanks[0] || ''
+      };
+    } else {
+      updated[qIdx] = {
+        ...updated[qIdx],
+        answers: blanks,
+        correct_answer: blanks.join(' | ')
+      };
+    }
     setQuestions(updated);
+  };
+
+  const handleAutoDetectBlanks = (qIdx: number) => {
+    const q = questions[qIdx];
+    const matches = Array.from((q.question || '').matchAll(/(_{2,}|\[_+\]|\[\s*\]|\[\d+\]|\.{3,}|\((?:_{2,}|\.{2,}|\s*)\)|\[(?:\.{2,}|\s*)\])/g));
+    if (matches.length > 0) {
+      const currentBlanks = getQuestionBlankAnswers(q);
+      const newBlanks = Array.from({ length: matches.length }, (_, i) => currentBlanks[i] || '');
+      const updated = [...questions];
+      updated[qIdx] = {
+        ...updated[qIdx],
+        answers: newBlanks,
+        correct_answer: newBlanks.join(' | ')
+      };
+      setQuestions(updated);
+    }
   };
 
   // Génération du JSON complet pour le quiz en cours d'édition
@@ -163,6 +196,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           item.correct_answer = q.correct_answer || '';
         } else {
           item.correct_answer = q.correct_answer || '';
+          if (Array.isArray(q.answers) && q.answers.length > 0) {
+            item.answers = q.answers;
+          }
         }
         if (q.explanation) {
           item.explanation = q.explanation;
@@ -197,6 +233,51 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     }
   };
 
+  const normalizeImportedQuestion = (q: any, i: number): QuizQuestion => {
+    const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
+    const sourceItems = type === 'reorder'
+      ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
+      : [];
+    const items = sourceItems.map((item: unknown) => {
+      if (item && typeof item === 'object' && 'id' in item && 'text' in item) {
+        const record = item as { id: unknown; text: unknown };
+        return { id: String(record.id), text: String(record.text) };
+      }
+      return createQuizReorderItem(String(item ?? ''));
+    });
+
+    let textAnswers: string[] | undefined = undefined;
+    let correctAnswer = q.correct_answer || '';
+
+    if (type === 'text') {
+      if (Array.isArray(q.answers) && q.answers.length > 0) {
+        const mapped = q.answers.map((a: any) => Array.isArray(a) ? a.map(String).join(' / ') : String(a || '').trim());
+        textAnswers = mapped;
+        correctAnswer = mapped.join(' | ');
+      } else if (Array.isArray(q.correct_answer) && q.correct_answer.length > 0) {
+        const arr = q.correct_answer as any[];
+        const mapped = arr.map((a: any) => Array.isArray(a) ? a.map(String).join(' / ') : String(a || '').trim());
+        textAnswers = mapped;
+        correctAnswer = mapped.join(' | ');
+      } else if (typeof q.correct_answer === 'string' && q.correct_answer.includes('|')) {
+        textAnswers = q.correct_answer.split(/\s*\|\s*/).filter(Boolean);
+      }
+    }
+
+    return {
+      id: `q_imported_${Date.now()}_${i}`,
+      type,
+      question: q.question || '',
+      options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
+      items: type === 'reorder' ? items : undefined,
+      answers: type === 'text' && textAnswers && textAnswers.length > 1 ? textAnswers : undefined,
+      correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
+      points: Number(q.points) || 1,
+      explanation: q.explanation || '',
+      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+    };
+  };
+
   const handleApplyJsonToCurrentQuiz = () => {
     setEditorJsonError(null);
     try {
@@ -222,30 +303,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       }
 
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-        const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => {
-          const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
-          const sourceItems = type === 'reorder'
-            ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
-            : [];
-          const items = sourceItems.map((item: unknown) => {
-            if (item && typeof item === 'object' && 'id' in item && 'text' in item) {
-              const record = item as { id: unknown; text: unknown };
-              return { id: String(record.id), text: String(record.text) };
-            }
-            return createQuizReorderItem(String(item ?? ''));
-          });
-          return {
-            id: `q_imported_${Date.now()}_${i}`,
-            type,
-            question: q.question || '',
-            options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
-            items: type === 'reorder' ? items : undefined,
-            correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : (q.correct_answer || ''),
-            points: Number(q.points) || 1,
-            explanation: q.explanation || '',
-            time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
-          };
-        });
+        const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => normalizeImportedQuestion(q, i));
         setQuestions(importedQuestions);
       }
 
@@ -304,30 +362,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         return;
       }
 
-      const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => {
-        const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
-        const sourceItems = type === 'reorder'
-          ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
-          : [];
-        const items = sourceItems.map((item: unknown) => {
-          if (item && typeof item === 'object' && 'id' in item && 'text' in item) {
-            const record = item as { id: unknown; text: unknown };
-            return { id: String(record.id), text: String(record.text) };
-          }
-          return createQuizReorderItem(String(item ?? ''));
-        });
-        return {
-          id: `q_imported_${Date.now()}_${i}`,
-          type,
-          question: q.question || '',
-          options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
-          items: type === 'reorder' ? items : undefined,
-          correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : (q.correct_answer || ''),
-          points: Number(q.points) || 5,
-          explanation: q.explanation || '',
-          time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
-        };
-      });
+      const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => normalizeImportedQuestion(q, i));
 
       dataService.createQuiz({
         title: parsed.title,
@@ -482,6 +517,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           setFormError(`Les éléments de la question réarrangement #${i + 1} doivent être distincts.`);
           return;
         }
+      } else if (q.type === 'text' && Array.isArray(q.answers) && q.answers.length > 0) {
+        if (q.answers.some(a => !a.trim())) {
+          setFormError(`Veuillez renseigner toutes les cases vides de la question #${i + 1}.`);
+          return;
+        }
       } else if (!q.correct_answer.trim()) {
         setFormError(`Veuillez renseigner la bonne réponse pour la question #${i + 1}.`);
         return;
@@ -489,13 +529,22 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     }
 
     const primaryClassId = selectedQuizClassIds[0] || selectedClassId || classes[0]?.id || '';
-    const normalizedQuestions = questions.map((question) => ({
-      ...question,
-      correct_answer: question.type === 'reorder'
-        ? JSON.stringify((question.items || []).map((item) => item.id))
-        : question.correct_answer,
-      time_limit_seconds: getQuestionTimeSeconds(question)
-    }));
+    const normalizedQuestions = questions.map((question) => {
+      let finalCorrectAnswer = question.correct_answer;
+      if (question.type === 'reorder') {
+        finalCorrectAnswer = JSON.stringify((question.items || []).map((item) => item.id));
+      } else if (question.type === 'text') {
+        if (Array.isArray(question.answers) && question.answers.length > 0) {
+          finalCorrectAnswer = question.answers.join(' | ');
+        }
+      }
+      return {
+        ...question,
+        correct_answer: finalCorrectAnswer,
+        answers: question.type === 'text' && Array.isArray(question.answers) && question.answers.length > 1 ? question.answers : undefined,
+        time_limit_seconds: getQuestionTimeSeconds(question)
+      };
+    });
 
     if (editingQuiz) {
       dataService.updateQuiz(editingQuiz.id, {
@@ -1561,68 +1610,96 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       </div>
                     )}
 
-                    {/* Text Expected Answers (Multiples réponses acceptées) */}
+                    {/* Text Expected Answers (Mono-trou ou Multi-trous ex: 4 verbes à conjuguer) */}
                     {q.type === 'text' && (() => {
-                      const variants = getQuestionTextVariants(q.correct_answer);
+                      const blankAnswers = getQuestionBlankAnswers(q);
+                      const isMultiBlank = blankAnswers.length > 1;
+                      const matches = Array.from((q.question || '').matchAll(/(_{2,}|\[_+\]|\[\s*\]|\[\d+\]|\.{3,}|\((?:_{2,}|\.{2,}|\s*)\)|\[(?:\.{2,}|\s*)\])/g));
+                      const detectedCount = matches.length;
+
                       return (
                         <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-blue-950">
-                                  Réponses correctes acceptées
+                                  {isMultiBlank 
+                                    ? `Réponses pour les ${blankAnswers.length} cases vides (ex: 4 verbes)` 
+                                    : 'Réponse correcte attendue'}
                                 </span>
                                 <span className="text-[10px] bg-blue-200 text-blue-900 font-extrabold px-2 py-0.5 rounded-full font-mono">
-                                  {variants.filter(v => v.trim() !== '').length || 1} acceptée{variants.filter(v => v.trim() !== '').length > 1 ? 's' : ''}
+                                  {blankAnswers.length} case{blankAnswers.length > 1 ? 's' : ''}
                                 </span>
                               </div>
                               <p className="text-[11px] text-blue-800 mt-0.5">
-                                L'élève valide la question s'il saisit l'une quelconque de ces réponses (insensible à la casse et aux espaces).
+                                {isMultiBlank 
+                                  ? 'Renseignez la réponse attendue pour chaque case vide. L’élève valide si chaque case correspond (insensible à la casse).' 
+                                  : 'Renseignez la réponse attendue (insensible à la casse). Séparez d’éventuelles variantes par un slash "/" (ex: "cuocio / io cuocio").'}
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleAddTextVariant(idx)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>+ Ajouter une réponse possible</span>
-                            </button>
+
+                            <div className="flex items-center gap-2">
+                              {detectedCount > 1 && detectedCount !== blankAnswers.length && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAutoDetectBlanks(idx)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                                  title="Créer automatiquement une case pour chaque trou détecté dans l'énoncé"
+                                >
+                                  <span>⚡ Détecter {detectedCount} trous</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleAddBlank(idx)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Ajouter une case (Verbe {blankAnswers.length + 1})</span>
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="space-y-2">
-                            {variants.map((variant, vIdx) => (
-                              <div key={vIdx} className="flex items-center gap-2">
-                                <span className={`w-6 h-6 shrink-0 rounded-lg text-[10px] font-bold flex items-center justify-center font-mono ${
-                                  vIdx === 0 ? 'bg-blue-800 text-white shadow-2xs' : 'bg-blue-100 text-blue-800 border border-blue-200'
-                                }`}>
-                                  {vIdx + 1}
-                                </span>
-                                <div className="flex-1 relative">
+                          <div className="space-y-2.5">
+                            {blankAnswers.map((blankAns, bIdx) => (
+                              <div key={bIdx} className="bg-white/95 border border-blue-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-6 h-6 shrink-0 rounded-lg text-[10px] font-bold flex items-center justify-center font-mono bg-blue-800 text-white shadow-2xs">
+                                      {bIdx + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800">
+                                      {isMultiBlank ? `Case / Verbe ${bIdx + 1}` : 'Réponse attendue'}
+                                    </span>
+                                  </div>
+                                  {isMultiBlank && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveBlank(idx, bIdx)}
+                                      title={`Supprimer la case ${bIdx + 1}`}
+                                      className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="relative">
                                   <input
                                     type="text"
-                                    required={vIdx === 0}
-                                    placeholder={vIdx === 0 ? "Réponse principale (ex: cuocio)" : `Autre réponse acceptée n°${vIdx + 1} (ex: io cuocio)`}
-                                    value={variant}
-                                    onChange={(e) => handleUpdateTextVariant(idx, vIdx, e.target.value)}
+                                    required
+                                    placeholder={isMultiBlank ? `Réponse attendue pour la case ${bIdx + 1} (ex: parlo ou parlo / io parlo)` : "Réponse principale ou variantes séparées par / (ex: cuocio / io cuocio)"}
+                                    value={blankAns}
+                                    onChange={(e) => handleUpdateBlankAnswer(idx, bIdx, e.target.value)}
                                     className="w-full bg-white border border-blue-200 focus:border-blue-500 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-blue-300"
                                   />
                                 </div>
-                                {vIdx === 0 && variants.length > 1 && (
-                                  <span className="hidden sm:inline-block text-[10px] uppercase font-bold text-blue-800 bg-blue-100 border border-blue-200 px-2 py-1 rounded-md">
-                                    Principale
-                                  </span>
-                                )}
-                                {variants.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveTextVariant(idx, vIdx)}
-                                    title="Supprimer cette réponse possible"
-                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
+                                <p className="text-[10px] text-slate-500">
+                                  {isMultiBlank 
+                                    ? `Pour accepter des variantes sur cette case (ex: avec ou sans pronom), séparez-les par un slash "/" (ex: "vado / io vado").`
+                                    : `Vous pouvez ajouter d'autres réponses acceptées séparées par un slash (ex: "cuocio / io cuocio").`}
+                                </p>
                               </div>
                             ))}
                           </div>
@@ -1820,7 +1897,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Le modèle est basé sur le quiz fourni et contient les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés. Pour les quiz de type saisie (<code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code>), vous pouvez définir plusieurs réponses valides séparées par un slash (ex: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">"cuocio / io cuocio"</code>).
+                  Le modèle intègre les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous ex: 4 verbes via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>) et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés.
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
 {quizImportTemplate}
