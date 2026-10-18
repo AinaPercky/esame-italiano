@@ -77,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex min-w-0 items-center gap-1.5 text-left font-display text-sm font-bold tracking-tight text-[#072a3f] transition-colors hover:text-[#0b3c5d] xs:text-base sm:gap-2 sm:text-2xl"
             >
               <img
-                src="/percky-lingua-logo.png"
+                src="/percky-lingua-logo.webp"
                 alt=""
                 className="h-8 w-8 shrink-0 rounded-xl bg-white object-contain shadow-sm sm:h-10 sm:w-10"
               />

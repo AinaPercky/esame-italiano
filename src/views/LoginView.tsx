@@ -172,7 +172,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     mobile ? (
       <header className="auth-mobile-brand">
         <div className="auth-mobile-lockup">
-          <img src="/percky-lingua-logo.png" alt="" className="auth-mobile-logo" />
+          <img src="/percky-lingua-logo.webp" alt="" className="auth-mobile-logo" />
           <div>
             <p className="auth-wordmark auth-wordmark-mobile">PerckyLingua</p>
             <div className="auth-tricolour auth-tricolour-mobile" aria-hidden="true"><i /><i /><i /></div>
@@ -180,14 +180,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
         <div className="auth-mobile-mascot-wrap">
           <span className="auth-mobile-glow" />
-          <img src="/student-learning-sticker.png" alt="Un élève prêt à apprendre l’italien" className="auth-mobile-mascot" draggable={false} />
+          <img src="/student-learning-sticker.webp" alt="Un élève prêt à apprendre l’italien" className="auth-mobile-mascot" draggable={false} />
         </div>
       </header>
     ) : (
       <section className="auth-visual" aria-label="PerckyLingua, apprendre l’italien avec confiance">
         <div className="auth-illustration-wrap">
           <div className="auth-illustration-glow" />
-          <img src="/student-learning-sticker.png" alt="Un élève souriant avec ses livres d’italien" className="auth-illustration" draggable={false} />
+          <img src="/student-learning-sticker.webp" alt="Un élève souriant avec ses livres d’italien" className="auth-illustration" draggable={false} />
         </div>
         <div className="auth-brand-copy">
           <p className="auth-brand-overline">QUIZ <i /> ÉVALUATIONS À CHAUD <i /> NOTES DU JOUR</p>
@@ -362,7 +362,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         <section className="auth-main" aria-label={viewMode === 'login' ? 'Se connecter à PerckyLingua' : 'Créer un compte élève'}>
           <div className="auth-main-content">
             <div className="auth-portal-mark" aria-hidden="true">
-              <img src="/percky-lingua-logo.png" alt="" />
+              <img src="/percky-lingua-logo.webp" alt="" />
               <span>Espace élève</span>
             </div>
             <div className="auth-card">{renderFormContent()}</div>

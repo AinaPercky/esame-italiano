@@ -139,7 +139,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
           {/* Header Banner */}
           <div className="text-center space-y-2">
             <img
-              src="/percky-lingua-logo.png"
+              src="/percky-lingua-logo.webp"
               alt="PerckyLingua"
               className="w-20 h-20 mx-auto rounded-2xl object-contain bg-white shadow-lg"
             />
