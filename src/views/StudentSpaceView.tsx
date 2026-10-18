@@ -38,7 +38,9 @@ import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
 import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
-import { shuffleQuizQuestions } from '../utils/quizQuestionOrder';
+import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
+import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
+import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 const STUDENT_TABS = [
@@ -226,14 +228,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     };
   }, [activeQuiz, quizAnswers]);
 
-  // Temps alloué pour chaque question en secondes
-  const getTimePerQuestion = (quiz: Quiz) => {
-    const qCount = Math.max(1, quiz.questions?.length || 1);
-    const totalSecs = (quiz.duration_minutes || 10) * 60;
-    // Répartit le temps total par question (ex: 10 min pour 5 questions = 120s / question) avec un minimum de 20s
-    return Math.max(20, Math.floor(totalSecs / qCount));
-  };
-
   // 1. Chronomètre du temps total du Quiz (en pause pendant l'affichage de l'explication)
   useEffect(() => {
     if (!activeQuiz || quizSecondsRemaining <= 0 || incorrectFeedback?.isOpen) return;
@@ -260,7 +254,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (questionTimerCueRef.current.questionKey !== questionKey) {
       questionTimerCueRef.current = { questionKey, played: new Set() };
     }
-    const questionSeconds = getTimePerQuestion(activeQuiz);
+    const questionSeconds = getQuestionTimeSeconds(activeQuiz.questions[currentQuestionIndex]);
     const cueSeconds = new Set([Math.ceil(questionSeconds / 2), 5, 3, 2, 1]);
     if (!cueSeconds.has(questionSecondsRemaining) || questionTimerCueRef.current.played.has(questionSecondsRemaining)) return;
     questionTimerCueRef.current.played.add(questionSecondsRemaining);
@@ -327,18 +321,21 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
     primeTimerAudio();
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
-    setActiveQuiz({
-      ...quiz,
-      questions: shuffleQuizQuestions(quiz.questions || [])
-    });
     setQuizAnswers({});
     setSkippedQuestions({});
     setIncorrectFeedback(null);
     setCurrentQuestionIndex(0);
-    const totalSecs = (quiz.duration_minutes || 10) * 60;
+    const randomizedQuiz = {
+      ...quiz,
+      questions: shuffleQuizQuestions(quiz.questions || []).map((question) => question.type === 'reorder'
+        ? { ...question, items: shuffleArray(question.items || []) }
+        : question)
+    };
+    const totalSecs = getQuizTotalTimeSeconds(randomizedQuiz);
+    const firstQuestionSeconds = getQuestionTimeSeconds(randomizedQuiz.questions[0]);
+    setActiveQuiz(randomizedQuiz);
     setQuizSecondsRemaining(totalSecs);
-    const perQSecs = getTimePerQuestion(quiz);
-    setQuestionSecondsRemaining(perQSecs);
+    setQuestionSecondsRemaining(firstQuestionSeconds);
     setLastSubmissionResult(null);
   };
 
@@ -347,6 +344,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const sAns = (studentAns || '').trim();
     const expected = (q.correct_answer || '').trim();
     if (!sAns) return false;
+
+    if (q.type === 'reorder') {
+      return isReorderAnswerCorrect(q, sAns);
+    }
 
     if (q.type === 'qcm') {
       return sAns.toLowerCase() === expected.toLowerCase();
@@ -366,9 +367,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       handleSubmitQuiz(false, updatedAnswers);
       return;
     }
-    setCurrentQuestionIndex(prev => Math.min(prev + 1, questions.length - 1));
-    const perQSecs = getTimePerQuestion(activeQuiz);
-    setQuestionSecondsRemaining(perQSecs);
+    const nextIndex = Math.min(currentQuestionIndex + 1, questions.length - 1);
+    setCurrentQuestionIndex(nextIndex);
+    setQuestionSecondsRemaining(getQuestionTimeSeconds(questions[nextIndex]));
   };
 
   // Traiter la réponse de la question : si fausse, afficher l'explication pendant 8s
@@ -393,8 +394,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
         questionText: currentQ.question,
-        studentAnswer: studentAns,
-        correctAnswer: currentQ.correct_answer,
+        studentAnswer: currentQ.type === 'reorder' ? formatReorderAnswer(currentQ, studentAns) : studentAns,
+        correctAnswer: currentQ.type === 'reorder' ? formatCorrectReorderAnswer(currentQ) : currentQ.correct_answer,
         explanation: currentQ.explanation,
         countdown: 8,
         pendingNextAnswers: updatedAnswers,
@@ -938,7 +939,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                           <div className="student-quiz-meta">
                             <div>{quiz.questions?.length || 0} questions</div>
-                            <div>{quiz.duration_minutes || 10} min</div>
+                            <div>{formatQuizDuration(getQuizTotalTimeSeconds(quiz))} au total</div>
                           </div>
                         </div>
 
@@ -955,7 +956,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               className="student-quiz-start"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
-                              <span>Commencer le Quiz ({quiz.duration_minutes}m)</span>
+                              <span>Commencer le Quiz ({formatQuizDuration(getQuizTotalTimeSeconds(quiz))})</span>
                             </button>
                           )}
 
@@ -998,7 +999,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           const safeIndex = Math.min(Math.max(0, currentQuestionIndex), Math.max(0, totalQuestions - 1));
           const currentQ = questions[safeIndex];
           const currentAnswer = currentQ ? (quizAnswers[currentQ.id] || '') : '';
-          const maxQSecs = getTimePerQuestion(activeQuiz);
+          const maxQSecs = currentQ ? getQuestionTimeSeconds(currentQ) : 1;
           const qProgressPercent = Math.max(0, Math.min(100, (questionSecondsRemaining / maxQSecs) * 100));
           const totalProgressPercent = Math.round((safeIndex / Math.max(1, totalQuestions)) * 100);
 
@@ -1140,7 +1141,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
                       {currentQ.type === 'qcm' 
                         ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
-                        : '👉 Saisissez votre réponse au clavier dans le champ ci-dessous :'}
+                        : currentQ.type === 'reorder'
+                          ? '👉 Replacez les éléments dans l’ordre correct avec les flèches :'
+                          : '👉 Saisissez votre réponse au clavier dans le champ ci-dessous :'}
                     </div>
 
                     {/* QCM Options */}
@@ -1170,6 +1173,36 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         })}
                       </div>
                     )}
+
+                    {currentQ.type === 'reorder' && (() => {
+                      const orderedIds = getReorderAnswerIds(currentQ, currentAnswer);
+                      const itemsById = new Map((currentQ.items || []).map((item) => [item.id, item]));
+                      return (
+                        <ol className="space-y-2 pt-4 sm:pl-16" aria-label="Éléments à réorganiser">
+                          {orderedIds.map((itemId, itemIndex) => {
+                            const item = itemsById.get(itemId);
+                            if (!item) return null;
+                            const moveItem = (direction: -1 | 1) => {
+                              const nextIndex = itemIndex + direction;
+                              if (nextIndex < 0 || nextIndex >= orderedIds.length) return;
+                              const nextOrder = [...orderedIds];
+                              [nextOrder[itemIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[itemIndex]];
+                              setQuizAnswers({ ...quizAnswers, [currentQ.id]: JSON.stringify(nextOrder) });
+                            };
+                            return (
+                              <li key={item.id} className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs sm:gap-3 sm:p-3">
+                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#e6f0f7] font-mono text-xs font-extrabold text-[#0b3c5d]">{itemIndex + 1}</span>
+                                <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-slate-800">{item.text}</span>
+                                <div className="flex shrink-0 gap-1">
+                                  <button type="button" aria-label={`Monter ${item.text}`} disabled={itemIndex === 0} onClick={() => moveItem(-1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↑</button>
+                                  <button type="button" aria-label={`Descendre ${item.text}`} disabled={itemIndex === orderedIds.length - 1} onClick={() => moveItem(1)} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-lg font-bold text-[#0b3c5d] disabled:opacity-30">↓</button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      );
+                    })()}
 
                     {/* Text input */}
                     {currentQ.type === 'text' && (

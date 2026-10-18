@@ -26,6 +26,8 @@ import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
+import { getQuestionTimeSeconds } from '../utils/quizTiming';
+import { formatCorrectReorderAnswer, formatReorderAnswer, isReorderAnswerCorrect } from '../utils/quizReorder';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1237,7 +1239,12 @@ export const dataService = {
     questions: QuizQuestion[];
     is_public?: boolean;
   }): Quiz {
-    const totalPoints = (data.questions || []).reduce((acc, curr) => acc + (Number(curr.points) || 0), 0) || 20;
+    const normalizedQuestions = (data.questions || []).map(question => ({
+      ...question,
+      time_limit_seconds: getQuestionTimeSeconds(question)
+    }));
+    const totalTimeSeconds = normalizedQuestions.reduce((total, question) => total + getQuestionTimeSeconds(question), 0);
+    const totalPoints = normalizedQuestions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0) || 20;
     const cls = state.classes.find(c => c.id === data.class_id);
 
     // Handle class_ids for backward compatibility
@@ -1253,9 +1260,11 @@ export const dataService = {
       class_ids: finalClassIds,
       class_name: cls ? cls.name : 'Classe',
       created_at: new Date().toISOString(),
-      duration_minutes: Number(data.duration_minutes) || 10,
+      duration_minutes: normalizedQuestions.length
+        ? Math.max(1, Math.ceil(totalTimeSeconds / 60))
+        : Number(data.duration_minutes) || 10,
       status: 'draft',
-      questions: data.questions,
+      questions: normalizedQuestions,
       total_points: totalPoints
     };
 
@@ -1298,13 +1307,22 @@ export const dataService = {
       }
     }
 
-    const totalPoints = updates.questions
-      ? updates.questions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0)
+    const normalizedQuestions = updates.questions?.map(question => ({
+      ...question,
+      time_limit_seconds: getQuestionTimeSeconds(question)
+    }));
+    const totalTimeSeconds = normalizedQuestions?.reduce((total, question) => total + getQuestionTimeSeconds(question), 0) || 0;
+    const totalPoints = normalizedQuestions
+      ? normalizedQuestions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0)
       : state.quizzes[idx].total_points;
 
     state.quizzes[idx] = {
       ...state.quizzes[idx],
       ...updates,
+      ...(normalizedQuestions ? {
+        questions: normalizedQuestions,
+        duration_minutes: Math.max(1, Math.ceil(totalTimeSeconds / 60))
+      } : {}),
       total_points: totalPoints || state.quizzes[idx].total_points
     };
 
@@ -1494,7 +1512,9 @@ export const dataService = {
       const expectedAns = (q.correct_answer || '').trim();
       let isCorrect = false;
 
-      if (q.type === 'qcm') {
+      if (q.type === 'reorder') {
+        isCorrect = isReorderAnswerCorrect(q, studentAns);
+      } else if (q.type === 'qcm') {
         isCorrect = studentAns.toLowerCase() === expectedAns.toLowerCase();
       } else {
         // Question texte saisie : comparaison tolérante (insensible à la casse, accents retirés)
@@ -1509,8 +1529,8 @@ export const dataService = {
       feedback[q.id] = {
         correct: isCorrect,
         points: awarded,
-        expected: expectedAns,
-        studentAnswer: studentAns
+        expected: q.type === 'reorder' ? formatCorrectReorderAnswer(q) : expectedAns,
+        studentAnswer: q.type === 'reorder' ? formatReorderAnswer(q, studentAns) : studentAns
       };
     });
 

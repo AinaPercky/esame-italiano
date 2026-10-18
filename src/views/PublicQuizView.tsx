@@ -19,7 +19,9 @@ import {
 import {
   parsePublicQuizConfig,
 } from './publicQuiz/publicQuizConfig';
-import { applyQuizQuestionOrder, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
+import { applyQuizQuestionOrder, shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
+import { getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
+import { applyQuizItemOrder } from '../utils/quizReorder';
 
 interface PublicQuizViewProps {
   quizId: string | null;
@@ -50,7 +52,7 @@ function saveToStorage(key: string, value: unknown) {
 }
 
 function clearStorage(quizId: string) {
-  ['studentName', 'answers', 'questionTimeLeftMs', 'totalTimeLeftMs', 'currentIndex', 'validated', 'questionOrder'].forEach(
+  ['studentName', 'answers', 'questionTimeLeftMs', 'totalTimeLeftMs', 'currentIndex', 'validated', 'questionOrder', 'itemOrders'].forEach(
     (suffix) => localStorage.removeItem(storageKey(quizId, suffix))
   );
 }
@@ -82,7 +84,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const [validatedSet, setValidatedSet] = useState<Record<string, boolean>>({});
 
   // ── Per-question timer ─────────────────────────────────────────────────────
-  // timePerQuestionMs = (duration_minutes * 60 * 1000) / questions.length
+  // Individual timer duration for the active question.
   const [timePerQuestionMs, setTimePerQuestionMs] = useState<number>(0);
   // Current question time remaining
   const [questionTimeLeftMs, setQuestionTimeLeftMs] = useState<number>(0);
@@ -108,7 +110,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     !showCorrectionAtEnd && questionForCorrection && validatedSet[questionForCorrection.id] &&
     perQuestionFeedback[questionForCorrection.id]
   );
-  const totalQuizDurationMs = Math.max(1, (quiz?.duration_minutes || 10) * 60 * 1000);
+  const totalQuizDurationMs = quiz ? getQuizTotalTimeSeconds(quiz) * 1000 : 1;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers (stable refs so callbacks don't need them in deps)
@@ -187,8 +189,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       const nextIdx = fromIndex + 1;
       setCurrentIndex(nextIdx);
       currentIndexRef.current = nextIdx;
-      // Reset per-question timer
-      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+      // Reset to this question's own configured duration.
+      const nextQuestionTimeMs = getQuestionTimeSeconds(quizRef.current?.questions[nextIdx]) * 1000;
+      timePerQuestionMsRef.current = nextQuestionTimeMs;
+      setTimePerQuestionMs(nextQuestionTimeMs);
+      setQuestionTimeLeftMs(nextQuestionTimeMs);
     } else {
       handleSubmit();
     }
@@ -246,12 +251,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setQuiz(q);
       quizRef.current = q;
 
-      // Compute per-question time
-      const totalMs = (q.duration_minutes || 10) * 60 * 1000;
-      const numQ = Math.max(1, (q.questions || []).length);
-      const perQ = Math.floor(totalMs / numQ);
-      setTimePerQuestionMs(perQ);
-      timePerQuestionMsRef.current = perQ;
+      // The overall deadline is the sum of each question's independent time.
+      const totalMs = getQuizTotalTimeSeconds(q) * 1000;
+      const firstQuestionTimeMs = getQuestionTimeSeconds(q.questions?.[0]) * 1000;
+      setTimePerQuestionMs(firstQuestionTimeMs);
+      timePerQuestionMsRef.current = firstQuestionTimeMs;
 
       // Restore persisted state
       const savedName = loadFromStorage<string>(storageKey(activeQuizId, 'studentName'), '');
@@ -264,7 +268,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       );
       // Restore per-question timer (if same question reloaded, keep remaining time)
       const savedQTime = loadFromStorage<number>(
-        storageKey(activeQuizId, 'questionTimeLeftMs'), perQ
+        storageKey(activeQuizId, 'questionTimeLeftMs'), firstQuestionTimeMs
       );
       const savedTotalTime = loadFromStorage<number>(
         storageKey(activeQuizId, 'totalTimeLeftMs'), totalMs
@@ -275,6 +279,9 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       answersRef.current = savedAnswers;
       setCurrentIndex(savedIndex);
       currentIndexRef.current = savedIndex;
+      const restoredQuestionTimeMs = getQuestionTimeSeconds(q.questions?.[savedIndex]) * 1000;
+      setTimePerQuestionMs(restoredQuestionTimeMs);
+      timePerQuestionMsRef.current = restoredQuestionTimeMs;
       setValidatedSet(savedValidated);
       validatedSetRef.current = savedValidated;
       setQuestionTimeLeftMs(savedQTime);
@@ -428,6 +435,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const sameStudent = Boolean(storedName)
       && storedName.toLocaleLowerCase() === normalizedStudentName.toLocaleLowerCase();
     const storedOrder = loadFromStorage<unknown>(storageKey(qId, 'questionOrder'), null);
+    const storedItemOrders = loadFromStorage<unknown>(storageKey(qId, 'itemOrders'), {});
     const restoredOrder = applyQuizQuestionOrder(sourceQuiz.questions, storedOrder);
     const savedAnswers = loadFromStorage<unknown>(storageKey(qId, 'answers'), {});
     const savedIndex = loadFromStorage<number>(storageKey(qId, 'currentIndex'), 0);
@@ -441,6 +449,17 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const orderedQuestions = isResuming
       ? (restoredOrder ?? [...sourceQuiz.questions])
       : shuffleQuizQuestions(sourceQuiz.questions);
+    const itemOrders: Record<string, string[]> = {};
+    const questionsWithItemOrders = orderedQuestions.map((question) => {
+      if (question.type !== 'reorder') return question;
+      const storedItemOrder = storedItemOrders && typeof storedItemOrders === 'object'
+        ? (storedItemOrders as Record<string, unknown>)[question.id]
+        : undefined;
+      const restoredItems = isResuming ? applyQuizItemOrder(question.items || [], storedItemOrder) : null;
+      const items = restoredItems || shuffleArray(question.items || []);
+      itemOrders[question.id] = items.map((item) => item.id);
+      return { ...question, items };
+    });
     const startingIndex = resetAttempt ? 0 : currentIndexRef.current;
 
     if (resetAttempt) {
@@ -456,17 +475,23 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setResult(null);
     }
 
-    const orderedQuiz = { ...sourceQuiz, questions: orderedQuestions };
+    const orderedQuiz = { ...sourceQuiz, questions: questionsWithItemOrders };
     quizRef.current = orderedQuiz;
     setQuiz(orderedQuiz);
+    const startingQuestionTimeMs = getQuestionTimeSeconds(orderedQuestions[startingIndex]) * 1000;
+    timePerQuestionMsRef.current = startingQuestionTimeMs;
+    setTimePerQuestionMs(startingQuestionTimeMs);
     hasSubmittedRef.current = false;
     timerCueRef.current = { questionKey: `${qId}:${startingIndex}`, played: new Set() };
     primeTimerAudio();
     saveToStorage(storageKey(qId, 'studentName'), normalizedStudentName);
-    saveToStorage(storageKey(qId, 'questionOrder'), orderedQuestions.map((question) => question.id));
+    saveToStorage(storageKey(qId, 'questionOrder'), questionsWithItemOrders.map((question) => question.id));
+    saveToStorage(storageKey(qId, 'itemOrders'), itemOrders);
     if (!isResuming) {
-      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
-      setTotalTimeLeftMs(Math.max(1, (sourceQuiz.duration_minutes || 10) * 60 * 1000));
+      setQuestionTimeLeftMs(startingQuestionTimeMs);
+      setTotalTimeLeftMs(getQuizTotalTimeSeconds(orderedQuiz) * 1000);
+    } else {
+      setQuestionTimeLeftMs(previous => Math.min(Math.max(0, previous), startingQuestionTimeMs));
     }
     setScreen('quiz');
   }, [studentName]);
@@ -515,8 +540,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     perQuestionFeedbackRef.current = {};
     setCurrentIndex(0);
     currentIndexRef.current = 0;
-    setQuestionTimeLeftMs(timePerQuestionMsRef.current);
-    setTotalTimeLeftMs((q.duration_minutes || 10) * 60 * 1000);
+    const firstQuestionTimeMs = getQuestionTimeSeconds(q.questions[0]) * 1000;
+    timePerQuestionMsRef.current = firstQuestionTimeMs;
+    setTimePerQuestionMs(firstQuestionTimeMs);
+    setQuestionTimeLeftMs(firstQuestionTimeMs);
+    setTotalTimeLeftMs(getQuizTotalTimeSeconds(q) * 1000);
     timeZeroFiredRef.current = -1;
     hasSubmittedRef.current = false;
     timerCueRef.current = { questionKey: `${q.id}:0`, played: new Set() };

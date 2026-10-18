@@ -138,12 +138,19 @@ export interface ExamStatistics {
 
 export interface QuizQuestion {
   id: string;
-  type: 'qcm' | 'text'; // QCM (Choix Multiple) ou Réponse Saisie (Texte)
+  type: 'qcm' | 'text' | 'reorder'; // QCM, réponse saisie ou remise en ordre
   question: string;
   options?: string[]; // Pour QCM (ex: 4 options)
+  items?: QuizReorderItem[]; // Éléments d'un exercice de remise en ordre, rangés par le professeur dans l'ordre correct
   correct_answer: string; // Pour QCM: l'option exacte ou l'index; Pour texte: mot-clé/réponse acceptée
   points: number; // Barème pour cette question (ex: 2, 4, 5 points)
   explanation?: string; // Explication pédagogique affichée lors de la correction
+  time_limit_seconds?: number; // Temps individuel de réponse; valeur par défaut selon le type si absent
+}
+
+export interface QuizReorderItem {
+  id: string;
+  text: string;
 }
 
 export interface Quiz {
