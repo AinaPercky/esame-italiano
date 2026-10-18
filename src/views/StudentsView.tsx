@@ -892,7 +892,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 onChange={(photo) => setFormAvatar(photo)}
                 onRemove={() => setFormAvatar('')}
                 label="Photo de profil"
-                helperText="Glissez une image ou cliquez pour télécharger/remplacer la photo (JPG, PNG, WebP)."
+                helperText="Formats JPG, PNG ou WebP acceptés ; la photo est convertie en WebP et compressée automatiquement."
               />
 
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">

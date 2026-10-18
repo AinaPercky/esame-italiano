@@ -179,7 +179,7 @@ VALUES (
     'student-avatars',
     TRUE,
     512000,
-    ARRAY['image/jpeg']::text[]
+    ARRAY['image/jpeg', 'image/png', 'image/webp']::text[]
 )
 ON CONFLICT (id) DO UPDATE
 SET public = EXCLUDED.public,

@@ -1,17 +1,7 @@
+import { canvasToWebpOrJpeg } from './imageEncoding';
+
 const MAX_AVATAR_BYTES = 200 * 1024; // 200 Ko — seuil max absolu
 const MAX_AVATAR_DIMENSION = 512;
-
-function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error('Impossible de compresser cette image.'));
-      }
-    }, 'image/jpeg', quality);
-  });
-}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,7 +39,7 @@ export async function compressAvatarImage(image: HTMLImageElement): Promise<stri
     context.drawImage(image, 0, 0, width, height);
 
     for (const quality of [0.85, 0.75, 0.62, 0.50, 0.38, 0.25]) {
-      const blob = await canvasToJpeg(canvas, quality);
+      const blob = await canvasToWebpOrJpeg(canvas, quality);
       if (blob.size <= MAX_AVATAR_BYTES) return blobToDataUrl(blob);
     }
 

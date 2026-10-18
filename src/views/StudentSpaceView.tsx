@@ -480,7 +480,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       const studentId = studentRecord?.id || currentUser.student_id || '';
       let savedAvatar = editAvatar;
       const cloudAvatar = studentRecord?.avatar_url || '';
-      const avatarIsNewUpload = editAvatar.startsWith('data:image/jpeg;base64,');
+      const avatarIsNewUpload = editAvatar.startsWith('data:image/');
       const avatarChanged = avatarIsNewUpload || editAvatar !== cloudAvatar;
 
       if (avatarChanged) {
@@ -674,7 +674,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       <header className="student-topbar sticky top-0 z-20 px-3 py-2.5 sm:px-6 sm:py-3">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-            <img src="/percky-lingua-logo.png" alt="" className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11" />
+            <img src="/percky-lingua-logo.webp" alt="" className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11" />
             <div className="min-w-0">
               <div className="font-display truncate text-base font-bold tracking-tight text-slate-900 sm:text-xl">PerckyLingua</div>
               <p className="hidden text-[9px] font-bold tracking-[0.16em] text-slate-500 sm:block">APPRENDRE · PROGRESSER · RÉUSSIR</p>
@@ -724,7 +724,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           <div className="student-welcome-copy">
             <div className="student-avatar-ring student-welcome-avatar">
               <img
-                src="/student-space-welcome-avatar.png"
+                src="/student-space-welcome-avatar.webp"
                 alt="Avatar étudiant PerckyLingua"
                 className="student-welcome-mascot"
                 draggable={false}
@@ -1564,7 +1564,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 onChange={(photo) => setEditAvatar(photo)}
                 onRemove={() => setEditAvatar('')}
                 label="Photo de profil"
-                helperText="Glissez une image ou cliquez pour télécharger/remplacer votre photo (formats JPG, PNG, WebP acceptés)."
+                helperText="Formats JPG, PNG ou WebP acceptés ; la photo est convertie en WebP et compressée automatiquement."
               />
 
               <div className="pt-2">
