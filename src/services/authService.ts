@@ -367,13 +367,14 @@ export const authService = {
     };
   },
 
-  updateStudentProfile(studentId: string, updates: { firstName?: string; lastName?: string; studentNumber?: string; avatar?: string }): boolean {
+  updateStudentProfile(studentId: string, updates: { firstName?: string; lastName?: string; studentNumber?: string; gender?: 'homme' | 'femme'; avatar?: string }): boolean {
     if (!currentUser || currentUser.role !== 'student' || currentUser.student_id !== studentId) return false;
 
     currentUser = {
       ...currentUser,
       name: `${normalizeFirstName(updates.firstName || currentUser.name.split(' ')[0])} ${normalizeLastName(updates.lastName || currentUser.name.split(' ').slice(1).join(' '))}`.trim(),
       student_number: updates.studentNumber || currentUser.student_number,
+      gender: updates.gender || currentUser.gender || 'homme',
       avatar: updates.avatar !== undefined ? updates.avatar : currentUser.avatar
     };
     notifyAuthChange();
