@@ -19,6 +19,7 @@ import {
 import {
   parsePublicQuizConfig,
 } from './publicQuiz/publicQuizConfig';
+import { applyQuizQuestionOrder, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 
 interface PublicQuizViewProps {
   quizId: string | null;
@@ -49,7 +50,7 @@ function saveToStorage(key: string, value: unknown) {
 }
 
 function clearStorage(quizId: string) {
-  ['studentName', 'answers', 'questionTimeLeftMs', 'totalTimeLeftMs', 'currentIndex', 'validated'].forEach(
+  ['studentName', 'answers', 'questionTimeLeftMs', 'totalTimeLeftMs', 'currentIndex', 'validated', 'questionOrder'].forEach(
     (suffix) => localStorage.removeItem(storageKey(quizId, suffix))
   );
 }
@@ -113,6 +114,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // Helpers (stable refs so callbacks don't need them in deps)
   // ─────────────────────────────────────────────────────────────────────────
   const quizRef = useRef<Quiz | null>(null);
+  const sourceQuizRef = useRef<Quiz | null>(null);
   const answersRef = useRef<Record<string, string>>({});
   const activeQuizIdRef = useRef<string | null>(null);
   const currentIndexRef = useRef<number>(0);
@@ -205,6 +207,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeQuizId) {
+      sourceQuizRef.current = null;
       setScreen('home');
       return;
     }
@@ -228,6 +231,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       if (cancelled) return;
 
       if (!q) {
+        sourceQuizRef.current = null;
         setLoadError('Quiz introuvable. Vérifiez le lien ou contactez votre enseignant.');
         setScreen('start');
         return;
@@ -238,6 +242,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setCleanDescription(description);
       setAllowBackNavigation(config.allowBackNavigation);
       setShowCorrectionAtEnd(config.showCorrectionAtEnd);
+      sourceQuizRef.current = q;
       setQuiz(q);
       quizRef.current = q;
 
@@ -413,14 +418,56 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // Start handler
   // ─────────────────────────────────────────────────────────────────────────
   const handleStart = useCallback(() => {
-    if (!quizRef.current || !studentName.trim()) return;
+    const sourceQuiz = sourceQuizRef.current ?? quizRef.current;
+    const normalizedStudentName = studentName.trim();
+    if (!sourceQuiz || !normalizedStudentName) return;
+
+    const qId = activeQuizIdRef.current ?? sourceQuiz.id;
+    const storedNameValue = loadFromStorage<unknown>(storageKey(qId, 'studentName'), '');
+    const storedName = typeof storedNameValue === 'string' ? storedNameValue.trim() : '';
+    const sameStudent = Boolean(storedName)
+      && storedName.toLocaleLowerCase() === normalizedStudentName.toLocaleLowerCase();
+    const storedOrder = loadFromStorage<unknown>(storageKey(qId, 'questionOrder'), null);
+    const restoredOrder = applyQuizQuestionOrder(sourceQuiz.questions, storedOrder);
+    const savedAnswers = loadFromStorage<unknown>(storageKey(qId, 'answers'), {});
+    const savedIndex = loadFromStorage<number>(storageKey(qId, 'currentIndex'), 0);
+    const savedValidated = loadFromStorage<unknown>(storageKey(qId, 'validated'), {});
+    const hasSavedProgress = (Number.isInteger(savedIndex) && savedIndex > 0)
+      || Boolean(savedAnswers && typeof savedAnswers === 'object' && Object.keys(savedAnswers).length)
+      || Boolean(savedValidated && typeof savedValidated === 'object' && Object.keys(savedValidated).length);
+    const resetAttempt = (Boolean(storedName) && !sameStudent)
+      || (storedOrder !== null && (!sameStudent || !restoredOrder));
+    const isResuming = !resetAttempt && (sameStudent || (!storedName && hasSavedProgress));
+    const orderedQuestions = isResuming
+      ? (restoredOrder ?? [...sourceQuiz.questions])
+      : shuffleQuizQuestions(sourceQuiz.questions);
+    const startingIndex = resetAttempt ? 0 : currentIndexRef.current;
+
+    if (resetAttempt) {
+      clearStorage(qId);
+      setAnswers({});
+      answersRef.current = {};
+      setCurrentIndex(0);
+      currentIndexRef.current = 0;
+      setValidatedSet({});
+      validatedSetRef.current = {};
+      setPerQuestionFeedback({});
+      perQuestionFeedbackRef.current = {};
+      setResult(null);
+    }
+
+    const orderedQuiz = { ...sourceQuiz, questions: orderedQuestions };
+    quizRef.current = orderedQuiz;
+    setQuiz(orderedQuiz);
     hasSubmittedRef.current = false;
-    timerCueRef.current = { questionKey: `${quizRef.current.id}:${currentIndexRef.current}`, played: new Set() };
+    timerCueRef.current = { questionKey: `${qId}:${startingIndex}`, played: new Set() };
     primeTimerAudio();
-    const qId = activeQuizIdRef.current;
-    if (qId) saveToStorage(storageKey(qId, 'studentName'), studentName.trim());
-    // Reset timer to per-question duration
-    setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+    saveToStorage(storageKey(qId, 'studentName'), normalizedStudentName);
+    saveToStorage(storageKey(qId, 'questionOrder'), orderedQuestions.map((question) => question.id));
+    if (!isResuming) {
+      setQuestionTimeLeftMs(timePerQuestionMsRef.current);
+      setTotalTimeLeftMs(Math.max(1, (sourceQuiz.duration_minutes || 10) * 60 * 1000));
+    }
     setScreen('quiz');
   }, [studentName]);
 
@@ -455,9 +502,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   const handleRetry = useCallback(() => {
     const qId = activeQuizIdRef.current;
-    const q = quizRef.current;
+    const q = sourceQuizRef.current ?? quizRef.current;
     if (!qId || !q) return;
     clearStorage(qId);
+    quizRef.current = q;
+    setQuiz(q);
     setAnswers({});
     answersRef.current = {};
     setValidatedSet({});
@@ -494,6 +543,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     setActiveQuizId(null);
     setQuiz(null);
     quizRef.current = null;
+    sourceQuizRef.current = null;
     setScreen('home');
   }, []);
 

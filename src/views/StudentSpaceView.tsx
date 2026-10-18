@@ -38,6 +38,7 @@ import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
 import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
+import { shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.jpg';
 
 const STUDENT_TABS = [
@@ -326,7 +327,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
     primeTimerAudio();
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
-    setActiveQuiz(quiz);
+    setActiveQuiz({
+      ...quiz,
+      questions: shuffleQuizQuestions(quiz.questions || [])
+    });
     setQuizAnswers({});
     setSkippedQuestions({});
     setIncorrectFeedback(null);
