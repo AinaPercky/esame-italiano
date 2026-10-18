@@ -1,4 +1,5 @@
 import { Quiz, QuizQuestion } from '../../types';
+import { formatCorrectReorderAnswer, formatReorderAnswer, isReorderAnswerCorrect } from '../../utils/quizReorder';
 
 export interface QuizFeedbackEntry {
   correct: boolean;
@@ -69,6 +70,10 @@ export function isQuestionAnswerCorrect(question: QuizQuestion, answer: string):
     return studentAnswer.toLowerCase() === expectedAnswer.toLowerCase();
   }
 
+  if (question.type === 'reorder') {
+    return isReorderAnswerCorrect(question, studentAnswer);
+  }
+
   return isTextAnswerCorrect(studentAnswer, expectedAnswer);
 }
 
@@ -89,8 +94,8 @@ export function evaluateQuizAnswers(
     feedback[question.id] = {
       correct,
       points,
-      expected: expectedAnswer,
-      studentAnswer
+      expected: question.type === 'reorder' ? formatCorrectReorderAnswer(question) : expectedAnswer,
+      studentAnswer: question.type === 'reorder' ? formatReorderAnswer(question, studentAnswer) : studentAnswer
     };
   });
 

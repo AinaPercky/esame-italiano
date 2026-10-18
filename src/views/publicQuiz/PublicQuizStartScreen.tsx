@@ -1,6 +1,7 @@
 import React from 'react';
 import { BookOpen, Clock3, ListChecks, Medal, PlayCircle, UserRound } from 'lucide-react';
 import { Quiz } from '../../types';
+import { formatQuizDuration, getQuizTotalTimeSeconds } from '../../utils/quizTiming';
 
 interface PublicQuizStartScreenProps {
   quiz: Quiz;
@@ -42,7 +43,7 @@ export const PublicQuizStartScreen: React.FC<PublicQuizStartScreenProps> = ({
               <Clock3 className="h-4 w-4" />
               Durée
             </div>
-            <div className="mt-3 text-lg font-bold text-slate-900">{quiz.duration_minutes || 10} min</div>
+            <div className="mt-3 text-lg font-bold text-slate-900">{formatQuizDuration(getQuizTotalTimeSeconds(quiz))}</div>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
             <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold uppercase tracking-wide">

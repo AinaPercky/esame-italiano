@@ -40,6 +40,10 @@ import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade } fr
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
+import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
+import { createQuizReorderItem } from '../utils/quizReorder';
+import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
+import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 
 interface QuizzesAdminViewProps {
   classes: ClassRoom[];
@@ -131,21 +135,36 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setJsonImportError(null);
     setJsonImportSuccess(null);
     try {
-      const parsed = JSON.parse(rawJsonInput);
+      const parsed = parseJsonWithComments<any>(rawJsonInput);
       if (!parsed.title || !Array.isArray(parsed.questions)) {
         setJsonImportError('Format JSON invalide : le JSON doit contenir au moins "title" et un tableau "questions".');
         return;
       }
 
-      const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => ({
-        id: `q_imported_${Date.now()}_${i}`,
-        type: q.type === 'text' ? 'text' : 'qcm',
-        question: q.question || '',
-        options: q.type === 'text' ? undefined : (q.options || ['', '', '', '']),
-        correct_answer: q.correct_answer || '',
-        points: Number(q.points) || 5,
-        explanation: q.explanation || ''
-      }));
+      const importedQuestions: QuizQuestion[] = parsed.questions.map((q: any, i: number) => {
+        const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
+        const sourceItems = type === 'reorder'
+          ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
+          : [];
+        const items = sourceItems.map((item: unknown) => {
+          if (item && typeof item === 'object' && 'id' in item && 'text' in item) {
+            const record = item as { id: unknown; text: unknown };
+            return { id: String(record.id), text: String(record.text) };
+          }
+          return createQuizReorderItem(String(item ?? ''));
+        });
+        return {
+          id: `q_imported_${Date.now()}_${i}`,
+          type,
+          question: q.question || '',
+          options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
+          items: type === 'reorder' ? items : undefined,
+          correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : (q.correct_answer || ''),
+          points: Number(q.points) || 5,
+          explanation: q.explanation || '',
+          time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+        };
+      });
 
       dataService.createQuiz({
         title: parsed.title,
@@ -214,7 +233,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setQuizTitle('');
     setQuizDescription('');
     setSelectedQuizClassIds(selectedClassId ? [selectedClassId] : (classes[0] ? [classes[0].id] : []));
-    setQuizDuration(10);
+    setQuizDuration(1);
     setQuestions([
       {
         id: `q_${Date.now()}_1`,
@@ -223,7 +242,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         options: ['', '', '', ''],
         correct_answer: '',
         points: 5,
-        explanation: ''
+        explanation: '',
+        time_limit_seconds: DEFAULT_QCM_TIME_SECONDS
       }
     ]);
     setIsEditorOpen(true);
@@ -235,20 +255,28 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setQuizDescription(quiz.description || '');
     const initialClassIds = quiz.class_ids && quiz.class_ids.length > 0 ? quiz.class_ids : (quiz.class_id ? [quiz.class_id] : []);
     setSelectedQuizClassIds(initialClassIds.length > 0 ? initialClassIds : (selectedClassId ? [selectedClassId] : []));
-    setQuizDuration(quiz.duration_minutes || 10);
-    setQuestions(quiz.questions ? JSON.parse(JSON.stringify(quiz.questions)) : []);
+    const normalizedQuestions: QuizQuestion[] = quiz.questions
+      ? JSON.parse(JSON.stringify(quiz.questions)).map((question: QuizQuestion) => ({
+          ...question,
+          time_limit_seconds: getQuestionTimeSeconds(question)
+        }))
+      : [];
+    setQuizDuration(Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ ...quiz, questions: normalizedQuestions }) / 60)));
+    setQuestions(normalizedQuestions);
     setIsEditorOpen(true);
   };
 
-  const handleAddQuestion = (type: 'qcm' | 'text') => {
+  const handleAddQuestion = (type: 'qcm' | 'text' | 'reorder') => {
     const newQ: QuizQuestion = {
       id: `q_${Date.now()}_${questions.length + 1}`,
       type,
       question: '',
       options: type === 'qcm' ? ['', '', '', ''] : undefined,
+      items: type === 'reorder' ? Array.from({ length: 5 }, () => createQuizReorderItem()) : undefined,
       correct_answer: '',
       points: 5,
-      explanation: ''
+      explanation: '',
+      time_limit_seconds: type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS
     };
     setQuestions([...questions, newQ]);
   };
@@ -280,13 +308,31 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         setFormError(`La question #${i + 1} n'a pas d'énoncé.`);
         return;
       }
-      if (!q.correct_answer.trim()) {
+      if (q.type === 'reorder') {
+        const items = q.items || [];
+        if (items.length < 2 || items.some((item) => !item.text.trim())) {
+          setFormError(`La question réarrangement #${i + 1} doit contenir au moins deux éléments, tous renseignés.`);
+          return;
+        }
+        const distinctItems = new Set(items.map((item) => item.text.trim().toLocaleLowerCase()));
+        if (distinctItems.size !== items.length) {
+          setFormError(`Les éléments de la question réarrangement #${i + 1} doivent être distincts.`);
+          return;
+        }
+      } else if (!q.correct_answer.trim()) {
         setFormError(`Veuillez renseigner la bonne réponse pour la question #${i + 1}.`);
         return;
       }
     }
 
     const primaryClassId = selectedQuizClassIds[0] || selectedClassId || classes[0]?.id || '';
+    const normalizedQuestions = questions.map((question) => ({
+      ...question,
+      correct_answer: question.type === 'reorder'
+        ? JSON.stringify((question.items || []).map((item) => item.id))
+        : question.correct_answer,
+      time_limit_seconds: getQuestionTimeSeconds(question)
+    }));
 
     if (editingQuiz) {
       dataService.updateQuiz(editingQuiz.id, {
@@ -294,8 +340,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         description: quizDescription,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
-        duration_minutes: quizDuration,
-        questions,
+        duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
+        questions: normalizedQuestions,
         is_public: editingQuiz.is_public || false // Keep existing public status when editing
       });
     } else {
@@ -304,8 +350,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         description: quizDescription,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
-        duration_minutes: quizDuration,
-        questions
+        duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
+        questions: normalizedQuestions
       });
     }
 
@@ -625,7 +671,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       <div className="text-right sm:shrink-0 text-xs font-mono text-slate-500">
                         <div>{quiz.questions?.length || 0} questions</div>
                         <div>Barème : {quiz.total_points || 20} pts</div>
-                        <div>Durée élève : {quiz.duration_minutes || 10} min</div>
+                        <div>Temps total : {formatQuizDuration(getQuizTotalTimeSeconds(quiz))}</div>
                       </div>
                     </div>
 
@@ -1003,16 +1049,17 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Durée de composition pour l'élève (minutes)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={quizDuration}
-                    onChange={(e) => setQuizDuration(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                  />
+                <div className="sm:col-span-2 rounded-xl border border-[#d5e4ed] bg-[#e6f0f7]/60 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-[#072a3f]">Temps total du quiz</p>
+                      <p className="mt-0.5 text-[11px] text-slate-600">Somme des temps individuels des questions; modifiez chaque valeur directement dans sa question.</p>
+                    </div>
+                    <span className="rounded-lg bg-white px-3 py-1.5 font-mono text-sm font-extrabold text-[#072a3f] shadow-xs">
+                      {formatQuizDuration(questions.reduce((sum, question) => sum + getQuestionTimeSeconds(question), 0))}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[10px] font-medium text-slate-500">Valeurs initiales : {DEFAULT_QCM_TIME_SECONDS} s par QCM et {DEFAULT_TEXT_TIME_SECONDS} s par réponse saisie.</p>
                 </div>
 
                 <div className="sm:col-span-2 space-y-1">
@@ -1029,10 +1076,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
               {/* Questions Section */}
               <div className="space-y-4 pt-4 border-t border-slate-200">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">Questions du Quiz ({questions.length})</h3>
-                    <p className="text-[11px] text-slate-500">Ajoutez des questions QCM ou des questions à réponse textuelle saisie.</p>
+                    <p className="text-[11px] text-slate-500">Ajoutez des QCM, des réponses saisies ou des éléments à remettre en ordre.</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1050,22 +1097,46 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     >
                       + Ajouter Réponse Saisie
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('reorder')}
+                      className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                    >
+                      + Réarranger
+                    </button>
                   </div>
                 </div>
 
                 {questions.map((q, idx) => (
                   <div key={q.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-full bg-amber-800 text-white font-mono font-bold text-xs flex items-center justify-center">
                           {idx + 1}
                         </span>
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : 'Réponse Saisie (Texte)'}
+                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : q.type === 'text' ? 'Réponse Saisie (Texte)' : 'Réarranger les éléments'}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <label className="flex items-center gap-1 text-xs">
+                          <span className="text-slate-500 font-bold">Temps :</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="600"
+                            aria-label={`Temps de réponse pour la question ${idx + 1} (secondes)`}
+                            value={q.time_limit_seconds ?? getQuestionTimeSeconds(q)}
+                            onChange={(e) => {
+                              const updated = [...questions];
+                              updated[idx] = { ...updated[idx], time_limit_seconds: Math.max(1, Number(e.target.value) || 1) };
+                              setQuestions(updated);
+                            }}
+                            className="w-16 bg-white border border-slate-300 rounded px-1.5 py-0.5 font-mono text-center font-bold"
+                          />
+                          <span className="text-slate-400">s</span>
+                        </label>
                         <div className="flex items-center gap-1 text-xs">
                           <label className="text-slate-500 font-bold">Barème :</label>
                           <input
@@ -1168,6 +1239,87 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       </div>
                     )}
 
+                    {q.type === 'reorder' && (
+                      <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 pt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] font-bold text-emerald-950">Éléments dans l’ordre correct</p>
+                            <p className="text-[10px] text-emerald-800">Cet ordre sert de référence; l’ordre sera mélangé pour l’élève.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...questions];
+                              updated[idx] = { ...updated[idx], items: [...(updated[idx].items || []), createQuizReorderItem()] };
+                              setQuestions(updated);
+                            }}
+                            className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-emerald-900"
+                          >
+                            + Ajouter un élément
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(q.items || []).map((item, itemIndex) => (
+                            <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-100 bg-white p-2">
+                              <span className="w-6 shrink-0 text-center font-mono text-xs font-extrabold text-emerald-800">{itemIndex + 1}</span>
+                              <input
+                                type="text"
+                                required
+                                aria-label={`Élément ${itemIndex + 1} de la question ${idx + 1}`}
+                                value={item.text}
+                                onChange={(e) => {
+                                  const updated = [...questions];
+                                  const items = [...(updated[idx].items || [])];
+                                  items[itemIndex] = { ...items[itemIndex], text: e.target.value };
+                                  updated[idx] = { ...updated[idx], items };
+                                  setQuestions(updated);
+                                }}
+                                placeholder={`Étape ${itemIndex + 1}`}
+                                className="min-w-0 flex-1 rounded-md border border-slate-200 px-2.5 py-2 text-xs text-slate-900"
+                              />
+                              <button
+                                type="button"
+                                aria-label={`Monter l’élément ${itemIndex + 1}`}
+                                disabled={itemIndex === 0}
+                                onClick={() => {
+                                  const updated = [...questions];
+                                  const items = [...(updated[idx].items || [])];
+                                  [items[itemIndex - 1], items[itemIndex]] = [items[itemIndex], items[itemIndex - 1]];
+                                  updated[idx] = { ...updated[idx], items };
+                                  setQuestions(updated);
+                                }}
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold text-slate-700 disabled:opacity-30"
+                              >↑</button>
+                              <button
+                                type="button"
+                                aria-label={`Descendre l’élément ${itemIndex + 1}`}
+                                disabled={itemIndex === (q.items || []).length - 1}
+                                onClick={() => {
+                                  const updated = [...questions];
+                                  const items = [...(updated[idx].items || [])];
+                                  [items[itemIndex], items[itemIndex + 1]] = [items[itemIndex + 1], items[itemIndex]];
+                                  updated[idx] = { ...updated[idx], items };
+                                  setQuestions(updated);
+                                }}
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm font-bold text-slate-700 disabled:opacity-30"
+                              >↓</button>
+                              <button
+                                type="button"
+                                aria-label={`Supprimer l’élément ${itemIndex + 1}`}
+                                disabled={(q.items || []).length <= 2}
+                                onClick={() => {
+                                  const updated = [...questions];
+                                  updated[idx] = { ...updated[idx], items: (updated[idx].items || []).filter((_, current) => current !== itemIndex) };
+                                  setQuestions(updated);
+                                }}
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-bold text-rose-600 disabled:opacity-30"
+                              >×</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Explanation */}
                     <div>
                       <input
@@ -1253,28 +1405,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const templateStr = JSON.stringify({
-                          title: "Vocabolario: Il cibo italiano",
-                          description: "Test rapide sur le vocabulaire gastronomique",
-                          duration_minutes: 10,
-                          questions: [
-                            {
-                              type: "qcm",
-                              question: "Quel est le plat national italien ?",
-                              options: ["Pizza", "Pasta", "Risotto", "Polenta"],
-                              correct_answer: "Pasta",
-                              points: 5,
-                              explanation: "La pasta est un incontournable."
-                            },
-                            {
-                              type: "text",
-                              question: "Comment dit-on 'bonjour' le matin en italien ?",
-                              correct_answer: "Buongiorno",
-                              points: 5,
-                              explanation: "Buon giorno."
-                            }
-                          ]
-                        }, null, 2);
+                        const templateStr = quizImportTemplate;
                         navigator.clipboard.writeText(templateStr);
                         setCopiedSuccess(true);
                         setTimeout(() => setCopiedSuccess(false), 2500);
@@ -1290,31 +1421,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <span className="text-slate-300">|</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const templateStr = JSON.stringify({
-                          title: "Vocabolario: Il cibo italiano",
-                          description: "Test rapide sur le vocabulaire gastronomique",
-                          duration_minutes: 10,
-                          questions: [
-                            {
-                              type: "qcm",
-                              question: "Quel est le plat national italien ?",
-                              options: ["Pizza", "Pasta", "Risotto", "Polenta"],
-                              correct_answer: "Pasta",
-                              points: 5,
-                              explanation: "La pasta est un incontournable."
-                            },
-                            {
-                              type: "text",
-                              question: "Comment dit-on 'bonjour' le matin en italien ?",
-                              correct_answer: "Buongiorno",
-                              points: 5,
-                              explanation: "Buon giorno."
-                            }
-                          ]
-                        }, null, 2);
-                        setRawJsonInput(templateStr);
-                      }}
+                      onClick={() => setRawJsonInput(quizImportTemplate)}
                       className="text-[11px] text-amber-800 hover:text-amber-900 font-bold underline cursor-pointer"
                     >
                       Utiliser ce modèle
@@ -1322,31 +1429,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Copiez ce modèle ou cliquez sur &quot;Utiliser ce modèle&quot;, remplissez vos questions (types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code>).
+                  Le modèle est basé sur le quiz fourni et contient les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés. Les temps des questions sont modifiables et le total est recalculé.
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
-{JSON.stringify({
-  title: "Vocabolario: Il cibo italiano",
-  description: "Test rapide sur le vocabulaire gastronomique",
-  duration_minutes: 10,
-  questions: [
-    {
-      type: "qcm",
-      question: "Quel est le plat national italien ?",
-      options: ["Pizza", "Pasta", "Risotto", "Polenta"],
-      correct_answer: "Pasta",
-      points: 5,
-      explanation: "La pasta est un incontournable."
-    },
-    {
-      type: "text",
-      question: "Comment dit-on 'bonjour' le matin en italien ?",
-      correct_answer: "Buongiorno",
-      points: 5,
-      explanation: "Buon giorno."
-    }
-  ]
-}, null, 2)}
+{quizImportTemplate}
                 </pre>
               </div>
 
@@ -1462,7 +1548,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div className="text-[11px] font-bold uppercase text-slate-400">Durée Impartie</div>
-                    <div className="text-2xl font-bold font-mono text-slate-900 mt-1">{aq.duration_minutes || 10} min</div>
+                    <div className="text-2xl font-bold font-mono text-slate-900 mt-1">{formatQuizDuration(getQuizTotalTimeSeconds(aq))}</div>
                   </div>
                 </div>
 

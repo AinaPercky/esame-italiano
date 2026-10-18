@@ -22,9 +22,9 @@ function randomIndex(maxExclusive: number): number {
   return Math.floor(Math.random() * maxExclusive);
 }
 
-/** Return a new question array in a random order without mutating the quiz. */
-export function shuffleQuizQuestions(questions: readonly QuizQuestion[]): QuizQuestion[] {
-  const shuffled = [...questions];
+/** Return a new array in random order without mutating its source. */
+export function shuffleArray<T>(items: readonly T[]): T[] {
+  const shuffled = [...items];
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const otherIndex = randomIndex(index + 1);
@@ -32,6 +32,11 @@ export function shuffleQuizQuestions(questions: readonly QuizQuestion[]): QuizQu
   }
 
   return shuffled;
+}
+
+/** Return the quiz questions in a random order without mutating the quiz. */
+export function shuffleQuizQuestions(questions: readonly QuizQuestion[]): QuizQuestion[] {
+  return shuffleArray(questions);
 }
 
 /** Restore a stored order only when it is a complete permutation of the current quiz. */
