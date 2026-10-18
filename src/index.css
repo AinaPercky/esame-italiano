@@ -553,14 +553,14 @@
 @media (max-width: 639px) {
   .student-logout { width: 40px; padding: 0; }
   .student-welcome { border-radius: 22px; }
-  .student-welcome-photo { top: 0; right: 0; bottom: auto; width: 58%; height: 235px; border-top-left-radius: 0; }
-  .student-welcome-photo img { object-position: 57% center; }
-  .student-welcome-photo-fade { background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,.94) 9%, rgba(255,255,255,.42) 52%, rgba(255,255,255,.04) 100%), linear-gradient(0deg, #fff 0%, rgba(255,255,255,.03) 62%); }
-  .student-welcome-copy { min-height: 210px; gap: 11px; padding: 17px 26% 13px 15px; }
+  .student-welcome-photo { top: 0; right: 0; bottom: auto; width: 70%; height: 228px; border-top-left-radius: 0; }
+  .student-welcome-photo img { object-position: 52% center; }
+  .student-welcome-photo-fade { background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,.96) 15%, rgba(255,255,255,.78) 44%, rgba(255,255,255,.2) 100%), linear-gradient(0deg, #fff 0%, rgba(255,255,255,.08) 72%); }
+  .student-welcome-copy { display: grid; min-height: 0; grid-template-columns: 62px minmax(0, 1fr); align-items: start; gap: 11px; padding: 17px 15px 13px; }
   .student-welcome-avatar { width: 62px; height: 62px; padding: 2px; }
-  .student-welcome h1 { margin-top: 9px; font-size: clamp(23px, 7vw, 30px); }
+  .student-learning-pill { display: none; }
+  .student-welcome h1 { margin-top: 3px; font-size: clamp(23px, 6.5vw, 29px); }
   .student-welcome-text > p { font-size: 12px; line-height: 1.55; }
-  .student-learning-pill { min-height: 27px; gap: 7px; padding: 4px 8px; font-size: 8px; letter-spacing: .1em; }
   .student-class-meta { gap: 6px; margin-top: 9px; font-size: 10px; }
   .student-daily-grade { grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 9px; margin: 0 10px 10px; border-radius: 17px; padding: 10px; }
   .student-daily-grade-icon, .student-daily-grade-trend { width: 36px; height: 36px; }
