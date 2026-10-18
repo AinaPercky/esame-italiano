@@ -1223,11 +1223,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     {/* Text Expected Answer if type === 'text' */}
                     {q.type === 'text' && (
                       <div className="space-y-1 pt-1">
-                        <label className="text-[11px] font-bold text-slate-600">Réponse attendue ou mot-clé obligatoire :</label>
+                        <label className="text-[11px] font-bold text-slate-600">Réponse(s) attendue(s) :</label>
                         <input
                           type="text"
                           required
-                          placeholder="ex: aquila, mare, siamo..."
+                          placeholder="ex: cuocio / io cuocio (séparez plusieurs réponses acceptées par '/')"
                           value={q.correct_answer}
                           onChange={(e) => {
                             const updated = [...questions];
@@ -1236,6 +1236,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           }}
                           className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-slate-900"
                         />
+                        <p className="text-[10px] text-slate-500">
+                          💡 Vous pouvez saisir plusieurs réponses acceptées en les séparant par <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">/</code> (ex : <span className="font-mono text-slate-700 font-semibold">cuocio / io cuocio</span>). Insensible à la casse.
+                        </p>
                       </div>
                     )}
 
@@ -1429,7 +1432,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Le modèle est basé sur le quiz fourni et contient les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés. Les temps des questions sont modifiables et le total est recalculé.
+                  Le modèle est basé sur le quiz fourni et contient les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés. Pour les quiz de type saisie (<code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code>), vous pouvez définir plusieurs réponses valides séparées par un slash (ex: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">"cuocio / io cuocio"</code>).
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
 {quizImportTemplate}

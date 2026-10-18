@@ -6,7 +6,11 @@
 //
 // Types de question :
 // - qcm : options (tableau de choix) et correct_answer (texte exact du bon choix).
-// - text : correct_answer (réponse attendue; comparaison tolérante aux accents/casse).
+// - text : correct_answer (mot, expression ou phrase attendue).
+//   PLUSIEURS RÉPONSES POSSIBLES : Vous pouvez déclarer plusieurs variantes acceptées
+//   en les séparant par un slash '/' ou un point-virgule ';' (ex: "cuocio / io cuocio" ou "lui / lei").
+//   La correction valide dès que l’élève saisit l’une des variantes (insensible à la casse
+//   majuscules/minuscules et aux espaces superflus).
 // - reorder : items (au moins deux éléments DISTINCTS, déjà rangés dans l’ordre correct).
 //   L’application mélange ces éléments pour l’élève; la correction vérifie la séquence exacte.
 //
@@ -74,7 +78,8 @@
     {
       "type": "text",
       "question": "Completa con il presente indicativo (noi) del verbo \"cuocere\": \"Noi ______ la pasta al dente.\"",
-      "correct_answer": "Cuociamo",
+      // Astuce : séparez plusieurs réponses valides par '/' (ex: "Cuociamo / noi cuociamo")
+      "correct_answer": "Cuociamo / noi cuociamo",
       "points": 1,
       "explanation": "Il presente di cuocere con \"noi\" è cuociamo (nous faisons cuire).",
       "time_limit_seconds": 32
