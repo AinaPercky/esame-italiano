@@ -406,7 +406,7 @@ class SupabaseService {
 
     const avatarPaths = (students || [])
       .filter(student => student.avatar_url && isUUID(student.id))
-      .map(student => `avatars/${student.id}.jpg`);
+      .flatMap(student => [`avatars/${student.id}.jpg`, `avatars/${student.id}.png`, `avatars/${student.id}.webp`]);
     if (avatarPaths.length > 0) {
       const { error } = await client.storage.from('student-avatars').remove(avatarPaths);
       failOnError('suppression des photos de profil', error);
@@ -644,6 +644,10 @@ class SupabaseService {
     if (!client || !isUUID(id)) return;
     try {
       await client.from('students').delete().eq('id', id);
+      const { error: avatarError } = await client.storage
+        .from('student-avatars')
+        .remove([`avatars/${id}.jpg`, `avatars/${id}.png`, `avatars/${id}.webp`]);
+      if (avatarError) console.warn('Supabase deleteStudent avatar cleanup warning:', avatarError);
     } catch (e) {
       console.error('Supabase deleteStudent error:', e);
     }
@@ -654,7 +658,8 @@ class SupabaseService {
     if (!client) throw new Error("Supabase n'est pas configuré.");
     if (!isUUID(studentId)) throw new Error("La fiche élève n'a pas d'identifiant Supabase valide.");
 
-    const path = `avatars/${studentId}.jpg`;
+    const avatarStoragePaths = [`avatars/${studentId}.jpg`, `avatars/${studentId}.png`, `avatars/${studentId}.webp`];
+    let obsoleteAvatarPaths: string[] = [];
     let avatarUrl: string | null = null;
 
     if (imageDataUrl) {
@@ -665,6 +670,8 @@ class SupabaseService {
           const imageResponse = await fetch(imageDataUrl);
           if (imageResponse.ok) {
             const imageBlob = await imageResponse.blob();
+            const imageExtension = imageBlob.type === 'image/webp' ? 'webp' : imageBlob.type === 'image/png' ? 'png' : 'jpg';
+            const path = `avatars/${studentId}.${imageExtension}`;
             const { error: uploadError } = await client.storage
               .from('student-avatars')
               .upload(path, imageBlob, {
@@ -676,6 +683,7 @@ class SupabaseService {
             if (!uploadError) {
               const { data } = client.storage.from('student-avatars').getPublicUrl(path);
               avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+              obsoleteAvatarPaths = avatarStoragePaths.filter(avatarPath => avatarPath !== path);
             } else {
               console.warn("Storage upload warning (utilisation directe de l'image):", uploadError.message);
               avatarUrl = imageDataUrl;
@@ -706,10 +714,11 @@ class SupabaseService {
       throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
     }
 
-    if (!imageDataUrl) {
+    const pathsToRemove = imageDataUrl ? obsoleteAvatarPaths : avatarStoragePaths;
+    if (pathsToRemove.length > 0) {
       const { error: removeError } = await client.storage
         .from('student-avatars')
-        .remove([path]);
+        .remove(pathsToRemove);
       if (removeError) {
         console.error('Supabase removeStudentAvatar error:', removeError);
       }

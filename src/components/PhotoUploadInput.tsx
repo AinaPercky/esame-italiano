@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Trash2, ImagePlus, CheckCircle2, AlertCircle } from 'lucide-react';
 import { StudentAvatar } from './StudentAvatar';
+import { canvasToWebpOrJpeg } from '../utils/imageEncoding';
 
 interface PhotoUploadInputProps {
   value?: string | null;
@@ -16,7 +17,7 @@ const TARGET_MAX_BYTES = 200 * 1024;  // 200 Ko — seuil max absolu
 
 /**
  * Compresse une image côté client via un canvas HTML5.
- * Utilise une bisection sur la qualité JPEG (puis réduit les dimensions si nécessaire)
+ * Utilise une bisection sur la qualité WebP (JPEG de secours si nécessaire)
  * pour cibler une taille finale entre 50 Ko et 200 Ko.
  * @param file       Fichier image source (JPG, PNG, WebP…)
  * @param maxDim     Dimension max en pixels (côté le plus long). Défaut : 512 px.
@@ -49,16 +50,6 @@ export async function compressAvatarFile(file: File, maxDim = 512): Promise<stri
   let width  = Math.max(1, Math.round(img.width  * scaleFactor));
   let height = Math.max(1, Math.round(img.height * scaleFactor));
 
-  // Helper : encode le canvas en blob JPEG à la qualité donnée
-  const encodeJpeg = (canvas: HTMLCanvasElement, quality: number): Promise<Blob> =>
-    new Promise((resolve, reject) =>
-      canvas.toBlob(
-        blob => (blob ? resolve(blob) : reject(new Error('Encodage JPEG impossible.'))),
-        'image/jpeg',
-        quality
-      )
-    );
-
   // Helper : blob → data URL
   const blobToDataUrl = (blob: Blob): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -79,13 +70,13 @@ export async function compressAvatarFile(file: File, maxDim = 512): Promise<stri
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, width, height);
 
-    // --- 4. Bisection sur la qualité JPEG (≤ 10 itérations) ---------------
+    // --- 4. Bisection sur la qualité WebP (≤ 10 itérations) ---------------
     let qLow = 0.10, qHigh = 0.92;
     let bestBlob: Blob | null = null;
 
     for (let iter = 0; iter < 10; iter++) {
       const qMid = (qLow + qHigh) / 2;
-      const blob = await encodeJpeg(canvas, qMid);
+      const blob = await canvasToWebpOrJpeg(canvas, qMid);
 
       if (blob.size <= TARGET_MAX_BYTES) {
         bestBlob = blob;     // candidat valide (≤ 200 Ko)
@@ -121,7 +112,7 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
   onChange,
   onRemove,
   label = 'Photo de profil',
-  helperText = 'Glissez une image ou cliquez pour parcourir (JPG, PNG ou WebP, max 8 Mo). La photo sera automatiquement compressée entre 50 et 200 Ko.'
+  helperText = 'Glissez une image ou cliquez pour parcourir (JPG, PNG ou WebP, max 8 Mo). Elle sera convertie en WebP et compressée entre 50 et 200 Ko.'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -142,7 +133,8 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
       const base64Data = compressedDataUrl.split(',')[1] ?? '';
       const approxBytes = Math.round((base64Data.length * 3) / 4);
       const approxKo = Math.round(approxBytes / 1024);
-      setSuccess(`Photo compressée (≈ ${approxKo} Ko) — prête à être enregistrée`);
+      const outputFormat = compressedDataUrl.startsWith('data:image/webp;') ? 'WebP' : 'JPEG';
+      setSuccess(`Photo optimisée en ${outputFormat} (≈ ${approxKo} Ko) — prête à être enregistrée`);
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de traitement de la photo');

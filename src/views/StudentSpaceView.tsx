@@ -480,7 +480,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       const studentId = studentRecord?.id || currentUser.student_id || '';
       let savedAvatar = editAvatar;
       const cloudAvatar = studentRecord?.avatar_url || '';
-      const avatarIsNewUpload = editAvatar.startsWith('data:image/jpeg;base64,');
+      const avatarIsNewUpload = editAvatar.startsWith('data:image/');
       const avatarChanged = avatarIsNewUpload || editAvatar !== cloudAvatar;
 
       if (avatarChanged) {
@@ -1564,7 +1564,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 onChange={(photo) => setEditAvatar(photo)}
                 onRemove={() => setEditAvatar('')}
                 label="Photo de profil"
-                helperText="Glissez une image ou cliquez pour télécharger/remplacer votre photo (formats JPG, PNG, WebP acceptés)."
+                helperText="Formats JPG, PNG ou WebP acceptés ; la photo est convertie en WebP et compressée automatiquement."
               />
 
               <div className="pt-2">
