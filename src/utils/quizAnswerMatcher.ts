@@ -163,34 +163,71 @@ export function formatCorrectTextAnswerForDisplay(question: QuizQuestion): strin
   return expectedAnswers.map((p, i) => `Case ${i + 1}: ${p}`).join(' · ');
 }
 
+export interface QuestionPointsResult {
+  awardedPoints: number;
+  maxPoints: number;
+  isFullyCorrect: boolean;
+  partialCorrectCount: number;
+  totalBlanks: number;
+}
+
 /**
- * Vérifie si la réponse à une question d'un quiz (QCM, texte ou réordonnancement) est correcte.
- * Prend en charge les questions à trou unique et à trous multiples (ex: 4 verbes dans une phrase).
+ * Calcule les points obtenus pour une question (avec gestion du score partiel pour les trous multiples,
+ * où chaque trou vaut par défaut 1 point).
  */
-export function isQuestionAnswerCorrect(question: QuizQuestion, studentAnswer: string): boolean {
+export function calculateQuestionPointsEarned(question: QuizQuestion, studentAnswer: string): QuestionPointsResult {
+  const maxPoints = Number(question.points) || 1;
   const sAns = (studentAnswer || '').trim();
 
   if (question.type === 'reorder') {
-    return isReorderAnswerCorrect(question, sAns);
+    const isCorrect = isReorderAnswerCorrect(question, sAns);
+    return { awardedPoints: isCorrect ? maxPoints : 0, maxPoints, isFullyCorrect: isCorrect, partialCorrectCount: isCorrect ? 1 : 0, totalBlanks: 1 };
   }
 
   if (question.type === 'qcm') {
     const expected = (question.correct_answer || '').trim();
-    return normalizeAnswerText(sAns) === normalizeAnswerText(expected);
+    const isCorrect = normalizeAnswerText(sAns) === normalizeAnswerText(expected);
+    return { awardedPoints: isCorrect ? maxPoints : 0, maxPoints, isFullyCorrect: isCorrect, partialCorrectCount: isCorrect ? 1 : 0, totalBlanks: 1 };
   }
 
   // Type texte : trou unique ou trous multiples
   const expectedAnswers = getQuestionExpectedAnswers(question);
+  const totalBlanks = Math.max(1, expectedAnswers.length);
 
-  if (expectedAnswers.length <= 1) {
+  if (totalBlanks <= 1) {
     const expectedSingle = expectedAnswers[0] || (question.correct_answer || '').trim();
     const studentSingle = parseStudentAnswers(sAns, 1)[0] || sAns;
-    return isTextAnswerCorrect(studentSingle, expectedSingle);
+    const isCorrect = isTextAnswerCorrect(studentSingle, expectedSingle);
+    return { awardedPoints: isCorrect ? maxPoints : 0, maxPoints, isFullyCorrect: isCorrect, partialCorrectCount: isCorrect ? 1 : 0, totalBlanks: 1 };
   }
 
-  // Multiples cases vides à remplir (ex: 2, 3, 4 verbes)
-  const studentParts = parseStudentAnswers(sAns, expectedAnswers.length);
-  return expectedAnswers.every((expectedPart, idx) => {
-    return isTextAnswerCorrect(studentParts[idx] || '', expectedPart);
+  // Multiples cases vides à remplir (notation partielle : 1 point par trou par défaut)
+  const studentParts = parseStudentAnswers(sAns, totalBlanks);
+  let correctCount = 0;
+  expectedAnswers.forEach((expectedPart, idx) => {
+    if (isTextAnswerCorrect(studentParts[idx] || '', expectedPart)) {
+      correctCount++;
+    }
   });
+
+  const effectiveMaxPoints = Math.max(maxPoints, totalBlanks);
+  const pointsPerBlank = effectiveMaxPoints / totalBlanks;
+  const awardedPoints = Number((correctCount * pointsPerBlank).toFixed(2));
+  const isFullyCorrect = correctCount === totalBlanks;
+
+  return {
+    awardedPoints,
+    maxPoints: effectiveMaxPoints,
+    isFullyCorrect,
+    partialCorrectCount: correctCount,
+    totalBlanks
+  };
+}
+
+/**
+ * Vérifie si la réponse à une question d'un quiz (QCM, texte ou réordonnancement) est correcte.
+ * Prend en charge les questions à trou unique et à trous multiples.
+ */
+export function isQuestionAnswerCorrect(question: QuizQuestion, studentAnswer: string): boolean {
+  return calculateQuestionPointsEarned(question, studentAnswer).isFullyCorrect;
 }

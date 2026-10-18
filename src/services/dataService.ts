@@ -27,7 +27,7 @@ import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
-import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
+import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay, calculateQuestionPointsEarned, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 
 interface AppState {
@@ -1240,10 +1240,18 @@ export const dataService = {
     questions: QuizQuestion[];
     is_public?: boolean;
   }): Quiz {
-    const normalizedQuestions = (data.questions || []).map(question => ({
-      ...question,
-      time_limit_seconds: getQuestionTimeSeconds(question)
-    }));
+    const normalizedQuestions = (data.questions || []).map(question => {
+      const expectedAnswers = getQuestionExpectedAnswers(question);
+      let pts = Number(question.points) || 1;
+      if (question.type === 'text' && expectedAnswers.length > 1 && pts <= 1) {
+        pts = expectedAnswers.length;
+      }
+      return {
+        ...question,
+        points: pts,
+        time_limit_seconds: getQuestionTimeSeconds(question)
+      };
+    });
     const totalTimeSeconds = normalizedQuestions.reduce((total, question) => total + getQuestionTimeSeconds(question), 0);
     const totalPoints = normalizedQuestions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0) || 20;
     const cls = state.classes.find(c => c.id === data.class_id);
@@ -1308,10 +1316,18 @@ export const dataService = {
       }
     }
 
-    const normalizedQuestions = updates.questions?.map(question => ({
-      ...question,
-      time_limit_seconds: getQuestionTimeSeconds(question)
-    }));
+    const normalizedQuestions = updates.questions?.map(question => {
+      const expectedAnswers = getQuestionExpectedAnswers(question);
+      let pts = Number(question.points) || 1;
+      if (question.type === 'text' && expectedAnswers.length > 1 && pts <= 1) {
+        pts = expectedAnswers.length;
+      }
+      return {
+        ...question,
+        points: pts,
+        time_limit_seconds: getQuestionTimeSeconds(question)
+      };
+    });
     const totalTimeSeconds = normalizedQuestions?.reduce((total, question) => total + getQuestionTimeSeconds(question), 0) || 0;
     const totalPoints = normalizedQuestions
       ? normalizedQuestions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0)
@@ -1510,19 +1526,17 @@ export const dataService = {
 
     quiz.questions.forEach(q => {
       const studentAns = (answers[q.id] || '').trim();
-      const expectedAns = (q.correct_answer || '').trim();
-      const isCorrect = isQuestionAnswerCorrect(q, studentAns);
-
-      const awarded = isCorrect ? (Number(q.points) || 1) : 0;
+      const pointsInfo = calculateQuestionPointsEarned(q, studentAns);
+      const awarded = pointsInfo.awardedPoints;
       rawScore += awarded;
       feedback[q.id] = {
-        correct: isCorrect,
+        correct: pointsInfo.isFullyCorrect,
         points: awarded,
         expected: q.type === 'reorder'
           ? formatCorrectReorderAnswer(q)
           : q.type === 'text'
           ? formatCorrectTextAnswerForDisplay(q)
-          : expectedAns,
+          : (q.correct_answer || ''),
         studentAnswer: q.type === 'reorder'
           ? formatReorderAnswer(q, studentAns)
           : q.type === 'text'

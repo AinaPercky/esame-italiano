@@ -11,10 +11,12 @@
 //      correct_answer (mot, expression ou phrase attendue). Vous pouvez déclarer plusieurs variantes 
 //      acceptées en les séparant par un slash '/' (ex: "cuocio / io cuocio"). 
 //      La correction valide dès que l’élève saisit l’une des variantes (insensible à la casse et aux espaces).
-//   2. MULTI-TROUS (ex: conjuguer plusieurs verbes à la fois dans une phrase) :
-//      Utilisez le champ "answers" (tableau de chaînes) ou séparez les réponses de chaque trou par un pipe '|' 
-//      dans "correct_answer" (ex: "parlo | scrivi | legge | dormiamo").
-//      Vous pouvez également autoriser des variantes par trou en séparant avec un slash '/' (ex: "parlo / io parlo").
+//   2. MULTI-TROUS & NOTATION PARTIELLE (ex: conjuguer plusieurs verbes à la fois) :
+//      - Barème par défaut : 1 point par trou (ex: une question avec 4 trous vaut automatiquement 4 points).
+//      - Notation partielle : L'élève obtient des points pour chaque trou correct (ex: 3 trous corrects sur 4 = 3 points).
+//      - Syntaxe : Utilisez le champ "answers" (tableau de chaînes) ou séparez les réponses de chaque trou par un pipe '|' 
+//        dans "correct_answer" (ex: "parlo | scrivi | legge | dormiamo").
+//        Vous pouvez autoriser des variantes par trou avec un slash '/' (ex: "parlo / io parlo").
 // - reorder : items (au moins deux éléments DISTINCTS, déjà rangés dans l’ordre correct).
 //   L’application mélange ces éléments pour l’élève; la correction vérifie la séquence exacte.
 //
@@ -89,8 +91,9 @@
       "time_limit_seconds": 32
     },
     {
-      // EXEMPLE DE QUESTION MULTI-TROUS : Conjuguer 4 verbes à la fois dans une même phrase.
-      // La phrase contient 4 trous (représentés par ____ ou des tirets bas).
+      // EXEMPLE DE QUESTION MULTI-TROUS & BARÈME PAR DÉFAUT (1 pt par trou) :
+      // Cette question comporte 4 trous. Par défaut, son barème est de 4 points (1 pt par trou).
+      // Si l'élève réussit 3 trous sur 4, il obtiendra 3 points (notation partielle).
       "type": "text",
       "question": "Coniuga i verbi al presente: Io ______ (parlare), tu ______ (scrivere), lui ______ (leggere), noi ______ (dormire).",
       // Option A : Utiliser le champ "answers" avec un tableau de réponses pour chaque trou (avec variantes possibles via '/')
@@ -102,7 +105,7 @@
       ],
       // Option B (alternative) : "correct_answer": "parlo | scrivi | legge | dormiamo"
       "correct_answer": "parlo | scrivi | legge | dormiamo",
-      "points": 2,
+      "points": 4, // 4 trous = 4 points par défaut (1 point par trou)
       "explanation": "Conjugaison correcte des quatre verbes aux personnes correspondantes.",
       "time_limit_seconds": 45
     },
