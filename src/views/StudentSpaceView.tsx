@@ -112,6 +112,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [editFirstName, setEditFirstName] = useState<string>(currentUser.name.split(' ')[0] || '');
   const [editLastName, setEditLastName] = useState<string>(currentUser.name.split(' ').slice(1).join(' ') || '');
   const [editStudentNumber, setEditStudentNumber] = useState<string>(currentUser.student_number || '1');
+  const [editGender, setEditGender] = useState<'homme' | 'femme'>(currentUser.gender || 'homme');
   const [editAvatar, setEditAvatar] = useState<string>(currentUser.avatar || '');
   const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
@@ -126,6 +127,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   useEffect(() => {
     if (studentRecord?.avatar_url) setEditAvatar(studentRecord.avatar_url);
   }, [studentRecord?.avatar_url]);
+
+  useEffect(() => {
+    setEditGender(studentRecord?.gender || currentUser.gender || 'homme');
+  }, [currentUser.gender, studentRecord?.gender]);
 
   const getStudentQueryInfo = () => {
     const stId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
@@ -495,12 +500,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         first_name: editFirstName.trim(),
         last_name: editLastName.trim(),
         student_number: editStudentNumber.trim(),
+        gender: editGender,
         avatar_url: savedAvatar || null
       });
       const ok = authService.updateStudentProfile(studentId, {
         firstName: editFirstName,
         lastName: editLastName,
         studentNumber: editStudentNumber,
+        gender: editGender,
         avatar: savedAvatar
       });
       if (!ok) throw new Error('Impossible de mettre à jour la session élève.');
@@ -1544,6 +1551,20 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   onChange={(e) => setEditStudentNumber(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="student-profile-gender" className="text-xs font-bold text-slate-700">Sexe</label>
+                <select
+                  id="student-profile-gender"
+                  required
+                  value={editGender}
+                  onChange={e => setEditGender(e.target.value === 'femme' ? 'femme' : 'homme')}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="homme">Homme</option>
+                  <option value="femme">Femme</option>
+                </select>
               </div>
 
               <div className="space-y-1">
