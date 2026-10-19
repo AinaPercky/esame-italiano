@@ -125,16 +125,18 @@ export function parseStudentAnswers(answerStr: string, expectedCount: number): s
   try {
     const parsed = JSON.parse(answerStr);
     if (Array.isArray(parsed)) {
-      return Array.from({ length: expectedCount }, (_, i) => String(parsed[i] ?? '').trim());
+      // Preserve trailing spaces while the student is typing; comparison normalizes later.
+      return Array.from({ length: expectedCount }, (_, i) => String(parsed[i] ?? ''));
     }
   } catch {}
 
-  if (answerStr.includes(' | ')) {
+  if (expectedCount > 1 && answerStr.includes(' | ')) {
     const parts = answerStr.split(/\s*\|\s*/);
-    return Array.from({ length: expectedCount }, (_, i) => String(parts[i] ?? '').trim());
+    return Array.from({ length: expectedCount }, (_, i) => String(parts[i] ?? ''));
   }
 
-  return [answerStr.trim(), ...Array(Math.max(0, expectedCount - 1)).fill('')];
+  // Do not trim a single input value: a trailing space is needed to enter the next word.
+  return [answerStr, ...Array(Math.max(0, expectedCount - 1)).fill('')];
 }
 
 /**
