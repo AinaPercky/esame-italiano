@@ -7,6 +7,7 @@ import {
   PassOrderItem, 
   ExamStatistics,
   Quiz,
+  QuizCategory,
   QuizQuestion,
   QuizSubmission,
   DailyGrade
@@ -1236,6 +1237,7 @@ export const dataService = {
   createQuiz(data: {
     title: string;
     description?: string;
+    category?: QuizCategory;
     class_id: string;
     class_ids?: string[];
     duration_minutes: number;
@@ -1265,6 +1267,7 @@ export const dataService = {
       id: generateUUID(),
       public_id: data.is_public ? generateUUID() : undefined,
       is_public: data.is_public ?? false,
+      category: data.category || 'Autre',
       title: data.title.trim(),
       description: data.description?.trim(),
       class_id: data.class_id, // Keep for backward compatibility (first class)
@@ -1363,9 +1366,8 @@ export const dataService = {
   },
 
   /**
-   * Le professeur lance le début du quiz pour la classe :
-   * - Tous les élèves de la classe peuvent alors commencer.
-   * - Fenêtre de disponibilité stricte d'1 heure (60 minutes).
+   * Lance le quiz pour les classes ciblées.
+   * Tous les quiz restent accessibles jusqu'à leur clôture manuelle.
    */
   launchQuiz(id: string): Quiz {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
@@ -1377,13 +1379,12 @@ export const dataService = {
     }
 
     const now = new Date();
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 heure exacte
 
     state.quizzes[idx] = {
       ...state.quizzes[idx],
       status: 'launched',
       launched_at: now.toISOString(),
-      expires_at: oneHourLater.toISOString()
+      expires_at: undefined
     };
 
     supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud launchQuiz error:', err));
@@ -1410,33 +1411,10 @@ export const dataService = {
     return state.quizzes[idx];
   },
 
-  /**
-   * Règle stricte :
-   * Le quiz disparaît 1 heure après le lancement.
-   * Si l'élève ne fait pas le quiz dans ce délai, alors sa note sera de zéro !
-   */
+  /** Les anciennes échéances sont ignorées : seul closeQuiz clôt un quiz lancé. */
   checkAndApplyExpiredQuizzes(): void {
-    if (!state.quizzes) return;
-    const now = Date.now();
-    let hasChanged = false;
-
-    state.quizzes.forEach(q => {
-      if (q.status === 'launched' && q.expires_at) {
-        const expireTime = new Date(q.expires_at).getTime();
-        if (now >= expireTime) {
-          // L'heure est écoulée : fermeture et attribution de 0 pour les retardataires
-          q.status = 'closed';
-          supabaseService.saveQuiz(q).catch(err => console.error('Cloud expireQuiz error:', err));
-          this.applyZeroForMissedStudents(q);
-          hasChanged = true;
-        }
-      }
-    });
-
-    if (hasChanged) {
-      persistState();
-      notifySubscribers();
-    }
+    // Conservée pour compatibilité avec les appelants existants; aucun quiz
+    // ne s'expire automatiquement, que le quiz soit public ou privé.
   },
 
   applyZeroForMissedStudents(quiz: Quiz): void {
@@ -1456,7 +1434,7 @@ export const dataService = {
 
     classStudents.forEach(st => {
       if (!existingStudentIds.has(st.id)) {
-        // L'élève n'a pas composé dans l'heure : attribution automatique de la note 0 / 20
+        // À la clôture, l'élève qui n'a pas composé reçoit la note de 0 / 20.
         const studentClass = state.classes.find(c => c.id === st.class_id);
         const zeroSubmission: QuizSubmission = {
           id: `sub_missed_${quiz.id}_${st.id}`,
@@ -1487,7 +1465,7 @@ export const dataService = {
   /**
    * Soumission et correction automatique d'un quiz
    */
-  submitQuiz(
+  async submitQuiz(
     quizId: string,
     studentId: string,
     studentName: string,
@@ -1495,7 +1473,7 @@ export const dataService = {
     classId: string,
     answers: Record<string, string>,
     isTimeout = false
-  ): QuizSubmission {
+  ): Promise<QuizSubmission> {
     const quiz = this.getQuizById(quizId);
     if (!quiz) throw new Error('Quiz introuvable');
 
@@ -1576,14 +1554,15 @@ export const dataService = {
       date: today
     };
 
+    // Persist the final score before marking this attempt complete in the UI.
+    await supabaseService.saveQuizSubmission(submission);
+
     if (existingIdx !== -1) {
       state.quizSubmissions[existingIdx] = submission;
     } else {
       state.quizSubmissions.unshift(submission);
     }
 
-    supabaseService.saveQuizSubmission(submission)
-      .catch(err => console.error('Cloud submitQuiz error:', err));
     persistState();
     notifySubscribers();
     return submission;

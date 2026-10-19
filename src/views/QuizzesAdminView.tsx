@@ -36,9 +36,11 @@ import {
   RotateCcw,
   QrCode,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Search,
+  SlidersHorizontal
 } from 'lucide-react';
-import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade } from '../types';
+import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
@@ -53,6 +55,14 @@ interface QuizzesAdminViewProps {
   onRefresh?: () => void;
 }
 
+const normalizeQuizSearchText = (value: string): string =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+
+const normalizeQuizCategory = (value: unknown): QuizCategory =>
+  typeof value === 'string' && QUIZ_CATEGORIES.includes(value as QuizCategory)
+    ? value as QuizCategory
+    : 'Autre';
+
 export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   classes,
   students,
@@ -63,6 +73,17 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
   const [dailyGrades, setDailyGrades] = useState<DailyGrade[]>([]);
   const [activeTab, setActiveTab] = useState<'quizzes' | 'leaderboard'>('quizzes');
+  const [quizSearchTerm, setQuizSearchTerm] = useState('');
+  const [quizStatusFilter, setQuizStatusFilter] = useState<'all' | Quiz['status']>('all');
+  const [quizVisibilityFilter, setQuizVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [quizCategoryFilter, setQuizCategoryFilter] = useState<'all' | QuizCategory>('all');
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
+  const [createdAfter, setCreatedAfter] = useState('');
+  const [createdBefore, setCreatedBefore] = useState('');
+  const [minQuestionCount, setMinQuestionCount] = useState('');
+  const [maxQuestionCount, setMaxQuestionCount] = useState('');
+  const [minSubmissionCount, setMinSubmissionCount] = useState('');
+  const [maxSubmissionCount, setMaxSubmissionCount] = useState('');
 
   // In-app Confirm Dialog State (remplace window.confirm pour éviter l'erreur de sandbox iframe)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -91,6 +112,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   // Form State
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDescription, setQuizDescription] = useState('');
+  const [quizCategory, setQuizCategory] = useState<QuizCategory | ''>('');
   const [selectedQuizClassIds, setSelectedQuizClassIds] = useState<string[]>(classes[0] ? [classes[0].id] : []);
   const [quizDuration, setQuizDuration] = useState(10);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -180,6 +202,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     const exportData = {
       title: quizTitle || 'Sans titre',
       description: quizDescription || '',
+      category: quizCategory || 'Autre',
       duration_minutes: quizDuration || 10,
       questions: questions.map((q) => {
         const item: any = {
@@ -298,6 +321,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       if (typeof parsed.description === 'string') {
         setQuizDescription(parsed.description);
       }
+      if (typeof parsed.category === 'string') {
+        setQuizCategory(normalizeQuizCategory(parsed.category));
+      }
       if (parsed.duration_minutes) {
         setQuizDuration(Number(parsed.duration_minutes) || 10);
       }
@@ -367,6 +393,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.createQuiz({
         title: parsed.title,
         description: parsed.description || '',
+        category: normalizeQuizCategory(parsed.category),
         class_id: selectedClassId || classes[0]?.id || '',
         duration_minutes: Number(parsed.duration_minutes) || 10,
         questions: importedQuestions
@@ -418,7 +445,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   useEffect(() => {
     loadData();
     const unsub = dataService.subscribe(loadData);
-    // Interval de rafraîchissement automatique toutes les 15s pour le décompte de 1h
+    // Rafraîchit l’état des quiz en direct et les compteurs des quiz publics temporisés.
     const timer = setInterval(loadData, 15000);
     return () => {
       unsub();
@@ -430,6 +457,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(null);
     setQuizTitle('');
     setQuizDescription('');
+    setQuizCategory('');
     setSelectedQuizClassIds(selectedClassId ? [selectedClassId] : (classes[0] ? [classes[0].id] : []));
     setQuizDuration(1);
     setQuestions([
@@ -451,6 +479,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(quiz);
     setQuizTitle(quiz.title);
     setQuizDescription(quiz.description || '');
+    setQuizCategory(normalizeQuizCategory(quiz.category));
     const initialClassIds = quiz.class_ids && quiz.class_ids.length > 0 ? quiz.class_ids : (quiz.class_id ? [quiz.class_id] : []);
     setSelectedQuizClassIds(initialClassIds.length > 0 ? initialClassIds : (selectedClassId ? [selectedClassId] : []));
     const normalizedQuestions: QuizQuestion[] = quiz.questions
@@ -488,6 +517,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setFormError(null);
     if (!quizTitle.trim()) {
       setFormError('Veuillez renseigner un titre pour le quiz.');
+      return;
+    }
+    if (!quizCategory) {
+      setFormError('Veuillez sélectionner une catégorie pour le quiz.');
       return;
     }
     if (selectedQuizClassIds.length === 0) {
@@ -550,6 +583,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.updateQuiz(editingQuiz.id, {
         title: quizTitle,
         description: quizDescription,
+        category: quizCategory,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -560,6 +594,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.createQuiz({
         title: quizTitle,
         description: quizDescription,
+        category: quizCategory,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -588,13 +623,19 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   };
 
   const handleLaunchQuiz = (quizId: string, isRelaunch = false) => {
+    const quiz = quizzes.find(item => item.id === quizId);
+    const targetClassIds = quiz?.class_ids?.length ? quiz.class_ids : (quiz?.class_id ? [quiz.class_id] : []);
+    const targetLabel = classes.length > 0 && targetClassIds.length === classes.length
+      ? 'toutes les classes'
+      : targetClassIds.length > 1 ? 'les classes sélectionnées' : 'la classe ciblée';
+    const accessRule = 'jusqu’à sa clôture manuelle par le professeur.';
     setConfirmDialog({
       isOpen: true,
       title: isRelaunch ? 'Relancer le Quiz en Direct' : 'Lancer le Quiz en Direct',
       message: isRelaunch
-        ? 'Relancer ce quiz dès maintenant pour tous les élèves ?\nIl sera de nouveau accessible pendant exactement 1 heure pour les élèves qui ne l\'avaient pas encore complété.'
-        : 'Lancer ce quiz dès maintenant pour tous les élèves de la classe ?\nIl sera accessible pendant exactement 1 heure pour les élèves.',
-      confirmLabel: isRelaunch ? 'Relancer le Quiz (1h)' : 'Lancer le Quiz (1h)',
+        ? `Relancer ce quiz pour ${targetLabel} ? Il restera accessible ${accessRule} Les élèves qui l'ont déjà soumis ne pourront pas le refaire.`
+        : `Lancer ce quiz pour ${targetLabel} ? Il restera accessible ${accessRule} Chaque élève ne pourra le soumettre qu'une seule fois.`,
+      confirmLabel: isRelaunch ? 'Relancer le quiz' : 'Lancer le quiz',
       variant: 'success',
       action: () => {
         dataService.launchQuiz(quizId);
@@ -608,7 +649,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setConfirmDialog({
       isOpen: true,
       title: 'Clôturer le Quiz',
-      message: 'Clôturer ce quiz immédiatement ?\nTout élève n\'ayant pas composé dans le temps imparti recevra la note de 0/20.',
+      message: 'Clôturer ce quiz immédiatement ? Tout élève qui ne l’a pas soumis recevra la note de 0/20.',
       confirmLabel: 'Clôturer maintenant',
       variant: 'warning',
       action: () => {
@@ -619,16 +660,6 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     });
   };
 
-  // Calcul du temps restant pour un quiz lancé (< 1h)
-  const getRemainingLaunchTime = (expiresAt?: string) => {
-    if (!expiresAt) return null;
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return 'Expiré (1h écoulée)';
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
-  };
-
   const trackingQuiz = activeTrackingQuizId 
     ? quizzes.find(q => q.id === activeTrackingQuizId) 
     : null;
@@ -637,7 +668,88 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     ? submissions.filter(s => s.quiz_id === trackingQuiz.id) 
     : [];
 
-  const classStudents = students.filter(s => s.class_id === (trackingQuiz?.class_id || selectedClassId));
+  const trackingClassIds = trackingQuiz
+    ? (trackingQuiz.class_ids?.length ? trackingQuiz.class_ids : [trackingQuiz.class_id])
+    : [];
+  const classStudents = trackingQuiz
+    ? students.filter(s => trackingClassIds.includes(s.class_id))
+    : students.filter(s => s.class_id === selectedClassId);
+  const trackingClassNames = classes
+    .filter(c => trackingClassIds.includes(c.id))
+    .map(c => c.name)
+    .join(', ');
+  const trackingClassLabel = classes.length > 0 && trackingClassIds.length === classes.length
+    ? 'Toutes les classes'
+    : trackingClassNames || 'Classe';
+
+  const submissionCountByQuiz = new Map<string, number>();
+  submissions.forEach(submission => {
+    submissionCountByQuiz.set(
+      submission.quiz_id,
+      (submissionCountByQuiz.get(submission.quiz_id) || 0) + 1
+    );
+  });
+  const searchTerms = normalizeQuizSearchText(quizSearchTerm).trim().split(/\s+/).filter(Boolean);
+  const filteredQuizzes = quizzes.filter(quiz => {
+    if (quizStatusFilter !== 'all' && quiz.status !== quizStatusFilter) return false;
+    if (quizVisibilityFilter === 'public' && !quiz.is_public) return false;
+    if (quizVisibilityFilter === 'private' && quiz.is_public) return false;
+    if (quizCategoryFilter !== 'all' && (quiz.category || 'Autre') !== quizCategoryFilter) return false;
+
+    const questionCount = quiz.questions?.length || 0;
+    const submissionCount = submissionCountByQuiz.get(quiz.id) || 0;
+    if (minQuestionCount !== '' && questionCount < Number(minQuestionCount)) return false;
+    if (maxQuestionCount !== '' && questionCount > Number(maxQuestionCount)) return false;
+    if (minSubmissionCount !== '' && submissionCount < Number(minSubmissionCount)) return false;
+    if (maxSubmissionCount !== '' && submissionCount > Number(maxSubmissionCount)) return false;
+
+    const createdDate = quiz.created_at?.slice(0, 10) || '';
+    if (createdAfter && (!createdDate || createdDate < createdAfter)) return false;
+    if (createdBefore && (!createdDate || createdDate > createdBefore)) return false;
+
+    if (searchTerms.length > 0) {
+      const quizClassIds = quiz.class_ids?.length ? quiz.class_ids : [quiz.class_id];
+      const classNames = quizClassIds
+        .map(id => classes.find(classroom => classroom.id === id)?.name || '')
+        .join(' ');
+      const statusLabel = quiz.status === 'draft'
+        ? 'brouillon draft'
+        : quiz.status === 'launched'
+        ? 'en direct lancé actif live'
+        : 'clôturé fermé closed';
+      const visibilityLabel = quiz.is_public ? 'public lien partagé' : 'privé classe';
+      const questionText = (quiz.questions || [])
+        .map(question => `${question.question || ''} ${question.type || ''}`)
+        .join(' ');
+      const searchableText = normalizeQuizSearchText([
+        quiz.title,
+        quiz.description || '',
+        quiz.category || 'Autre',
+        classNames,
+        statusLabel,
+        visibilityLabel,
+        createdDate,
+        questionText
+      ].join(' '));
+      if (!searchTerms.every(term => searchableText.includes(term))) return false;
+    }
+
+    return true;
+  });
+
+  const resetQuizFilters = () => {
+    setSelectedClassId('');
+    setQuizSearchTerm('');
+    setQuizStatusFilter('all');
+    setQuizVisibilityFilter('all');
+    setQuizCategoryFilter('all');
+    setCreatedAfter('');
+    setCreatedBefore('');
+    setMinQuestionCount('');
+    setMaxQuestionCount('');
+    setMinSubmissionCount('');
+    setMaxSubmissionCount('');
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -657,7 +769,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
-              Créez des quiz (QCM ou texte), lancez-les en direct avec une fenêtre de 1 heure. Notes cumulées journalières calculées automatiquement.
+              Tous les quiz restent ouverts jusqu’à leur clôture manuelle par le professeur, qu’ils soient publics ou privés. Notes cumulées journalières calculées automatiquement.
             </p>
           </div>
         </div>
@@ -780,6 +892,116 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         </div>
       </div>
 
+      {/* Recherche multicritère et filtres des quiz */}
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <label className="relative block md:col-span-1">
+            <span className="sr-only">Rechercher un quiz</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={quizSearchTerm}
+              onChange={event => setQuizSearchTerm(event.target.value)}
+              placeholder="Titre, classe, question, statut…"
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Statut</span>
+            <select
+              value={quizStatusFilter}
+              onChange={event => setQuizStatusFilter(event.target.value as 'all' | Quiz['status'])}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="draft">Brouillons</option>
+              <option value="launched">En direct</option>
+              <option value="closed">Clôturés</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Accès</span>
+            <select
+              value={quizVisibilityFilter}
+              onChange={event => setQuizVisibilityFilter(event.target.value as 'all' | 'public' | 'private')}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">Publics et privés</option>
+              <option value="public">Publics</option>
+              <option value="private">Privés</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Catégorie</span>
+            <select
+              value={quizCategoryFilter}
+              onChange={event => setQuizCategoryFilter(event.target.value as 'all' | QuizCategory)}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">Toutes les catégories</option>
+              {QUIZ_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <p className="text-[11px] text-slate-400">
+          La recherche parcourt les titres, descriptions, classes, questions, catégories, statuts et accès publics ou privés.
+        </p>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+          <p className="text-xs font-semibold text-slate-500" aria-live="polite">
+            {filteredQuizzes.length} quiz affiché{filteredQuizzes.length === 1 ? '' : 's'} sur {quizzes.length}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-expanded={isAdvancedFilterOpen}
+              onClick={() => setIsAdvancedFilterOpen(open => !open)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${isAdvancedFilterOpen ? 'border-amber-700 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtres avancés
+            </button>
+            <button
+              type="button"
+              onClick={resetQuizFilters}
+              className="rounded-lg px-3 py-2 text-xs font-bold text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+            >
+              Effacer les filtres
+            </button>
+          </div>
+        </div>
+
+        {isAdvancedFilterOpen && (
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-amber-100 bg-amber-50/50 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Créé à partir du</span>
+              <input type="date" value={createdAfter} onChange={event => setCreatedAfter(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Créé jusqu’au</span>
+              <input type="date" value={createdBefore} onChange={event => setCreatedBefore(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Questions minimum</span>
+              <input type="number" min="0" step="1" value={minQuestionCount} onChange={event => setMinQuestionCount(event.target.value)} placeholder="Sans minimum" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Questions maximum</span>
+              <input type="number" min="0" step="1" value={maxQuestionCount} onChange={event => setMaxQuestionCount(event.target.value)} placeholder="Sans maximum" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Soumissions minimum</span>
+              <input type="number" min="0" step="1" value={minSubmissionCount} onChange={event => setMinSubmissionCount(event.target.value)} placeholder="Sans minimum" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">Soumissions maximum</span>
+              <input type="number" min="0" step="1" value={maxSubmissionCount} onChange={event => setMaxSubmissionCount(event.target.value)} placeholder="Sans maximum" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500" />
+            </label>
+          </div>
+        )}
+      </div>
+
       {/* Main Quizzes List */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -788,7 +1010,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-amber-800" />
-              <span>Liste des Quiz créés ({quizzes.length})</span>
+              <span>Liste des Quiz ({filteredQuizzes.length} / {quizzes.length})</span>
             </h2>
           </div>
 
@@ -807,12 +1029,20 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                 Créer un premier quiz
               </button>
             </div>
+          ) : filteredQuizzes.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-3">
+              <Search className="mx-auto h-9 w-9 text-slate-400" />
+              <h3 className="text-sm font-bold text-slate-800">Aucun quiz ne correspond à ces critères</h3>
+              <p className="mx-auto max-w-sm text-xs text-slate-500">Modifiez la recherche ou effacez les filtres pour retrouver vos quiz.</p>
+              <button type="button" onClick={resetQuizFilters} className="rounded-xl bg-amber-800 px-4 py-2 text-xs font-bold text-white hover:bg-amber-900">
+                Effacer les filtres
+              </button>
+            </div>
           ) : (
             <div className="space-y-3">
-              {quizzes.map((quiz) => {
+              {filteredQuizzes.map((quiz) => {
                 const isLive = quiz.status === 'launched';
                 const isClosed = quiz.status === 'closed';
-                const remaining = isLive ? getRemainingLaunchTime(quiz.expires_at) : null;
                 const quizSubs = submissions.filter(s => s.quiz_id === quiz.id);
 
                 return (
@@ -827,6 +1057,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                            {quiz.category || 'Autre'}
+                          </span>
                           {quiz.class_ids && quiz.class_ids.length > 1 ? (
                             quiz.class_ids.map(cid => {
                               const c = classes.find(item => item.id === cid);
@@ -845,7 +1078,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           {isLive && (
                             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                               <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                              <span>EN DIRECT • {remaining}</span>
+                              <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">EN DIRECT • jusqu’à clôture</span>
                             </span>
                           )}
 
@@ -913,10 +1146,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             type="button"
                             onClick={() => handleLaunchQuiz(quiz.id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Lancer le quiz pour la classe pendant 1 heure"
+                            title="Lancer le quiz jusqu’à sa clôture manuelle"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Lancer (1h)</span>
+                            <span>Lancer</span>
                           </button>
                         )}
 
@@ -925,10 +1158,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             type="button"
                             onClick={() => handleLaunchQuiz(quiz.id, true)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Relancer ce quiz pour 1 heure (accessible à tous les élèves n'ayant pas encore complété le test)"
+                            title="Relancer ce quiz jusqu’à sa clôture manuelle; les élèves ayant déjà soumis ne pourront pas le refaire"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Relancer (1h)</span>
+                            <span>Relancer</span>
                           </button>
                         )}
 
@@ -1049,8 +1282,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               </div>
 
               <div className="text-xs text-slate-600 space-y-1">
-                <p>Classe : <strong>{trackingQuiz.class_name}</strong></p>
-                <p>Temps restant sur la session d'1 heure : <strong className="text-emerald-700 font-mono">{getRemainingLaunchTime(trackingQuiz.expires_at)}</strong></p>
+                <p>{trackingClassIds.length > 1 ? 'Classes' : 'Classe'} : <strong>{trackingClassLabel}</strong></p>
+                <p>Disponibilité : <strong>jusqu’à la clôture manuelle du professeur</strong></p>
               </div>
 
               {/* Roster participation checklist */}
@@ -1381,6 +1614,19 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     placeholder="ex: Vocabolario: Gli Animali (Test Rapido)"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Catégorie *</label>
+                  <select
+                    required
+                    value={quizCategory}
+                    onChange={(e) => setQuizCategory(e.target.value as QuizCategory | '')}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="" disabled>Sélectionner une catégorie</option>
+                    {QUIZ_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                  </select>
                 </div>
 
                 <div className="sm:col-span-2 space-y-1.5">

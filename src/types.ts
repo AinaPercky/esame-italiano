@@ -155,10 +155,28 @@ export interface QuizReorderItem {
   text: string;
 }
 
+export const QUIZ_CATEGORIES = [
+  'Vocabulaire',
+  'Grammaire',
+  'Thème (traduction FR → IT)',
+  'Conjugaison',
+  'Fonctions du langage',
+  'Compréhension écrite',
+  'Compréhension orale',
+  'Expression écrite',
+  'Expression orale',
+  'Culture et civilisation italiennes',
+  'Orthographe et prononciation',
+  'Autre'
+] as const;
+
+export type QuizCategory = typeof QUIZ_CATEGORIES[number];
+
 export interface Quiz {
   id: string;
   public_id?: string; // UUID unique pour l'accès public via lien partageable
   is_public?: boolean; // Indique si le quiz est publié publiquement
+  category?: QuizCategory;
   title: string;
   description?: string;
   class_id: string; // Primary class (backward compatibility)
@@ -168,7 +186,7 @@ export interface Quiz {
   duration_minutes: number; // Temps imparti pour composer (ex: 5, 10, 15 min)
   status: 'draft' | 'launched' | 'closed';
   launched_at?: string; // Timestamp ISO lorsque le professeur lance le quiz
-  expires_at?: string; // Timestamp ISO (1 heure après le lancement)
+  expires_at?: string; // Ancien champ conservé pour compatibilité; les quiz ne sont plus expirés automatiquement
   questions: QuizQuestion[];
   total_points: number; // Total des points des questions
 }
@@ -188,7 +206,7 @@ export interface QuizSubmission {
   score: number; // Points obtenus
   max_score: number; // Total points du quiz
   score_20: number; // Note normalisée sur 20
-  status: 'completed' | 'timeout' | 'missed'; // 'missed' = non fait dans l'heure (note = 0)
+  status: 'completed' | 'timeout' | 'missed'; // 'missed' = non fait avant la clôture (note = 0)
   feedback?: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }>;
   date: string; // YYYY-MM-DD
 }

@@ -104,6 +104,7 @@ CREATE TABLE quizzes (
     class_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
+    category TEXT NOT NULL DEFAULT 'Autre',
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     duration_minutes INTEGER NOT NULL DEFAULT 10,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),

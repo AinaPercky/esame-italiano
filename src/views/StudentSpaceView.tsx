@@ -20,7 +20,6 @@ import {
   RotateCcw,
   Check,
   Trophy,
-  FastForward,
   ChevronRight,
   Lock,
   ImagePlus,
@@ -88,10 +87,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [questionSecondsRemaining, setQuestionSecondsRemaining] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
-  const [skippedQuestions, setSkippedQuestions] = useState<Record<string, boolean>>({});
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
+  const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
 
   // Correction & Explication si la réponse est fausse (affichée 8 secondes, suspend les chronomètres)
@@ -104,7 +104,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     explanation?: string;
     countdown: number; // 8 secondes par défaut
     pendingNextAnswers: Record<string, string>;
-    isTimeoutOrSkip: boolean;
+    isTimeout: boolean;
   } | null>(null);
 
   // Profile edit form
@@ -330,7 +330,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     primeTimerAudio();
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
     setQuizAnswers({});
-    setSkippedQuestions({});
     setIncorrectFeedback(null);
     setCurrentQuestionIndex(0);
     const randomizedQuiz = {
@@ -345,6 +344,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuizSecondsRemaining(totalSecs);
     setQuestionSecondsRemaining(firstQuestionSeconds);
     setLastSubmissionResult(null);
+    setQuizSubmissionError(null);
   };
 
   // Fonction utilitaire pour tester si une réponse est correcte
@@ -368,7 +368,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   // Traiter la réponse de la question : si fausse, afficher l'explication pendant 8s
   const processQuestionProgression = (
     updatedAnswers: Record<string, string>,
-    isTimeoutOrSkip: boolean = false
+    isTimeout: boolean = false
   ) => {
     if (!activeQuiz) return;
     const currentQ = activeQuiz.questions[currentQuestionIndex];
@@ -381,7 +381,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       // Bonne réponse : passage direct et fluide à la question suivante
       advanceToNextQuestion(updatedAnswers);
     } else {
-      // Réponse FAUSSE (ou temps écoulé / skippé) :
+      // Réponse fausse ou temps écoulé :
       // Afficher la correction et l'explication pendant 8 secondes (temps hors chronomètre quiz)
       setIncorrectFeedback({
         isOpen: true,
@@ -400,7 +400,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         explanation: currentQ.explanation,
         countdown: 8,
         pendingNextAnswers: updatedAnswers,
-        isTimeoutOrSkip
+        isTimeout
       });
     }
   };
@@ -424,55 +424,44 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     processQuestionProgression(quizAnswers, false);
   };
 
-  // L'élève skippe la question (ne connaît pas la réponse -> note 0)
-  const handleSkipQuestion = () => {
-    if (!activeQuiz) return;
-    const currentQ = activeQuiz.questions[currentQuestionIndex];
-    if (!currentQ) return;
-
-    // Skipper = réponse vide explicite, marquée comme skippée (0 pt)
-    const updatedAnswers = { ...quizAnswers, [currentQ.id]: '' };
-    setQuizAnswers(updatedAnswers);
-    setSkippedQuestions(prev => ({ ...prev, [currentQ.id]: true }));
-
-    processQuestionProgression(updatedAnswers, true);
-  };
-
-  // Bouton pour fermer immédiatement l'explication et avancer sans attendre la fin des 8s
-  const handleSkipExplanation = () => {
-    if (!incorrectFeedback) return;
-    const pending = incorrectFeedback.pendingNextAnswers;
-    setIncorrectFeedback(null);
-    advanceToNextQuestion(pending);
-  };
-
-  const handleSubmitQuiz = (isAutoTimeout = false, customAnswers?: Record<string, string>) => {
-    if (!activeQuiz) return;
+  const handleSubmitQuiz = async (isAutoTimeout = false, customAnswers?: Record<string, string>) => {
+    if (!activeQuiz || quizSubmissionLockRef.current) return;
+    quizSubmissionLockRef.current = true;
     setIsSubmitting(true);
+    setQuizSubmissionError(null);
 
     const answersToSubmit = customAnswers || quizAnswers;
+    setQuizAnswers(answersToSubmit);
 
     const { stId, stName, stNum } = getStudentQueryInfo();
     const clId = activeQuiz.class_id;
 
-    const result = dataService.submitQuiz(
-      activeQuiz.id,
-      stId,
-      stName,
-      stNum,
-      clId,
-      answersToSubmit,
-      isAutoTimeout
-    );
+    try {
+      const result = await dataService.submitQuiz(
+        activeQuiz.id,
+        stId,
+        stName,
+        stNum,
+        clId,
+        answersToSubmit,
+        isAutoTimeout
+      );
 
-    setIsSubmitting(false);
-    setActiveQuiz(null);
-    setCurrentQuestionIndex(0);
-    setLastSubmissionResult(result);
-    loadData();
+      setActiveQuiz(null);
+      setCurrentQuestionIndex(0);
+      setLastSubmissionResult(result);
+      loadData();
 
-    if (isAutoTimeout) {
-      setTimeoutNotice(true);
+      if (isAutoTimeout) {
+        setTimeoutNotice(true);
+      }
+    } catch (error) {
+      setQuizSubmissionError(error instanceof Error
+        ? error.message
+        : 'Le résultat n’a pas pu être enregistré. Vérifiez votre connexion, puis réessayez.');
+    } finally {
+      quizSubmissionLockRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -560,16 +549,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       setProfileErrorMsg('Impossible de lire cette image. Essayez un autre fichier.');
     };
     image.src = imageUrl;
-  };
-
-  // Calcul du temps restant sur la session d'1 heure du quiz lancé par le prof
-  const getRemainingLaunchTime = (expiresAt?: string) => {
-    if (!expiresAt) return null;
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return null;
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
   };
 
   // Formatage chronomètre mm:ss
@@ -884,7 +863,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isTimedOut = sub?.status === 'timeout';
                     const isMissed = sub?.status === 'missed';
                     const isLive = quiz.status === 'launched' && !hasSubmission;
-                    const remaining1h = isLive ? getRemainingLaunchTime(quiz.expires_at) : null;
 
                     return (
                       <div
@@ -894,10 +872,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                                {quiz.category || 'Autre'}
+                              </span>
                               {isLive && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                                   <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                  <span>EN DIRECT • {remaining1h || 'Fermeture imminente'}</span>
+                                  <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">EN DIRECT • jusqu’à clôture</span>
                                 </span>
                               )}
 
@@ -1010,6 +991,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
           return (
             <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
+
+              {quizSubmissionError && (
+                <div role="alert" className="mx-3 mt-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 sm:mx-6">
+                  <span>{quizSubmissionError} Cliquez sur le bouton de validation pour réessayer.</span>
+                </div>
+              )}
               
               {/* Anti-Screenshot Watermark Banner */}
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-2.5 py-1 text-[9px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
@@ -1097,7 +1084,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isPassed = idx < currentQuestionIndex;
                     const isCurrent = idx === currentQuestionIndex;
                     const isAnswered = Boolean(quizAnswers[q.id]);
-                    const isSkipped = Boolean(skippedQuestions[q.id]);
 
                     return (
                       <div
@@ -1106,11 +1092,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                           isCurrent
                             ? 'bg-amber-800 ring-2 ring-amber-400 scale-105'
                             : isPassed
-                              ? isSkipped
-                                ? 'bg-slate-300'
-                                : isAnswered
-                                  ? 'bg-emerald-500'
-                                  : 'bg-slate-300'
+                              ? isAnswered
+                                ? 'bg-emerald-500'
+                                : 'bg-slate-300'
                               : 'bg-slate-200'
                         }`}
                         title={`Question #${idx + 1}`}
@@ -1214,47 +1198,21 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
                   {/* Navigation and Actions Footer */}
                   <div className="sticky bottom-0 -mx-3 flex flex-col gap-2 border-t border-slate-200 bg-slate-100/95 px-2.5 py-2 backdrop-blur sm:-mx-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-0 sm:py-3">
-                    {/* Skip button rule reminder */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSkipQuestion}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 transition-colors hover:bg-slate-200 sm:px-4 sm:py-3 sm:text-sm"
-                        title="Passer cette question (note : 0 pour cette question)"
-                      >
-                        <FastForward className="w-4 h-4 text-slate-500" />
-                        <span>Passer cette question (Note : 0)</span>
-                      </button>
-                    </div>
-
                     {/* Next / Submit Button */}
                     <div className="flex items-center justify-between gap-2 sm:gap-3 sm:justify-end">
                       <button
                         type="button"
-                        onClick={() => {
-                          setConfirmDialog({
-                            isOpen: true,
-                            title: 'Quitter le quiz',
-                            message: 'Voulez-vous vraiment quitter ce quiz en cours ?\nVos réponses déjà passées seront comptabilisées.',
-                            confirmLabel: 'Quitter et enregistrer',
-                            variant: 'warning',
-                            action: () => {
-                              handleSubmitQuiz(false);
-                            }
-                          });
-                        }}
-                        className="px-2 py-1.5 text-[11px] font-semibold text-slate-500 hover:text-slate-700 sm:px-4 sm:py-2.5 sm:text-xs"
-                      >
-                        Abandonner
-                      </button>
-
-                      <button
-                        type="button"
                         disabled={isSubmitting}
-                        onClick={handleAnswerAndNext}
+                        onClick={quizSubmissionError
+                          ? () => void handleSubmitQuiz(quizSecondsRemaining <= 0)
+                          : handleAnswerAndNext}
                         className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-800 px-3 py-2 text-[11px] font-extrabold text-white shadow-md transition-transform hover:bg-amber-900 active:scale-95 sm:flex-none sm:px-6 sm:py-3.5 sm:text-sm"
                       >
-                        {currentQuestionIndex + 1 === totalQuestions ? (
+                        {isSubmitting ? (
+                          <span>Enregistrement du résultat…</span>
+                        ) : quizSubmissionError ? (
+                          <span>Réessayer la validation</span>
+                        ) : currentQuestionIndex + 1 === totalQuestions ? (
                           <>
                             <Save className="w-4 h-4" />
                             <span>Valider et Terminer le Quiz</span>
@@ -1287,7 +1245,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             Correction Pédagogique
                           </span>
                           <h3 className="font-display font-extrabold text-base text-white">
-                            {incorrectFeedback.isTimeoutOrSkip ? 'Question Non Validée ou Passée' : 'Réponse Incorrecte !'}
+                            {incorrectFeedback.isTimeout ? 'Temps écoulé' : 'Réponse incorrecte !'}
                           </h3>
                         </div>
                       </div>
@@ -1369,19 +1327,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center">
                       <span className="text-xs text-slate-500 font-mono">
                         Passage automatique dans {incorrectFeedback.countdown}s...
                       </span>
-
-                      <button
-                        type="button"
-                        onClick={handleSkipExplanation}
-                        className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-                      >
-                        <span>Continuer tout de suite</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
                     </div>
 
                   </div>
