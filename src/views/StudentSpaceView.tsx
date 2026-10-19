@@ -91,7 +91,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [skippedQuestions, setSkippedQuestions] = useState<Record<string, boolean>>({});
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
+  const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
 
   // Correction & Explication si la réponse est fausse (affichée 8 secondes, suspend les chronomètres)
@@ -345,6 +347,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuizSecondsRemaining(totalSecs);
     setQuestionSecondsRemaining(firstQuestionSeconds);
     setLastSubmissionResult(null);
+    setQuizSubmissionError(null);
   };
 
   // Fonction utilitaire pour tester si une réponse est correcte
@@ -446,33 +449,44 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     advanceToNextQuestion(pending);
   };
 
-  const handleSubmitQuiz = (isAutoTimeout = false, customAnswers?: Record<string, string>) => {
-    if (!activeQuiz) return;
+  const handleSubmitQuiz = async (isAutoTimeout = false, customAnswers?: Record<string, string>) => {
+    if (!activeQuiz || quizSubmissionLockRef.current) return;
+    quizSubmissionLockRef.current = true;
     setIsSubmitting(true);
+    setQuizSubmissionError(null);
 
     const answersToSubmit = customAnswers || quizAnswers;
+    setQuizAnswers(answersToSubmit);
 
     const { stId, stName, stNum } = getStudentQueryInfo();
     const clId = activeQuiz.class_id;
 
-    const result = dataService.submitQuiz(
-      activeQuiz.id,
-      stId,
-      stName,
-      stNum,
-      clId,
-      answersToSubmit,
-      isAutoTimeout
-    );
+    try {
+      const result = await dataService.submitQuiz(
+        activeQuiz.id,
+        stId,
+        stName,
+        stNum,
+        clId,
+        answersToSubmit,
+        isAutoTimeout
+      );
 
-    setIsSubmitting(false);
-    setActiveQuiz(null);
-    setCurrentQuestionIndex(0);
-    setLastSubmissionResult(result);
-    loadData();
+      setActiveQuiz(null);
+      setCurrentQuestionIndex(0);
+      setLastSubmissionResult(result);
+      loadData();
 
-    if (isAutoTimeout) {
-      setTimeoutNotice(true);
+      if (isAutoTimeout) {
+        setTimeoutNotice(true);
+      }
+    } catch (error) {
+      setQuizSubmissionError(error instanceof Error
+        ? error.message
+        : 'Le résultat n’a pas pu être enregistré. Vérifiez votre connexion, puis réessayez.');
+    } finally {
+      quizSubmissionLockRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -562,7 +576,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     image.src = imageUrl;
   };
 
-  // Calcul du temps restant sur la session d'1 heure du quiz lancé par le prof
+  // Compte à rebours réservé aux quiz publics; les quiz privés n'expirent pas.
   const getRemainingLaunchTime = (expiresAt?: string) => {
     if (!expiresAt) return null;
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -884,7 +898,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isTimedOut = sub?.status === 'timeout';
                     const isMissed = sub?.status === 'missed';
                     const isLive = quiz.status === 'launched' && !hasSubmission;
-                    const remaining1h = isLive ? getRemainingLaunchTime(quiz.expires_at) : null;
+                    const remaining1h = isLive && quiz.is_public && quiz.expires_at
+                      ? getRemainingLaunchTime(quiz.expires_at)
+                      : null;
 
                     return (
                       <div
@@ -897,7 +913,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               {isLive && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                                   <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                  <span>EN DIRECT • {remaining1h || 'Fermeture imminente'}</span>
+                                  <span>{remaining1h
+                                    ? `EN DIRECT • ${remaining1h}`
+                                    : quiz.is_public
+                                    ? 'EN DIRECT • Fermeture imminente'
+                                    : 'EN DIRECT • sans expiration'}</span>
                                 </span>
                               )}
 
@@ -1010,6 +1030,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
           return (
             <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
+
+              {quizSubmissionError && (
+                <div role="alert" className="mx-3 mt-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 sm:mx-6">
+                  <span>{quizSubmissionError}</span>
+                  <button type="button" onClick={() => void handleSubmitQuiz(quizSecondsRemaining <= 0)} className="shrink-0 underline">Réessayer</button>
+                </div>
+              )}
               
               {/* Anti-Screenshot Watermark Banner */}
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-2.5 py-1 text-[9px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
@@ -1254,7 +1281,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         onClick={handleAnswerAndNext}
                         className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-800 px-3 py-2 text-[11px] font-extrabold text-white shadow-md transition-transform hover:bg-amber-900 active:scale-95 sm:flex-none sm:px-6 sm:py-3.5 sm:text-sm"
                       >
-                        {currentQuestionIndex + 1 === totalQuestions ? (
+                        {isSubmitting ? (
+                          <span>Enregistrement du résultat…</span>
+                        ) : currentQuestionIndex + 1 === totalQuestions ? (
                           <>
                             <Save className="w-4 h-4" />
                             <span>Valider et Terminer le Quiz</span>

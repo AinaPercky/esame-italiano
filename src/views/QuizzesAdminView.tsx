@@ -418,7 +418,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   useEffect(() => {
     loadData();
     const unsub = dataService.subscribe(loadData);
-    // Interval de rafraîchissement automatique toutes les 15s pour le décompte de 1h
+    // Rafraîchit l’état des quiz en direct et les compteurs des quiz publics temporisés.
     const timer = setInterval(loadData, 15000);
     return () => {
       unsub();
@@ -588,13 +588,23 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   };
 
   const handleLaunchQuiz = (quizId: string, isRelaunch = false) => {
+    const quiz = quizzes.find(item => item.id === quizId);
+    const targetClassIds = quiz?.class_ids?.length ? quiz.class_ids : (quiz?.class_id ? [quiz.class_id] : []);
+    const targetLabel = classes.length > 0 && targetClassIds.length === classes.length
+      ? 'toutes les classes'
+      : targetClassIds.length > 1 ? 'les classes sélectionnées' : 'la classe ciblée';
+    const accessRule = quiz?.is_public
+      ? 'pendant une heure.'
+      : 'jusqu’à sa clôture manuelle par le professeur.';
     setConfirmDialog({
       isOpen: true,
       title: isRelaunch ? 'Relancer le Quiz en Direct' : 'Lancer le Quiz en Direct',
       message: isRelaunch
-        ? 'Relancer ce quiz dès maintenant pour tous les élèves ?\nIl sera de nouveau accessible pendant exactement 1 heure pour les élèves qui ne l\'avaient pas encore complété.'
-        : 'Lancer ce quiz dès maintenant pour tous les élèves de la classe ?\nIl sera accessible pendant exactement 1 heure pour les élèves.',
-      confirmLabel: isRelaunch ? 'Relancer le Quiz (1h)' : 'Lancer le Quiz (1h)',
+        ? `Relancer ce quiz pour ${targetLabel} ? Il restera accessible ${accessRule} Les élèves qui l'ont déjà soumis ne pourront pas le refaire.`
+        : `Lancer ce quiz pour ${targetLabel} ? Il restera accessible ${accessRule} Chaque élève ne pourra le soumettre qu'une seule fois.`,
+      confirmLabel: isRelaunch
+        ? (quiz?.is_public ? 'Relancer (1h)' : 'Relancer le quiz')
+        : (quiz?.is_public ? 'Lancer (1h)' : 'Lancer le quiz'),
       variant: 'success',
       action: () => {
         dataService.launchQuiz(quizId);
@@ -608,7 +618,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setConfirmDialog({
       isOpen: true,
       title: 'Clôturer le Quiz',
-      message: 'Clôturer ce quiz immédiatement ?\nTout élève n\'ayant pas composé dans le temps imparti recevra la note de 0/20.',
+      message: 'Clôturer ce quiz immédiatement ? Tout élève qui ne l’a pas soumis recevra la note de 0/20.',
       confirmLabel: 'Clôturer maintenant',
       variant: 'warning',
       action: () => {
@@ -619,7 +629,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     });
   };
 
-  // Calcul du temps restant pour un quiz lancé (< 1h)
+  // Calcul du temps restant réservé aux quiz publics temporisés.
   const getRemainingLaunchTime = (expiresAt?: string) => {
     if (!expiresAt) return null;
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -637,7 +647,19 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     ? submissions.filter(s => s.quiz_id === trackingQuiz.id) 
     : [];
 
-  const classStudents = students.filter(s => s.class_id === (trackingQuiz?.class_id || selectedClassId));
+  const trackingClassIds = trackingQuiz
+    ? (trackingQuiz.class_ids?.length ? trackingQuiz.class_ids : [trackingQuiz.class_id])
+    : [];
+  const classStudents = trackingQuiz
+    ? students.filter(s => trackingClassIds.includes(s.class_id))
+    : students.filter(s => s.class_id === selectedClassId);
+  const trackingClassNames = classes
+    .filter(c => trackingClassIds.includes(c.id))
+    .map(c => c.name)
+    .join(', ');
+  const trackingClassLabel = classes.length > 0 && trackingClassIds.length === classes.length
+    ? 'Toutes les classes'
+    : trackingClassNames || 'Classe';
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -657,7 +679,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-500">
-              Créez des quiz (QCM ou texte), lancez-les en direct avec une fenêtre de 1 heure. Notes cumulées journalières calculées automatiquement.
+              Les quiz privés restent ouverts jusqu’à leur clôture manuelle; les quiz publics gardent une fenêtre d’une heure. Notes cumulées journalières calculées automatiquement.
             </p>
           </div>
         </div>
@@ -812,7 +834,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               {quizzes.map((quiz) => {
                 const isLive = quiz.status === 'launched';
                 const isClosed = quiz.status === 'closed';
-                const remaining = isLive ? getRemainingLaunchTime(quiz.expires_at) : null;
+                const remaining = isLive && quiz.is_public && quiz.expires_at
+                  ? getRemainingLaunchTime(quiz.expires_at)
+                  : null;
                 const quizSubs = submissions.filter(s => s.quiz_id === quiz.id);
 
                 return (
@@ -845,7 +869,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           {isLive && (
                             <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                               <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                              <span>EN DIRECT • {remaining}</span>
+                              <span>{remaining
+                                ? `EN DIRECT • ${remaining}`
+                                : quiz.is_public
+                                ? 'EN DIRECT • Fermeture imminente'
+                                : 'EN DIRECT • sans expiration'}</span>
                             </span>
                           )}
 
@@ -913,10 +941,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             type="button"
                             onClick={() => handleLaunchQuiz(quiz.id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Lancer le quiz pour la classe pendant 1 heure"
+                            title={quiz.is_public
+                              ? 'Lancer le quiz pour une heure'
+                              : 'Lancer le quiz jusqu’à sa clôture manuelle'}
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Lancer (1h)</span>
+                            <span>{quiz.is_public ? 'Lancer (1h)' : 'Lancer'}</span>
                           </button>
                         )}
 
@@ -925,10 +955,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             type="button"
                             onClick={() => handleLaunchQuiz(quiz.id, true)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Relancer ce quiz pour 1 heure (accessible à tous les élèves n'ayant pas encore complété le test)"
+                            title={quiz.is_public
+                              ? 'Relancer ce quiz pour une heure'
+                              : 'Relancer ce quiz jusqu’à sa clôture manuelle; les élèves ayant déjà soumis ne pourront pas le refaire'}
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Relancer (1h)</span>
+                            <span>{quiz.is_public ? 'Relancer (1h)' : 'Relancer'}</span>
                           </button>
                         )}
 
@@ -1049,8 +1081,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               </div>
 
               <div className="text-xs text-slate-600 space-y-1">
-                <p>Classe : <strong>{trackingQuiz.class_name}</strong></p>
-                <p>Temps restant sur la session d'1 heure : <strong className="text-emerald-700 font-mono">{getRemainingLaunchTime(trackingQuiz.expires_at)}</strong></p>
+                <p>{trackingClassIds.length > 1 ? 'Classes' : 'Classe'} : <strong>{trackingClassLabel}</strong></p>
+                {trackingQuiz.is_public && trackingQuiz.expires_at ? (
+                  <p>Temps restant : <strong className="text-emerald-700 font-mono">{getRemainingLaunchTime(trackingQuiz.expires_at)}</strong></p>
+                ) : (
+                  <p>Disponibilité : <strong>jusqu’à la clôture manuelle du professeur</strong></p>
+                )}
               </div>
 
               {/* Roster participation checklist */}
