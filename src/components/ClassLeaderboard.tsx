@@ -40,10 +40,8 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     return dates.sort((a, b) => b.localeCompare(a));
   }, [dailyGrades]);
 
-  // En vue étudiant : toujours afficher toutes les dates (cumul global, sans filtre de période)
-  const [selectedDate, setSelectedDate] = useState<string>(
-    isStudentView ? ALL_DATES : (availableDates[0] || new Date().toISOString().split('T')[0])
-  );
+  // Le classement s'ouvre sur le cumul historique; l'enseignant peut ensuite choisir une journée.
+  const [selectedDate, setSelectedDate] = useState<string>(ALL_DATES);
 
   const [selectedQuizId, setSelectedQuizId] = useState<string>('');
   const [selectedClassId, setSelectedClassId] = useState<string>(
@@ -201,7 +199,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
   const topScore = leaderboardEntries.graded[0]?.average_score_20 ?? null;
 
   const todayFormatted = new Date().toISOString().split('T')[0];
-  const isToday = selectedDate === todayFormatted;
+  const isLiveLeaderboard = selectedDate === ALL_DATES || selectedDate === todayFormatted;
 
   return (
     <div className="min-w-0 overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(7,42,63,0.08)]">
@@ -225,7 +223,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                         ? 'Classement Cumulé — Tous les Quiz'
                         : 'Classement Journalier Cumulé'}
                   </h3>
-                  {isToday && (
+                  {isLiveLeaderboard && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-0.5 text-[9px] font-extrabold tracking-wide text-emerald-200">
                       <span className="h-1.5 w-1.5 rounded-full bg-[#2FA36B]" /> EN DIRECT
                     </span>
@@ -233,8 +231,10 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                 </div>
                 <p className="mt-1 max-w-2xl text-xs leading-relaxed text-[#D5E7F1]/80">
                   {effectiveQuizId
-                    ? 'Classement des élèves selon leur note à ce quiz.'
-                    : 'Classement basé sur le total des points obtenus par rapport aux points possibles.'}
+                    ? 'Classement des élèves selon leur note à ce quiz pour la période sélectionnée.'
+                    : selectedDate === ALL_DATES
+                      ? 'Classement pondéré par points, toutes les dates confondues.'
+                      : 'Classement pondéré par points pour la période sélectionnée.'}
                 </p>
               </div>
             </div>
@@ -298,7 +298,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                   className="w-full min-w-0 max-w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
                 >
                   <option value={ALL_DATES} className="bg-slate-900 text-white">
-                    Toutes les dates
+                    Toutes les dates (cumul historique)
                   </option>
                   {availableDates.map(d => (
                     <option key={d} value={d} className="bg-slate-900 text-white">
@@ -320,7 +320,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
               className="w-full min-w-0 max-w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:bg-slate-900 cursor-pointer"
             >
               <option value="" className="bg-slate-900 text-white">
-                Cumul de tous les quiz
+                Tous les quiz de la période
               </option>
               {availableQuizzes.map(quiz => (
                 <option key={quiz.id} value={quiz.id} className="bg-slate-900 text-white">
@@ -330,6 +330,11 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
             </select>
           </div>
         </div>
+        {!isStudentView && (
+          <p className="mt-2 text-[10px] leading-relaxed text-[#D5E7F1]/75">
+            « Tous les quiz de la période » inclut les quiz de la période choisie; « Toutes les dates » affiche tout l’historique.
+          </p>
+        )}
         </div>
       </div>
 
@@ -576,11 +581,15 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
               );
             })}
 
-            {/* Pending Students (haven't submitted today) */}
+            {/* Élèves sans résultat dans la période sélectionnée */}
             {leaderboardEntries.pending.length > 0 && (
               <div className="mt-4 border-t border-slate-200 pt-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">En attente de participation</span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-500">
+                    {selectedDate === ALL_DATES
+                      ? (effectiveQuizId ? 'En attente sur ce quiz' : 'En attente de participation')
+                      : (effectiveQuizId ? 'Sans résultat pour ce quiz' : 'Sans résultat sur la période')}
+                  </span>
                   <span className="rounded-full bg-[#E6F0F7] px-2 py-0.5 text-[10px] font-bold text-[#0B3C5D]">{leaderboardEntries.pending.length}</span>
                 </div>
                 <div className="space-y-2">
@@ -614,7 +623,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
                           )}
                         </div>
                         <span className="pl-9 text-[11px] text-slate-500 sm:pl-0">
-                          Pas encore de note
+                          {selectedDate === ALL_DATES ? 'Pas encore de note' : 'Aucune note sur cette période'}
                         </span>
                       </div>
                     );
