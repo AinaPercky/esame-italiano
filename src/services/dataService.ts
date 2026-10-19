@@ -1364,8 +1364,7 @@ export const dataService = {
 
   /**
    * Lance le quiz pour les classes ciblées.
-   * Les quiz privés restent accessibles jusqu'à leur clôture manuelle;
-   * seuls les quiz publics gardent leur fenêtre d'une heure.
+   * Tous les quiz restent accessibles jusqu'à leur clôture manuelle.
    */
   launchQuiz(id: string): Quiz {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
@@ -1376,15 +1375,13 @@ export const dataService = {
       state.quizSubmissions = state.quizSubmissions.filter(sub => !(sub.quiz_id === id && sub.status === 'missed'));
     }
 
-    const isTimedLaunch = Boolean(state.quizzes[idx].is_public);
     const now = new Date();
-    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000); // 1 heure exacte
 
     state.quizzes[idx] = {
       ...state.quizzes[idx],
       status: 'launched',
       launched_at: now.toISOString(),
-      expires_at: isTimedLaunch ? oneHourLater.toISOString() : undefined
+      expires_at: undefined
     };
 
     supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud launchQuiz error:', err));
@@ -1411,32 +1408,10 @@ export const dataService = {
     return state.quizzes[idx];
   },
 
-  /**
-   * Les quiz publics expirent après leur heure de disponibilité.
-   * Les quiz privés restent lancés jusqu'à la clôture manuelle du professeur.
-   */
+  /** Les anciennes échéances sont ignorées : seul closeQuiz clôt un quiz lancé. */
   checkAndApplyExpiredQuizzes(): void {
-    if (!state.quizzes) return;
-    const now = Date.now();
-    let hasChanged = false;
-
-    state.quizzes.forEach(q => {
-      if (q.status === 'launched' && q.is_public && q.expires_at) {
-        const expireTime = new Date(q.expires_at).getTime();
-        if (now >= expireTime) {
-          // L'heure est écoulée : fermeture et attribution de 0 pour les retardataires
-          q.status = 'closed';
-          supabaseService.saveQuiz(q).catch(err => console.error('Cloud expireQuiz error:', err));
-          this.applyZeroForMissedStudents(q);
-          hasChanged = true;
-        }
-      }
-    });
-
-    if (hasChanged) {
-      persistState();
-      notifySubscribers();
-    }
+    // Conservée pour compatibilité avec les appelants existants; aucun quiz
+    // ne s'expire automatiquement, que le quiz soit public ou privé.
   },
 
   applyZeroForMissedStudents(quiz: Quiz): void {

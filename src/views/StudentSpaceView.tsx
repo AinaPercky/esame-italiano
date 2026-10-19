@@ -576,16 +576,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     image.src = imageUrl;
   };
 
-  // Compte à rebours réservé aux quiz publics; les quiz privés n'expirent pas.
-  const getRemainingLaunchTime = (expiresAt?: string) => {
-    if (!expiresAt) return null;
-    const diff = new Date(expiresAt).getTime() - Date.now();
-    if (diff <= 0) return null;
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
-  };
-
   // Formatage chronomètre mm:ss
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -898,9 +888,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isTimedOut = sub?.status === 'timeout';
                     const isMissed = sub?.status === 'missed';
                     const isLive = quiz.status === 'launched' && !hasSubmission;
-                    const remaining1h = isLive && quiz.is_public && quiz.expires_at
-                      ? getRemainingLaunchTime(quiz.expires_at)
-                      : null;
 
                     return (
                       <div
@@ -913,11 +900,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               {isLive && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                                   <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                  <span>{remaining1h
-                                    ? `EN DIRECT • ${remaining1h}`
-                                    : quiz.is_public
-                                    ? 'EN DIRECT • Fermeture imminente'
-                                    : 'EN DIRECT • sans expiration'}</span>
+                                  <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">EN DIRECT • jusqu’à clôture</span>
                                 </span>
                               )}
 

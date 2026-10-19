@@ -168,7 +168,7 @@ export interface Quiz {
   duration_minutes: number; // Temps imparti pour composer (ex: 5, 10, 15 min)
   status: 'draft' | 'launched' | 'closed';
   launched_at?: string; // Timestamp ISO lorsque le professeur lance le quiz
-  expires_at?: string; // Timestamp ISO pour les quiz publics temporisés; absent pour les quiz privés
+  expires_at?: string; // Ancien champ conservé pour compatibilité; les quiz ne sont plus expirés automatiquement
   questions: QuizQuestion[];
   total_points: number; // Total des points des questions
 }
