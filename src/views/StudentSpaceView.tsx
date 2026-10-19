@@ -41,6 +41,8 @@ import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
+import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
+import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
@@ -87,12 +89,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [questionSecondsRemaining, setQuestionSecondsRemaining] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const quizAnswersRef = useRef<Record<string, string>>({});
+  quizAnswersRef.current = quizAnswers;
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
   const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
 
   // Correction & Explication si la réponse est fausse (affichée 8 secondes, suspend les chronomètres)
   const [incorrectFeedback, setIncorrectFeedback] = useState<{
@@ -169,6 +175,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }
   };
 
+  const updateQuizAnswer = (questionId: string, answer: string) => {
+    const updatedAnswers = { ...quizAnswersRef.current, [questionId]: answer };
+    quizAnswersRef.current = updatedAnswers;
+    setQuizAnswers(updatedAnswers);
+  };
+
   const loadData = () => {
     // Synchroniser avec dataService
     const stList = dataService.getStudents();
@@ -213,7 +225,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Système anti-triche : si l'élève quitte la fenêtre / change d'onglet pendant le quiz
   useEffect(() => {
-    if (!activeQuiz) return;
+    if (!activeQuiz || isPracticeMode) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -234,7 +246,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [activeQuiz, quizAnswers]);
+  }, [activeQuiz, isPracticeMode]);
 
   // 1. Chronomètre du temps total du Quiz (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -244,8 +256,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       setQuizSecondsRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Soumission automatique si le temps total expire
-          handleSubmitQuiz(true);
+          // En entraînement, le résultat reste local; un quiz officiel est soumis normalement.
+          if (isPracticeMode) {
+          finishTutorialQuiz(quizAnswersRef.current);
+          } else {
+            handleSubmitQuiz(true);
+          }
           return 0;
         }
         return prev - 1;
@@ -253,7 +269,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
+  }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen, isPracticeMode]);
 
   // Alerte sonore du temps de chaque question : moitié, cinq secondes puis les trois dernières secondes.
   useEffect(() => {
@@ -286,7 +302,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }, 1000);
 
     return () => clearInterval(qTimer);
-  }, [activeQuiz, questionSecondsRemaining, currentQuestionIndex, incorrectFeedback?.isOpen]);
+  }, [activeQuiz, questionSecondsRemaining, currentQuestionIndex, incorrectFeedback?.isOpen, isPracticeMode]);
 
   // 3. Décompte de la fenêtre d'explication pédagogique (8 secondes)
   useEffect(() => {
@@ -309,26 +325,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(fbTimer);
   }, [incorrectFeedback?.isOpen]);
 
-  const handleStartQuiz = (quiz: Quiz) => {
-    // RÈGLE STRICTE : Une fois le quiz fait, l'élève ne peut plus le recommencer
-    const { stId, stName, stNum, classId } = getStudentQueryInfo();
-    const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
-    const alreadySubmitted = mySubmissions.some(s => s.quiz_id === quiz.id) || freshSubs.some(s => s.quiz_id === quiz.id);
-
-    if (alreadySubmitted) {
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Quiz déjà effectué',
-        message: 'Vous avez déjà passé et soumis cette évaluation. Conformément au règlement officiel, vous ne pouvez pas recommencer ce quiz.',
-        confirmLabel: 'J\'ai compris',
-        variant: 'primary',
-        action: () => {}
-      });
-      return;
-    }
-
+  const startQuizSession = (quiz: Quiz, practiceMode: boolean) => {
     primeTimerAudio();
+    quizSubmissionLockRef.current = false;
+    setIsSubmitting(false);
+    setIsPracticeMode(practiceMode);
+    setTutorialResult(null);
+    setTimeoutNotice(false);
+    setAntiCheatNotice(false);
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
+    quizAnswersRef.current = {};
     setQuizAnswers({});
     setIncorrectFeedback(null);
     setCurrentQuestionIndex(0);
@@ -347,6 +353,48 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuizSubmissionError(null);
   };
 
+  const handleStartQuiz = (quiz: Quiz) => {
+    // RÈGLE STRICTE : Une fois le quiz fait, l'élève ne peut plus le recommencer
+    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+    const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
+    const alreadySubmitted = mySubmissions.some(s => s.quiz_id === quiz.id) || freshSubs.some(s => s.quiz_id === quiz.id);
+
+    if (alreadySubmitted) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Quiz déjà effectué',
+        message: 'Vous avez déjà passé et soumis cette évaluation. Conformément au règlement officiel, vous ne pouvez pas recommencer ce quiz.',
+        confirmLabel: 'J\'ai compris',
+        variant: 'primary',
+        action: () => {}
+      });
+      return;
+    }
+
+    startQuizSession(quiz, false);
+  };
+
+  const handleStartTutorial = () => {
+    const { classId } = getStudentQueryInfo();
+    const className = classesList.find((classRoom) => classRoom.id === classId)?.name || 'Entraînement';
+    startQuizSession(createTutorialQuiz(classId, className), true);
+  };
+
+  const handleExitTutorial = () => {
+    if (!isPracticeMode) return;
+    setActiveQuiz(null);
+    setIsPracticeMode(false);
+    setCurrentQuestionIndex(0);
+    quizAnswersRef.current = {};
+    setQuizAnswers({});
+    setQuestionSecondsRemaining(0);
+    setQuizSecondsRemaining(0);
+    setIncorrectFeedback(null);
+    setQuizSubmissionError(null);
+    setIsSubmitting(false);
+    quizSubmissionLockRef.current = false;
+  };
+
   // Fonction utilitaire pour tester si une réponse est correcte
   const isAnswerCorrect = (q: QuizQuestion, studentAns: string) => {
     return isQuestionAnswerCorrect(q, studentAns);
@@ -357,7 +405,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!activeQuiz) return;
     const questions = activeQuiz.questions || [];
     if (currentQuestionIndex >= questions.length - 1) {
-      handleSubmitQuiz(false, updatedAnswers);
+      if (isPracticeMode) {
+        finishTutorialQuiz(updatedAnswers);
+      } else {
+        void handleSubmitQuiz(false, updatedAnswers);
+      }
       return;
     }
     const nextIndex = Math.min(currentQuestionIndex + 1, questions.length - 1);
@@ -411,8 +463,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const currentQ = activeQuiz.questions[currentQuestionIndex];
     if (!currentQ) return;
 
-    const currentAns = quizAnswers[currentQ.id] || '';
-    const updated = { ...quizAnswers, [currentQ.id]: currentAns };
+    const currentAns = quizAnswersRef.current[currentQ.id] || '';
+    const updated = { ...quizAnswersRef.current, [currentQ.id]: currentAns };
+    quizAnswersRef.current = updated;
     setQuizAnswers(updated);
 
     processQuestionProgression(updated, true);
@@ -421,16 +474,40 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   // L'élève valide sa réponse pour la question courante et passe à la suite
   const handleAnswerAndNext = () => {
     if (!activeQuiz) return;
-    processQuestionProgression(quizAnswers, false);
+    processQuestionProgression(quizAnswersRef.current, false);
+  };
+
+  const finishTutorialQuiz = (answers: Record<string, string>) => {
+    if (!activeQuiz || !isPracticeMode || quizSubmissionLockRef.current) return;
+    quizSubmissionLockRef.current = true;
+    quizAnswersRef.current = answers;
+    setQuizAnswers(answers);
+    setTutorialResult(scoreTutorialQuiz(activeQuiz, answers));
+    setLastSubmissionResult(null);
+    setQuizSubmissionError(null);
+    setActiveQuiz(null);
+    setCurrentQuestionIndex(0);
+    setQuestionSecondsRemaining(0);
+    setQuizSecondsRemaining(0);
+    setIsPracticeMode(false);
+    setIsSubmitting(false);
+    setTimeoutNotice(false);
+    setAntiCheatNotice(false);
   };
 
   const handleSubmitQuiz = async (isAutoTimeout = false, customAnswers?: Record<string, string>) => {
-    if (!activeQuiz || quizSubmissionLockRef.current) return;
+    if (!activeQuiz) return;
+    if (isPracticeMode) {
+      finishTutorialQuiz(customAnswers || quizAnswersRef.current);
+      return;
+    }
+    if (quizSubmissionLockRef.current) return;
     quizSubmissionLockRef.current = true;
     setIsSubmitting(true);
     setQuizSubmissionError(null);
 
-    const answersToSubmit = customAnswers || quizAnswers;
+    const answersToSubmit = customAnswers || quizAnswersRef.current;
+    quizAnswersRef.current = answersToSubmit;
     setQuizAnswers(answersToSubmit);
 
     const { stId, stName, stNum } = getStudentQueryInfo();
@@ -840,6 +917,33 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
             )}
 
+            {tutorialResult && (
+              <div role="status" className="flex flex-col gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800">Entraînement terminé · résultat local</span>
+                  <h3 className="mt-1 text-sm font-bold text-emerald-950">Votre résultat de démonstration : {tutorialResult.score} / {tutorialResult.maxScore} points ({tutorialResult.score20} / 20).</h3>
+                  <p className="mt-1 text-xs text-emerald-900">Ce résultat n’est pas enregistré et n’apparaît ni dans vos notes journalières ni dans le classement. Vous pouvez refaire le tutoriel autant de fois que vous le souhaitez.</p>
+                </div>
+                <button type="button" onClick={handleStartTutorial} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-900">
+                  <RotateCcw className="h-3.5 w-3.5" /> Recommencer
+                </button>
+              </div>
+            )}
+
+            <section className="flex flex-col gap-4 rounded-2xl border border-[#C7DCEB] bg-gradient-to-br from-[#F4F8FB] to-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full border border-[#C7DCEB] bg-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0B3C5D]">Entraînement · essais illimités</span>
+                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 5 minutes</span>
+                </div>
+                <h2 className="font-display text-base font-bold text-[#072A3F]">Découvrir comment passer un quiz</h2>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres et les corrections. Aucun résultat n’est envoyé à la base de données ou pris en compte dans vos notes et classements.</p>
+              </div>
+              <button type="button" onClick={handleStartTutorial} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#072A3F]">
+                <Play className="h-4 w-4 fill-current" /> Démarrer le tutoriel
+              </button>
+            </section>
+
             {/* Quizzes List */}
             <div className="space-y-4">
               <h2 className="student-section-title">
@@ -999,15 +1103,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               )}
               
               {/* Anti-Screenshot Watermark Banner */}
-              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 bg-rose-950 px-2.5 py-1 text-[9px] leading-tight text-rose-100 shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs">
+              <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1 text-[9px] leading-tight shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs ${isPracticeMode ? 'bg-[#0B3C5D] text-sky-100' : 'bg-rose-950 text-rose-100'}`}>
                 <span className="flex min-w-0 items-center gap-1.5 truncate font-bold sm:gap-2">
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-rose-300 sm:h-4 sm:w-4" />
-                  <span className="sm:hidden">MODE SÉCURISÉ ANTI-TRICHE</span>
-                  <span className="hidden sm:inline">MODE SÉCURISÉ ANTI-TRICHE • Capture d'écran strictement interdite</span>
+                  <ShieldCheck className={`h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${isPracticeMode ? 'text-sky-300' : 'text-rose-300'}`} />
+                  <span className="sm:hidden">{isPracticeMode ? 'MODE ENTRAÎNEMENT' : 'MODE SÉCURISÉ ANTI-TRICHE'}</span>
+                  <span className="hidden sm:inline">{isPracticeMode ? 'MODE ENTRAÎNEMENT • Résultat non enregistré' : 'MODE SÉCURISÉ ANTI-TRICHE • Capture d’écran strictement interdite'}</span>
                 </span>
-                <span className="hidden shrink-0 truncate opacity-90 sm:block">
-                  {currentUser.name} • {currentUser.student_number || 'N°1'} • Session officielle
-                </span>
+                {!isPracticeMode && (
+                  <span className="hidden shrink-0 truncate opacity-90 sm:block">
+                    {currentUser.name} • {currentUser.student_number || 'N°1'} • Session officielle
+                  </span>
+                )}
+                {isPracticeMode && (
+                  <button type="button" onClick={handleExitTutorial} className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 font-bold text-white hover:bg-white/20" aria-label="Quitter le tutoriel">
+                    <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Quitter</span>
+                  </button>
+                )}
               </div>
               
               {/* Quiz Header Bar with Global & Question Timers */}
@@ -1017,7 +1128,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
-                        Évaluation en cours • {activeQuiz.class_name || 'Classe'}
+                        {isPracticeMode ? 'Mode entraînement • sans note officielle' : `Évaluation en cours • ${activeQuiz.class_name || 'Classe'}`}
                       </span>
                       <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-200 sm:px-2 sm:text-[10px]">
                         {safeIndex + 1}/{totalQuestions}
@@ -1148,7 +1259,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                                   <button
                                     key={optIdx}
                                     type="button"
-                                    onClick={() => setQuizAnswers({ ...quizAnswers, [currentQ.id]: opt })}
+                                    onClick={() => updateQuizAnswer(currentQ.id, opt)}
                                     className={`flex min-h-[60px] items-center justify-between rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all cursor-pointer shadow-xs sm:min-h-[72px] ${
                                       isSelected
                                         ? 'bg-amber-800 text-white border-amber-900 shadow-md ring-2 ring-amber-400 scale-[1.01]'
@@ -1172,7 +1283,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               <QuizReorderList
                                 question={currentQ}
                                 answer={currentAnswer}
-                                onChange={(newOrderJson) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newOrderJson })}
+                                onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
                                 theme="amber"
                               />
                             </div>
@@ -1185,7 +1296,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                                 question={currentQ}
                                 customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
                                 answer={currentAnswer}
-                                onChange={(newAnswer) => setQuizAnswers({ ...quizAnswers, [currentQ.id]: newAnswer })}
+                                onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
                                 theme="amber"
                                 onEnterPress={handleAnswerAndNext}
                               />
@@ -1209,13 +1320,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-800 px-3 py-2 text-[11px] font-extrabold text-white shadow-md transition-transform hover:bg-amber-900 active:scale-95 sm:flex-none sm:px-6 sm:py-3.5 sm:text-sm"
                       >
                         {isSubmitting ? (
-                          <span>Enregistrement du résultat…</span>
+                          <span>{isPracticeMode ? 'Calcul du résultat local…' : 'Enregistrement du résultat…'}</span>
                         ) : quizSubmissionError ? (
                           <span>Réessayer la validation</span>
                         ) : currentQuestionIndex + 1 === totalQuestions ? (
                           <>
                             <Save className="w-4 h-4" />
-                            <span>Valider et Terminer le Quiz</span>
+                            <span>{isPracticeMode ? 'Terminer le tutoriel' : 'Valider et Terminer le Quiz'}</span>
                           </>
                         ) : (
                           <>
