@@ -1,23 +1,22 @@
 import { isValidEmail, normalizeEmail } from '../utils/email';
 import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { ClassRoom, Student } from '../types';
+import type { Session } from '@supabase/supabase-js';
 import { supabaseService } from './supabaseService';
 import { dataService } from './dataService';
 
 /**
  * Service d'authentification et de contrôle d'accès multi-rôles pour Esame :
- * 1. Admin par défaut : AinaPercky (ainapercky@gmail.com, code: user1234)
+ * 1. Professeur : compte Supabase Auth associé à l'adresse administrateur.
  * 2. Étudiants : Inscription autonome, connexion, espace personnel de quiz et notes.
  */
 
 const ENC_EMAIL = 'YWluYXBlcmNreUBnbWFpbC5jb20=';
 const ENC_NAME = 'QWluYVBlcmNreQ==';
-const ENC_CODE = 'dXNlcjEyMzQ=';
 
 export const ADMIN_EMAIL = atob(ENC_EMAIL);
 export const AUTHORIZED_EMAIL = ADMIN_EMAIL;
 export const ADMIN_NAME = atob(ENC_NAME);
-export const DEFAULT_ACCESS_CODE = atob(ENC_CODE);
 
 export interface AuthUser {
   id: string;
@@ -38,7 +37,6 @@ const LOCKOUT_DURATION_MS = 30000; // 30s
 
 const listeners: Array<() => void> = [];
 let currentUser: AuthUser | null = null;
-let accessCode = DEFAULT_ACCESS_CODE;
 let failedAttempts = { count: 0, lockedUntil: 0 };
 
 function notifyAuthChange() {
@@ -105,20 +103,6 @@ export const authService = {
     return ADMIN_NAME;
   },
 
-  getAccessCode(): string {
-    return accessCode;
-  },
-
-  setAccessCode(newCode: string): boolean {
-    if (!newCode || newCode.trim().length < 4) return false;
-    accessCode = newCode.trim();
-    return true;
-  },
-
-  resetAccessCodeToDefault(): void {
-    accessCode = DEFAULT_ACCESS_CODE;
-  },
-
   getLockoutStatus(): { isLocked: boolean; remainingSeconds: number } {
     const now = Date.now();
     if (failedAttempts.lockedUntil > now) {
@@ -144,8 +128,50 @@ export const authService = {
     return currentUser;
   },
 
-  isAuthenticated(): boolean {
-    return this.getCurrentUser() !== null;
+  async restoreFromSupabaseSession(session: Session): Promise<AuthUser> {
+    const email = normalizeEmail(session.user.email || '');
+    if (!email) throw new Error('La session Supabase ne contient aucune adresse e-mail.');
+
+    let user: AuthUser;
+    if (email === ADMIN_EMAIL.toLowerCase()) {
+      user = {
+        id: session.user.id,
+        email,
+        name: `${ADMIN_NAME} (Professeur)`,
+        role: 'admin',
+        loginAt: session.user.last_sign_in_at || new Date().toISOString()
+      };
+    } else {
+      const student = await supabaseService.getStudentForAuthEmail(email);
+      user = {
+        id: `session_${student.id}`,
+        email: student.email,
+        name: `${student.first_name} ${student.last_name}`,
+        gender: student.gender || 'homme',
+        role: 'student',
+        student_id: student.id,
+        student_number: student.student_number,
+        class_id: student.class_id,
+        class_name: student.class_name,
+        avatar: student.avatar_url || undefined,
+        loginAt: session.user.last_sign_in_at || new Date().toISOString()
+      };
+    }
+
+    currentUser = user;
+    notifyAuthChange();
+    return user;
+  },
+
+  clearCurrentUser(): void {
+    currentUser = null;
+    notifyAuthChange();
+  },
+
+  async updateAdminPassword(password: string): Promise<void> {
+    if (currentUser?.role !== 'admin') throw new Error('Seul le compte professeur peut modifier ce mot de passe.');
+    if (password.trim().length < 6) throw new Error('Le mot de passe doit contenir au moins 6 caractères.');
+    await supabaseService.updateAuthenticatedUserPassword(password);
   },
 
   isAdmin(): boolean {
@@ -170,13 +196,13 @@ export const authService = {
       return { success: false, error: 'Veuillez renseigner votre adresse e-mail.' };
     }
     if (!passwordOrCode) {
-      return { success: false, error: 'Veuillez saisir votre mot de passe ou code d\'accès.' };
+      return { success: false, error: 'Veuillez saisir votre mot de passe.' };
     }
 
     // 1. Détection automatique : Compte Administrateur / Enseignant (AinaPercky)
     const isAdminCandidate = cleanId === ADMIN_EMAIL.toLowerCase() || cleanId === 'ainapercky' || cleanId === ADMIN_NAME.toLowerCase();
     if (isAdminCandidate) {
-      return this.loginAdmin(cleanId, passwordOrCode.trim());
+      return this.loginAdmin(cleanId, passwordOrCode);
     }
 
     if (!supabaseService.isConfigured()) {
@@ -231,7 +257,7 @@ export const authService = {
   /**
    * Connexion Administrateur / Professeur (AinaPercky)
    */
-  loginAdmin(emailOrUsername: string, code: string): { success: boolean; error?: string; user?: AuthUser } {
+  async loginAdmin(emailOrUsername: string, password: string): Promise<{ success: boolean; error?: string; user?: AuthUser }> {
     const lockout = this.getLockoutStatus();
     if (lockout.isLocked) {
       return {
@@ -243,48 +269,41 @@ export const authService = {
     const cleanInput = (emailOrUsername || '').trim().toLowerCase();
     const cleanAdminEmail = ADMIN_EMAIL.toLowerCase();
     const cleanAdminName = ADMIN_NAME.toLowerCase();
-    const expectedCode = this.getAccessCode();
-
-    if (!cleanInput) {
-      return { success: false, error: 'Veuillez saisir votre identifiant admin (email ou nom).' };
-    }
-
     const isMatch = cleanInput === cleanAdminEmail || cleanInput === cleanAdminName || cleanInput === 'ainapercky';
     if (!isMatch) {
       this.recordFailedAttempt();
       return {
         success: false,
-        error: `Identifiant administrateur non reconnu. Utilisez ${ADMIN_EMAIL} ou ${ADMIN_NAME}.`
+        error: `Identifiant professeur non reconnu. Utilisez ${ADMIN_EMAIL} ou ${ADMIN_NAME}.`
       };
     }
 
-    if (!code || code.trim() !== expectedCode) {
+    try {
+      const authUser = await supabaseService.authenticateAdmin(ADMIN_EMAIL, password);
+      this.resetFailedAttempts();
+      const user: AuthUser = {
+        id: authUser.id,
+        email: authUser.email,
+        name: `${ADMIN_NAME} (Professeur)`,
+        role: 'admin',
+        loginAt: new Date().toISOString()
+      };
+      currentUser = user;
+      notifyAuthChange();
+      return { success: true, user };
+    } catch (error) {
       const failInfo = this.recordFailedAttempt();
       if (failInfo.isLocked) {
         return {
           success: false,
-          error: `Code d'accès erroné. Compte verrouillé pour ${failInfo.remainingSeconds}s.`
+          error: `Trop de tentatives erronées. Compte temporairement verrouillé pour ${failInfo.remainingSeconds}s.`
         };
       }
       return {
         success: false,
-        error: `Code d'accès incorrect (${failInfo.attemptsLeft} tentative(s) restante(s)).`
+        error: error instanceof Error ? error.message : 'Connexion professeur Supabase Auth impossible.'
       };
     }
-
-    this.resetFailedAttempts();
-
-    const user: AuthUser = {
-      id: 'admin_ainapercky',
-      email: ADMIN_EMAIL,
-      name: 'AinaPercky (Professeur)',
-      role: 'admin',
-      loginAt: new Date().toISOString()
-    };
-
-    currentUser = user;
-    notifyAuthChange();
-    return { success: true, user };
   },
 
   /**
@@ -381,10 +400,12 @@ export const authService = {
     return true;
   },
 
-  logout(): void {
-    supabaseService.signOutStudent().catch(error => {
+  async logout(): Promise<void> {
+    try {
+      await supabaseService.signOutStudent();
+    } catch (error) {
       console.error('Déconnexion Supabase impossible :', error);
-    });
+    }
     currentUser = null;
     notifyAuthChange();
   },

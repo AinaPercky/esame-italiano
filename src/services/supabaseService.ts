@@ -128,8 +128,9 @@ class SupabaseService {
       try {
         this.client = createClient(this.currentConfig.url, this.currentConfig.anonKey, {
           auth: {
-            persistSession: false,
-            autoRefreshToken: false
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
           }
         });
       } catch (e) {
@@ -161,21 +162,54 @@ class SupabaseService {
     }
     if (!data.user) throw new Error('Supabase n’a retourné aucun compte étudiant.');
 
+    return this.loadStudentByEmail(email, client);
+  }
+
+  public async authenticateAdmin(email: string, password: string): Promise<{ id: string; email: string }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase n’est pas configuré. Le compte professeur doit être créé dans Supabase Auth.');
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error } = await client.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (error) {
+      if (error.message.toLowerCase().includes('invalid login credentials')) {
+        throw new Error(`Compte professeur Supabase Auth introuvable ou mot de passe incorrect. Configurez un compte Auth pour ${normalizedEmail}.`);
+      }
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        throw new Error('Confirmez d’abord l’adresse e-mail du compte professeur dans Supabase Auth.');
+      }
+      throw new Error(`Échec de connexion professeur Supabase Auth : ${error.message}`);
+    }
+    if (!data.user || !data.session) throw new Error('Supabase n’a retourné aucune session professeur.');
+    if ((data.user.email || '').trim().toLowerCase() !== normalizedEmail) {
+      await client.auth.signOut();
+      throw new Error('L’adresse du compte Supabase Auth ne correspond pas au compte professeur attendu.');
+    }
+    return { id: data.user.id, email: data.user.email || normalizedEmail };
+  }
+
+  public async getStudentForAuthEmail(email: string): Promise<Student> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    return this.loadStudentByEmail(email, client);
+  }
+
+  private async loadStudentByEmail(email: string, client: SupabaseClient): Promise<Student> {
     let student: any = null;
     let studentError: any = null;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // Tentative de sélection avec validation_status directement depuis Supabase online
     const res = await client
       .from('students')
       .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, validation_status, created_at, updated_at')
-      .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
+      .ilike('email', normalizedEmail.replace(/[\\%_]/g, '\\$&'))
       .maybeSingle();
 
     if (res.error && (res.error.code === '42703' || res.error.message?.includes('validation_status'))) {
       const fallbackRes = await client
         .from('students')
         .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, created_at, updated_at')
-        .ilike('email', email.trim().toLowerCase().replace(/[\\%_]/g, '\\$&'))
+        .ilike('email', normalizedEmail.replace(/[\\%_]/g, '\\$&'))
         .maybeSingle();
       student = fallbackRes.data ? { ...fallbackRes.data, validation_status: 'approved' } : null;
       studentError = fallbackRes.error;
@@ -192,8 +226,6 @@ class SupabaseService {
       await client.auth.signOut();
       throw new Error('Aucune fiche élève ne correspond à ce compte dans Supabase. Contactez votre enseignant.');
     }
-
-    // Vérification stricte en ligne du statut de validation de l'élève (sans local storage)
     if (student.validation_status === 'pending') {
       await client.auth.signOut();
       throw new Error('Votre inscription est en attente de validation par le professeur dans la base de données. Vous pourrez vous connecter dès son approbation.');
@@ -241,6 +273,15 @@ class SupabaseService {
     if (!client) return;
     const { error } = await client.auth.signOut();
     if (error) throw new Error(`Déconnexion Supabase impossible : ${error.message}`);
+  }
+
+  public async updateAuthenticatedUserPassword(password: string): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { data: { user }, error: userError } = await client.auth.getUser();
+    if (userError || !user) throw new Error('Aucun compte Supabase Auth n’est connecté.');
+    const { error } = await client.auth.updateUser({ password });
+    if (error) throw new Error(`Modification du mot de passe Supabase impossible : ${error.message}`);
   }
 
   /**
