@@ -30,7 +30,7 @@ import {
   STUDENT_GENDER_MIGRATION_SQL,
   SUPABASE_SQL_SCHEMA
 } from '../data/supabaseSqlSchema';
-import { authService, AUTHORIZED_EMAIL, DEFAULT_ACCESS_CODE, AuthUser } from '../services/authService';
+import { authService, AUTHORIZED_EMAIL, AuthUser } from '../services/authService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface SettingsViewProps {
@@ -68,39 +68,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     message: ''
   });
 
-  // Gestion du code d'accès
-  const [currentCode, setCurrentCode] = useState<string>(authService.getAccessCode());
-  const [newCodeInput, setNewCodeInput] = useState<string>('');
-  const [codeSuccessMessage, setCodeSuccessMessage] = useState<string | null>(null);
-  const [codeErrorMessage, setCodeErrorMessage] = useState<string | null>(null);
+  // Gestion du mot de passe du compte professeur Supabase Auth
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  const handleUpdateCode = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCodeSuccessMessage(null);
-    setCodeErrorMessage(null);
+    setPasswordSuccessMessage(null);
+    setPasswordErrorMessage(null);
 
-    if (!newCodeInput || newCodeInput.trim().length < 4) {
-      setCodeErrorMessage('Le code d\'accès doit contenir au moins 4 caractères.');
+    if (newPasswordInput.trim().length < 6) {
+      setPasswordErrorMessage('Le mot de passe doit contenir au moins 6 caractères.');
       return;
     }
 
-    const success = authService.setAccessCode(newCodeInput.trim());
-    if (success) {
-      setCurrentCode(newCodeInput.trim());
-      setNewCodeInput('');
-      setCodeSuccessMessage('Code d\'accès mis à jour avec succès.');
-      setTimeout(() => setCodeSuccessMessage(null), 3500);
-    } else {
-      setCodeErrorMessage('Impossible de modifier le code d\'accès.');
+    setIsUpdatingPassword(true);
+    try {
+      await authService.updateAdminPassword(newPasswordInput);
+      setNewPasswordInput('');
+      setPasswordSuccessMessage('Mot de passe Supabase Auth mis à jour avec succès.');
+      setTimeout(() => setPasswordSuccessMessage(null), 3500);
+    } catch (error) {
+      setPasswordErrorMessage(error instanceof Error ? error.message : 'Impossible de modifier le mot de passe.');
+    } finally {
+      setIsUpdatingPassword(false);
     }
-  };
-
-  const handleResetDefaultCode = () => {
-    authService.resetAccessCodeToDefault();
-    setCurrentCode(DEFAULT_ACCESS_CODE);
-    setNewCodeInput('');
-    setCodeSuccessMessage('Code d\'accès réinitialisé à la valeur par défaut (user1234).');
-    setTimeout(() => setCodeSuccessMessage(null), 3500);
   };
 
   // Copier le script SQL complet prêt à être exécuté dans Supabase SQL Editor
@@ -313,60 +307,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
           )}
         </div>
 
-        {/* Section Code d'Accès */}
+        {/* Section mot de passe professeur Supabase Auth */}
         <div className="pt-3.5 border-t border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
             <div>
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-slate-800" />
-                <span className="text-xs font-semibold text-slate-800">Code d'accès actuel :</span>
-                <span className="font-mono font-bold text-xs bg-slate-100 text-slate-900 px-2 py-0.5 rounded">
-                  {currentCode}
-                </span>
+                <span className="text-xs font-semibold text-slate-800">Mot de passe du compte professeur</span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Code requis lors de la connexion pour déverrouiller l'application.
+                Géré par Supabase Auth. Le mot de passe actuel n’est jamais affiché dans l’application.
               </p>
             </div>
 
-            <form onSubmit={handleUpdateCode} className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+            <form onSubmit={handleUpdatePassword} className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
               <input
-                type="text"
-                value={newCodeInput}
-                onChange={(e) => setNewCodeInput(e.target.value)}
-                placeholder="Nouveau code..."
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-800 w-full sm:w-auto sm:max-w-[140px]"
+                type="password"
+                value={newPasswordInput}
+                onChange={(e) => setNewPasswordInput(e.target.value)}
+                placeholder="Nouveau mot de passe"
+                autoComplete="new-password"
+                minLength={6}
+                required
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-800 w-full sm:w-auto sm:max-w-[180px]"
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-slate-950 hover:bg-slate-950 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
+                disabled={isUpdatingPassword}
+                className="px-3 py-1.5 bg-slate-950 hover:bg-slate-950 text-white rounded text-xs font-semibold transition-colors cursor-pointer disabled:opacity-60"
               >
-                Modifier
+                {isUpdatingPassword ? 'Mise à jour…' : 'Modifier'}
               </button>
-              {currentCode !== DEFAULT_ACCESS_CODE && (
-                <button
-                  type="button"
-                  onClick={handleResetDefaultCode}
-                  className="px-2 py-1.5 text-[11px] text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded transition-colors"
-                  title="Rétablir le code par défaut (user1234)"
-                >
-                  Rétablir user1234
-                </button>
-              )}
             </form>
           </div>
 
-          {codeSuccessMessage && (
+          {passwordSuccessMessage && (
             <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{codeSuccessMessage}</span>
+              <span>{passwordSuccessMessage}</span>
             </p>
           )}
 
-          {codeErrorMessage && (
+          {passwordErrorMessage && (
             <p className="text-xs text-slate-700 font-medium mt-2 flex items-center gap-1">
               <AlertCircle className="w-3.5 h-3.5" />
-              <span>{codeErrorMessage}</span>
+              <span>{passwordErrorMessage}</span>
             </p>
           )}
         </div>

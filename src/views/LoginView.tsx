@@ -243,7 +243,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
           <div className="auth-field-group">
-            <label htmlFor="login-password" className="auth-label">Mot de passe / code d’accès</label>
+            <label htmlFor="login-password" className="auth-label">Mot de passe</label>
             <div className="auth-input-wrap">
               <KeyRound className="auth-input-icon" aria-hidden="true" />
               <input id="login-password" type={showPassword ? 'text' : 'password'} required value={password}

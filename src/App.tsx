@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './views/DashboardView';
@@ -23,10 +24,16 @@ import { StudentSpaceView } from './views/StudentSpaceView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { dataService } from './services/dataService';
 import { authService, AuthUser } from './services/authService';
+import { supabaseService } from './services/supabaseService';
 import { ClassRoom, Exam, Student, Evaluation } from './types';
 
+let initialCloudSyncPromise: Promise<boolean> | null = null;
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => authService.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [initialDataReady, setInitialDataReady] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isPublicMode, setIsPublicMode] = useState<boolean>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -79,18 +86,100 @@ export default function App() {
       reloadData();
     });
 
-    dataService.initFromCloud().then(synced => {
+    if (!initialCloudSyncPromise) initialCloudSyncPromise = dataService.initFromCloud();
+    initialCloudSyncPromise.then(synced => {
       if (synced) {
         reloadData();
       }
     }).catch(err => {
       console.warn('Initial cloud sync notice:', err);
-    });
+    }).finally(() => setInitialDataReady(true));
 
     return () => {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!initialDataReady) return;
+
+    const client = supabaseService.getClient();
+    if (!client) {
+      setSession(null);
+      setCurrentUser(null);
+      setAuthLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    let requestId = 0;
+
+    const applySession = async (nextSession: Session | null) => {
+      const currentRequestId = ++requestId;
+      setSession(nextSession);
+
+      if (!nextSession) {
+        authService.clearCurrentUser();
+        setCurrentUser(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      setAuthLoading(true);
+      try {
+        const user = await authService.restoreFromSupabaseSession(nextSession);
+        if (isMounted && currentRequestId === requestId) setCurrentUser(user);
+      } catch (error) {
+        console.error('Impossible de restaurer le profil de la session Supabase :', error);
+        if (isMounted && currentRequestId === requestId) {
+          setCurrentUser(null);
+          setSession(null);
+        }
+        await client.auth.signOut().catch(signOutError => {
+          console.error('Impossible de fermer la session Supabase invalide :', signOutError);
+        });
+      } finally {
+        if (isMounted && currentRequestId === requestId) setAuthLoading(false);
+      }
+    };
+
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'INITIAL_SESSION') return;
+      if (event === 'TOKEN_REFRESHED' && nextSession) {
+        if (isMounted) setSession(nextSession);
+        return;
+      }
+      if (!nextSession) {
+        void applySession(null);
+        return;
+      }
+      if (isMounted) {
+        setSession(nextSession);
+        setAuthLoading(true);
+      }
+      window.setTimeout(() => {
+        if (isMounted) void applySession(nextSession);
+      }, 0);
+    });
+
+    client.auth.getSession().then(({ data, error }) => {
+      if (error) throw error;
+      return applySession(data.session);
+    }).catch(error => {
+      console.error('Impossible de récupérer la session Supabase au démarrage :', error);
+      if (isMounted) {
+        authService.clearCurrentUser();
+        setSession(null);
+        setCurrentUser(null);
+        setAuthLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [initialDataReady]);
 
   // 1. Si l'élève a scanné le Code QR -> Afficher la Fiche Officielle en lecture seule
   const urlParams = new URLSearchParams(window.location.search);
@@ -125,14 +214,34 @@ export default function App() {
     );
   }
 
-  // 2. Si l'utilisateur n'est pas connecté -> Afficher la page de Login sécurisée
-  if (!currentUser) {
+  // Attendre la vérification de session avant de protéger les vues privées.
+  if (authLoading) {
+    return (
+      <div className="min-h-svh flex items-center justify-center bg-slate-50 px-4 text-sm font-medium text-slate-600" role="status">
+        Vérification de la session…
+      </div>
+    );
+  }
+
+  // La session Supabase est la source de vérité pour l'accès aux vues privées.
+  if (!session) {
     return <LoginView onLoginSuccess={() => setCurrentUser(authService.getCurrentUser())} />;
   }
 
-  const handleLogout = () => {
-    authService.logout();
+  if (!currentUser) {
+    return (
+      <div className="min-h-svh flex items-center justify-center bg-slate-50 px-4 text-sm font-medium text-slate-600" role="status">
+        Chargement du profil…
+      </div>
+    );
+  }
+
+  const handleLogout = async () => {
+    setAuthLoading(true);
+    await authService.logout();
+    setSession(null);
     setCurrentUser(null);
+    setAuthLoading(false);
   };
 
   // 3. Si l'utilisateur est un Étudiant -> Afficher son Espace Étudiant dédié
