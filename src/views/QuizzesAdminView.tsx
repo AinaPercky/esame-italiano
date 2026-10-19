@@ -44,6 +44,7 @@ import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUI
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
+import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
 import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { createQuizReorderItem } from '../utils/quizReorder';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
@@ -348,6 +349,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   // Vue détail / Suivi en direct d'un quiz
   const [activeTrackingQuizId, setActiveTrackingQuizId] = useState<string | null>(null);
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
+  const [analyticsClassId, setAnalyticsClassId] = useState<string>('');
 
   // Génération automatique du QR code lorsque sharingQuiz est ouvert
   useEffect(() => {
@@ -774,7 +776,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setAnalyticsClassId(selectedClassId || classes[0]?.id || '');
+              setActiveAnalyticsQuizId('all');
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-800 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-indigo-900 sm:text-sm"
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>Analyse de classe</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsJsonModalOpen(true)}
@@ -1133,7 +1146,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setActiveAnalyticsQuizId(quiz.id)}
+                          onClick={() => {
+                            setAnalyticsClassId(quiz.class_ids?.[0] || quiz.class_id || selectedClassId || classes[0]?.id || '');
+                            setActiveAnalyticsQuizId(quiz.id);
+                          }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
                           title="Dashboard Data Analysis & Bilan des notions"
                         >
@@ -2184,220 +2200,17 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         </div>
       )}
 
-      {/* MODAL DASHBOARD DATA ANALYSIS QUIZ */}
-      {activeAnalyticsQuizId && (() => {
-        const aq = quizzes.find(q => q.id === activeAnalyticsQuizId);
-        if (!aq) return null;
-        const subs = submissions.filter(s => s.quiz_id === aq.id);
-        const totalSubs = subs.length;
-        const avgScore20 = totalSubs > 0 ? (subs.reduce((a, b) => a + b.score_20, 0) / totalSubs).toFixed(1) : '0';
-        const successRate = totalSubs > 0 ? Math.round((subs.filter(s => s.score_20 >= 10).length / totalSubs) * 100) : 0;
-
-        const questionStats = (aq.questions || []).map((q, qIdx) => {
-          let correctCount = 0;
-          subs.forEach(sub => {
-            const fb = sub.feedback?.[q.id];
-            if (fb?.correct) {
-              correctCount++;
-            }
-          });
-          const qRate = totalSubs > 0 ? Math.round((correctCount / totalSubs) * 100) : 0;
-          return {
-            ...q,
-            index: qIdx + 1,
-            correctCount,
-            successRate: qRate
-          };
-        });
-
-        const sortedByDifficulty = [...questionStats].sort((a, b) => a.successRate - b.successRate);
-        const weakestQuestion = sortedByDifficulty[0];
-        const strongestQuestion = sortedByDifficulty[sortedByDifficulty.length - 1];
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
-              
-              <div className="sticky top-0 bg-white px-6 py-4 border-b border-slate-200 flex items-center justify-between z-10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
-                    <BarChart3 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-display font-bold text-lg text-slate-900">
-                        Dashboard Data Analysis : {aq.title}
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800">
-                        {aq.class_name || 'Classe'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Analyse pédagogique des points forts, notions incomprises et performance des élèves.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveAnalyticsQuizId(null)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="text-[11px] font-bold uppercase text-slate-400">Copies Soumises</div>
-                    <div className="text-2xl font-bold font-mono text-slate-900 mt-1">{totalSubs}</div>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="text-[11px] font-bold uppercase text-slate-400">Moyenne de la Classe</div>
-                    <div className="text-2xl font-bold font-mono text-indigo-700 mt-1">{avgScore20}/20</div>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="text-[11px] font-bold uppercase text-slate-400">Taux de Réussite (≥ 10/20)</div>
-                    <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">{successRate}%</div>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <div className="text-[11px] font-bold uppercase text-slate-400">Durée Impartie</div>
-                    <div className="text-2xl font-bold font-mono text-slate-900 mt-1">{formatQuizDuration(getQuizTotalTimeSeconds(aq))}</div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-indigo-300" />
-                    <h3 className="font-bold text-sm tracking-wide">Synthèse Pédagogique Intelligente</h3>
-                  </div>
-                  <p className="text-xs text-indigo-100 leading-relaxed">
-                    {totalSubs === 0 ? (
-                      "Aucun élève n'a encore soumis ce quiz. Les analyses détaillées s'afficheront dès les premières soumissions."
-                    ) : (
-                      <>
-                        Sur ce deck de quiz, la classe obtient une moyenne de <strong>{avgScore20}/20</strong>. 
-                        {weakestQuestion && (
-                          <> La notion la plus fragile (taux d'échec élevé) concerne la question #{weakestQuestion.index} <em>(&laquo; {weakestQuestion.question} &raquo;</em>, {weakestQuestion.successRate}% de réussite). Il est fortement conseillé de réexpliquer ce point en classe.</>
-                        )}
-                        {strongestQuestion && weakestQuestion?.id !== strongestQuestion.id && (
-                          <> En revanche, les élèves maîtrisent très bien la question #{strongestQuestion.index} <em>(&laquo; {strongestQuestion.question} &raquo;</em>, {strongestQuestion.successRate}% de réussite).</>
-                        )}
-                      </>
-                    )}
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-indigo-700" />
-                    <span>Analyse détaillée par question & Notions (Points forts / Points faibles)</span>
-                  </h3>
-
-                  <div className="space-y-3">
-                    {questionStats.map((qs) => {
-                      const isWeak = qs.successRate < 50;
-                      const isStrong = qs.successRate >= 75;
-
-                      return (
-                        <div key={qs.id} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3 shadow-2xs">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-full bg-slate-900 text-white font-mono font-bold text-xs flex items-center justify-center">
-                                {qs.index}
-                              </span>
-                              <span className="text-xs font-bold text-slate-900">
-                                {qs.question}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              {isWeak ? (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
-                                  🔴 Point faible / Notion non assimilée ({qs.successRate}%)
-                                </span>
-                              ) : isStrong ? (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                  🟢 Point fort / Bien assimilé ({qs.successRate}%)
-                                </span>
-                              ) : (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
-                                  🟡 À consolider ({qs.successRate}%)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all ${
-                                isWeak ? 'bg-rose-500' : isStrong ? 'bg-emerald-500' : 'bg-amber-500'
-                              }`}
-                              style={{ width: `${qs.successRate}%` }}
-                            />
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1">
-                            <div>Réponse attendue : <strong className="text-slate-800 font-mono">{qs.correct_answer}</strong></div>
-                            <div>Réussite : <strong className="font-mono">{qs.correctCount} / {totalSubs} élève(s)</strong></div>
-                          </div>
-
-                          {qs.explanation && (
-                            <div className="text-[11px] bg-slate-50 p-2.5 rounded-lg text-slate-600 italic border border-slate-100">
-                              <strong>Rappel pédagogique :</strong> {qs.explanation}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-4 border-t border-slate-200">
-                  <h3 className="font-bold text-slate-900 text-sm">Résultats individuels des élèves ({subs.length})</h3>
-                  {subs.length === 0 ? (
-                    <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400">
-                      Aucune copie enregistrée.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                      {subs.map(sub => (
-                        <div key={sub.id} className="p-3 flex items-center justify-between text-xs">
-                          <div>
-                            <div className="font-bold text-slate-900">{sub.student_name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">Soumis le {new Date(sub.submitted_at || sub.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs ${
-                              sub.score_20 >= 14 ? 'bg-emerald-100 text-emerald-800' :
-                              sub.score_20 >= 10 ? 'bg-blue-100 text-blue-800' :
-                              'bg-rose-100 text-rose-800'
-                            }`}>
-                              {sub.score_20}/20 ({sub.score}/{sub.max_score} pts)
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              <div className="sticky bottom-0 bg-white px-6 py-4 border-t border-slate-200 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => setActiveAnalyticsQuizId(null)}
-                  className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl cursor-pointer"
-                >
-                  Fermer le Dashboard
-                </button>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
+      {activeAnalyticsQuizId && (
+        <QuizAnalyticsDashboard
+          initialClassId={analyticsClassId}
+          initialQuizId={activeAnalyticsQuizId}
+          classes={classes}
+          students={students}
+          quizzes={dataService.getQuizzes()}
+          submissions={submissions}
+          onClose={() => setActiveAnalyticsQuizId(null)}
+        />
+      )}
 
       {/* Modal Partage & QR Code du Quiz Public */}
       {sharingQuiz && (
