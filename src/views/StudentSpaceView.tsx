@@ -872,6 +872,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0 space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                                {quiz.category || 'Autre'}
+                              </span>
                               {isLive && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                                   <span className="w-2 h-2 rounded-full bg-emerald-600" />

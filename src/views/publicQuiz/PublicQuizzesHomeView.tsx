@@ -111,7 +111,7 @@ export const PublicQuizzesHomeView: React.FC<PublicQuizzesHomeViewProps> = ({
       if (selectedTheme !== 'Tous' && m.theme !== selectedTheme) return false;
       if (selectedLevel !== 'Tous' && m.level !== selectedLevel) return false;
       if (!q) return true;
-      const hay = `${m.quiz.title || ''}\n${m.quiz.description || ''}`.toLowerCase();
+      const hay = `${m.quiz.title || ''}\n${m.quiz.description || ''}\n${m.quiz.category || 'Autre'}`.toLowerCase();
       return hay.includes(q);
     });
   }, [metas, query, selectedTheme, selectedLevel]);
@@ -206,6 +206,9 @@ export const PublicQuizzesHomeView: React.FC<PublicQuizzesHomeViewProps> = ({
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 text-xs font-semibold">
+                            {quiz.category || 'Autre'}
+                          </span>
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 text-emerald-800 px-3 py-1 text-xs font-semibold">
                             <Sparkles className="h-3.5 w-3.5" />
                             Public

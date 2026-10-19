@@ -929,6 +929,7 @@ class SupabaseService {
         is_public: Boolean(quiz.is_public),
         class_id: quiz.class_id,
         class_ids: quiz.class_ids || [quiz.class_id],
+        category: quiz.category || 'Autre',
         title: quiz.title,
         description: quiz.description || null,
         created_at: quiz.created_at || new Date().toISOString(),
@@ -966,6 +967,7 @@ class SupabaseService {
       is_public: true, // Force public for external access
       class_id: q.class_id,
       class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
+      category: q.category || 'Autre',
       title: q.title,
       description: q.description || undefined,
       created_at: q.created_at,
@@ -1370,6 +1372,7 @@ class SupabaseService {
         is_public: Boolean(q.is_public),
         class_id: q.class_id,
         class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
+        category: q.category || 'Autre',
         title: q.title,
         description: q.description || undefined,
         created_at: q.created_at,

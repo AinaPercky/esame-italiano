@@ -106,6 +106,7 @@ CREATE TABLE quizzes (
     class_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
+    category TEXT NOT NULL DEFAULT 'Autre',
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     duration_minutes INTEGER NOT NULL DEFAULT 10,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),
@@ -233,6 +234,7 @@ CREATE TABLE IF NOT EXISTS public.quizzes (
     class_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
+    category TEXT NOT NULL DEFAULT 'Autre',
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     duration_minutes INTEGER NOT NULL DEFAULT 10,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched', 'closed')),
@@ -244,6 +246,9 @@ CREATE TABLE IF NOT EXISTS public.quizzes (
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
     class_ids TEXT[]
 );
+
+ALTER TABLE public.quizzes
+    ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Autre';
 
 CREATE TABLE IF NOT EXISTS public.quiz_submissions (
     id TEXT PRIMARY KEY,

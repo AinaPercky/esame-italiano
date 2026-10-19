@@ -7,6 +7,7 @@ import {
   PassOrderItem, 
   ExamStatistics,
   Quiz,
+  QuizCategory,
   QuizQuestion,
   QuizSubmission,
   DailyGrade
@@ -1236,6 +1237,7 @@ export const dataService = {
   createQuiz(data: {
     title: string;
     description?: string;
+    category?: QuizCategory;
     class_id: string;
     class_ids?: string[];
     duration_minutes: number;
@@ -1265,6 +1267,7 @@ export const dataService = {
       id: generateUUID(),
       public_id: data.is_public ? generateUUID() : undefined,
       is_public: data.is_public ?? false,
+      category: data.category || 'Autre',
       title: data.title.trim(),
       description: data.description?.trim(),
       class_id: data.class_id, // Keep for backward compatibility (first class)

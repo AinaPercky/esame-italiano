@@ -155,10 +155,28 @@ export interface QuizReorderItem {
   text: string;
 }
 
+export const QUIZ_CATEGORIES = [
+  'Vocabulaire',
+  'Grammaire',
+  'Thème (traduction FR → IT)',
+  'Conjugaison',
+  'Fonctions du langage',
+  'Compréhension écrite',
+  'Compréhension orale',
+  'Expression écrite',
+  'Expression orale',
+  'Culture et civilisation italiennes',
+  'Orthographe et prononciation',
+  'Autre'
+] as const;
+
+export type QuizCategory = typeof QUIZ_CATEGORIES[number];
+
 export interface Quiz {
   id: string;
   public_id?: string; // UUID unique pour l'accès public via lien partageable
   is_public?: boolean; // Indique si le quiz est publié publiquement
+  category?: QuizCategory;
   title: string;
   description?: string;
   class_id: string; // Primary class (backward compatibility)

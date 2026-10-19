@@ -40,7 +40,7 @@ import {
   Search,
   SlidersHorizontal
 } from 'lucide-react';
-import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade } from '../types';
+import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
@@ -58,6 +58,11 @@ interface QuizzesAdminViewProps {
 const normalizeQuizSearchText = (value: string): string =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
 
+const normalizeQuizCategory = (value: unknown): QuizCategory =>
+  typeof value === 'string' && QUIZ_CATEGORIES.includes(value as QuizCategory)
+    ? value as QuizCategory
+    : 'Autre';
+
 export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   classes,
   students,
@@ -71,6 +76,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [quizSearchTerm, setQuizSearchTerm] = useState('');
   const [quizStatusFilter, setQuizStatusFilter] = useState<'all' | Quiz['status']>('all');
   const [quizVisibilityFilter, setQuizVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [quizCategoryFilter, setQuizCategoryFilter] = useState<'all' | QuizCategory>('all');
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
   const [createdAfter, setCreatedAfter] = useState('');
   const [createdBefore, setCreatedBefore] = useState('');
@@ -106,6 +112,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   // Form State
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDescription, setQuizDescription] = useState('');
+  const [quizCategory, setQuizCategory] = useState<QuizCategory | ''>('');
   const [selectedQuizClassIds, setSelectedQuizClassIds] = useState<string[]>(classes[0] ? [classes[0].id] : []);
   const [quizDuration, setQuizDuration] = useState(10);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -195,6 +202,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     const exportData = {
       title: quizTitle || 'Sans titre',
       description: quizDescription || '',
+      category: quizCategory || 'Autre',
       duration_minutes: quizDuration || 10,
       questions: questions.map((q) => {
         const item: any = {
@@ -313,6 +321,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       if (typeof parsed.description === 'string') {
         setQuizDescription(parsed.description);
       }
+      if (typeof parsed.category === 'string') {
+        setQuizCategory(normalizeQuizCategory(parsed.category));
+      }
       if (parsed.duration_minutes) {
         setQuizDuration(Number(parsed.duration_minutes) || 10);
       }
@@ -382,6 +393,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.createQuiz({
         title: parsed.title,
         description: parsed.description || '',
+        category: normalizeQuizCategory(parsed.category),
         class_id: selectedClassId || classes[0]?.id || '',
         duration_minutes: Number(parsed.duration_minutes) || 10,
         questions: importedQuestions
@@ -445,6 +457,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(null);
     setQuizTitle('');
     setQuizDescription('');
+    setQuizCategory('');
     setSelectedQuizClassIds(selectedClassId ? [selectedClassId] : (classes[0] ? [classes[0].id] : []));
     setQuizDuration(1);
     setQuestions([
@@ -466,6 +479,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setEditingQuiz(quiz);
     setQuizTitle(quiz.title);
     setQuizDescription(quiz.description || '');
+    setQuizCategory(normalizeQuizCategory(quiz.category));
     const initialClassIds = quiz.class_ids && quiz.class_ids.length > 0 ? quiz.class_ids : (quiz.class_id ? [quiz.class_id] : []);
     setSelectedQuizClassIds(initialClassIds.length > 0 ? initialClassIds : (selectedClassId ? [selectedClassId] : []));
     const normalizedQuestions: QuizQuestion[] = quiz.questions
@@ -503,6 +517,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setFormError(null);
     if (!quizTitle.trim()) {
       setFormError('Veuillez renseigner un titre pour le quiz.');
+      return;
+    }
+    if (!quizCategory) {
+      setFormError('Veuillez sélectionner une catégorie pour le quiz.');
       return;
     }
     if (selectedQuizClassIds.length === 0) {
@@ -565,6 +583,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.updateQuiz(editingQuiz.id, {
         title: quizTitle,
         description: quizDescription,
+        category: quizCategory,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -575,6 +594,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       dataService.createQuiz({
         title: quizTitle,
         description: quizDescription,
+        category: quizCategory,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -674,6 +694,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     if (quizStatusFilter !== 'all' && quiz.status !== quizStatusFilter) return false;
     if (quizVisibilityFilter === 'public' && !quiz.is_public) return false;
     if (quizVisibilityFilter === 'private' && quiz.is_public) return false;
+    if (quizCategoryFilter !== 'all' && (quiz.category || 'Autre') !== quizCategoryFilter) return false;
 
     const questionCount = quiz.questions?.length || 0;
     const submissionCount = submissionCountByQuiz.get(quiz.id) || 0;
@@ -703,6 +724,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       const searchableText = normalizeQuizSearchText([
         quiz.title,
         quiz.description || '',
+        quiz.category || 'Autre',
         classNames,
         statusLabel,
         visibilityLabel,
@@ -720,6 +742,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setQuizSearchTerm('');
     setQuizStatusFilter('all');
     setQuizVisibilityFilter('all');
+    setQuizCategoryFilter('all');
     setCreatedAfter('');
     setCreatedBefore('');
     setMinQuestionCount('');
@@ -871,7 +894,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
       {/* Recherche multicritère et filtres des quiz */}
       <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:p-5">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           <label className="relative block md:col-span-1">
             <span className="sr-only">Rechercher un quiz</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -908,10 +931,21 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               <option value="private">Privés</option>
             </select>
           </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Catégorie</span>
+            <select
+              value={quizCategoryFilter}
+              onChange={event => setQuizCategoryFilter(event.target.value as 'all' | QuizCategory)}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">Toutes les catégories</option>
+              {QUIZ_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
         </div>
 
         <p className="text-[11px] text-slate-400">
-          La recherche parcourt les titres, descriptions, classes, questions, statuts et accès publics ou privés.
+          La recherche parcourt les titres, descriptions, classes, questions, catégories, statuts et accès publics ou privés.
         </p>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
@@ -1023,6 +1057,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
+                            {quiz.category || 'Autre'}
+                          </span>
                           {quiz.class_ids && quiz.class_ids.length > 1 ? (
                             quiz.class_ids.map(cid => {
                               const c = classes.find(item => item.id === cid);
@@ -1577,6 +1614,19 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     placeholder="ex: Vocabolario: Gli Animali (Test Rapido)"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Catégorie *</label>
+                  <select
+                    required
+                    value={quizCategory}
+                    onChange={(e) => setQuizCategory(e.target.value as QuizCategory | '')}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="" disabled>Sélectionner une catégorie</option>
+                    {QUIZ_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                  </select>
                 </div>
 
                 <div className="sm:col-span-2 space-y-1.5">
