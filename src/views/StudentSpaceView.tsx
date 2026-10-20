@@ -38,7 +38,7 @@ import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
 import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
-import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
+import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
@@ -101,7 +101,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
 
-  // Correction & Explication si la réponse est fausse (affichée 8 secondes, suspend les chronomètres)
+  // Correction & Explication si la réponse est fausse (affichée 13 secondes, suspend les chronomètres)
   const [incorrectFeedback, setIncorrectFeedback] = useState<{
     isOpen: boolean;
     questionNumber: number;
@@ -109,7 +109,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     studentAnswer: string;
     correctAnswer: string;
     explanation?: string;
-    countdown: number; // 8 secondes par défaut
+    countdown: number; // 13 secondes par défaut
     pendingNextAnswers: Record<string, string>;
     isTimeout: boolean;
   } | null>(null);
@@ -314,7 +314,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(qTimer);
   }, [activeQuiz, questionSecondsRemaining, currentQuestionIndex, incorrectFeedback?.isOpen, isPracticeMode]);
 
-  // 3. Décompte de la fenêtre d'explication pédagogique (8 secondes)
+  // 3. Décompte de la fenêtre d'explication pédagogique (13 secondes)
   useEffect(() => {
     if (!incorrectFeedback || !incorrectFeedback.isOpen) return;
 
@@ -323,7 +323,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         if (!prev) return null;
         if (prev.countdown <= 1) {
           clearInterval(fbTimer);
-          // 8 secondes écoulées -> fermer l'explication et passer à la question suivante
+          // 13 secondes écoulées -> fermer l'explication et passer à la question suivante
           const pending = prev.pendingNextAnswers;
           advanceToNextQuestion(pending);
           return null;
@@ -428,7 +428,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuestionSecondsRemaining(getQuestionTimeSeconds(questions[nextIndex]));
   };
 
-  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 8s
+  const handleCloseCorrection = () => {
+    if (!incorrectFeedback) return;
+    const pendingAnswers = incorrectFeedback.pendingNextAnswers;
+    setIncorrectFeedback(null);
+    advanceToNextQuestion(pendingAnswers);
+  };
+
+  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 13s
   const processQuestionProgression = (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
@@ -445,7 +452,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       advanceToNextQuestion(updatedAnswers);
     } else {
       // Réponse fausse ou temps écoulé :
-      // Afficher la correction et l'explication pendant 8 secondes (temps hors chronomètre quiz)
+      // Afficher la correction et l'explication pendant 13 secondes (temps hors chronomètre quiz)
       setIncorrectFeedback({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
@@ -461,7 +468,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           ? formatCorrectTextAnswerForDisplay(currentQ)
           : currentQ.correct_answer,
         explanation: currentQ.explanation,
-        countdown: 8,
+        countdown: CORRECTION_DISPLAY_SECONDS,
         pendingNextAnswers: updatedAnswers,
         isTimeout
       });
@@ -1353,7 +1360,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
               ) : null}
 
-              {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (8 SECONDES) */}
+              {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (13 SECONDES) */}
               {incorrectFeedback && incorrectFeedback.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
                   <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-rose-300 overflow-hidden transform animate-scale-in flex flex-col">
@@ -1374,18 +1381,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         </div>
                       </div>
 
-                      {/* 8s Countdown Badge (temps non décompté du quiz) */}
+                      {/* Countdown de 13 s (temps non décompté du quiz) */}
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 rounded-xl border border-white/20 text-white font-mono font-black text-sm">
                         <Clock className="w-4 h-4 text-amber-300 animate-spin" />
                         <span>{incorrectFeedback.countdown}s</span>
                       </div>
                     </div>
 
-                    {/* Progress Bar of 8 seconds */}
+                    {/* Barre de progression des 13 secondes */}
                     <div className="w-full bg-rose-100 h-2 overflow-hidden">
                       <div 
                         className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
-                        style={{ width: `${(incorrectFeedback.countdown / 8) * 100}%` }}
+                        style={{ width: `${(incorrectFeedback.countdown / CORRECTION_DISPLAY_SECONDS) * 100}%` }}
                       />
                     </div>
 
@@ -1451,10 +1458,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center">
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center justify-between gap-3 sm:flex-row">
                       <span className="text-xs text-slate-500 font-mono">
                         Passage automatique dans {incorrectFeedback.countdown}s...
                       </span>
+                      <button type="button" onClick={handleCloseCorrection} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072A3F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2FA36B]">
+                        {currentQuestionIndex + 1 === totalQuestions ? 'Fermer la correction et terminer' : 'Fermer la correction et continuer'}
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
 
                   </div>

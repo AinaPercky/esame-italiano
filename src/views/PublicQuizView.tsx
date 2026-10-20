@@ -389,7 +389,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   // When per-question timer hits 0 → show correction (even if no answer) then advance
   // Zero‑point answer is recorded automatically by doValidate (empty answer = 0 pts).
-  // The correction stays visible for ~8 seconds before moving on.
+  // A visible correction stays open for thirteen seconds before moving on.
   // ─────────────────────────────────────────────────────────────────────────
   const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
@@ -415,8 +415,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       doValidate(question.id);
     }
 
-    // The modal handles its own eight-second pause; retain the old delay when
-    // corrections are configured to appear only at the end (or unavailable).
+    // A visible correction uses its own thirteen-second pause; retain the existing
+    // fallback delay only when no per-question correction is shown.
     const correction = perQuestionFeedbackRef.current[question.id]
       || evaluateQuizAnswers(q, answersRef.current).feedback[question.id];
     if (showCorrectionAtEnd || !correction) {
