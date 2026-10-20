@@ -23,6 +23,7 @@ import {
 import { dataService } from '../services/dataService';
 import { supabaseService, ConnectionTestResult } from '../services/supabaseService';
 import {
+  ATOMIC_QUIZ_CLOSE_MIGRATION_SQL,
   QUIZ_SUPABASE_MIGRATION_SQL,
   STUDENT_AVATAR_MIGRATION_SQL,
   STUDENT_EMAIL_IDENTITY_MIGRATION_SQL,
@@ -45,6 +46,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [supabaseKey, setSupabaseKey] = useState(initialConfig.anonKey);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedQuizMigration, setCopiedQuizMigration] = useState(false);
+  const [copiedAtomicQuizMigration, setCopiedAtomicQuizMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -115,6 +117,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
       setTimeout(() => setCopiedQuizMigration(false), 2500);
     } catch (e) {
       console.error('Erreur copie migration Quiz:', e);
+    }
+  };
+
+  const handleCopyAtomicQuizMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(ATOMIC_QUIZ_CLOSE_MIGRATION_SQL);
+      setCopiedAtomicQuizMigration(true);
+      setTimeout(() => setCopiedAtomicQuizMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration transactionnelle quiz:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration des fonctions RPC de quiz.' });
     }
   };
 
@@ -469,6 +482,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyAtomicQuizMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-700 hover:bg-indigo-800 active:bg-indigo-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedAtomicQuizMigration ? '✓ RPC Quiz copiées !' : 'Copier les RPC Quiz anti-écrasement'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -496,6 +517,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-emerald-800">
               Si Supabase signale que la colonne <code>quizzes.category</code> est absente, copiez la migration Quiz ci-dessus, puis exécutez-la dans Supabase &gt; SQL Editor &gt; New query &gt; Run. Elle n’efface aucune donnée et recharge le cache de schéma.
+            </span>
+            <span className="text-[11px] text-indigo-800">
+              Avant d’utiliser la clôture transactionnelle, copiez puis exécutez « RPC Quiz anti-écrasement » dans Supabase &gt; SQL Editor. Le script ne supprime que les anciennes absences <code>missed</code> au lancement; les notes réelles sont conservées.
             </span>
           </div>
         </div>
