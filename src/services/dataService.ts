@@ -1369,11 +1369,15 @@ export const dataService = {
    * Lance le quiz pour les classes ciblées.
    * Tous les quiz restent accessibles jusqu'à leur clôture manuelle.
    */
-  launchQuiz(id: string): Quiz {
+  async launchQuiz(id: string): Promise<Quiz> {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
-    // Remove any automatic zero submissions from a previous expiration so students can attempt again
+    // En cloud, le RPC verrouille la ligne quiz et supprime les anciennes absences
+    // dans la même transaction que la relance. Les copies réelles sont conservées.
+    await supabaseService.launchQuizAtomically(id);
+
+    // Le service local reflète le même état que la transaction distante.
     if (state.quizSubmissions) {
       state.quizSubmissions = state.quizSubmissions.filter(sub => !(sub.quiz_id === id && sub.status === 'missed'));
     }
@@ -1387,24 +1391,36 @@ export const dataService = {
       expires_at: undefined
     };
 
-    supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud launchQuiz error:', err));
+    if (!supabaseService.isConfigured()) {
+      supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud launchQuiz error:', err));
+    }
     persistState();
     notifySubscribers();
     return state.quizzes[idx];
   },
 
-  closeQuiz(id: string): Quiz {
+  async closeQuiz(id: string): Promise<Quiz> {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
+
+    // En cloud, statut et zéros manquants sont décidés atomiquement en base;
+    // les copies déjà présentes sont protégées par ON CONFLICT DO NOTHING.
+    const authoritativeSubmissions = await supabaseService.closeQuizAtomically(id);
 
     state.quizzes[idx] = {
       ...state.quizzes[idx],
       status: 'closed'
     };
-    supabaseService.saveQuiz(state.quizzes[idx]).catch(err => console.error('Cloud closeQuiz error:', err));
 
-    // Attribution automatique du 0/20 pour tous les élèves qui n'ont pas composé
-    this.applyZeroForMissedStudents(state.quizzes[idx]);
+    if (authoritativeSubmissions) {
+      state.quizSubmissions = [
+        ...authoritativeSubmissions,
+        ...(state.quizSubmissions || []).filter(sub => sub.quiz_id !== id)
+      ];
+    } else {
+      // Mode local sans Supabase.
+      this.applyZeroForMissedStudents(state.quizzes[idx]);
+    }
 
     persistState();
     notifySubscribers();
@@ -1554,8 +1570,11 @@ export const dataService = {
       date: today
     };
 
-    // Persist the final score before marking this attempt complete in the UI.
-    await supabaseService.saveQuizSubmission(submission);
+    // En cloud, la remise verrouille la même ligne quiz que la clôture.
+    // Une seule des deux opérations gagne la course; une note réelle ne peut
+    // pas être remplacée par un résultat manqué.
+    const savedAtomically = await supabaseService.submitQuizSubmissionAtomically(submission);
+    if (!savedAtomically) await supabaseService.saveQuizSubmission(submission);
 
     if (existingIdx !== -1) {
       state.quizSubmissions[existingIdx] = submission;

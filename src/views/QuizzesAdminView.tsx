@@ -99,6 +99,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [quizActionError, setQuizActionError] = useState<string | null>(null);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
   // Public Quiz State
   const [publicLinkCopied, setPublicLinkCopied] = useState<boolean>(false);
@@ -635,9 +636,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       confirmLabel: isRelaunch ? 'Relancer le quiz' : 'Lancer le quiz',
       variant: 'success',
       action: () => {
-        dataService.launchQuiz(quizId);
-        loadData();
-        if (onRefresh) onRefresh();
+        setQuizActionError(null);
+        void dataService.launchQuiz(quizId).then(() => {
+          loadData();
+          if (onRefresh) onRefresh();
+        }).catch(error => {
+          setQuizActionError(error instanceof Error ? error.message : 'Impossible de lancer le quiz.');
+        });
       }
     });
   };
@@ -650,9 +655,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       confirmLabel: 'Clôturer maintenant',
       variant: 'warning',
       action: () => {
-        dataService.closeQuiz(quizId);
-        loadData();
-        if (onRefresh) onRefresh();
+        setQuizActionError(null);
+        void dataService.closeQuiz(quizId).then(() => {
+          loadData();
+          if (onRefresh) onRefresh();
+        }).catch(error => {
+          setQuizActionError(error instanceof Error ? error.message : 'Impossible de clôturer le quiz.');
+        });
       }
     });
   };
@@ -801,6 +810,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           </button>
         </div>
       </div>
+
+      {quizActionError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800">
+          {quizActionError} Si les fonctions RPC viennent d’être installées, actualisez la page et réessayez.
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs: Quiz & Leaderboard */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
