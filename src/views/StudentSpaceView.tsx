@@ -42,6 +42,7 @@ import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds,
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
+import { getStudentVisibleQuizzes } from '../utils/studentQuizVisibility';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
@@ -208,9 +209,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const allClassDg = dataService.getDailyGrades(classId);
     setClassDailyGrades(allClassDg);
 
-    // RÈGLE : Les quizs non lancés (draft) ne doivent pas être affichés dans l'interface de l'élève (sauf s'ils ont déjà été soumis)
+    // Les quiz en brouillon sont masqués à l'élève, sauf si une soumission existe déjà.
     const rawQList = dataService.getQuizzes(classId);
-    const qList = rawQList.filter(q => q.status === 'launched' || subs.some(s => s.quiz_id === q.id));
+    const qList = getStudentVisibleQuizzes(rawQList, subs);
     setQuizzes(qList);
   };
 
