@@ -289,6 +289,8 @@ DROP POLICY IF EXISTS "Quizzes full access" ON public.quizzes;
 CREATE POLICY "Quizzes full access" ON public.quizzes FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Quiz submissions full access" ON public.quiz_submissions;
 CREATE POLICY "Quiz submissions full access" ON public.quiz_submissions FOR ALL USING (true) WITH CHECK (true);
+
+NOTIFY pgrst, 'reload schema';
 `;
 
 export const STUDENT_VALIDATION_STATUS_MIGRATION_SQL = `-- Migration pour ajouter le statut de validation des comptes étudiants dans Supabase
