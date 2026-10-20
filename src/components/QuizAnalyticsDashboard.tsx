@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart3, BookOpen, Lightbulb, TrendingUp, X } from 'lucide-react';
 import { ClassRoom, Quiz, QuizQuestion, QuizSubmission, Student } from '../types';
-import { calculateQuestionPointsEarned } from '../utils/quizAnswerMatcher';
+import { analyzeSubmissionQuestion, submissionHasDetailedAnswerData } from '../utils/quizSubmissionAnalysis';
 
 interface QuizAnalyticsDashboardProps {
   initialClassId: string;
@@ -46,22 +46,6 @@ const formatScore = (value: number | null): string => value === null ? '—' : `
 const fullName = (student?: Student, fallback = 'Élève'): string => student
   ? `${student.first_name} ${student.last_name}`
   : fallback;
-
-const responseFor = (question: QuizQuestion, submission: QuizSubmission): AnswerDetail | null => {
-  const feedback = submission.feedback?.[question.id];
-  const rawAnswer = submission.answers?.[question.id] ?? feedback?.studentAnswer ?? '';
-  if (!rawAnswer.trim() && !feedback) return null;
-
-  const calculated = calculateQuestionPointsEarned(question, rawAnswer);
-  return {
-    submission,
-    answer: feedback?.studentAnswer || rawAnswer || 'Aucune réponse',
-    expected: feedback?.expected || question.correct_answer || '—',
-    correct: feedback?.correct ?? calculated.isFullyCorrect,
-    points: Number.isFinite(Number(feedback?.points)) ? Number(feedback?.points) : calculated.awardedPoints,
-    maxPoints: calculated.maxPoints
-  };
-};
 
 const rateOf = (details: AnswerDetail[]): number | null => {
   if (!details.length) return null;
@@ -113,6 +97,8 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const scopedSubmissions = studentId
     ? classSubmissions.filter(submission => submission.student_id === studentId)
     : classSubmissions;
+  const submissionsWithAnswerDetails = scopedSubmissions.filter(submissionHasDetailedAnswerData).length;
+  const submissionsWithoutAnswerDetails = scopedSubmissions.length - submissionsWithAnswerDetails;
 
   const studentMeans = useMemo(() => {
     const means = new Map<string, number>();
@@ -140,7 +126,7 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
       (quiz.questions || []).forEach((question, index) => {
         const classDetails = classSubmissions.flatMap(submission => {
           if (submission.quiz_id !== quiz.id) return [];
-          const detail = responseFor(question, submission);
+          const detail = analyzeSubmissionQuestion(question, submission);
           return detail ? [detail] : [];
         });
         if (!classDetails.length) return;
@@ -302,8 +288,14 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
                   <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900"><BookOpen className="h-4 w-4 text-indigo-700" /> Résultats et réponses par question</h3>
                   <p className="mt-1 text-[11px] text-slate-500">Questions les moins réussies d’abord. Ouvrez une ligne pour lire les réponses réellement données.</p>
                 </div>
-                {!questionAnalyses.length ? <p className="p-4 text-xs text-slate-500">Aucune réponse détaillée n’est disponible dans les copies sélectionnées.</p> : (
+                {!questionAnalyses.length ? (
+                  <div className="space-y-2 p-4 text-xs text-slate-600">
+                    <p>Aucune réponse détaillée n’est disponible dans les copies sélectionnées.</p>
+                    {submissionsWithoutAnswerDetails > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">{submissionsWithoutAnswerDetails} copie(s) contiennent une note, mais aucune réponse par question n’a été enregistrée. La note seule ne permet pas de reconstituer les réponses passées. Les nouvelles soumissions détaillées pourront être analysées ici.</p>}
+                  </div>
+                ) : (
                   <div className="divide-y divide-slate-100">
+                    {submissionsWithoutAnswerDetails > 0 && <p className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[11px] text-amber-950 sm:px-5">Les réponses détaillées sont présentes pour {submissionsWithAnswerDetails} copie(s) sur {scopedSubmissions.length}. {submissionsWithoutAnswerDetails} copie(s) ne contiennent qu’une note; leurs réponses historiques ne peuvent pas être reconstituées.</p>}
                     {questionAnalyses.slice(0, 10).map(row => (
                       <details key={row.key} className="group px-4 py-3 sm:px-5">
                         <summary className="grid cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-3 [&::-webkit-details-marker]:hidden">
