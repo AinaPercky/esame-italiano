@@ -2,6 +2,12 @@
 // L’import accepte les commentaires JSONC commençant par // ou entourés par /* ... */.
 //
 // Champs du quiz : title (obligatoire), category (facultative; Autre par défaut), description (facultative), questions (obligatoire).
+// Pour classer le quiz, ajoutez au niveau principal : "category": "Vocabulaire".
+// Catégories acceptées : Vocabulaire, Grammaire, Thème (traduction FR → IT), Conjugaison,
+// Fonctions du langage, Compréhension écrite, Compréhension orale, Expression écrite,
+// Expression orale, Culture et civilisation italiennes, Orthographe et prononciation, Autre.
+// Une catégorie absente ou inconnue est importée comme « Autre ».
+// Pour ajouter une nouvelle catégorie à la liste, elle doit être ajoutée au code de l’application.
 // duration_minutes est conservé pour compatibilité; le temps réel est la somme des time_limit_seconds.
 //
 // Types de question :

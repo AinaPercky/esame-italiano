@@ -945,7 +945,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Catégorie</span>
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Filtrer par catégorie</span>
             <select
               value={quizCategoryFilter}
               onChange={event => setQuizCategoryFilter(event.target.value as 'all' | QuizCategory)}
@@ -1542,6 +1542,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <p className="text-xs text-slate-600">
                       Chargez un fichier <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-800">.json</code> ou collez son contenu ci-dessous. Le titre, les consignes et les questions du quiz en cours d'édition seront actualisés directement dans cette fenêtre.
                     </p>
+
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-950">
+                      <p className="font-bold">Ajouter une catégorie au quiz</p>
+                      <p className="mt-1">Dans l’objet principal du JSON, ajoutez par exemple <code className="rounded bg-white px-1 py-0.5 font-mono">"category": "Vocabulaire"</code>. Cette clé est facultative; sans elle, le quiz sera classé « Autre ».</p>
+                      <p className="mt-1"><strong>Catégories disponibles :</strong> {QUIZ_CATEGORIES.join(' · ')}.</p>
+                      <p className="mt-1 text-indigo-800">Une valeur non reconnue est remplacée par « Autre ». Pour créer une nouvelle catégorie, il faut d’abord l’ajouter à la liste des catégories de l’application. Vous pouvez aussi choisir la catégorie dans le champ « Catégorie » du formulaire de création ou de modification.</p>
+                    </div>
 
                     {editorJsonError && (
                       <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
