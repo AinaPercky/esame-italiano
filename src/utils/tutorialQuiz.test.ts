@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createTutorialQuiz, scoreTutorialQuiz } from './tutorialQuiz';
+import { getQuizTotalTimeSeconds } from './quizTiming';
 
 describe('tutoriel local des quiz étudiants', () => {
   it('contient exactement cinq questions et tous les formats disponibles', () => {
@@ -12,7 +13,8 @@ describe('tutoriel local des quiz étudiants', () => {
       ['qcm', 'reorder', 'text']
     );
     assert.equal(quiz.total_points, 20);
-    assert.ok(quiz.questions.every((question) => question.time_limit_seconds === 60));
+    assert.deepEqual(quiz.questions.map((question) => question.time_limit_seconds), [15, 15, 25, 44, 35]);
+    assert.equal(getQuizTotalTimeSeconds(quiz), 134);
   });
 
   it('calcule 20/20 localement pour des réponses correctes, dont le reorder et le cloze', () => {

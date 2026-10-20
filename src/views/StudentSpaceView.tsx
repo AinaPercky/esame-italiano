@@ -93,6 +93,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   quizAnswersRef.current = quizAnswers;
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
+  const finalQuizBeepSecondRef = useRef<number>(-1);
   const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
@@ -225,7 +226,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Système anti-triche : si l'élève quitte la fenêtre / change d'onglet pendant le quiz
   useEffect(() => {
-    if (!activeQuiz || isPracticeMode) return;
+    if (!activeQuiz) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -271,9 +272,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(timer);
   }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen, isPracticeMode]);
 
+  // Bip global répété chaque seconde durant les cinq dernières secondes (quiz officiels et tutoriel).
+  useEffect(() => {
+    if (!activeQuiz || incorrectFeedback?.isOpen || quizSecondsRemaining <= 0 || quizSecondsRemaining > 5) return;
+    if (finalQuizBeepSecondRef.current === quizSecondsRemaining) return;
+    finalQuizBeepSecondRef.current = quizSecondsRemaining;
+    playTimerBeep();
+  }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
+
   // Alerte sonore du temps de chaque question : moitié, cinq secondes puis les trois dernières secondes.
   useEffect(() => {
     if (!activeQuiz || questionSecondsRemaining <= 0) return;
+    if (quizSecondsRemaining <= 5) return;
     const questionKey = `${activeQuiz.id}:${currentQuestionIndex}`;
     if (questionTimerCueRef.current.questionKey !== questionKey) {
       questionTimerCueRef.current = { questionKey, played: new Set() };
@@ -283,7 +293,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!cueSeconds.has(questionSecondsRemaining) || questionTimerCueRef.current.played.has(questionSecondsRemaining)) return;
     questionTimerCueRef.current.played.add(questionSecondsRemaining);
     playTimerBeep();
-  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining]);
+  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining, quizSecondsRemaining]);
 
   // 2. Chronomètre dédié par Question (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -334,6 +344,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setTimeoutNotice(false);
     setAntiCheatNotice(false);
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
+    finalQuizBeepSecondRef.current = -1;
     quizAnswersRef.current = {};
     setQuizAnswers({});
     setIncorrectFeedback(null);
@@ -876,10 +887,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-bold text-amber-950 text-sm">
-                      🛡️ Alerte Anti-Triche • Fenêtre quittée
+                      {tutorialResult ? '🛡️ Entraînement interrompu • Fenêtre quittée' : '🛡️ Alerte Anti-Triche • Fenêtre quittée'}
                     </h3>
                     <p className="text-xs text-amber-900">
-                      Vous avez quitté la fenêtre ou l'onglet d'évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.
+                      {tutorialResult
+                        ? 'Vous avez quitté la fenêtre ou l’onglet pendant le tutoriel. L’entraînement a été arrêté avec un résultat local; aucune note officielle n’a été enregistrée.'
+                        : 'Vous avez quitté la fenêtre ou l’onglet d’évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.'}
                     </p>
                   </div>
                 </div>
@@ -934,10 +947,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center rounded-full border border-[#C7DCEB] bg-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0B3C5D]">Entraînement · essais illimités</span>
-                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 5 minutes</span>
+                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 2 min 15</span>
                 </div>
                 <h2 className="font-display text-base font-bold text-[#072A3F]">Découvrir comment passer un quiz</h2>
-                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres et les corrections. Aucun résultat n’est envoyé à la base de données ou pris en compte dans vos notes et classements.</p>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Un changement d’onglet clôt l’essai, mais son résultat reste local : il n’est pas envoyé à la base ni pris en compte dans vos notes et classements.</p>
               </div>
               <button type="button" onClick={handleStartTutorial} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#072A3F]">
                 <Play className="h-4 w-4 fill-current" /> Démarrer le tutoriel

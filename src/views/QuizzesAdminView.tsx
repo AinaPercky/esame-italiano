@@ -1151,10 +1151,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             setActiveAnalyticsQuizId(quiz.id);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                          title="Dashboard Data Analysis & Bilan des notions"
+                          title="Analyse pédagogique simple des résultats, tendances et réponses"
                         >
                           <BarChart3 className="w-3.5 h-3.5" />
-                          <span>Data Analysis</span>
+                          <span>Analyse pédagogique</span>
                         </button>
 
                         {quiz.status === 'draft' && (

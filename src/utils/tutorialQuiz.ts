@@ -22,7 +22,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       options: ['Buongiorno', 'Buonanotte', 'Arrivederci', 'Per favore'],
       correct_answer: 'Buongiorno',
       points: 4,
-      time_limit_seconds: 60,
+      time_limit_seconds: 15,
       explanation: 'Buongiorno s’utilise pour saluer le matin et pendant la journée.'
     },
     {
@@ -32,7 +32,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       options: ['Io sono studente.', 'Io sei studente.', 'Io è studente.', 'Io siamo studente.'],
       correct_answer: 'Io sono studente.',
       points: 4,
-      time_limit_seconds: 60,
+      time_limit_seconds: 15,
       explanation: 'À la première personne du singulier, essere se conjugue sono : io sono.'
     },
     {
@@ -41,7 +41,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       question: 'Saisissez en italien : « Merci beaucoup ».',
       correct_answer: 'Grazie mille / Molte grazie',
       points: 4,
-      time_limit_seconds: 60,
+      time_limit_seconds: 25,
       explanation: '« Grazie mille » et « Molte grazie » sont deux façons courantes de remercier.'
     },
     {
@@ -51,7 +51,8 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       answers: ['vado', 'resti'],
       correct_answer: 'vado | resti',
       points: 4,
-      time_limit_seconds: 60,
+      // Deux trous à environ 22 secondes par réponse.
+      time_limit_seconds: 44,
       explanation: 'On dit « io vado » (je vais) et « tu resti » (tu restes). Chaque case vaut deux points.'
     },
     {
@@ -66,7 +67,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       ],
       correct_answer: JSON.stringify(reorderIds),
       points: 4,
-      time_limit_seconds: 60,
+      time_limit_seconds: 35,
       explanation: 'La phrase complète est « Domani vado al mercato. »'
     }
   ];
