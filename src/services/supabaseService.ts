@@ -923,7 +923,7 @@ class SupabaseService {
       const publicId = quiz.public_id && isUUID(quiz.public_id)
         ? quiz.public_id
         : (quiz.is_public ? generateUUID() : null);
-      const { error } = await client.from('quizzes').upsert({
+      const quizPayload = {
         id: quiz.id,
         public_id: publicId,
         is_public: Boolean(quiz.is_public),
@@ -939,7 +939,20 @@ class SupabaseService {
         expires_at: quiz.expires_at || null,
         questions: quiz.questions || [],
         total_points: Number(quiz.total_points) || 20
-      }, { onConflict: 'id' });
+      };
+      let { error } = await client.from('quizzes').upsert(quizPayload, { onConflict: 'id' });
+
+      // Les anciennes bases peuvent ne pas encore avoir reçu la migration category.
+      // Réessayer sans cette colonne permet au moins de persister class_ids et les
+      // autres modifications du quiz pendant que la migration SQL est appliquée.
+      if (error && /category/i.test(error.message) && /schema cache|column/i.test(error.message)) {
+        console.warn(
+          `La colonne quizzes.category manque dans Supabase. Les autres changements de « ${quiz.title} » sont sauvegardés; exécutez la migration Quiz dans Paramètres pour activer la persistance des catégories.`
+        );
+        const legacyPayload = { ...quizPayload };
+        Reflect.deleteProperty(legacyPayload, 'category');
+        ({ error } = await client.from('quizzes').upsert(legacyPayload, { onConflict: 'id' }));
+      }
 
       if (error) throw new Error(`Quiz « ${quiz.title} » : ${error.message}`);
     });

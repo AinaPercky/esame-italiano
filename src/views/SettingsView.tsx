@@ -494,6 +494,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             <span className="text-[11px] text-slate-500 italic">
               Les migrations Photo et Sexe ajoutent leurs colonnes sans supprimer les données existantes. Exécutez la migration Sexe avant les nouvelles inscriptions.
             </span>
+            <span className="text-[11px] text-emerald-800">
+              Si Supabase signale que la colonne <code>quizzes.category</code> est absente, copiez la migration Quiz ci-dessus, puis exécutez-la dans Supabase &gt; SQL Editor &gt; New query &gt; Run. Elle n’efface aucune donnée et recharge le cache de schéma.
+            </span>
           </div>
         </div>
       )}
