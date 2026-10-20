@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { QuizQuestion } from '../../types';
 import { QuizFeedbackEntry, formatQuizTime } from './publicQuizUtils';
+import { CORRECTION_DISPLAY_SECONDS } from '../../utils/quizTiming';
 import { QuizReorderList } from '../../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../../components/QuizClozeInput';
 
@@ -55,7 +56,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   onNext,
   onPrevious
 }) => {
-  const [correctionCountdown, setCorrectionCountdown] = React.useState(8);
+  const [correctionCountdown, setCorrectionCountdown] = React.useState(CORRECTION_DISPLAY_SECONDS);
   const isLastQuestion = questionIndex === totalQuestions - 1;
   const totalTimeRatio = totalTimeDurationMs > 0 ? totalTimeLeftMs / totalTimeDurationMs : 1;
   const totalTimeRemainingPercent = Math.max(0, Math.min(100, totalTimeRatio * 100));
@@ -85,10 +86,10 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 
   React.useEffect(() => {
     if (!showCorrection || !feedback) return;
-    setCorrectionCountdown(8);
+    setCorrectionCountdown(CORRECTION_DISPLAY_SECONDS);
     const startedAt = Date.now();
     const interval = setInterval(() => {
-      const next = Math.max(0, 8 - Math.floor((Date.now() - startedAt) / 1000));
+      const next = Math.max(0, CORRECTION_DISPLAY_SECONDS - Math.floor((Date.now() - startedAt) / 1000));
       setCorrectionCountdown(next);
       if (next === 0) {
         clearInterval(interval);
@@ -287,7 +288,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
             </div>
 
             <div className="h-2 w-full overflow-hidden bg-slate-100">
-              <div className="h-full bg-[#2fa36b] transition-[width] duration-300" style={{ width: `${(correctionCountdown / 8) * 100}%` }} />
+              <div className="h-full bg-[#2fa36b] transition-[width] duration-300" style={{ width: `${(correctionCountdown / CORRECTION_DISPLAY_SECONDS) * 100}%` }} />
             </div>
 
             <div className="space-y-4 overflow-y-auto p-4 sm:p-6">
@@ -325,7 +326,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 p-4">
               <span className="text-xs text-slate-500">Passage automatique dans {correctionCountdown}s…</span>
               <button type="button" onClick={onNext} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#0b3c5d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2fa36b]">
-                Continuer tout de suite
+                Fermer la correction et continuer
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>

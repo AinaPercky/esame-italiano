@@ -2,6 +2,7 @@ import { Quiz, QuizQuestion } from '../types';
 
 export const DEFAULT_QCM_TIME_SECONDS = 17;
 export const DEFAULT_TEXT_TIME_SECONDS = 32;
+export const CORRECTION_DISPLAY_SECONDS = 13;
 
 export function getQuestionTimeSeconds(question?: Pick<QuizQuestion, 'type' | 'time_limit_seconds'>): number {
   if (!question) return DEFAULT_QCM_TIME_SECONDS;

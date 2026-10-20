@@ -38,7 +38,7 @@ import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
 import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
-import { formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
+import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
@@ -93,6 +93,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   quizAnswersRef.current = quizAnswers;
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
+  const finalQuizBeepSecondRef = useRef<number>(-1);
   const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
@@ -100,7 +101,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
 
-  // Correction & Explication si la réponse est fausse (affichée 8 secondes, suspend les chronomètres)
+  // Correction & Explication si la réponse est fausse (affichée 13 secondes, suspend les chronomètres)
   const [incorrectFeedback, setIncorrectFeedback] = useState<{
     isOpen: boolean;
     questionNumber: number;
@@ -108,7 +109,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     studentAnswer: string;
     correctAnswer: string;
     explanation?: string;
-    countdown: number; // 8 secondes par défaut
+    countdown: number; // 13 secondes par défaut
     pendingNextAnswers: Record<string, string>;
     isTimeout: boolean;
   } | null>(null);
@@ -225,7 +226,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Système anti-triche : si l'élève quitte la fenêtre / change d'onglet pendant le quiz
   useEffect(() => {
-    if (!activeQuiz || isPracticeMode) return;
+    if (!activeQuiz) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -271,9 +272,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(timer);
   }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen, isPracticeMode]);
 
+  // Bip global répété chaque seconde durant les cinq dernières secondes (quiz officiels et tutoriel).
+  useEffect(() => {
+    if (!activeQuiz || incorrectFeedback?.isOpen || quizSecondsRemaining <= 0 || quizSecondsRemaining > 5) return;
+    if (finalQuizBeepSecondRef.current === quizSecondsRemaining) return;
+    finalQuizBeepSecondRef.current = quizSecondsRemaining;
+    playTimerBeep();
+  }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
+
   // Alerte sonore du temps de chaque question : moitié, cinq secondes puis les trois dernières secondes.
   useEffect(() => {
     if (!activeQuiz || questionSecondsRemaining <= 0) return;
+    if (quizSecondsRemaining <= 5) return;
     const questionKey = `${activeQuiz.id}:${currentQuestionIndex}`;
     if (questionTimerCueRef.current.questionKey !== questionKey) {
       questionTimerCueRef.current = { questionKey, played: new Set() };
@@ -283,7 +293,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!cueSeconds.has(questionSecondsRemaining) || questionTimerCueRef.current.played.has(questionSecondsRemaining)) return;
     questionTimerCueRef.current.played.add(questionSecondsRemaining);
     playTimerBeep();
-  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining]);
+  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining, quizSecondsRemaining]);
 
   // 2. Chronomètre dédié par Question (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -304,7 +314,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(qTimer);
   }, [activeQuiz, questionSecondsRemaining, currentQuestionIndex, incorrectFeedback?.isOpen, isPracticeMode]);
 
-  // 3. Décompte de la fenêtre d'explication pédagogique (8 secondes)
+  // 3. Décompte de la fenêtre d'explication pédagogique (13 secondes)
   useEffect(() => {
     if (!incorrectFeedback || !incorrectFeedback.isOpen) return;
 
@@ -313,7 +323,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         if (!prev) return null;
         if (prev.countdown <= 1) {
           clearInterval(fbTimer);
-          // 8 secondes écoulées -> fermer l'explication et passer à la question suivante
+          // 13 secondes écoulées -> fermer l'explication et passer à la question suivante
           const pending = prev.pendingNextAnswers;
           advanceToNextQuestion(pending);
           return null;
@@ -334,6 +344,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setTimeoutNotice(false);
     setAntiCheatNotice(false);
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
+    finalQuizBeepSecondRef.current = -1;
     quizAnswersRef.current = {};
     setQuizAnswers({});
     setIncorrectFeedback(null);
@@ -417,7 +428,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuestionSecondsRemaining(getQuestionTimeSeconds(questions[nextIndex]));
   };
 
-  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 8s
+  const handleCloseCorrection = () => {
+    if (!incorrectFeedback) return;
+    const pendingAnswers = incorrectFeedback.pendingNextAnswers;
+    setIncorrectFeedback(null);
+    advanceToNextQuestion(pendingAnswers);
+  };
+
+  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 13s
   const processQuestionProgression = (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
@@ -434,7 +452,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       advanceToNextQuestion(updatedAnswers);
     } else {
       // Réponse fausse ou temps écoulé :
-      // Afficher la correction et l'explication pendant 8 secondes (temps hors chronomètre quiz)
+      // Afficher la correction et l'explication pendant 13 secondes (temps hors chronomètre quiz)
       setIncorrectFeedback({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
@@ -450,7 +468,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           ? formatCorrectTextAnswerForDisplay(currentQ)
           : currentQ.correct_answer,
         explanation: currentQ.explanation,
-        countdown: 8,
+        countdown: CORRECTION_DISPLAY_SECONDS,
         pendingNextAnswers: updatedAnswers,
         isTimeout
       });
@@ -876,10 +894,12 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-bold text-amber-950 text-sm">
-                      🛡️ Alerte Anti-Triche • Fenêtre quittée
+                      {tutorialResult ? '🛡️ Entraînement interrompu • Fenêtre quittée' : '🛡️ Alerte Anti-Triche • Fenêtre quittée'}
                     </h3>
                     <p className="text-xs text-amber-900">
-                      Vous avez quitté la fenêtre ou l'onglet d'évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.
+                      {tutorialResult
+                        ? 'Vous avez quitté la fenêtre ou l’onglet pendant le tutoriel. L’entraînement a été arrêté avec un résultat local; aucune note officielle n’a été enregistrée.'
+                        : 'Vous avez quitté la fenêtre ou l’onglet d’évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.'}
                     </p>
                   </div>
                 </div>
@@ -934,10 +954,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center rounded-full border border-[#C7DCEB] bg-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0B3C5D]">Entraînement · essais illimités</span>
-                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 5 minutes</span>
+                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 2 min 15</span>
                 </div>
                 <h2 className="font-display text-base font-bold text-[#072A3F]">Découvrir comment passer un quiz</h2>
-                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres et les corrections. Aucun résultat n’est envoyé à la base de données ou pris en compte dans vos notes et classements.</p>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Un changement d’onglet clôt l’essai, mais son résultat reste local : il n’est pas envoyé à la base ni pris en compte dans vos notes et classements.</p>
               </div>
               <button type="button" onClick={handleStartTutorial} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#072A3F]">
                 <Play className="h-4 w-4 fill-current" /> Démarrer le tutoriel
@@ -1340,7 +1360,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
               ) : null}
 
-              {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (8 SECONDES) */}
+              {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (13 SECONDES) */}
               {incorrectFeedback && incorrectFeedback.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
                   <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-rose-300 overflow-hidden transform animate-scale-in flex flex-col">
@@ -1361,18 +1381,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         </div>
                       </div>
 
-                      {/* 8s Countdown Badge (temps non décompté du quiz) */}
+                      {/* Countdown de 13 s (temps non décompté du quiz) */}
                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 rounded-xl border border-white/20 text-white font-mono font-black text-sm">
                         <Clock className="w-4 h-4 text-amber-300 animate-spin" />
                         <span>{incorrectFeedback.countdown}s</span>
                       </div>
                     </div>
 
-                    {/* Progress Bar of 8 seconds */}
+                    {/* Barre de progression des 13 secondes */}
                     <div className="w-full bg-rose-100 h-2 overflow-hidden">
                       <div 
                         className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
-                        style={{ width: `${(incorrectFeedback.countdown / 8) * 100}%` }}
+                        style={{ width: `${(incorrectFeedback.countdown / CORRECTION_DISPLAY_SECONDS) * 100}%` }}
                       />
                     </div>
 
@@ -1438,10 +1458,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center">
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center justify-between gap-3 sm:flex-row">
                       <span className="text-xs text-slate-500 font-mono">
                         Passage automatique dans {incorrectFeedback.countdown}s...
                       </span>
+                      <button type="button" onClick={handleCloseCorrection} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072A3F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2FA36B]">
+                        {currentQuestionIndex + 1 === totalQuestions ? 'Fermer la correction et terminer' : 'Fermer la correction et continuer'}
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
 
                   </div>
