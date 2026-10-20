@@ -158,7 +158,7 @@ export interface QuizReorderItem {
 export const QUIZ_CATEGORIES = [
   'Vocabulaire',
   'Grammaire',
-  'Thème (traduction FR → IT)',
+  'Thème',
   'Conjugaison',
   'Fonctions du langage',
   'Compréhension écrite',
@@ -171,6 +171,14 @@ export const QUIZ_CATEGORIES = [
 ] as const;
 
 export type QuizCategory = typeof QUIZ_CATEGORIES[number];
+
+export function normalizeQuizCategory(value: unknown): QuizCategory {
+  if (typeof value !== 'string') return 'Autre';
+  const normalized = value.trim().replace(/\s*->\s*/g, ' → ').replace(/\s*→\s*/g, ' → ').replace(/\s+/g, ' ').toLocaleLowerCase('fr-FR');
+  if (normalized === 'thème (traduction fr → it)' || normalized === 'thème (traduction it → fr)') return 'Thème';
+
+  return QUIZ_CATEGORIES.find(category => category.toLocaleLowerCase('fr-FR') === normalized) || 'Autre';
+}
 
 export interface Quiz {
   id: string;

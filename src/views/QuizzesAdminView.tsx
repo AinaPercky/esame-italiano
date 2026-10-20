@@ -40,7 +40,7 @@ import {
   Search,
   SlidersHorizontal
 } from 'lucide-react';
-import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory } from '../types';
+import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
@@ -58,11 +58,6 @@ interface QuizzesAdminViewProps {
 
 const normalizeQuizSearchText = (value: string): string =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
-
-const normalizeQuizCategory = (value: unknown): QuizCategory =>
-  typeof value === 'string' && QUIZ_CATEGORIES.includes(value as QuizCategory)
-    ? value as QuizCategory
-    : 'Autre';
 
 export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   classes,
