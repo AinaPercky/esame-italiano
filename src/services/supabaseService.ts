@@ -7,7 +7,8 @@ import {
   Evaluation,
   PassOrderItem,
   Quiz,
-  QuizSubmission
+  QuizSubmission,
+  normalizeQuizCategory
 } from '../types';
 
 export function cleanSupabaseUrl(url: string): string {
@@ -980,7 +981,7 @@ class SupabaseService {
       is_public: true, // Force public for external access
       class_id: q.class_id,
       class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
-      category: q.category || 'Autre',
+      category: normalizeQuizCategory(q.category),
       title: q.title,
       description: q.description || undefined,
       created_at: q.created_at,
@@ -1053,9 +1054,85 @@ class SupabaseService {
       status: submission.status,
       feedback: submission.feedback || {},
       date: submission.date
-    }, { onConflict: 'quiz_id,student_id' });
+    }, { onConflict: 'quiz_id,student_id', ignoreDuplicates: true });
 
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
+  }
+
+  public async launchQuizAtomically(quizId: string): Promise<boolean> {
+    const client = this.getClient();
+    if (!client) {
+      if (this.isConfigured()) throw new Error('Le client Supabase est indisponible; le quiz n’a pas été relancé.');
+      return false;
+    }
+
+    const { error } = await client.rpc('launch_quiz_and_clear_missed', { p_quiz_id: quizId });
+    if (error) throw new Error(`Relance du quiz : ${error.message}`);
+    return true;
+  }
+
+  public async closeQuizAtomically(quizId: string): Promise<QuizSubmission[] | null> {
+    const client = this.getClient();
+    if (!client) {
+      if (this.isConfigured()) throw new Error('Le client Supabase est indisponible; le quiz n’a pas été clôturé.');
+      return null;
+    }
+
+    const { data, error } = await client.rpc('close_quiz_and_mark_missed', { p_quiz_id: quizId });
+    if (error) throw new Error(`Clôture transactionnelle du quiz : ${error.message}`);
+
+    const rows = Array.isArray(data?.submissions) ? data.submissions : [];
+    return rows.map((row: any): QuizSubmission => ({
+      id: row.id,
+      quiz_id: row.quiz_id,
+      quiz_title: row.quiz_title,
+      student_id: row.student_id,
+      student_name: row.student_name,
+      student_number: row.student_number || null,
+      class_id: row.class_id,
+      class_name: row.class_name || undefined,
+      started_at: row.started_at,
+      submitted_at: row.submitted_at || undefined,
+      answers: row.answers || {},
+      score: Number(row.score) || 0,
+      max_score: Number(row.max_score) || 20,
+      score_20: Number(row.score_20) || 0,
+      status: row.status,
+      feedback: row.feedback || {},
+      date: row.date
+    }));
+  }
+
+  public async submitQuizSubmissionAtomically(submission: QuizSubmission): Promise<boolean> {
+    const client = this.getClient();
+    if (!client) {
+      if (this.isConfigured()) throw new Error('Le client Supabase est indisponible; le résultat n’a pas été enregistré.');
+      return false;
+    }
+
+    const { error } = await client.rpc('submit_quiz_submission', {
+      p_submission: {
+        id: submission.id,
+        quiz_id: submission.quiz_id,
+        quiz_title: submission.quiz_title,
+        student_id: submission.student_id,
+        student_name: submission.student_name,
+        student_number: submission.student_number || null,
+        class_id: submission.class_id,
+        class_name: submission.class_name || null,
+        started_at: submission.started_at,
+        submitted_at: submission.submitted_at || null,
+        answers: submission.answers || {},
+        score: submission.score,
+        max_score: submission.max_score,
+        score_20: submission.score_20,
+        status: submission.status,
+        feedback: submission.feedback || {},
+        date: submission.date
+      }
+    });
+    if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
+    return true;
   }
 
   public async syncQuizData(quizzes: Quiz[] = [], submissions: QuizSubmission[] = []): Promise<void> {
@@ -1385,7 +1462,7 @@ class SupabaseService {
         is_public: Boolean(q.is_public),
         class_id: q.class_id,
         class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
-        category: q.category || 'Autre',
+        category: normalizeQuizCategory(q.category),
         title: q.title,
         description: q.description || undefined,
         created_at: q.created_at,
