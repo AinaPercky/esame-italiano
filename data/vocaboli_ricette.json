@@ -1,0 +1,198 @@
+// Quiz PerckyLingua : « Il vocabolario della cucina » (A1 expert → A2 → B1 débutant) - 4 choix par question
+// Méthode calquée sur le site de référence : phrase à trou (__) + choix + un indice dans la phrase.
+// Les 4 choix se ressemblent (même famille, même genre, même forme) pour rendre la décision difficile.
+// Niveaux : 7 questions A1 expert (1-7), 8 questions A2 (8-15), 5 questions B1 très débutant (16-20).
+// Mots italiens : leçon PDF « La cucina e le ricette » + texte PDF « Ragù alla Bolognese ». Les questions sur le ragù (8, 9, 11, 13, 14, 19, 20) suivent le texte « Ragù alla Bolognese ».
+{
+  "title": "I vocaboli della cucina",
+  "description": "Quiz di vocabolario basato sulla cucina e le ricette",
+  "category": "Vocabulaire",
+  "duration_minutes": 5,
+  "questions": [
+    // ===== A1 expert =====
+    {
+      "type": "qcm",
+      "question": "Taglio la cipolla con il coltello sul __.",
+      "options": ["mestolo", "tagliere", "frullatore", "coperchio"],
+      "correct_answer": "tagliere",
+      "points": 1,
+      "explanation": "Indice : on coupe avec le coltello sur une planche. Il tagliere = la planche à découper. Il mestolo = la louche, il frullatore = le mixeur, il coperchio = le couvercle.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Prendi una __ e scalda l'olio.",
+      "options": ["forchetta", "ciotola", "padella", "grattugia"],
+      "correct_answer": "padella",
+      "points": 1,
+      "explanation": "Dans la leçon : « Prendi una padella » (Prends une poêle). Indice : on chauffe l'huile. La padella = la poêle. La forchetta = la fourchette, la ciotola = le bol, la grattugia = la râpe.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Per la pasta aggiungo un __ di sale.",
+      "options": ["litro", "pizzico", "chilo", "bicchiere"],
+      "correct_answer": "pizzico",
+      "points": 1,
+      "explanation": "Un pizzico = une pincée (très peu). Un litro = un litre, un chilo = un kilo, un bicchiere = un verre : c'est beaucoup trop pour du sel.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Per il soffritto tagliamo la cipolla, la carota e il __.",
+      "options": ["peperone", "limone", "basilico", "sedano"],
+      "correct_answer": "sedano",
+      "points": 1,
+      "explanation": "Dans la leçon, le soffritto = cipolla (oignon), carota (carotte) et sedano (céleri). Il peperone = le poivron, il limone = le citron, il basilico = le basilic.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Gli spaghetti e le penne sono un tipo di __.",
+      "options": ["pasta", "riso", "pane", "farina"],
+      "correct_answer": "pasta",
+      "points": 1,
+      "explanation": "Spaghetti et penne sont des pâtes. La pasta = les pâtes. Il riso = le riz, il pane = le pain, la farina = la farine : ce sont d'autres aliments de base, mais pas des types de pâtes.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Per la frittata prendi un __.",
+      "options": ["limone", "zucchero", "uovo", "sedano"],
+      "correct_answer": "uovo",
+      "points": 1,
+      "explanation": "La frittata se prépare avec l'uovo (l'œuf). Il limone = le citron, lo zucchero = le sucre, il sedano = le céleri.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Vorrei mezzo __ di carote, per favore.",
+      "options": ["litro", "bicchiere", "chilo", "pizzico"],
+      "correct_answer": "chilo",
+      "points": 1,
+      "explanation": "Indice : les carottes s'achètent au poids. Mezzo chilo = un demi-kilo. Un litro = un litre et un bicchiere = un verre (pour un liquide), un pizzico = une pincée.",
+      "time_limit_seconds": 15
+    },
+
+    // ===== A2 =====
+    {
+      "type": "qcm",
+      "question": "Poi mettiamo l'olio in una __.",
+      "options": ["cipolla", "pentola", "carota", "carne"],
+      "correct_answer": "pentola",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « Poi mettiamo l'olio in una pentola » (Ensuite nous mettons l'huile dans une casserole). La pentola = la casserole. Una cipolla = un oignon, una carota = une carotte : ce sont des légumes, pas un ustensile. Une carne n'existe pas : on dit « la carne ».",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Dopo aggiungiamo i pomodori, il vino, il sale e il __.",
+      "options": ["latte", "olio", "pepe", "sedano"],
+      "correct_answer": "pepe",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « il vino, il sale e il pepe ». Sale e pepe vont ensemble (sel et poivre). Il latte = le lait : on l'ajoute à la fin (« Infine »). L'olio = l'huile : on la met avant, dans la pentola. Il sedano = le céleri : on le coupe au début avec les verdure.",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Cuoci gli spaghetti al dente e poi __ la pasta.",
+      "options": ["Alza", "Scola", "Abbassa", "Lava"],
+      "correct_answer": "Scola",
+      "points": 1,
+      "explanation": "Après la cuisson al dente, on égoutte les pâtes. Scola = égoutte. Lava = lave. Alza et Abbassa (monte, baisse) s'utilisent pour le feu, pas pour les pâtes.",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Per il ragù abbiamo 400 grammi di pomodori e 400 grammi di __.",
+      "options": ["tagliatelle", "carne", "vino", "latte"],
+      "correct_answer": "tagliatelle",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : 400 grammi di pomodori et 400 grammi di tagliatelle. La carne macinata = 300 grammi seulement. Il vino et il latte n'ont pas de quantité en grammes.",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Per cuocere gli spaghetti, faccio __ l'acqua.",
+      "options": ["scaldare", "arrostire", "raffreddare", "bollire"],
+      "correct_answer": "bollire",
+      "points": 1,
+      "explanation": "Dans la leçon : « Faccio bollire l'acqua » (je fais bouillir l'eau). Dorare = faire dorer, arrostire = rôtir, raffreddare = refroidir.",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Cuociamo lentamente per un'__.",
+      "options": ["ore", "oliva", "ora", "olio"],
+      "correct_answer": "ora",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « Cuociamo lentamente per un'ora » (Nous cuisons lentement pendant une heure). Avec « un' » on écrit un'ora (singulier, féminin). Un'oliva = une olive, l'olio = l'huile, ore = heures (pluriel : « due ore »).",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Per il ragù abbiamo 300 grammi di __ macinata.",
+      "options": ["pentola", "carota", "cipolla", "carne"],
+      "correct_answer": "carne",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « 300 grammi di carne macinata » (300 grammes de viande hachée). Pentola = casserole, carota = carotte, cipolla = oignon : on ne les trouve pas « macinata » dans la recette.",
+      "time_limit_seconds": 16
+    },
+    {
+      "type": "qcm",
+      "question": "Cameriere: «Desidera anche qualcosa da __?»",
+      "options": ["cuocere", "bollire", "bere", "scolare"],
+      "correct_answer": "bere",
+      "points": 1,
+      "explanation": "Dans le dialogue au restaurant : « Desidera anche qualcosa da bere? » (Désirez-vous aussi quelque chose à boire ?). Cuocere = cuire, bollire = bouillir, scolare = égoutter.",
+      "time_limit_seconds": 16
+    },
+
+    // ===== B1 très débutant =====
+    {
+      "type": "qcm",
+      "question": "__ preparo gli ingredienti, poi li taglio. Infine servo il piatto.",
+      "options": ["Dopo", "Successivamente", "Prima", "Nel frattempo"],
+      "correct_answer": "Prima",
+      "points": 1,
+      "explanation": "Indice : « poi » et « Infine » sont déjà dans la phrase : on commence donc par Prima = d'abord. Dopo = après, successivamente = par la suite, nel frattempo = pendant ce temps.",
+      "time_limit_seconds": 17
+    },
+    {
+      "type": "qcm",
+      "question": "Porta a __ l'acqua.",
+      "options": ["ebollizione", "cottura", "fuoco", "fine"],
+      "correct_answer": "ebollizione",
+      "points": 1,
+      "explanation": "Dans la leçon : « Porta a ebollizione una pentola d'acqua » (Porte à ébullition une casserole d'eau). Cottura = cuisson, fuoco = feu, fine = fin.",
+      "time_limit_seconds": 17
+    },
+    {
+      "type": "qcm",
+      "question": "Dopo la cottura, faccio __ la torta.",
+      "options": ["cuocere", "bollire", "dorare", "raffreddare"],
+      "correct_answer": "raffreddare",
+      "points": 1,
+      "explanation": "Dans la leçon : « Faccio raffreddare la torta » (je laisse refroidir le gâteau). Indice : « dopo la cottura ». Cuocere = cuire, bollire = bouillir, dorare = faire dorer.",
+      "time_limit_seconds": 17
+    },
+    {
+      "type": "qcm",
+      "question": "Abbiamo bisogno __ 400 grammi di pomodori.",
+      "options": ["in", "di", "con", "per"],
+      "correct_answer": "di",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « abbiamo bisogno di » (nous avons besoin de). Après bisogno, on met toujours di. In = dans, con = avec, per = pour.",
+      "time_limit_seconds": 17
+    },
+    {
+      "type": "qcm",
+      "question": "Noi __ il ragù.",
+      "options": ["servo", "servi", "serviamo", "servono"],
+      "correct_answer": "serviamo",
+      "points": 1,
+      "explanation": "Dans le texte du ragù : « serviamo il ragù » (nous servons le ragù). Avec noi, la fin du verbe est -iamo. Servo = je sers (io), servi = tu sers, servono = ils servent (loro).",
+      "time_limit_seconds": 17
+    }
+  ]
+}
