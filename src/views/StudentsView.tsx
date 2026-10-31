@@ -50,6 +50,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+  const [deleteStudentError, setDeleteStudentError] = useState<string | null>(null);
 
   // Single Form State
   const [formFirstName, setFormFirstName] = useState('');
@@ -282,10 +284,18 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     onRefresh();
   };
 
-  const handleDeleteStudent = (id: string) => {
-    dataService.deleteStudent(id);
-    setConfirmDeleteId(null);
-    onRefresh();
+  const handleDeleteStudent = async (id: string) => {
+    setIsDeletingStudent(true);
+    setDeleteStudentError(null);
+    try {
+      await dataService.deleteStudent(id);
+      setConfirmDeleteId(null);
+      onRefresh();
+    } catch (error) {
+      setDeleteStudentError(error instanceof Error ? error.message : 'Impossible de supprimer les données de cet élève.');
+    } finally {
+      setIsDeletingStudent(false);
+    }
   };
 
   // CSV / JSON parsing for preview
@@ -662,7 +672,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setConfirmDeleteId(s.id)}
+                    onClick={() => { setDeleteStudentError(null); setConfirmDeleteId(s.id); }}
                     className="p-2 text-slate-400 hover:text-rose-600 active:bg-rose-50 rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center"
                     title="Supprimer"
                   >
@@ -845,7 +855,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirmDeleteId(s.id)}
+                          onClick={() => { setDeleteStudentError(null); setConfirmDeleteId(s.id); }}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 min-h-[36px] min-w-[36px] inline-flex items-center justify-center cursor-pointer"
                           title="Supprimer"
                         >
@@ -1161,22 +1171,30 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 sm:p-6 text-center">
             <h3 className="font-semibold text-slate-900 mb-2">Supprimer cet élève ?</h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              L'élève sera retiré de la liste. Ses évaluations déjà enregistrées sont conservées dans l'historique d'examens.
+              Sa fiche, ses notes, ses évaluations, son historique de quiz et ses résultats de classement seront définitivement supprimés. Son accès à l'espace étudiant sera révoqué.
             </p>
+            {deleteStudentError && (
+              <p role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-left text-xs font-medium text-rose-700">
+                {deleteStudentError}
+              </p>
+            )}
             <div className="flex flex-col-reverse xs:flex-row justify-center gap-2 sm:gap-3">
               <button
                 type="button"
+                disabled={isDeletingStudent}
                 onClick={() => setConfirmDeleteId(null)}
-                className="w-full xs:w-auto px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
+                className="w-full xs:w-auto px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 rounded-lg min-h-[44px]"
               >
                 Annuler
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteStudent(confirmDeleteId)}
-                className="w-full xs:w-auto px-4 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg min-h-[44px]"
+                disabled={isDeletingStudent}
+                onClick={() => { void handleDeleteStudent(confirmDeleteId); }}
+                className="w-full xs:w-auto px-4 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg min-h-[44px] inline-flex items-center justify-center gap-2"
               >
-                Supprimer
+                {isDeletingStudent && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isDeletingStudent ? 'Suppression…' : 'Supprimer définitivement'}
               </button>
             </div>
           </div>

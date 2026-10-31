@@ -135,6 +135,27 @@ CREATE TABLE quiz_submissions (
     CONSTRAINT unique_quiz_student_submission UNIQUE (quiz_id, student_id)
 );
 
+-- quiz_submissions.student_id is TEXT for legacy ID compatibility. Delete the
+-- quiz history transactionally when the related student roster entry is deleted.
+CREATE OR REPLACE FUNCTION public.delete_student_quiz_submissions()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    DELETE FROM public.quiz_submissions WHERE student_id = OLD.id::text;
+    RETURN OLD;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_student_quiz_submissions() FROM PUBLIC;
+DROP TRIGGER IF EXISTS delete_student_quiz_submissions ON public.students;
+CREATE TRIGGER delete_student_quiz_submissions
+BEFORE DELETE ON public.students
+FOR EACH ROW
+EXECUTE FUNCTION public.delete_student_quiz_submissions();
+
 -- ==============================================================================
 -- INDEX POUR L'OPTIMISATION DES PERFORMANCES
 -- ==============================================================================

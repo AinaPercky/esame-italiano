@@ -224,6 +224,49 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     };
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!supabaseService.isConfigured()) return;
+    let cancelled = false;
+    let checking = false;
+    let signedOut = false;
+
+    const verifyRosterEntry = async () => {
+      const studentId = currentUser.student_id || studentRecord?.id;
+      if (!studentId || checking || signedOut) return;
+      checking = true;
+      try {
+        const isActive = await supabaseService.isStudentRosterEntryActive(studentId);
+        if (!isActive && !cancelled) {
+          signedOut = true;
+          try {
+            await supabaseService.signOutStudent();
+          } catch (error) {
+            console.warn('Déconnexion après suppression de la fiche étudiant :', error);
+          }
+          if (!cancelled) onLogout();
+        }
+      } catch (error) {
+        // Une panne réseau ne doit pas déconnecter un élève dont la fiche existe toujours.
+        console.warn('Vérification périodique de la fiche étudiant indisponible :', error);
+      } finally {
+        checking = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void verifyRosterEntry();
+    };
+
+    void verifyRosterEntry();
+    const interval = window.setInterval(verifyRosterEntry, 15000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUser.student_id, onLogout, studentRecord?.id]);
+
   // Système anti-triche : si l'élève quitte la fenêtre / change d'onglet pendant le quiz
   useEffect(() => {
     if (!activeQuiz) return;

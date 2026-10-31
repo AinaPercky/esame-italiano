@@ -453,15 +453,16 @@ export const dataService = {
     }
   },
 
-  deleteStudent(id: string) {
-    state.students = state.students.filter(s => s.id !== id);
-    state.evaluations = state.evaluations.filter(e => e.student_id !== id);
-    state.passOrder = state.passOrder.filter(po => po.student_id !== id);
+  async deleteStudent(id: string): Promise<void> {
+    // Ne retirer les données locales qu’après réussite de la suppression cloud.
+    await supabaseService.deleteStudent(id);
+    state.students = state.students.filter(student => student.id !== id);
+    authService.synchronizeStudentAccountsWithRoster(state.students, state.classes);
+    state.evaluations = state.evaluations.filter(evaluation => evaluation.student_id !== id);
+    state.passOrder = state.passOrder.filter(item => item.student_id !== id);
+    state.quizSubmissions = (state.quizSubmissions || []).filter(submission => submission.student_id !== id);
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase
-    supabaseService.deleteStudent(id).catch(err => console.error('Cloud deleteStudent error:', err));
   },
 
   async importStudents(rawList: Array<Record<string, any>>, defaultClassId?: string) {

@@ -277,6 +277,24 @@ CREATE INDEX IF NOT EXISTS idx_quiz_submissions_quiz_id ON public.quiz_submissio
 CREATE INDEX IF NOT EXISTS idx_quiz_submissions_student_date
     ON public.quiz_submissions (student_id, date);
 
+CREATE OR REPLACE FUNCTION public.delete_student_quiz_submissions()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    DELETE FROM public.quiz_submissions WHERE student_id = OLD.id::text;
+    RETURN OLD;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.delete_student_quiz_submissions() FROM PUBLIC;
+DROP TRIGGER IF EXISTS delete_student_quiz_submissions ON public.students;
+CREATE TRIGGER delete_student_quiz_submissions
+BEFORE DELETE ON public.students
+FOR EACH ROW
+EXECUTE FUNCTION public.delete_student_quiz_submissions();
+
 ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS public_id UUID;
 ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.quizzes ADD COLUMN IF NOT EXISTS class_ids TEXT[];

@@ -195,6 +195,19 @@ class SupabaseService {
     return this.loadStudentByEmail(email, client);
   }
 
+  /** Recheck the roster entry for an already-authenticated student session. */
+  public async isStudentRosterEntryActive(studentId: string): Promise<boolean> {
+    const client = this.getClient();
+    if (!client || !isUUID(studentId)) return true;
+    const { data, error } = await client
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .maybeSingle();
+    if (error) throw new Error(`Vérification de la fiche étudiant impossible : ${error.message}`);
+    return Boolean(data);
+  }
+
   private async loadStudentByEmail(email: string, client: SupabaseClient): Promise<Student> {
     let student: any = null;
     let studentError: any = null;
@@ -684,15 +697,13 @@ class SupabaseService {
   public async deleteStudent(id: string): Promise<void> {
     const client = this.getClient();
     if (!client || !isUUID(id)) return;
-    try {
-      await client.from('students').delete().eq('id', id);
-      const { error: avatarError } = await client.storage
-        .from('student-avatars')
-        .remove([`avatars/${id}.jpg`, `avatars/${id}.png`, `avatars/${id}.webp`]);
-      if (avatarError) console.warn('Supabase deleteStudent avatar cleanup warning:', avatarError);
-    } catch (e) {
-      console.error('Supabase deleteStudent error:', e);
-    }
+    const { error } = await client.from('students').delete().eq('id', id);
+    if (error) throw new Error(`Suppression de l’élève impossible : ${error.message}`);
+
+    const { error: avatarError } = await client.storage
+      .from('student-avatars')
+      .remove([`avatars/${id}.jpg`, `avatars/${id}.png`, `avatars/${id}.webp`]);
+    if (avatarError) console.warn('Supabase deleteStudent avatar cleanup warning:', avatarError);
   }
 
   public async saveStudentAvatar(studentId: string, imageDataUrl: string | null): Promise<string | null> {
