@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, MessageCircle, Sparkles, Volume2 } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, LockKeyhole, MessageCircle, Sparkles, Volume2 } from 'lucide-react';
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
+import { buildLessonQuizChoices, compactLessonAnswer, isLessonQuizChoiceCorrect, LessonQuizChoice } from '../../utils/lessonQuiz';
 import './lessonExperience.css';
+import './lessonGuidedQuiz.css';
 
 const TYPE_META: Record<string, { label: string; color: string; soft: string }> = {
   grammaire: { label: 'Grammaire', color: '#2f6fd6', soft: '#e8f1ff' },
@@ -69,12 +71,25 @@ interface DiscoveryState {
 
 type DiscoveryCallback = (step: DiscoveryStep, value: any) => void;
 
-function Block({ block, discovery, onDiscovery, allBlocks }: {
+const COURSE_BLOCK_TYPES = new Set(['rules_table', 'rule_cards', 'steps_text', 'key_value_list', 'tip', 'warning', 'formula', 'exceptions', 'recap']);
+
+function isBlockVisible(block: LessonBlock, guidedComplete: boolean): boolean {
+  if (!guidedComplete && COURSE_BLOCK_TYPES.has(block.type)) return false;
+  if (block.type === 'module') {
+    const children = block.content?.blocks || [];
+    return children.some((child: LessonBlock) => isBlockVisible(child, guidedComplete));
+  }
+  return true;
+}
+
+function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete }: {
   block: LessonBlock;
   discovery: DiscoveryState;
   onDiscovery: DiscoveryCallback;
   allBlocks: LessonBlock[];
+  guidedComplete: boolean;
 }) {
+  if (!isBlockVisible(block, guidedComplete)) return null;
   const c = block.content || {};
   if (block.type === 'dialogue') return <DialogueBlock content={c} />;
   if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b>{x.it}</b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
@@ -88,14 +103,16 @@ function Block({ block, discovery, onDiscovery, allBlocks }: {
   if (block.type === 'recap') return <aside className="lesson-recap"><Sparkles size={20} /><div><h3>À retenir</h3><ul>{(c.bullets || []).map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>{c.model && <p><b>{c.model.it}</b> — {c.model.fr}</p>}</div></aside>;
   if (block.type === 'formula') return <section className="lesson-formula"><h3>{c.title || 'Formule générale'}</h3>{(c.formulas || []).map((f: any, i: number) => <div key={i} className="lesson-formula-item"><b>{f.label}</b><div className="lesson-formula-parts">{(f.parts || []).map((part: any, j: number) => <span key={j} className={`formula-${part.kind}`}>{part.text}{part.hint && <small>{part.hint}</small>}</span>)}</div>{(f.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</div>)}</section>;
   if (block.type === 'exceptions') return <section className="lesson-exceptions"><h3>{c.title || 'Exceptions'}</h3>{(c.items || []).map((x: any, i: number) => <article key={i}><strong>{x.rule}</strong><p>{x.explanation}</p>{(x.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</article>)}</section>;
-  if (block.type === 'module') return <ModuleBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} />;
+  if (block.type === 'module') return <ModuleBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />;
   if (block.type === 'discovery') return <DiscoveryBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} />;
   return null;
 }
 
-const ModuleBlock: React.FC<{ content: any; discovery: DiscoveryState; onDiscovery: DiscoveryCallback; allBlocks: LessonBlock[] }> = ({ content, discovery, onDiscovery, allBlocks }) => {
+const ModuleBlock: React.FC<{ content: any; discovery: DiscoveryState; onDiscovery: DiscoveryCallback; allBlocks: LessonBlock[]; guidedComplete: boolean }> = ({ content, discovery, onDiscovery, allBlocks, guidedComplete }) => {
   const [open, setOpen] = useState(true);
-  return <section className="lesson-module"><button type="button" className="lesson-module-toggle" onClick={() => setOpen(!open)}><span>{content.emoji || '📘'} {content.title}</span><TypeTag type={content.tag_type || 'theme'} />{open ? <ChevronDown size={19} /> : <ChevronRight size={19} />}</button>{open && <div className="lesson-module-body">{(content.blocks || []).map((block: LessonBlock, i: number) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} />)}</div>}</section>;
+  const visibleBlocks = (content.blocks || []).filter((block: LessonBlock) => isBlockVisible(block, guidedComplete));
+  if (!visibleBlocks.length) return null;
+  return <section className="lesson-module"><button type="button" className="lesson-module-toggle" onClick={() => setOpen(!open)}><span>{content.emoji || '📘'} {content.title}</span><TypeTag type={content.tag_type || 'theme'} />{open ? <ChevronDown size={19} /> : <ChevronRight size={19} />}</button>{open && <div className="lesson-module-body">{visibleBlocks.map((block: LessonBlock, i: number) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />)}</div>}</section>;
 };
 
 const cleanAnswer = (value: string) => value
@@ -117,6 +134,7 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
   const rows = data?.rows || [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const missing = rows.flatMap((row: any, rowIndex: number) => (row.cells || []).map((cell: string, cellIndex: number) => ({ rowIndex, cellIndex, cell })).filter(({ rowIndex, cellIndex }: any) => rows[rowIndex].given?.[cellIndex] !== true));
+  const choices = Array.from(new Set<string>(rows.flatMap((row: any) => (row.cells || []) as string[]))).map(value => ({ value, label: value.split(/\s+/).slice(0, 3).join(' ') }));
   const validate = () => {
     const correct = missing.every(({ rowIndex, cellIndex, cell }: any) => cleanAnswer(answers[`${rowIndex}-${cellIndex}`] || '') === cleanAnswer(cell));
     onResult(answers, correct);
@@ -124,13 +142,14 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
   return <div className="lesson-discovery-table-exercise"><div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th></th>{(data?.columns || []).map((column: string) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row: any, rowIndex: number) => <tr key={rowIndex}><th>{row.label}</th>{(row.cells || []).map((cell: string, cellIndex: number) => {
     const given = row.given?.[cellIndex] === true;
     const key = `${rowIndex}-${cellIndex}`;
-    return <td key={cellIndex}>{given ? <span>{cell}</span> : <input aria-label={`${row.label}, ${data?.columns?.[cellIndex] || `colonne ${cellIndex + 1}`}`} value={answers[key] || ''} onChange={event => setAnswers(previous => ({ ...previous, [key]: event.target.value }))} placeholder="…" />}</td>;
+    return <td key={cellIndex}>{given ? <span>{cell}</span> : <select aria-label={`${row.label}, ${data?.columns?.[cellIndex] || `colonne ${cellIndex + 1}`}`} value={answers[key] || ''} onChange={event => setAnswers(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Choisir…</option>{choices.map(choice => <option key={`${key}-${choice.value}`} value={choice.value}>{choice.label}</option>)}</select>}</td>;
   })}</tr>)}</tbody></table></div><button type="button" className="lesson-discovery-check" onClick={validate}>Vérifier le tableau</button></div>;
 };
 
-const DiscoveryInput: React.FC<{ onSubmit: (value: string) => void }> = ({ onSubmit }) => {
-  const [value, setValue] = useState('');
-  return <form className="lesson-discovery-input" onSubmit={event => { event.preventDefault(); if (value.trim()) onSubmit(value); }}><input value={value} onChange={event => setValue(event.target.value)} placeholder="Écrivez votre idée…" /><button type="submit" disabled={!value.trim()}>Valider</button></form>;
+const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: LessonQuizChoice) => void; disabled?: boolean }> = ({ choices, onSubmit, disabled }) => {
+  const [selectedId, setSelectedId] = useState('');
+  const selected = choices.find(choice => choice.id === selectedId);
+  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse (3 mots maximum)</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => selected && onSubmit(selected)}>Vérifier ma réponse</button>{choices.length === 0 && <small>Cette question doit être complétée par l’enseignant avec des choix de réponse.</small>}</div>;
 };
 
 function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
@@ -141,20 +160,20 @@ function getCorrectionEntries(step: DiscoveryStep, formulaPieces: string[], targ
   const data = step.data || {};
   const explicitAnswer = data.correct_answer ?? data.correctAnswer ?? data.expected_answer ?? data.answer;
   if (explicitAnswer !== undefined && explicitAnswer !== null && explicitAnswer !== '') {
-    return Array.isArray(explicitAnswer) ? explicitAnswer.map(String) : [String(explicitAnswer)];
+    return Array.isArray(explicitAnswer) ? explicitAnswer.map(value => compactLessonAnswer(value)) : [compactLessonAnswer(explicitAnswer)];
   }
   if (step.kind === 'choose' || step.kind === 'guess_meaning') {
     const options = data.options || [];
     const markedCorrect = options.filter((option: any) => option.correct === true);
-    return (markedCorrect.length ? markedCorrect : options.filter((option: any) => option.correct !== false)).map((option: any) => option.text || String(option));
+    return (markedCorrect.length ? markedCorrect : options.filter((option: any) => option.correct !== false)).map((option: any) => compactLessonAnswer(option.short_text || option.label || option.text || String(option)));
   }
-  if (step.kind === 'highlight') return targets.length ? targets : [step.insight || step.hints?.[0] || 'Relisez les éléments mis en évidence dans la phrase.'];
-  if (step.kind === 'complete_table') return (data.rows || []).map((row: any) => `${row.label}: ${(row.cells || []).join(' · ')}`);
-  if (step.kind === 'build_formula') return formulaPieces.length ? [formulaPieces.join(' ')] : [step.insight || 'Consultez la formule présentée dans la leçon.'];
+  if (step.kind === 'highlight') return targets.length ? targets.map(target => compactLessonAnswer(target)) : ['Relisez les mots ciblés.'];
+  if (step.kind === 'complete_table') return (data.rows || []).flatMap((row: any) => (row.cells || []).map((cell: string) => compactLessonAnswer(cell)));
+  if (step.kind === 'build_formula') return formulaPieces.length ? [compactLessonAnswer(formulaPieces.join(' '))] : ['Consultez la formule.'];
   if (step.kind === 'compare') {
     const options = data.options || data.sentences || [];
     const markedCorrect = options.filter((option: any) => option.correct === true);
-    if (markedCorrect.length) return markedCorrect.map((option: any) => option.text || option.it || String(option));
+    if (markedCorrect.length) return markedCorrect.map((option: any) => compactLessonAnswer(option.short_text || option.label || option.text || option.it || String(option)));
   }
   return [step.insight || step.hints?.[0] || 'Comparez votre réponse avec les exemples et la règle de la leçon.'];
 }
@@ -167,8 +186,7 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   const step = steps[currentStepIndex];
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
   const [pendingAnswer, setPendingAnswer] = useState<any>(null);
-  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
-  const [formulaSelection, setFormulaSelection] = useState<number[]>([]);
+  const [hasAttempted, setHasAttempted] = useState(false);
   const done = step ? discovery.completed.includes(step.id) : false;
   const hintCount = step ? discovery.hints[step.id] || 0 : 0;
   const sourceId = content.source || step?.data?.source;
@@ -177,8 +195,7 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   useEffect(() => {
     setFeedback(null);
     setPendingAnswer(null);
-    setSelectedTargets([]);
-    setFormulaSelection([]);
+    setHasAttempted(false);
   }, [step?.id]);
 
   if (!step) return null;
@@ -187,12 +204,13 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     setPendingAnswer(answer);
     setFeedback({ good: true, text: message });
   };
-  const answerOption = (option: any) => {
-    if (option?.correct === false) {
-      setFeedback({ good: false, text: option.reply || step.ko || 'Pas encore. Relisez l’exemple et réessayez.' });
+  const answerOption = (choice: LessonQuizChoice) => {
+    setHasAttempted(true);
+    if (!isLessonQuizChoiceCorrect(step, choice)) {
+      setFeedback({ good: false, text: choice.reply || step.ko || 'Pas encore. Relisez l’exemple et réessayez.' });
       return;
     }
-    prepareAnswer(option, option?.reply || step.ok || step.insight || 'Exact. Vous pouvez continuer.');
+    prepareAnswer(choice.value, choice.reply || step.ok || step.insight || 'Exact. Vous pouvez continuer.');
   };
   const revealHint = () => onDiscovery(step, { hint: true });
   const targets: string[] = (step.data?.targets || []).map((target: string) => cleanAnswer(target));
@@ -202,51 +220,18 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   const formulaBlock = step.data?.formula_block ? allBlocks.find(block => block.id === step.data.formula_block) : undefined;
   const formula = formulaBlock?.content?.formulas?.[Number(step.data?.formula_index) || 0];
   const formulaPieces: string[] = (step.data?.pieces || formula?.parts?.map((part: any) => part.text) || ['préposition', '+', 'article défini', '→', 'forme collée']).map((piece: any) => typeof piece === 'string' ? piece : piece.text);
+  const contextWords = sourceLines.flatMap((line: any) => cleanLessonSpeechText(line.text).match(/[\p{L}\p{M}]+/gu) || []);
+  const quizChoices = buildLessonQuizChoices(step, contextWords, formulaPieces.join(' '));
   const showCorrection = discovery.revealed.includes(step.id);
   const correctionEntries = getCorrectionEntries(step, formulaPieces, targets);
 
-  const renderHighlightedLine = (text: string, lineIndex: number) => cleanLessonSpeechText(text).split(/(\s+)/).map((token, tokenIndex) => {
-    if (!token.trim()) return <React.Fragment key={`${lineIndex}-${tokenIndex}`}>{token}</React.Fragment>;
-    const word = cleanAnswer(token.replace(/[^\p{L}\p{M}'’\-]/gu, ''));
-    const target = targets.includes(word);
-    const selected = selectedTargets.includes(word);
-    return <button type="button" key={`${lineIndex}-${tokenIndex}`} className={`lesson-highlight-token ${target ? 'is-target' : ''} ${selected ? 'is-selected' : ''}`} aria-pressed={selected} onClick={() => {
-      if (!target) {
-        setFeedback({ good: false, text: step.ko || 'Cherchez les prépositions mises en évidence dans la phrase.' });
-        return;
-      }
-      const next = selectedTargets.includes(word) ? selectedTargets : [...selectedTargets, word];
-      setSelectedTargets(next);
-      setFeedback({ good: false, text: `${next.length}/${targets.length} préposition(s) repérée(s).` });
-      if (targets.length > 0 && targets.every(item => next.includes(item))) prepareAnswer(next, step.ok || 'Toutes les prépositions ont été repérées.');
-    }}>{token}</button>;
-  });
-
-  const formulaChoice = (pieceIndex: number) => {
-    if (formulaSelection.includes(pieceIndex) || pendingAnswer !== null) return;
-    const next = [...formulaSelection, pieceIndex];
-    setFormulaSelection(next);
-    if (next.length === formulaPieces.length) {
-      const answer = next.map(index => formulaPieces[index]);
-      if (answer.every((piece, index) => piece === formulaPieces[index])) prepareAnswer(answer, step.ok || 'La formule est dans le bon ordre.');
-      else {
-        setFeedback({ good: false, text: step.ko || 'L’ordre n’est pas encore correct. Réessayez.' });
-        setFormulaSelection([]);
-      }
-    }
-  };
-
   return <section className="lesson-discovery" aria-labelledby={`discovery-${step.id}`}>
-    <div className="lesson-discovery-head"><span className="lesson-discovery-icon"><Sparkles size={19} /></span><div><span>Découverte guidée</span><small>Étape {Math.min(stepIndex + 1, steps.length)} sur {steps.length}</small></div></div>
+    <div className="lesson-discovery-head"><span className="lesson-discovery-icon"><Sparkles size={19} /></span><div><span>Quiz de découverte guidée</span><small>Question {Math.min(stepIndex + 1, steps.length)} sur {steps.length}</small></div></div>
     <div className="lesson-discovery-progress" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={stepIndex + (done ? 1 : 0)}><span style={{ width: `${Math.min(100, ((stepIndex + (done ? 1 : 0)) / Math.max(steps.length, 1)) * 100)}%` }} /></div>
     <h3 id={`discovery-${step.id}`}>{step.prompt}</h3>
-    {step.kind === 'choose' && <div className="lesson-choice-list">{(step.data?.options || []).map((option: any, i: number) => <button type="button" key={i} onClick={() => answerOption(option)} disabled={done || pendingAnswer !== null} className={pendingAnswer === option ? 'selected' : ''}>{option.text}</button>)}</div>}
-    {step.kind === 'highlight' && <div className="lesson-highlight-exercise">{sourceLines.length ? sourceLines.map((line: any, i: number) => <p className="lesson-highlight-phrase" key={i}>{line.speaker && <strong>{line.speaker}</strong>}{renderHighlightedLine(line.text, i)}</p>) : <p className="lesson-highlight-phrase">Aucun exemple source n’est associé à cette activité.</p>}<small className="lesson-discovery-instruction">Touchez les prépositions dans les phrases. {targets.length ? `${selectedTargets.length}/${targets.length} repérée(s)` : ''}</small></div>}
-    {step.kind === 'free_text' && <DiscoveryInput onSubmit={value => prepareAnswer(value, 'Merci pour votre réflexion. Comparez votre réponse avec l’indice de la leçon.')} />}
-    {step.kind === 'guess_meaning' && <div className="lesson-choice-list">{(step.data?.options || []).map((option: any, i: number) => <button type="button" key={i} onClick={() => answerOption(option)} disabled={done || pendingAnswer !== null} className={pendingAnswer === option ? 'selected' : ''}>{option.text}</button>)}</div>}
-    {step.kind === 'complete_table' && <DiscoveryTableExercise data={step.data} onResult={(answers, correct) => correct ? prepareAnswer(answers, step.ok || 'Le tableau est complet.') : setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' })} />}
-    {step.kind === 'compare' && <div className="lesson-compare">{(step.data?.options || step.data?.sentences || []).map((option: any, i: number) => <button type="button" key={i} onClick={() => answerOption(option)} disabled={done || pendingAnswer !== null} className={pendingAnswer === option ? 'selected' : ''}>{option.text || option.it}<small>{option.fr}</small></button>)}</div>}
-    {step.kind === 'build_formula' && <div className="lesson-formula-discovery"><div className="lesson-formula-constructed" aria-live="polite">{formulaSelection.length ? formulaSelection.map((index, i) => <span key={`${index}-${i}`}>{formulaPieces[index]}</span>) : <small>Choisissez les éléments dans le bon ordre.</small>}</div><div className="lesson-formula-builder">{formulaPieces.map((piece, i) => <button type="button" key={`${piece}-${i}`} disabled={formulaSelection.includes(i) || pendingAnswer !== null || done} onClick={() => formulaChoice(i)}>{piece}</button>)}</div></div>}
+    {step.kind === 'highlight' && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, i: number) => <p className="lesson-highlight-phrase" key={i}>{line.speaker && <strong>{line.speaker}</strong>}{cleanLessonSpeechText(line.text)}</p>)}</div>}
+    {['choose', 'guess_meaning', 'compare', 'free_text', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done || pendingAnswer !== null} />}
+    {step.kind === 'complete_table' && <DiscoveryTableExercise key={step.id} data={step.data} onResult={(answers, correct) => { setHasAttempted(true); if (correct) prepareAnswer(answers, step.ok || 'Le tableau est complet.'); else setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' }); }} />}
     {feedback && <Feedback good={feedback.good}>
       {feedback.text}
     </Feedback>}
@@ -254,7 +239,7 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     {showCorrection && <aside className="lesson-discovery-correction" aria-live="polite"><h4><BookOpen size={17} /> Correction</h4><ul>{correctionEntries.map((entry, i) => <li key={i}>{entry}</li>)}</ul>{step.insight && <p><strong>À retenir :</strong> {step.insight}</p>}</aside>}
     <div className="lesson-discovery-actions">
       <button type="button" onClick={revealHint} disabled={hintCount >= 3 || done}><Lightbulb size={15} /> Indice {hintCount ? `${hintCount}/3` : ''}</button>
-      <button type="button" onClick={() => onDiscovery(step, { reveal: true })} aria-expanded={showCorrection}><BookOpen size={15} /> {showCorrection ? 'Correction affichée' : 'Voir la correction'}</button>
+      <button type="button" onClick={() => onDiscovery(step, { reveal: true })} aria-expanded={showCorrection} disabled={!hasAttempted && !done}><BookOpen size={15} /> {showCorrection ? 'Correction affichée' : 'Voir la correction'}</button>
       {pendingAnswer !== null && !done && <button type="button" className="lesson-discovery-continue" onClick={() => onDiscovery(step, pendingAnswer)}><Check size={16} /> Valider la réponse</button>}
     </div>
     {done && <Feedback good>Étape terminée. Passez à la suite de la leçon.</Feedback>}
@@ -284,6 +269,8 @@ export const LessonRenderer: React.FC<{
   });
   const allBlocks = flattenBlocks(lesson.blocks);
   const allSteps = allBlocks.flatMap(block => block.type === 'discovery' ? block.content?.steps || [] : []);
+  const requiresGuidedQuiz = lesson.method === 'inductive' && allSteps.length > 0;
+  const guidedComplete = !requiresGuidedQuiz || allSteps.every(step => discovery.completed.includes(step.id));
   const handleDiscovery = (step: DiscoveryStep, value: any) => {
     const completed = [...discovery.completed];
     const revealed = [...discovery.revealed];
@@ -314,13 +301,14 @@ export const LessonRenderer: React.FC<{
       <h1>{lesson.title_it}</h1>
       <p className="lesson-title-fr">{lesson.title_fr}</p>
       <section className="lesson-objective"><BookOpen size={21} /><div><b>À la fin de la leçon</b><p>{lesson.objective}</p></div></section>
-      {allSteps.length > 0 && <div className="lesson-overall-progress"><span>Votre progression</span><strong>{completedCount}/{allSteps.length} étapes</strong><div role="progressbar" aria-valuemin={0} aria-valuemax={allSteps.length} aria-valuenow={completedCount}><span style={{ width: `${Math.min(100, (completedCount / allSteps.length) * 100)}%` }} /></div></div>}
-      {lesson.blocks.map((block, i) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={handleDiscovery} allBlocks={allBlocks} />)}
+      {allSteps.length > 0 && <div className="lesson-overall-progress"><span>Quiz de découverte</span><strong>{completedCount}/{allSteps.length} questions</strong><div role="progressbar" aria-valuemin={0} aria-valuemax={allSteps.length} aria-valuenow={completedCount}><span style={{ width: `${Math.min(100, (completedCount / allSteps.length) * 100)}%` }} /></div></div>}
+      {requiresGuidedQuiz && !guidedComplete && <aside className="lesson-course-locked" role="status"><LockKeyhole size={19} /><div><b>Le cours se débloque après le quiz</b><p>Répondez à toutes les questions de découverte guidée pour accéder aux règles grammaticales.</p></div></aside>}
+      {lesson.blocks.map((block, i) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={handleDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />)}
       {discovery.notebook.length > 0 && <aside className="lesson-notebook"><h3><Sparkles size={18} /> Ce que j’ai découvert</h3><ul>{discovery.notebook.map((item, i) => <li key={i}>{item}</li>)}</ul></aside>}
       <footer className="lesson-reader-footer">
         {lesson.quiz_ref && <button type="button" className="lesson-primary" onClick={() => onQuiz?.(lesson.quiz_ref!)}>Aller au quiz <ChevronRight size={18} /></button>}
         {onNext && <button type="button" className="lesson-secondary" onClick={onNext}>Leçon suivante <ChevronRight size={18} /></button>}
-        {!completed && <button type="button" className="lesson-complete" onClick={() => onProgress?.(discovery, true)}><Check size={18} /> Marquer comme terminée</button>}
+        {!completed && <button type="button" className="lesson-complete" disabled={!guidedComplete} onClick={() => onProgress?.(discovery, true)}><Check size={18} /> {guidedComplete ? 'Marquer comme terminée' : 'Terminez le quiz guidé d’abord'}</button>}
       </footer>
     </div>
   </div>;
