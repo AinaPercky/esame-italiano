@@ -3,6 +3,7 @@ import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, Loc
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
 import { buildLessonQuizChoices, compactLessonAnswer, isLessonQuizChoiceCorrect, LessonQuizChoice } from '../../utils/lessonQuiz';
+import { isGuidedQuizComplete } from '../../utils/lessonProgress';
 import './lessonExperience.css';
 import './lessonGuidedQuiz.css';
 
@@ -130,7 +131,7 @@ const Feedback: React.FC<{ good: boolean; children: React.ReactNode }> = ({ good
   </div>
 );
 
-const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<string, string>, correct: boolean) => void }> = ({ data, onResult }) => {
+const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<string, string>, correct: boolean) => void; disabled?: boolean }> = ({ data, onResult, disabled }) => {
   const rows = data?.rows || [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const missing = rows.flatMap((row: any, rowIndex: number) => (row.cells || []).map((cell: string, cellIndex: number) => ({ rowIndex, cellIndex, cell })).filter(({ rowIndex, cellIndex }: any) => rows[rowIndex].given?.[cellIndex] !== true));
@@ -142,8 +143,8 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
   return <div className="lesson-discovery-table-exercise"><div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th></th>{(data?.columns || []).map((column: string) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row: any, rowIndex: number) => <tr key={rowIndex}><th>{row.label}</th>{(row.cells || []).map((cell: string, cellIndex: number) => {
     const given = row.given?.[cellIndex] === true;
     const key = `${rowIndex}-${cellIndex}`;
-    return <td key={cellIndex}>{given ? <span>{cell}</span> : <select aria-label={`${row.label}, ${data?.columns?.[cellIndex] || `colonne ${cellIndex + 1}`}`} value={answers[key] || ''} onChange={event => setAnswers(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Choisir…</option>{choices.map(choice => <option key={`${key}-${choice.value}`} value={choice.value}>{choice.label}</option>)}</select>}</td>;
-  })}</tr>)}</tbody></table></div><button type="button" className="lesson-discovery-check" onClick={validate}>Vérifier le tableau</button></div>;
+    return <td key={cellIndex}>{given ? <span>{cell}</span> : <select disabled={disabled} aria-label={`${row.label}, ${data?.columns?.[cellIndex] || `colonne ${cellIndex + 1}`}`} value={answers[key] || ''} onChange={event => setAnswers(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Choisir…</option>{choices.map(choice => <option key={`${key}-${choice.value}`} value={choice.value}>{choice.label}</option>)}</select>}</td>;
+  })}</tr>)}</tbody></table></div><button type="button" className="lesson-discovery-check" onClick={validate} disabled={disabled}>Vérifier le tableau</button></div>;
 };
 
 const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: LessonQuizChoice) => void; disabled?: boolean }> = ({ choices, onSubmit, disabled }) => {
@@ -185,7 +186,6 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const step = steps[currentStepIndex];
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
-  const [pendingAnswer, setPendingAnswer] = useState<any>(null);
   const [hasAttempted, setHasAttempted] = useState(false);
   const done = step ? discovery.completed.includes(step.id) : false;
   const hintCount = step ? discovery.hints[step.id] || 0 : 0;
@@ -194,15 +194,14 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
 
   useEffect(() => {
     setFeedback(null);
-    setPendingAnswer(null);
     setHasAttempted(false);
   }, [step?.id]);
 
   if (!step) return null;
   const stepIndex = currentStepIndex;
   const prepareAnswer = (answer: any, message = step.ok || step.insight || 'Bien joué, vous avez trouvé.') => {
-    setPendingAnswer(answer);
     setFeedback({ good: true, text: message });
+    onDiscovery(step, answer);
   };
   const answerOption = (choice: LessonQuizChoice) => {
     setHasAttempted(true);
@@ -230,8 +229,8 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     <div className="lesson-discovery-progress" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={stepIndex + (done ? 1 : 0)}><span style={{ width: `${Math.min(100, ((stepIndex + (done ? 1 : 0)) / Math.max(steps.length, 1)) * 100)}%` }} /></div>
     <h3 id={`discovery-${step.id}`}>{step.prompt}</h3>
     {step.kind === 'highlight' && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, i: number) => <p className="lesson-highlight-phrase" key={i}>{line.speaker && <strong>{line.speaker}</strong>}{cleanLessonSpeechText(line.text)}</p>)}</div>}
-    {['choose', 'guess_meaning', 'compare', 'free_text', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done || pendingAnswer !== null} />}
-    {step.kind === 'complete_table' && <DiscoveryTableExercise key={step.id} data={step.data} onResult={(answers, correct) => { setHasAttempted(true); if (correct) prepareAnswer(answers, step.ok || 'Le tableau est complet.'); else setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' }); }} />}
+    {['choose', 'guess_meaning', 'compare', 'free_text', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />}
+    {step.kind === 'complete_table' && <DiscoveryTableExercise key={step.id} data={step.data} disabled={done} onResult={(answers, correct) => { setHasAttempted(true); if (correct) prepareAnswer(answers, step.ok || 'Le tableau est complet.'); else setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' }); }} />}
     {feedback && <Feedback good={feedback.good}>
       {feedback.text}
     </Feedback>}
@@ -240,9 +239,8 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     <div className="lesson-discovery-actions">
       <button type="button" onClick={revealHint} disabled={hintCount >= 3 || done}><Lightbulb size={15} /> Indice {hintCount ? `${hintCount}/3` : ''}</button>
       <button type="button" onClick={() => onDiscovery(step, { reveal: true })} aria-expanded={showCorrection} disabled={!hasAttempted && !done}><BookOpen size={15} /> {showCorrection ? 'Correction affichée' : 'Voir la correction'}</button>
-      {pendingAnswer !== null && !done && <button type="button" className="lesson-discovery-continue" onClick={() => onDiscovery(step, pendingAnswer)}><Check size={16} /> Valider la réponse</button>}
     </div>
-    {done && <Feedback good>Étape terminée. Passez à la suite de la leçon.</Feedback>}
+    {done && !feedback?.good && <Feedback good>Étape terminée. Passez à la suite de la leçon.</Feedback>}
     <nav className="lesson-discovery-navigation" aria-label="Navigation dans la découverte guidée">
       <button type="button" onClick={() => setCurrentStepIndex(index => Math.max(0, index - 1))} disabled={stepIndex === 0}><ChevronLeft size={17} /> Précédent</button>
       <span>Étape {stepIndex + 1} / {steps.length}</span>
@@ -270,7 +268,7 @@ export const LessonRenderer: React.FC<{
   const allBlocks = flattenBlocks(lesson.blocks);
   const allSteps = allBlocks.flatMap(block => block.type === 'discovery' ? block.content?.steps || [] : []);
   const requiresGuidedQuiz = lesson.method === 'inductive' && allSteps.length > 0;
-  const guidedComplete = !requiresGuidedQuiz || allSteps.every(step => discovery.completed.includes(step.id));
+  const guidedComplete = !requiresGuidedQuiz || isGuidedQuizComplete(allSteps, discovery.completed, progress?.status);
   const handleDiscovery = (step: DiscoveryStep, value: any) => {
     const completed = [...discovery.completed];
     const revealed = [...discovery.revealed];
@@ -287,10 +285,11 @@ export const LessonRenderer: React.FC<{
     }
     const next = { ...discovery, completed, hints, revealed, notebook, answers };
     setDiscovery(next);
-    onProgress?.({ completedSteps: completed, hintsUsed: hints, revealedSteps: revealed, notebook, freeTextAnswers: answers }, allSteps.length > 0 && completed.length >= allSteps.length);
+    onProgress?.({ completedSteps: completed, hintsUsed: hints, revealedSteps: revealed, notebook, freeTextAnswers: answers }, allSteps.length > 0 && isGuidedQuizComplete(allSteps, completed));
   };
   const completed = progress?.status === 'done';
-  const completedCount = discovery.completed.length;
+  const completedCount = guidedComplete ? allSteps.length : allSteps.filter(step => discovery.completed.includes(step.id)).length;
+  const remainingSteps = allSteps.filter(step => !discovery.completed.includes(step.id));
 
   return <div className="lessons-root" style={{ '--lesson-accent': meta.color, '--lesson-soft': meta.soft } as React.CSSProperties}>
     <div className="lesson-reader">
@@ -302,7 +301,7 @@ export const LessonRenderer: React.FC<{
       <p className="lesson-title-fr">{lesson.title_fr}</p>
       <section className="lesson-objective"><BookOpen size={21} /><div><b>À la fin de la leçon</b><p>{lesson.objective}</p></div></section>
       {allSteps.length > 0 && <div className="lesson-overall-progress"><span>Quiz de découverte</span><strong>{completedCount}/{allSteps.length} questions</strong><div role="progressbar" aria-valuemin={0} aria-valuemax={allSteps.length} aria-valuenow={completedCount}><span style={{ width: `${Math.min(100, (completedCount / allSteps.length) * 100)}%` }} /></div></div>}
-      {requiresGuidedQuiz && !guidedComplete && <aside className="lesson-course-locked" role="status"><LockKeyhole size={19} /><div><b>Le cours se débloque après le quiz</b><p>Répondez à toutes les questions de découverte guidée pour accéder aux règles grammaticales.</p></div></aside>}
+      {requiresGuidedQuiz && !guidedComplete && <aside className="lesson-course-locked" role="status"><LockKeyhole size={19} /><div><b>Quiz validés : {completedCount}/{allSteps.length} — le cours reste verrouillé</b><p>Une réponse n’est comptée qu’après le message « Exact » ou « Correct ». Il reste {remainingSteps.length} question(s) à valider :</p><ul>{remainingSteps.map(step => <li key={step.id}>{step.prompt}</li>)}</ul></div></aside>}
       {lesson.blocks.map((block, i) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={handleDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />)}
       {discovery.notebook.length > 0 && <aside className="lesson-notebook"><h3><Sparkles size={18} /> Ce que j’ai découvert</h3><ul>{discovery.notebook.map((item, i) => <li key={i}>{item}</li>)}</ul></aside>}
       <footer className="lesson-reader-footer">
