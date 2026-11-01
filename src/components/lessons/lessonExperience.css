@@ -81,7 +81,8 @@
   margin: 18px 0 10px;
   padding: 18px 14px;
   border-radius: 26px;
-  background: var(--lesson-blue);
+  border: 1px solid var(--lesson-line);
+  background: var(--lesson-surface);
 }
 
 .lesson-dialogue-line {
@@ -90,7 +91,7 @@
 
 .lesson-dialogue-speaker {
   max-width: 54px;
-  color: rgba(255, 255, 255, .9);
+  color: var(--lesson-muted);
   font-size: 11px;
 }
 
@@ -347,6 +348,80 @@
   background: #072a3f;
 }
 
+.lesson-discovery-navigation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid var(--lesson-line);
+  padding-top: 12px;
+}
+
+.lesson-discovery-navigation button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--lesson-line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--lesson-surface);
+  color: var(--lesson-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.lesson-discovery-navigation button:last-child {
+  justify-self: end;
+}
+
+.lesson-discovery-navigation button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.lesson-discovery-navigation > span {
+  color: var(--lesson-muted);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.lesson-discovery-correction {
+  margin-top: 12px;
+  border: 1px solid #f0d77d;
+  border-left: 5px solid var(--lesson-yellow);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fff9df;
+  color: var(--lesson-text);
+}
+
+.lesson-discovery-correction h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.lesson-discovery-correction ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.lesson-discovery-correction p {
+  margin: 8px 0 0;
+  color: var(--lesson-muted);
+  font-size: 12px;
+}
+
 .lesson-hint,
 .lesson-reveal {
   display: flex;
@@ -455,17 +530,14 @@
     color: #b8f3d5;
   }
 
-  .lesson-dialogue {
-    background: #5aa8f0;
-  }
-
-  .lesson-dialogue-speaker {
-    color: #08203d;
-  }
-
   .lesson-discovery-feedback.try-again {
     background: #403716;
     color: #ffe89a;
+  }
+
+  .lesson-discovery-correction {
+    border-color: #65531c;
+    background: #342d17;
   }
 
   .lesson-reveal {

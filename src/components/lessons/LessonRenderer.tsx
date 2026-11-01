@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronRight, Lightbulb, MessageCircle, Sparkles, Volume2 } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, MessageCircle, Sparkles, Volume2 } from 'lucide-react';
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
 import './lessonExperience.css';
@@ -137,9 +137,34 @@ function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
   return blocks.flatMap(block => [block, ...(block.type === 'module' ? flattenBlocks(block.content?.blocks || []) : [])]);
 }
 
+function getCorrectionEntries(step: DiscoveryStep, formulaPieces: string[], targets: string[]): string[] {
+  const data = step.data || {};
+  const explicitAnswer = data.correct_answer ?? data.correctAnswer ?? data.expected_answer ?? data.answer;
+  if (explicitAnswer !== undefined && explicitAnswer !== null && explicitAnswer !== '') {
+    return Array.isArray(explicitAnswer) ? explicitAnswer.map(String) : [String(explicitAnswer)];
+  }
+  if (step.kind === 'choose' || step.kind === 'guess_meaning') {
+    const options = data.options || [];
+    const markedCorrect = options.filter((option: any) => option.correct === true);
+    return (markedCorrect.length ? markedCorrect : options.filter((option: any) => option.correct !== false)).map((option: any) => option.text || String(option));
+  }
+  if (step.kind === 'highlight') return targets.length ? targets : [step.insight || step.hints?.[0] || 'Relisez les éléments mis en évidence dans la phrase.'];
+  if (step.kind === 'complete_table') return (data.rows || []).map((row: any) => `${row.label}: ${(row.cells || []).join(' · ')}`);
+  if (step.kind === 'build_formula') return formulaPieces.length ? [formulaPieces.join(' ')] : [step.insight || 'Consultez la formule présentée dans la leçon.'];
+  if (step.kind === 'compare') {
+    const options = data.options || data.sentences || [];
+    const markedCorrect = options.filter((option: any) => option.correct === true);
+    if (markedCorrect.length) return markedCorrect.map((option: any) => option.text || option.it || String(option));
+  }
+  return [step.insight || step.hints?.[0] || 'Comparez votre réponse avec les exemples et la règle de la leçon.'];
+}
+
 const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDiscovery: DiscoveryCallback; allBlocks: LessonBlock[] }> = ({ content, discovery, onDiscovery, allBlocks }) => {
   const steps: DiscoveryStep[] = content.steps || [];
-  const step = steps.find(item => !discovery.completed.includes(item.id)) || steps[steps.length - 1];
+  const firstIncomplete = steps.findIndex(item => !discovery.completed.includes(item.id));
+  const initialStepIndex = firstIncomplete >= 0 ? firstIncomplete : Math.max(steps.length - 1, 0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
+  const step = steps[currentStepIndex];
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
   const [pendingAnswer, setPendingAnswer] = useState<any>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
@@ -157,7 +182,7 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   }, [step?.id]);
 
   if (!step) return null;
-  const stepIndex = Math.max(0, steps.findIndex(item => item.id === step.id));
+  const stepIndex = currentStepIndex;
   const prepareAnswer = (answer: any, message = step.ok || step.insight || 'Bien joué, vous avez trouvé.') => {
     setPendingAnswer(answer);
     setFeedback({ good: true, text: message });
@@ -177,6 +202,8 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   const formulaBlock = step.data?.formula_block ? allBlocks.find(block => block.id === step.data.formula_block) : undefined;
   const formula = formulaBlock?.content?.formulas?.[Number(step.data?.formula_index) || 0];
   const formulaPieces: string[] = (step.data?.pieces || formula?.parts?.map((part: any) => part.text) || ['préposition', '+', 'article défini', '→', 'forme collée']).map((piece: any) => typeof piece === 'string' ? piece : piece.text);
+  const showCorrection = discovery.revealed.includes(step.id);
+  const correctionEntries = getCorrectionEntries(step, formulaPieces, targets);
 
   const renderHighlightedLine = (text: string, lineIndex: number) => cleanLessonSpeechText(text).split(/(\s+)/).map((token, tokenIndex) => {
     if (!token.trim()) return <React.Fragment key={`${lineIndex}-${tokenIndex}`}>{token}</React.Fragment>;
@@ -224,13 +251,18 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
       {feedback.text}
     </Feedback>}
     {hintCount > 0 && <p className="lesson-hint"><Lightbulb size={15} /> {step.hints?.[hintCount - 1] || 'Relisez attentivement les exemples de la leçon.'}</p>}
-    {discovery.revealed.includes(step.id) && <p className="lesson-reveal">{step.ok || step.insight || 'Relisez la formule et comparez-la avec les exemples.'}</p>}
+    {showCorrection && <aside className="lesson-discovery-correction" aria-live="polite"><h4><BookOpen size={17} /> Correction</h4><ul>{correctionEntries.map((entry, i) => <li key={i}>{entry}</li>)}</ul>{step.insight && <p><strong>À retenir :</strong> {step.insight}</p>}</aside>}
     <div className="lesson-discovery-actions">
       <button type="button" onClick={revealHint} disabled={hintCount >= 3 || done}><Lightbulb size={15} /> Indice {hintCount ? `${hintCount}/3` : ''}</button>
-      <button type="button" onClick={() => onDiscovery(step, { reveal: true })} disabled={done}><BookOpen size={15} /> Voir la règle</button>
-      {pendingAnswer !== null && <button type="button" className="lesson-discovery-continue" onClick={() => onDiscovery(step, pendingAnswer)}><Check size={16} /> Continuer</button>}
+      <button type="button" onClick={() => onDiscovery(step, { reveal: true })} aria-expanded={showCorrection}><BookOpen size={15} /> {showCorrection ? 'Correction affichée' : 'Voir la correction'}</button>
+      {pendingAnswer !== null && !done && <button type="button" className="lesson-discovery-continue" onClick={() => onDiscovery(step, pendingAnswer)}><Check size={16} /> Valider la réponse</button>}
     </div>
     {done && <Feedback good>Étape terminée. Passez à la suite de la leçon.</Feedback>}
+    <nav className="lesson-discovery-navigation" aria-label="Navigation dans la découverte guidée">
+      <button type="button" onClick={() => setCurrentStepIndex(index => Math.max(0, index - 1))} disabled={stepIndex === 0}><ChevronLeft size={17} /> Précédent</button>
+      <span>Étape {stepIndex + 1} / {steps.length}</span>
+      <button type="button" onClick={() => setCurrentStepIndex(index => Math.min(steps.length - 1, index + 1))} disabled={stepIndex >= steps.length - 1}>Suivant <ChevronRight size={17} /></button>
+    </nav>
   </section>;
 };
 
