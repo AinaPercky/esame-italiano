@@ -77,6 +77,13 @@ class LessonsService {
     const { error } = await this.client().from('lessons').delete().eq('id', id);
     if (error) throw new Error(`Suppression : ${error.message}`);
   }
+  async updateStatus(id: string, status: Lesson['status']): Promise<void> {
+    const { error } = await this.client()
+      .from('lessons')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(`Publication de la leçon : ${error.message}`);
+  }
   async duplicate(lesson: Lesson): Promise<Lesson> {
     const draft: LessonDraft = { ...lesson, slug: `${lesson.slug}-copie-${Date.now()}`, status: 'draft', title_fr: `${lesson.title_fr} (copie)`, blocks: lesson.blocks };
     delete (draft as any).id; delete (draft as any).created_at; delete (draft as any).updated_at; delete (draft as any).created_by;
