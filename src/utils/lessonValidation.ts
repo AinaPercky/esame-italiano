@@ -7,10 +7,24 @@ const statuses: LessonStatus[] = ['draft', 'published'];
 
 export interface LessonValidationResult { valid: boolean; errors: string[]; value?: LessonDraft; }
 
+/** Accepte le format compact (les propriétés du bloc au niveau supérieur) et
+ * le format canonique { type, content }. */
+function normalizeLessonInput(input: any): any {
+  if (!input || typeof input !== 'object') return input;
+  return {
+    ...input,
+    blocks: Array.isArray(input.blocks) ? input.blocks.map((block: any) => {
+      if (block?.content && typeof block.content === 'object') return block;
+      const { id, type, position, lesson_id, parent_block_id, ...content } = block || {};
+      return { id, type, position, lesson_id, parent_block_id, content };
+    }) : input.blocks
+  };
+}
+
 export function validateLessonDraft(input: unknown): LessonValidationResult {
   const errors: string[] = [];
   if (!input || typeof input !== 'object') return { valid: false, errors: ['Le JSON doit être un objet.'] };
-  const raw = input as Partial<LessonDraft>;
+  const raw = normalizeLessonInput(input) as Partial<LessonDraft>;
   if (!raw.slug?.trim()) errors.push('slug est obligatoire.');
   if (!raw.title_it?.trim()) errors.push('title_it est obligatoire.');
   if (!raw.title_fr?.trim()) errors.push('title_fr est obligatoire.');
