@@ -45,10 +45,12 @@ import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
+import { LessonsStudentView } from './LessonsStudentView';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
   { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
+  { id: 'lessons', label: 'Leçons de cours', shortLabel: 'Leçons', icon: Sparkles },
   { id: 'daily_grades', label: 'Notes journalières', shortLabel: 'Notes', icon: TrendingUp },
   { id: 'leaderboard', label: 'Classement de classe', shortLabel: 'Classe', icon: Trophy },
   { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award }
@@ -63,7 +65,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'profile'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'profile'>('quizzes');
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
   const [classStudentsList, setClassStudentsList] = useState<Student[]>([]);
@@ -901,6 +903,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             </button>
           ))}
         </nav>
+
+        {activeTab === 'lessons' && (
+          <LessonsStudentView
+            currentUser={currentUser}
+            onOpenQuiz={() => setActiveTab('quizzes')}
+          />
+        )}
 
         {/* TAB 1: QUIZZES EN DIRECT & HISTORIQUE */}
         {activeTab === 'quizzes' && !activeQuiz && (

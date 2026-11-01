@@ -21,6 +21,7 @@ import { StudentPublicReportView } from './views/StudentPublicReportView';
 import { QuizzesAdminView } from './views/QuizzesAdminView';
 import { PublicQuizView } from './views/PublicQuizView';
 import { StudentSpaceView } from './views/StudentSpaceView';
+import { LessonsAdminView } from './views/LessonsAdminView';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { dataService } from './services/dataService';
 import { authService, AuthUser } from './services/authService';
@@ -345,6 +346,10 @@ export default function App() {
               students={students}
               onRefresh={reloadData}
             />
+          )}
+
+          {currentTab === 'lessons' && (
+            <LessonsAdminView currentUser={currentUser} />
           )}
 
           {currentTab === 'classes' && (

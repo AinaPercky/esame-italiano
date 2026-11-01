@@ -32,6 +32,11 @@ export interface AuthUser {
   loginAt: string;
 }
 
+/** Point d'extension unique pour séparer ultérieurement Admin et Professeur. */
+export function canManageLessons(user: Pick<AuthUser, 'role'> | null | undefined): boolean {
+  return user?.role === 'admin' || (user?.role as string) === 'teacher';
+}
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 30000; // 30s
 

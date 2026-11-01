@@ -400,3 +400,45 @@ ALTER TABLE public.students
     ADD COLUMN IF NOT EXISTS gender TEXT NOT NULL DEFAULT 'homme'
     CHECK (gender IN ('homme', 'femme'));
 `;
+
+export const LESSONS_SUPABASE_MIGRATION_SQL = `-- Module Leçons de cours : contenu, découverte et progression
+CREATE TABLE IF NOT EXISTS public.lessons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), slug TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL CHECK (type IN ('grammaire','vocabulaire','fonction','theme','prononciation')),
+  level TEXT NOT NULL CHECK (level IN ('A1','A2','B1','B2','C1')), duration_min INTEGER NOT NULL DEFAULT 10,
+  title_it TEXT NOT NULL, title_fr TEXT NOT NULL, objective TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+  method TEXT NOT NULL DEFAULT 'inductive' CHECK (method IN ('inductive','direct')),
+  sort_order INTEGER NOT NULL DEFAULT 0, access TEXT NOT NULL DEFAULT 'free' CHECK (access IN ('free','pass')),
+  quiz_ref TEXT, created_by UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.lesson_blocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), lesson_id UUID NOT NULL REFERENCES public.lessons(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0, type TEXT NOT NULL, content JSONB NOT NULL DEFAULT '{}'::jsonb,
+  parent_block_id UUID REFERENCES public.lesson_blocks(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS public.lesson_progress (
+  user_id UUID NOT NULL, lesson_id UUID NOT NULL REFERENCES public.lessons(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'started' CHECK (status IN ('started','done')),
+  discovery_state JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, lesson_id)
+);
+CREATE INDEX IF NOT EXISTS idx_lessons_published_order ON public.lessons(status, sort_order);
+CREATE INDEX IF NOT EXISTS idx_lesson_blocks_lesson_position ON public.lesson_blocks(lesson_id, position);
+ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_progress ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Published lessons are readable" ON public.lessons;
+CREATE POLICY "Published lessons are readable" ON public.lessons FOR SELECT TO anon, authenticated USING (status = 'published');
+DROP POLICY IF EXISTS "Managers can manage lessons" ON public.lessons;
+CREATE POLICY "Managers can manage lessons" ON public.lessons FOR ALL TO authenticated USING (auth.jwt() ->> 'email' = 'ainapercky@gmail.com') WITH CHECK (auth.jwt() ->> 'email' = 'ainapercky@gmail.com');
+DROP POLICY IF EXISTS "Published lesson blocks are readable" ON public.lesson_blocks;
+CREATE POLICY "Published lesson blocks are readable" ON public.lesson_blocks FOR SELECT TO anon, authenticated USING (EXISTS (SELECT 1 FROM public.lessons l WHERE l.id = lesson_id AND l.status = 'published'));
+DROP POLICY IF EXISTS "Managers can manage lesson blocks" ON public.lesson_blocks;
+CREATE POLICY "Managers can manage lesson blocks" ON public.lesson_blocks FOR ALL TO authenticated USING (auth.jwt() ->> 'email' = 'ainapercky@gmail.com') WITH CHECK (auth.jwt() ->> 'email' = 'ainapercky@gmail.com');
+DROP POLICY IF EXISTS "Students manage own lesson progress" ON public.lesson_progress;
+CREATE POLICY "Students manage own lesson progress" ON public.lesson_progress FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Managers read lesson progress" ON public.lesson_progress;
+CREATE POLICY "Managers read lesson progress" ON public.lesson_progress FOR SELECT TO authenticated USING (true);
+NOTIFY pgrst, 'reload schema';
+`;
