@@ -78,11 +78,14 @@ class LessonsService {
     if (error) throw new Error(`Suppression : ${error.message}`);
   }
   async updateStatus(id: string, status: Lesson['status']): Promise<void> {
-    const { error } = await this.client()
+    const { data, error } = await this.client()
       .from('lessons')
       .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
     if (error) throw new Error(`Publication de la leçon : ${error.message}`);
+    if (!data) throw new Error('Aucune leçon mise à jour. Vérifiez que la leçon existe et que vous avez les droits nécessaires.');
   }
   async duplicate(lesson: Lesson): Promise<Lesson> {
     const draft: LessonDraft = { ...lesson, slug: `${lesson.slug}-copie-${Date.now()}`, status: 'draft', title_fr: `${lesson.title_fr} (copie)`, blocks: lesson.blocks };
