@@ -1,0 +1,349 @@
+{
+  "_documentation": {
+    "purpose": "Modèle de référence complet pour créer une leçon Percky Lingua. Ce champ documentaire est ignoré lors de l’enregistrement.",
+    "format": "JSON strict, sans commentaires // ou /* */ : l’importateur admin utilise JSON.parse.",
+    "workflow": "Pour une leçon inductive, l’élève répond d’abord à toutes les étapes du bloc discovery. Les règles, formules, exceptions, conseils et le récapitulatif ne sont révélés qu’après validation de toutes les réponses.",
+    "shortAnswers": "Dans les menus du quiz guidé, les libellés affichés sont limités aux trois premiers mots. Préférer des options naturellement courtes et distinguer les options avec short_text si nécessaire.",
+    "rootFields": {
+      "slug": "Identifiant unique de la leçon, en minuscules et avec des tirets. Remplacer le slug du modèle avant publication.",
+      "type": "Une valeur parmi grammaire, vocabulaire, fonction, theme, prononciation.",
+      "level": "Une valeur parmi A1, A2, B1, B2, C1.",
+      "duration_min": "Durée indicative en minutes, nombre supérieur ou égal à 1.",
+      "title_it": "Titre en italien.",
+      "title_fr": "Titre en français.",
+      "objective": "Objectif pédagogique de la leçon.",
+      "status": "draft pour garder la leçon en brouillon; published pour la rendre visible aux étudiants.",
+      "method": "inductive active le quiz de découverte avant le cours; direct affiche le cours sans ce verrou.",
+      "sort_order": "Ordre de présentation dans la liste des leçons.",
+      "access": "free ou pass selon les règles d’accès du projet.",
+      "quiz_ref": "Référence facultative d’un quiz existant, sinon null.",
+      "blocks": "Blocs de contenu affichés dans l’ordre donné. Chaque bloc a type et content; id sert aux références entre blocs."
+    },
+    "blockTypes": {
+      "dialogue": "content.lines[]: speaker, side (left/right), it, fr; les marqueurs ==mot== et ++mot++ sont visuels et ne sont pas lus par la synthèse vocale.",
+      "vocab_cards": "content.items[]: it et fr; cartes de vocabulaire avec lecture audio.",
+      "rules_table": "content.title facultatif, label, columns[] et rows[] avec label et cells[]. Bloc de règle révélé après le quiz inductif.",
+      "rule_cards": "content.cards[]: title, text et examples[] (it/fr). Règles sous forme de fiches.",
+      "example_list": "content.examples[]: it et fr; liste d’exemples audio.",
+      "steps_text": "content.steps[]: title, it et fr; séquence explicative.",
+      "key_value_list": "content.rows[]: key, it et fr; liste de correspondances.",
+      "chips": "content.items[]: it et fr; mots ou expressions sous forme de pastilles.",
+      "tip": "content.text: conseil pédagogique; révélé après le quiz inductif.",
+      "warning": "content.text: avertissement; révélé après le quiz inductif.",
+      "recap": "content.bullets[] et model facultatif (it/fr); synthèse affichée après le quiz inductif.",
+      "formula": "content.title et formulas[]: label, parts[] (text, kind=slot/fixed/operator, hint facultatif), examples[]. Révélé après le quiz inductif.",
+      "exceptions": "content.title et items[]: rule, explanation, examples[]. Révélé après le quiz inductif.",
+      "discovery": "content.steps[]: quiz guidé; id, kind, prompt, data, hints (maximum 3), ok, ko et insight.",
+      "module": "content.title, emoji facultatif, tag_type facultatif et blocks[] imbriqués."
+    },
+    "discoveryKinds": {
+      "choose": "data.options[] avec text (ou short_text), correct (booléen) et reply facultatif.",
+      "guess_meaning": "Même format d’options; faire choisir un sens ou une fonction.",
+      "compare": "data.options[] (ou sentences[]) avec text/it, fr facultatif et correct.",
+      "highlight": "data.source référence l’id d’un bloc dialogue; data.targets[] contient les mots à identifier. L’élève choisit un mot dans un menu.",
+      "complete_table": "data.columns[], data.rows[] avec label/cells[] et given[] indiquant les cellules déjà données (true/false). Les cellules manquantes sont des menus.",
+      "free_text": "Ancien format converti en choix: fournir data.options[] et marquer correct=true. Aucun champ de rédaction libre n’est affiché.",
+      "build_formula": "Format converti en choix de réponse: fournir data.options[] ou formula_block/formula_index et correct_answer; ne pas demander d’assembler ou de réordonner des pièces.",
+      "group": "Catégorisation convertie en choix: fournir data.options[] avec une option correcte; aucune interaction de glisser-déposer."
+    },
+    "references": "Pour relier une étape à un bloc, utiliser son id source dans data.source ou data.formula_block. Les identifiants alias sont remplacés par des UUID lors de la sauvegarde et les références sont remappées.",
+    "correctAnswers": "Toujours marquer la bonne option avec correct=true et les distracteurs avec correct=false. Prévoir une seule option correcte pour choose, guess_meaning, compare, free_text, build_formula et group.",
+    "publishing": "Garder status=draft pendant l’édition et la vérification; publier depuis l’administration une fois la leçon validée."
+  },
+  "slug": "modele-lecon-complet-a-personnaliser",
+  "type": "grammaire",
+  "level": "A1",
+  "duration_min": 15,
+  "title_it": "I pronomi combinati: una giornata a Roma",
+  "title_fr": "Les pronoms combinés : une journée à Rome",
+  "objective": "Reconnaître les pronoms combinés dans un dialogue, puis comprendre leur formation et leurs usages.",
+  "status": "draft",
+  "method": "inductive",
+  "sort_order": 0,
+  "access": "free",
+  "quiz_ref": null,
+  "blocks": [
+    {
+      "id": "dialogue-roma",
+      "type": "dialogue",
+      "content": {
+        "lines": [
+          { "speaker": "Giulia", "side": "left", "it": "Hai il libro? Sì, te ==lo== porto domani.", "fr": "Tu as le livre ? Oui, je te l’apporte demain." },
+          { "speaker": "Marco", "side": "right", "it": "E le chiavi? Me ++le++ puoi lasciare qui.", "fr": "Et les clés ? Tu peux me les laisser ici." },
+          { "speaker": "Giulia", "side": "left", "it": "Certo, te le lascio sul tavolo.", "fr": "Bien sûr, je te les laisse sur la table." }
+        ]
+      }
+    },
+    {
+      "id": "vocab-cards",
+      "type": "vocab_cards",
+      "content": {
+        "items": [
+          { "it": "portare", "fr": "apporter" },
+          { "it": "lasciare", "fr": "laisser" },
+          { "it": "le chiavi", "fr": "les clés" }
+        ]
+      }
+    },
+    {
+      "id": "example-list",
+      "type": "example_list",
+      "content": {
+        "examples": [
+          { "it": "Te lo porto.", "fr": "Je te l’apporte." },
+          { "it": "Me le lasci.", "fr": "Tu me les laisses." }
+        ]
+      }
+    },
+    {
+      "id": "guided-quiz",
+      "type": "discovery",
+      "content": {
+        "source": "dialogue-roma",
+        "steps": [
+          {
+            "id": "discover-meaning",
+            "kind": "choose",
+            "prompt": "Dans « te lo porto », combien d’éléments sont réunis ?",
+            "data": {
+              "options": [
+                { "text": "Deux pronoms", "short_text": "Deux pronoms", "correct": true, "reply": "Exact: un pronom indirect et un pronom direct." },
+                { "text": "Un pronom", "correct": false, "reply": "Observez les deux mots placés avant le verbe." },
+                { "text": "Un article défini", "correct": false, "reply": "Regardez la fonction de « te » et de « lo »." }
+              ]
+            },
+            "hints": ["Observez les mots avant le verbe."],
+            "ok": "Bien observé.",
+            "ko": "Relisez les deux mots avant le verbe.",
+            "insight": "Deux pronoms peuvent précéder ensemble le verbe."
+          },
+          {
+            "id": "discover-highlight",
+            "kind": "highlight",
+            "prompt": "Quel mot remplace « il libro » dans le dialogue ?",
+            "data": { "source": "dialogue-roma", "targets": ["lo"], "options": ["libro", "lo", "te"] },
+            "hints": ["Cherchez le pronom qui reprend un nom masculin singulier."],
+            "ok": "Oui: « lo » reprend « il libro ». ",
+            "ko": "Choisissez le pronom qui remplace « il libro ».",
+            "insight": "Le pronom direct s’accorde ici avec le nom remplacé."
+          },
+          {
+            "id": "discover-guess-meaning",
+            "kind": "guess_meaning",
+            "prompt": "Que signifie « Me le puoi lasciare » ?",
+            "data": {
+              "options": [
+                { "text": "Tu peux me le laisser", "short_text": "Me le laisser", "correct": true },
+                { "text": "Je peux te voir", "short_text": "Te voir", "correct": false },
+                { "text": "Il me connaît", "short_text": "Me connaît", "correct": false }
+              ]
+            },
+            "hints": ["« lasciare » signifie laisser."],
+            "ok": "Exact.",
+            "ko": "Relisez le sens du verbe et des deux pronoms.",
+            "insight": "Le pronom indirect précède le pronom direct."
+          },
+          {
+            "id": "discover-compare",
+            "kind": "compare",
+            "prompt": "Quelle phrase reprend correctement « do il libro a te » ?",
+            "data": {
+              "options": [
+                { "text": "Te lo do", "correct": true },
+                { "text": "Lo te do", "correct": false },
+                { "text": "Do te lo", "correct": false }
+              ]
+            },
+            "hints": ["Le pronom indirect vient avant le pronom direct."],
+            "ok": "Correct.",
+            "ko": "Vérifiez l’ordre des pronoms avant le verbe.",
+            "insight": "L’ordre attendu est indirect puis direct."
+          },
+          {
+            "id": "discover-table",
+            "kind": "complete_table",
+            "prompt": "Complétez les formes combinées en choisissant chaque pronom.",
+            "data": {
+              "columns": ["lo", "la"],
+              "rows": [
+                { "label": "mi", "cells": ["me lo", "me la"], "given": [true, false] },
+                { "label": "ti", "cells": ["te lo", "te la"], "given": [false, true] }
+              ]
+            },
+            "hints": ["mi et ti deviennent me et te devant lo/la."],
+            "ok": "Tableau complété.",
+            "ko": "Vérifiez les formes me/te et les pronoms lo/la.",
+            "insight": "mi et ti changent en me et te dans ces combinaisons."
+          },
+          {
+            "id": "discover-formula",
+            "kind": "build_formula",
+            "prompt": "Quelle formule décrit « te lo porto » ?",
+            "data": {
+              "formula_block": "grammar-formula",
+              "formula_index": 0,
+              "options": [
+                { "text": "Indirect + direct", "correct": true },
+                { "text": "Direct + indirect", "correct": false },
+                { "text": "Article + nom", "correct": false }
+              ],
+              "correct_answer": "Indirect + direct"
+            },
+            "hints": ["Comparez l’ordre dans les exemples du dialogue."],
+            "ok": "Exact: indirect puis direct.",
+            "ko": "La formule suit l’ordre indirect puis direct.",
+            "insight": "Les deux pronoms précèdent généralement le verbe conjugué."
+          },
+          {
+            "id": "discover-group",
+            "kind": "group",
+            "prompt": "À quelle catégorie appartient « te » dans « te lo porto » ?",
+            "data": {
+              "options": [
+                { "text": "Pronom indirect", "correct": true },
+                { "text": "Pronom direct", "correct": false },
+                { "text": "Article défini", "correct": false }
+              ]
+            },
+            "hints": ["« te » indique à qui l’on apporte le livre."],
+            "ok": "Oui, « te » indique le destinataire.",
+            "ko": "Demandez-vous qui reçoit le livre.",
+            "insight": "Le pronom indirect désigne le destinataire."
+          },
+          {
+            "id": "discover-short-answer",
+            "kind": "free_text",
+            "prompt": "Quel pronom remplace « le chiavi » dans « me le lasci » ?",
+            "data": {
+              "options": [
+                { "text": "le", "correct": true },
+                { "text": "lo", "correct": false },
+                { "text": "li", "correct": false }
+              ]
+            },
+            "hints": ["« le chiavi » est féminin pluriel."],
+            "ok": "Bonne réponse: « le ».",
+            "ko": "Regardez le genre et le nombre de « le chiavi ».",
+            "insight": "Le pronom direct reprend le genre et le nombre du nom."
+          }
+        ]
+      }
+    },
+    {
+      "id": "grammar-table",
+      "type": "rules_table",
+      "content": {
+        "title": "Ordre des pronoms",
+        "label": "Pronom indirect",
+        "columns": ["lo", "la", "li", "le"],
+        "rows": [
+          { "label": "mi → me", "cells": ["me lo", "me la", "me li", "me le"] },
+          { "label": "ti → te", "cells": ["te lo", "te la", "te li", "te le"] }
+        ]
+      }
+    },
+    {
+      "id": "grammar-cards",
+      "type": "rule_cards",
+      "content": {
+        "cards": [
+          { "title": "Ordre", "text": "Le pronom indirect précède le pronom direct.", "examples": [{ "it": "Te lo porto.", "fr": "Je te l’apporte." }] },
+          { "title": "Formes", "text": "mi et ti deviennent me et te devant un pronom direct.", "examples": [{ "it": "Me le lasci.", "fr": "Tu me les laisses." }] }
+        ]
+      }
+    },
+    {
+      "id": "grammar-steps",
+      "type": "steps_text",
+      "content": {
+        "steps": [
+          { "title": "1. Trouver le destinataire", "it": "a me → mi", "fr": "à moi → me" },
+          { "title": "2. Trouver l’objet", "it": "il libro → lo", "fr": "le livre → le" },
+          { "title": "3. Réunir les pronoms", "it": "mi + lo → me lo", "fr": "mi + lo → me lo" }
+        ]
+      }
+    },
+    {
+      "id": "grammar-key-values",
+      "type": "key_value_list",
+      "content": {
+        "rows": [
+          { "key": "mi + lo", "it": "me lo", "fr": "me le / je le" },
+          { "key": "ti + la", "it": "te la", "fr": "te la / je te la" }
+        ]
+      }
+    },
+    {
+      "id": "vocabulary-chips",
+      "type": "chips",
+      "content": {
+        "items": [
+          { "it": "me lo", "fr": "me le" },
+          { "it": "te la", "fr": "te la" },
+          { "it": "glielo", "fr": "le lui" }
+        ]
+      }
+    },
+    {
+      "id": "teacher-tip",
+      "type": "tip",
+      "content": { "text": "Pour mémoriser l’ordre, repérez d’abord le destinataire, puis l’objet." }
+    },
+    {
+      "id": "common-warning",
+      "type": "warning",
+      "content": { "text": "Ne placez pas le pronom direct avant le pronom indirect dans ces exemples." }
+    },
+    {
+      "id": "grammar-formula",
+      "type": "formula",
+      "content": {
+        "title": "Formule générale",
+        "formulas": [
+          {
+            "label": "Pronoms combinés",
+            "parts": [
+              { "text": "pronom indirect", "kind": "slot", "hint": "à qui ?" },
+              { "text": "+", "kind": "operator" },
+              { "text": "pronom direct", "kind": "slot", "hint": "quoi ?" },
+              { "text": "→", "kind": "operator" },
+              { "text": "verbe", "kind": "fixed" }
+            ],
+            "examples": [{ "it": "Te lo porto.", "fr": "Je te l’apporte." }]
+          }
+        ]
+      }
+    },
+    {
+      "id": "grammar-exceptions",
+      "type": "exceptions",
+      "content": {
+        "title": "Changements de forme",
+        "items": [
+          { "rule": "gli + lo → glielo", "explanation": "Certaines formes de gli se combinent en un seul mot avec les pronoms directs.", "examples": [{ "it": "Glielo dico.", "fr": "Je le lui dis." }] }
+        ]
+      }
+    },
+    {
+      "id": "lesson-recap",
+      "type": "recap",
+      "content": {
+        "bullets": ["Le pronom indirect vient avant le pronom direct.", "mi et ti deviennent me et te devant lo/la/li/le."],
+        "model": { "it": "Te lo porto.", "fr": "Je te l’apporte." }
+      }
+    },
+    {
+      "id": "practice-module",
+      "type": "module",
+      "content": {
+        "title": "Exemples complémentaires",
+        "emoji": "📘",
+        "tag_type": "theme",
+        "blocks": [
+          { "type": "example_list", "content": { "examples": [{ "it": "Me lo spieghi?", "fr": "Tu me l’expliques ?" }] } },
+          { "type": "tip", "content": { "text": "Relisez les exemples à voix haute." } }
+        ]
+      }
+    }
+  ]
+}
