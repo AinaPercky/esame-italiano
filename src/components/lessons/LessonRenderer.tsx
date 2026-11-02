@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, GripVertical, Lightbulb, LockKeyhole, MessageCircle, RotateCcw, Sparkles, Volume2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Download, GripVertical, Lightbulb, LockKeyhole, MessageCircle, RotateCcw, Sparkles, Volume2, X } from 'lucide-react';
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
 import { buildLessonOrderItems, buildLessonQuizChoices, getLessonExpectedOrder, isLessonFreeTextCorrect, isLessonOrderCorrect, isLessonQuizChoiceCorrect, LessonOrderItem, LessonQuizChoice, moveLessonOrderItem, normalizeLessonAnswer, normalizeLessonText } from '../../utils/lessonQuiz';
 import { isGuidedQuizComplete } from '../../utils/lessonProgress';
 import { buildScreens, getFirstDiscoveryScreenIndex, getFirstLessonScreenIndex, lessonScreenSegment, LessonScreen } from '../../utils/lessonScreens';
+import { downloadLessonPdf } from '../../utils/lessonPdf';
 
 const TYPE_META: Record<string, { label: string; color: string; soft: string }> = {
   grammaire: { label: 'Grammaire', color: '#2f6fd6', soft: '#e8f1ff' },
@@ -264,6 +265,17 @@ const ReorderAnswer: React.FC<{ data: any; onSubmit: (values: string[], correct:
 
 function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
   return blocks.flatMap(block => [block, ...(block.type === 'module' ? flattenBlocks(block.content?.blocks || []) : [])]);
+}
+
+function getDirectCourseBlocks(blocks: LessonBlock[] = []): LessonBlock[] {
+  return blocks.flatMap(block => {
+    if (block.type === 'dialogue' || block.type === 'discovery') return [];
+    if (block.type === 'module') {
+      const children = getDirectCourseBlocks(block.content?.blocks || []);
+      return children.length ? [{ ...block, content: { ...block.content, blocks: children } }] : [];
+    }
+    return [block];
+  });
 }
 
 function getCorrectionEntries(step: DiscoveryStep, formulaPieces: string[], targets: string[]): string[] {
@@ -546,9 +558,13 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
   const [verifySignal, setVerifySignal] = useState(0);
   const [questionPassed, setQuestionPassed] = useState(false);
   const [questionAttempted, setQuestionAttempted] = useState(false);
+  const [directReading, setDirectReading] = useState(progress?.status === 'done');
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [pdfError, setPdfError] = useState('');
   const screen = screens[screenIndex] || screens[0];
   const meta = lessonTypeMeta(lesson.type);
   const allBlocks = useMemo(() => flattenBlocks(lesson.blocks), [lesson.blocks]);
+  const directLesson = useMemo<Lesson>(() => ({ ...lesson, method: 'direct', blocks: getDirectCourseBlocks(lesson.blocks) }), [lesson]);
   const allSteps = allBlocks.flatMap(candidate => candidate.type === 'discovery' ? candidate.content?.steps || [] : []);
   const guidedComplete = !allSteps.length || isGuidedQuizComplete(allSteps, discovery.completed, progress?.status);
   const reviewMode = progress?.status === 'done';
@@ -568,6 +584,23 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
 
   const persist = (state: DiscoveryState, index: number, done = false) => {
     onProgress?.(serialize(state, index), done, index);
+  };
+
+  const openDirectReading = () => {
+    if (screen?.kind === 'done') persist(discovery, screenIndex, true);
+    setDirectReading(true);
+  };
+
+  const handlePdfDownload = async () => {
+    setPdfError('');
+    setPdfDownloading(true);
+    try {
+      await downloadLessonPdf(lesson);
+    } catch (error) {
+      setPdfError(error instanceof Error ? error.message : 'Le téléchargement du PDF a échoué.');
+    } finally {
+      setPdfDownloading(false);
+    }
   };
 
   const handleStepResult = (currentScreen: StepScreen, correct: boolean, answer: unknown) => {
@@ -646,8 +679,25 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
     if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
     if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
     if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
-    return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Votre progression est enregistrée.</p>{lesson.quiz_ref && <button type="button" className="lesson-player-quiz-link" onClick={() => onQuiz?.(lesson.quiz_ref!)}>Accéder au quiz associé <ChevronRight size={16} /></button>}</section>;
+    return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
+      <div className="lesson-player-completion-actions">
+        <button type="button" className="lesson-player-read-course" onClick={openDirectReading}><BookOpen size={17} /> Lire la leçon directement</button>
+        <button type="button" className="lesson-player-download-pdf" onClick={() => void handlePdfDownload()} disabled={pdfDownloading}><Download size={17} /> {pdfDownloading ? 'Préparation du PDF…' : 'Télécharger le PDF A4'}</button>
+      </div>
+      {pdfError && <p className="lesson-pdf-error" role="alert">{pdfError}</p>}
+      {lesson.quiz_ref && <button type="button" className="lesson-player-quiz-link" onClick={() => onQuiz?.(lesson.quiz_ref!)}>Accéder au quiz associé <ChevronRight size={16} /></button>}
+    </section>;
   };
+
+  if (directReading) return <div className="lessons-root lesson-direct-reading-root" style={{ '--lesson-accent': meta.color, '--lesson-soft': meta.soft } as React.CSSProperties}>
+    <header className="lesson-direct-toolbar">
+      {showClose && <button type="button" className="lesson-direct-back" onClick={onExit}><X size={17} /> Retour aux leçons</button>}
+      <div className="lesson-direct-toolbar-copy"><span>Révision autonome</span><strong>{lesson.title_it}</strong></div>
+      <button type="button" className="lesson-direct-download" onClick={() => void handlePdfDownload()} disabled={pdfDownloading}><Download size={17} /> {pdfDownloading ? 'Préparation…' : 'Télécharger le PDF A4'}</button>
+    </header>
+    {pdfError && <p className="lesson-pdf-error" role="alert">{pdfError}</p>}
+    <LessonFullPreview lesson={directLesson} progress={progress ? { ...progress, status: 'done' } : null} revealAll onQuiz={onQuiz} />
+  </div>;
 
   if (!screen) return null;
   const canRedo = reviewMode && getFirstDiscoveryScreenIndex(screens) < firstLessonIndex;
