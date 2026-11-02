@@ -41,13 +41,24 @@ class LessonsService {
     if (error) throw new Error(`Leçon : ${error.message}`);
     return data ? mapLesson(data, data.lesson_blocks || []) : null;
   }
+  private async ensureUniqueSlug(slug: string, lessonId?: string): Promise<string> {
+    const base = slug.trim();
+    const { data, error } = await this.client().from('lessons').select('id,slug').like('slug', `${base}%`).limit(500);
+    if (error) throw new Error(`Vérification du slug : ${error.message}`);
+    const used = new Set((data || []).filter((row: any) => row.id !== lessonId).map((row: any) => row.slug));
+    if (!used.has(base)) return base;
+    let suffix = 2;
+    while (used.has(`${base}-${suffix}`)) suffix += 1;
+    return `${base}-${suffix}`;
+  }
   async save(draft: LessonDraft, id?: string, createdBy?: string): Promise<Lesson> {
     const validation = validateLessonDraft(draft);
     if (!validation.valid || !validation.value) throw new Error(validation.errors.join('\n'));
     const client = this.client();
     const lessonId = id || generateUUID();
     const now = new Date().toISOString();
-    const payload = { ...validation.value, id: lessonId, created_by: createdBy || null, updated_at: now };
+    const uniqueSlug = await this.ensureUniqueSlug(validation.value.slug, id);
+    const payload = { ...validation.value, slug: uniqueSlug, id: lessonId, created_by: createdBy || null, updated_at: now };
     delete (payload as any).blocks;
     const { data, error } = await client.from('lessons').upsert(payload, { onConflict: 'id' }).select().single();
     if (error) throw new Error(`Enregistrement de la leçon : ${error.message}`);
