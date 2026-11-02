@@ -1,12 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLessonQuizChoices, compactLessonAnswer, isLessonQuizChoiceCorrect } from './lessonQuiz';
+import {
+  buildLessonOrderItems,
+  buildLessonQuizChoices,
+  getLessonExpectedOrder,
+  isLessonFreeTextCorrect,
+  isLessonOrderCorrect,
+  isLessonQuizChoiceCorrect,
+  moveLessonOrderItem,
+  normalizeLessonAnswer,
+  normalizeLessonText,
+} from './lessonQuiz';
 
-test('limite chaque libellé proposé à trois mots maximum', () => {
-  assert.equal(compactLessonAnswer('  la   ragazza    parla con lui  '), 'la ragazza parla');
-  const choices = buildLessonQuizChoices({ kind: 'choose', data: { options: [{ text: 'Una formula di saluto', correct: true }, 'Una ricetta di cucina'] } });
-  assert.deepEqual(choices.map(choice => choice.label), ['Una formula di', 'Una ricetta di']);
-  assert.ok(choices.every(choice => choice.label.split(' ').length <= 3));
+test('conserve les libellés complets au-delà de trois mots', () => {
+  assert.equal(normalizeLessonText('  la   ragazza    parla con lui  '), 'la ragazza parla con lui');
+  const choices = buildLessonQuizChoices({ kind: 'choose', data: { options: [
+    { text: 'Una formula di saluto molto importante', correct: true },
+    'Una ricetta tradizionale della cucina italiana'
+  ] } });
+  assert.deepEqual(choices.map(choice => choice.label), [
+    'Una formula di saluto molto importante',
+    'Una ricetta tradizionale della cucina italiana'
+  ]);
 });
 
 test('construit les choix de surbrillance et identifie les mots cibles', () => {
@@ -24,18 +39,13 @@ test('utilise la bonne option marquée et respecte la clé de réponse explicite
   assert.equal(isLessonQuizChoiceCorrect(step, choices[1]), false);
 });
 
-test('préserve le choix correct lorsque la troncature crée des libellés identiques', () => {
+test('ne fusionne pas des réponses complètes uniquement parce que leur début est identique', () => {
   const choices = buildLessonQuizChoices({ kind: 'choose', data: { options: [
     { text: 'Lei parla spesso con lui', correct: false },
     { text: 'Lei parla spesso con lei', correct: true }
   ] } });
-  assert.equal(choices.length, 1);
-  assert.equal(choices[0].correct, true);
-  assert.equal(choices[0].label.split(' ').length, 3);
-});
-
-test('ne propose aucun constructeur de phrase libre en absence de choix', () => {
-  assert.deepEqual(buildLessonQuizChoices({ kind: 'free_text', data: {} }), []);
+  assert.equal(choices.length, 2);
+  assert.deepEqual(choices.map(choice => choice.label), ['Lei parla spesso con lei', 'Lei parla spesso con lui']);
 });
 
 test('retombe sur les choix non vides si options est présent mais vide', () => {
@@ -46,7 +56,7 @@ test('retombe sur les choix non vides si options est présent mais vide', () => 
   assert.deepEqual(choices.map(choice => choice.label), ['Essere', 'Avere']);
 });
 
-test('garde le libellé complet de trois mots si short_text en coupe le dernier mot', () => {
+test('conserve le libellé complet verbe de mouvement', () => {
   const choices = buildLessonQuizChoices({ kind: 'choose', data: { options: [
     { text: 'Verbe de mouvement', short_text: 'Verbe de', correct: true }
   ] } });
@@ -61,4 +71,58 @@ test('un tableau de distracteurs vide ne masque pas les choix de formule', () =>
     correct_answer: 'Essere o avere',
   } });
   assert.deepEqual(choices.map(choice => choice.label), ['Essere o avere', 'Avoir seulement']);
+});
+
+test('corrige une réponse rédigée complète, longue et tolérante à la casse, aux accents et aux espaces', () => {
+  const step = { kind: 'free_text', data: { correct_answer: 'Ieri sono andata al mercato con mia sorella.' } };
+  assert.equal(isLessonFreeTextCorrect(step, '  IERI   SONO ANDATA AL MERCATO CON MIA SORELLA  '), true);
+  assert.equal(isLessonFreeTextCorrect(step, 'Ieri sono andata al mercato'), false);
+});
+
+test('accepte les variantes de réponse rédigée déclarées par l’enseignant', () => {
+  const step = { kind: 'free_text', data: { accepted_answers: ['Noi siamo andati a Roma', 'Noi siamo andate a Roma'] } };
+  assert.equal(isLessonFreeTextCorrect(step, 'Noi siamo andate a Roma.'), true);
+  assert.equal(isLessonFreeTextCorrect(step, 'Noi siamo andato a Roma'), false);
+});
+
+test('accepte une réponse libre non vide quand aucune clé de correction n’est déclarée', () => {
+  assert.equal(isLessonFreeTextCorrect({ kind: 'free_text', data: {} }, 'Una risposta completa di più parole'), true);
+  assert.equal(isLessonFreeTextCorrect({ kind: 'free_text', data: {} }, '   '), false);
+});
+
+test('construit des éléments d’ordre et valide correct_order', () => {
+  const data = {
+    items: ['Tagliamo la cipolla', 'Scaldiamo l’olio', 'Serviamo la pasta'],
+    correct_order: ['Scaldiamo l’olio', 'Tagliamo la cipolla', 'Serviamo la pasta']
+  };
+  assert.equal(buildLessonOrderItems(data).length, 3);
+  assert.deepEqual(getLessonExpectedOrder(data), data.correct_order);
+  assert.equal(isLessonOrderCorrect(data, data.correct_order), true);
+  assert.equal(isLessonOrderCorrect(data, ['Tagliamo la cipolla', 'Scaldiamo l’olio', 'Serviamo la pasta']), false);
+});
+
+test('déduit l’ordre attendu des propriétés order/position des éléments', () => {
+  const data = { items: [
+    { id: 'last', text: 'Servire', order: 3 },
+    { id: 'first', text: 'Preparare', order: 1 },
+    { id: 'middle', text: 'Cuocere', order: 2 }
+  ] };
+  assert.deepEqual(getLessonExpectedOrder(data), ['Preparare', 'Cuocere', 'Servire']);
+  assert.equal(isLessonOrderCorrect(data, ['Preparare', 'Cuocere', 'Servire']), true);
+});
+
+test('ne bloque pas un réordonnancement sans clé de correction', () => {
+  const data = { items: ['A', 'B', 'C'] };
+  assert.equal(isLessonOrderCorrect(data, ['C', 'A', 'B']), true);
+});
+
+test('déplace les éléments dans les deux sens et ignore les indices invalides', () => {
+  assert.deepEqual(moveLessonOrderItem(['A', 'B', 'C', 'D'], 2, 0), ['C', 'A', 'B', 'D']);
+  assert.deepEqual(moveLessonOrderItem(['A', 'B', 'C', 'D'], 0, 3), ['B', 'C', 'D', 'A']);
+  const items = ['A', 'B'];
+  assert.equal(moveLessonOrderItem(items, -1, 1), items);
+});
+
+test('normalise une réponse sans couper les mots', () => {
+  assert.equal(normalizeLessonAnswer('  È   VERAMENTE   IMPORTANTE!  '), 'e veramente importante');
 });

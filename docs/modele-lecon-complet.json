@@ -3,7 +3,7 @@
     "purpose": "Modèle de référence complet pour créer une leçon Percky Lingua. Ce champ documentaire est ignoré lors de l’enregistrement.",
     "format": "JSON strict, sans commentaires // ou /* */ : l’importateur admin utilise JSON.parse.",
     "workflow": "Pour une leçon inductive, l’élève répond d’abord à toutes les étapes du bloc discovery. Les règles, formules, exceptions, conseils et le récapitulatif ne sont révélés qu’après validation de toutes les réponses.",
-    "shortAnswers": "Dans les menus du quiz guidé, les libellés affichés sont limités aux trois premiers mots. Préférer des options naturellement courtes et distinguer les options avec short_text si nécessaire.",
+    "shortAnswers": "Aucune limite de mots n’est appliquée aux réponses ou aux libellés. Les espaces multiples sont normalisés, mais le texte complet est conservé.",
     "rootFields": {
       "slug": "Identifiant unique de la leçon, en minuscules et avec des tirets. Remplacer le slug du modèle avant publication.",
       "type": "Une valeur parmi grammaire, vocabulaire, fonction, theme, prononciation.",
@@ -42,12 +42,14 @@
       "compare": "data.options[] (ou sentences[]) avec text/it, fr facultatif et correct.",
       "highlight": "data.source référence l’id d’un bloc dialogue; data.targets[] contient les mots à identifier. L’élève choisit un mot dans un menu.",
       "complete_table": "data.columns[], data.rows[] avec label/cells[] et given[] indiquant les cellules déjà données (true/false). Les cellules manquantes sont des menus.",
-      "free_text": "Ancien format converti en choix: fournir data.options[] et marquer correct=true. Aucun champ de rédaction libre n’est affiché.",
-      "build_formula": "Format converti en choix de réponse: fournir data.options[] ou formula_block/formula_index et correct_answer; ne pas demander d’assembler ou de réordonner des pièces.",
-      "group": "Catégorisation convertie en choix: fournir data.options[] avec une option correcte; aucune interaction de glisser-déposer."
+      "free_text": "Affiche une zone de texte libre sans limite de mots. Fournir correct_answer (chaîne ou tableau) ou accepted_answers[] pour corriger; la casse, les accents et les espaces superflus sont normalisés. Sans clé de correction, toute réponse non vide est acceptée afin de ne pas bloquer l’élève.",
+      "build_formula": "Question de compréhension de formule au format choix: fournir data.options[] ou formula_block/formula_index et correct_answer. Pour faire reconstruire une suite d’éléments, utiliser reorder.",
+      "group": "Catégorisation convertie en choix: fournir data.options[] avec une option correcte; aucune interaction de glisser-déposer.",
+      "reorder": "Réponse ordonnée par glisser-déposer: data.items[] (chaînes ou objets avec id/text/value) contient les éléments; data.correct_order[] définit l’ordre attendu (valeurs, identifiants ou indices de tableau zéro-based). La saisie fonctionne à la souris, au tactile et au clavier. Le type order est aussi accepté.",
+      "order": "Alias de reorder: fournir data.items[] et data.correct_order[]; les éléments doivent être réorganisés par glisser-déposer."
     },
     "references": "Pour relier une étape à un bloc, utiliser son id source dans data.source ou data.formula_block. Les identifiants alias sont remplacés par des UUID lors de la sauvegarde et les références sont remappées.",
-    "correctAnswers": "Toujours marquer la bonne option avec correct=true et les distracteurs avec correct=false. Prévoir une seule option correcte pour choose, guess_meaning, compare, free_text, build_formula et group.",
+    "correctAnswers": "Pour choose, guess_meaning, compare, build_formula et group, marquer la bonne option avec correct=true et les distracteurs avec correct=false. Pour free_text, préciser correct_answer ou accepted_answers[] pour comparer les phrases complètes. Pour reorder, préciser correct_order[].",
     "publishing": "Garder status=draft pendant l’édition et la vérification; publier depuis l’administration une fois la leçon validée."
   },
   "slug": "modele-lecon-complet-a-personnaliser",
@@ -211,15 +213,24 @@
             "insight": "Le pronom indirect désigne le destinataire."
           },
           {
+            "id": "discover-order",
+            "kind": "reorder",
+            "prompt": "Remettez les éléments de la phrase dans l’ordre correct.",
+            "data": {
+              "items": ["lo", "porto", "te"],
+              "correct_order": ["te", "lo", "porto"]
+            },
+            "hints": ["Le pronom indirect précède le pronom direct."],
+            "ok": "Exact: te lo porto.",
+            "ko": "Placez les deux pronoms avant le verbe.",
+            "insight": "L’ordre est pronom indirect, pronom direct, puis verbe."
+          },
+          {
             "id": "discover-short-answer",
             "kind": "free_text",
             "prompt": "Quel pronom remplace « le chiavi » dans « me le lasci » ?",
             "data": {
-              "options": [
-                { "text": "le", "correct": true },
-                { "text": "lo", "correct": false },
-                { "text": "li", "correct": false }
-              ]
+              "correct_answer": "le"
             },
             "hints": ["« le chiavi » est féminin pluriel."],
             "ok": "Bonne réponse: « le ».",

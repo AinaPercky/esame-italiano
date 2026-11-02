@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, LockKeyhole, MessageCircle, RotateCcw, Sparkles, Volume2, X } from 'lucide-react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, GripVertical, Lightbulb, LockKeyhole, MessageCircle, RotateCcw, Sparkles, Volume2, X } from 'lucide-react';
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
-import { buildLessonQuizChoices, compactLessonAnswer, isLessonQuizChoiceCorrect, LessonQuizChoice } from '../../utils/lessonQuiz';
+import { buildLessonOrderItems, buildLessonQuizChoices, getLessonExpectedOrder, isLessonFreeTextCorrect, isLessonOrderCorrect, isLessonQuizChoiceCorrect, LessonOrderItem, LessonQuizChoice, moveLessonOrderItem, normalizeLessonAnswer, normalizeLessonText } from '../../utils/lessonQuiz';
 import { isGuidedQuizComplete } from '../../utils/lessonProgress';
 import { buildScreens, getFirstDiscoveryScreenIndex, getFirstLessonScreenIndex, lessonScreenSegment, LessonScreen } from '../../utils/lessonScreens';
 
@@ -117,14 +117,6 @@ const ModuleBlock: React.FC<{ content: any; discovery: DiscoveryState; onDiscove
   return <section className="lesson-module"><button type="button" className="lesson-module-toggle" onClick={() => setOpen(!open)}><span>{content.emoji || '📘'} {content.title}</span><TypeTag type={content.tag_type || 'theme'} />{open ? <ChevronDown size={19} /> : <ChevronRight size={19} />}</button>{open && <div className="lesson-module-body">{visibleBlocks.map((block: LessonBlock, i: number) => <Block key={block.id || i} block={block} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />)}</div>}</section>;
 };
 
-const cleanAnswer = (value: string) => value
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toLocaleLowerCase('it')
-  .replace(/[.,!?;:()[\]{}“”"'’]/g, '')
-  .replace(/\s+/g, ' ')
-  .trim();
-
 const Feedback: React.FC<{ good: boolean; children: React.ReactNode }> = ({ good, children }) => (
   <div className={`lesson-discovery-feedback ${good ? 'good' : 'try-again'}`} role="status">
     {good ? <Check size={17} /> : <MessageCircle size={17} />}
@@ -136,9 +128,9 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
   const rows = data?.rows || [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const missing = rows.flatMap((row: any, rowIndex: number) => (row.cells || []).map((cell: string, cellIndex: number) => ({ rowIndex, cellIndex, cell })).filter(({ rowIndex, cellIndex }: any) => rows[rowIndex].given?.[cellIndex] !== true));
-  const choices = Array.from(new Set<string>(rows.flatMap((row: any) => (row.cells || []) as string[]))).map(value => ({ value, label: value.split(/\s+/).slice(0, 3).join(' ') }));
+  const choices = Array.from(new Set<string>(rows.flatMap((row: any) => (row.cells || []) as string[]))).map(value => ({ value, label: normalizeLessonText(value) }));
   const validate = () => {
-    const correct = missing.every(({ rowIndex, cellIndex, cell }: any) => cleanAnswer(answers[`${rowIndex}-${cellIndex}`] || '') === cleanAnswer(cell));
+    const correct = missing.every(({ rowIndex, cellIndex, cell }: any) => normalizeLessonAnswer(answers[`${rowIndex}-${cellIndex}`] || '') === normalizeLessonAnswer(cell));
     onResult(answers, correct);
   };
   useEffect(() => { if (verifySignal > 0) validate(); }, [verifySignal]);
@@ -153,7 +145,97 @@ const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: L
   const [selectedId, setSelectedId] = useState('');
   const selected = choices.find(choice => choice.id === selectedId);
   useEffect(() => { if (verifySignal > 0) onSubmit(selected || null); }, [verifySignal]);
-  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse (3 mots maximum)</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>{!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => onSubmit(selected || null)}>Vérifier ma réponse</button>}{choices.length === 0 && <small>Cette question doit être complétée par l’enseignant avec des choix de réponse.</small>}</div>;
+  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>{!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => onSubmit(selected || null)}>Vérifier ma réponse</button>}{choices.length === 0 && <small>Cette question ne contient aucun choix de réponse.</small>}</div>;
+};
+
+const FreeTextAnswer: React.FC<{ onSubmit: (answer: string) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ onSubmit, disabled = false, verifySignal = 0, hideCheck = false }) => {
+  const [answer, setAnswer] = useState('');
+  const answerId = useId();
+  useEffect(() => { if (verifySignal > 0) onSubmit(answer); }, [verifySignal]);
+  return <div className="lesson-quiz-answer lesson-free-text-answer">
+    <label htmlFor={answerId}><span>Rédigez votre réponse</span>
+      <textarea id={answerId} rows={3} value={answer} onChange={event => setAnswer(event.target.value)} disabled={disabled} placeholder="Saisissez votre réponse complète…" />
+    </label>
+    {!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !answer.trim()} onClick={() => onSubmit(answer)}>Vérifier ma réponse</button>}
+  </div>;
+};
+
+function initialOrder(items: LessonOrderItem[], data: any): LessonOrderItem[] {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  const expected = getLessonExpectedOrder(data, items);
+  if (expected?.length === shuffled.length && shuffled.length > 1
+    && shuffled.every((item, index) => normalizeLessonAnswer(item.value) === normalizeLessonAnswer(expected[index]))) {
+    shuffled.push(shuffled.shift()!);
+  }
+  return shuffled;
+}
+
+const ReorderAnswer: React.FC<{ data: any; onSubmit: (values: string[], correct: boolean) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ data, onSubmit, disabled = false, verifySignal = 0, hideCheck = false }) => {
+  const [items, setItems] = useState<LessonOrderItem[]>(() => initialOrder(buildLessonOrderItems(data), data));
+  const instructionId = useId();
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [keyboardLiftedId, setKeyboardLiftedId] = useState<string | null>(null);
+  const activeDragIndex = useRef<number | null>(null);
+  const moveItem = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return;
+    setItems(current => moveLessonOrderItem(current, from, to));
+    activeDragIndex.current = to;
+  };
+  const submit = () => {
+    const values = items.map(item => item.value);
+    onSubmit(values, isLessonOrderCorrect(data, values));
+  };
+  useEffect(() => { if (verifySignal > 0) submit(); }, [verifySignal]);
+  const startPointerDrag = (event: React.PointerEvent<HTMLButtonElement>, index: number, item: LessonOrderItem) => {
+    if (disabled || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.preventDefault();
+    activeDragIndex.current = index;
+    setDraggingId(item.id);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* Certains navigateurs ne gèrent pas pointer capture. */ }
+  };
+  const movePointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const from = activeDragIndex.current;
+    if (from === null) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-order-index]');
+    if (!target) return;
+    const to = Number(target.dataset.orderIndex);
+    if (Number.isInteger(to) && to !== from) moveItem(from, to);
+  };
+  const finishPointerDrag = () => {
+    activeDragIndex.current = null;
+    setDraggingId(null);
+  };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, item: LessonOrderItem, index: number) => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      setKeyboardLiftedId(current => current === item.id ? null : item.id);
+      return;
+    }
+    if (event.key === 'Escape') {
+      setKeyboardLiftedId(null);
+      return;
+    }
+    if (keyboardLiftedId !== item.id || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    const to = Math.max(0, Math.min(items.length - 1, index + (event.key === 'ArrowUp' ? -1 : 1)));
+    moveItem(index, to);
+  };
+  return <div className="lesson-order-exercise">
+    <p className="lesson-order-instructions" id={instructionId}>Faites glisser les éléments pour les remettre dans l’ordre. Au clavier : Espace pour saisir/déposer, puis ↑ ou ↓ pour déplacer.</p>
+    <ol className="lesson-order-list" aria-describedby={instructionId} aria-label="Éléments à ordonner">
+      {items.map((item, index) => <li key={item.id} data-order-index={index} className={`lesson-order-item ${draggingId === item.id || keyboardLiftedId === item.id ? 'is-dragging' : ''}`} aria-posinset={index + 1} aria-setsize={items.length}>
+        <button type="button" className="lesson-order-handle" disabled={disabled} aria-label={`Déplacer ${item.label}`} aria-pressed={keyboardLiftedId === item.id} onPointerDown={event => startPointerDrag(event, index, item)} onPointerMove={movePointerDrag} onPointerUp={finishPointerDrag} onPointerCancel={finishPointerDrag} onLostPointerCapture={finishPointerDrag} onKeyDown={event => handleKeyDown(event, item, index)}>
+          <GripVertical size={18} aria-hidden="true" /><span className="lesson-order-position">{index + 1}</span><span>{item.label}</span>
+        </button>
+      </li>)}
+    </ol>
+    {!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || items.length < 2} onClick={submit}>Vérifier l’ordre</button>}
+    {items.length < 2 && <small>Ajoutez au moins deux éléments à ordonner dans le contenu de la leçon.</small>}
+  </div>;
 };
 
 function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
@@ -162,22 +244,24 @@ function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
 
 function getCorrectionEntries(step: DiscoveryStep, formulaPieces: string[], targets: string[]): string[] {
   const data = step.data || {};
-  const explicitAnswer = data.correct_answer ?? data.correctAnswer ?? data.expected_answer ?? data.answer;
+  if (step.kind === 'reorder' || step.kind === 'order') return getLessonExpectedOrder(data) || ['Consultez les éléments dans leur ordre attendu.'];
+  const explicitAnswer = data.accepted_answers ?? data.acceptedAnswers ?? data.alternatives ?? data.variants
+    ?? data.correct_answer ?? data.correctAnswer ?? data.expected_answer ?? data.answer;
   if (explicitAnswer !== undefined && explicitAnswer !== null && explicitAnswer !== '') {
-    return Array.isArray(explicitAnswer) ? explicitAnswer.map(value => compactLessonAnswer(value)) : [compactLessonAnswer(explicitAnswer)];
+    return Array.isArray(explicitAnswer) ? explicitAnswer.map(value => normalizeLessonText(value)) : [normalizeLessonText(explicitAnswer)];
   }
   if (step.kind === 'choose' || step.kind === 'guess_meaning') {
     const options = data.options || [];
     const markedCorrect = options.filter((option: any) => option.correct === true);
-    return (markedCorrect.length ? markedCorrect : options.filter((option: any) => option.correct !== false)).map((option: any) => compactLessonAnswer(option.short_text || option.label || option.text || String(option)));
+    return (markedCorrect.length ? markedCorrect : options.filter((option: any) => option.correct !== false)).map((option: any) => normalizeLessonText(option.text || option.label || option.short_text || String(option)));
   }
-  if (step.kind === 'highlight') return targets.length ? targets.map(target => compactLessonAnswer(target)) : ['Relisez les mots ciblés.'];
-  if (step.kind === 'complete_table') return (data.rows || []).flatMap((row: any) => (row.cells || []).map((cell: string) => compactLessonAnswer(cell)));
-  if (step.kind === 'build_formula') return formulaPieces.length ? [compactLessonAnswer(formulaPieces.join(' '))] : ['Consultez la formule.'];
+  if (step.kind === 'highlight') return targets.length ? targets.map(target => normalizeLessonText(target)) : ['Relisez les mots ciblés.'];
+  if (step.kind === 'complete_table') return (data.rows || []).flatMap((row: any) => (row.cells || []).map((cell: string) => normalizeLessonText(cell)));
+  if (step.kind === 'build_formula') return formulaPieces.length ? [normalizeLessonText(formulaPieces.join(' '))] : ['Consultez la formule.'];
   if (step.kind === 'compare') {
     const options = data.options || data.sentences || [];
     const markedCorrect = options.filter((option: any) => option.correct === true);
-    if (markedCorrect.length) return markedCorrect.map((option: any) => compactLessonAnswer(option.short_text || option.label || option.text || option.it || String(option)));
+    if (markedCorrect.length) return markedCorrect.map((option: any) => normalizeLessonText(option.text || option.it || option.label || option.short_text || String(option)));
   }
   return [step.insight || step.hints?.[0] || 'Comparez votre réponse avec les exemples et la règle de la leçon.'];
 }
@@ -218,8 +302,25 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     }
     prepareAnswer(choice.value, choice.reply || step.ok || step.insight || 'Exact. Vous pouvez continuer.');
   };
+  const answerFreeText = (answer: string) => {
+    setHasAttempted(true);
+    if (!answer.trim()) {
+      setFeedback({ good: false, text: 'Saisissez une réponse avant de vérifier.' });
+      return;
+    }
+    if (!isLessonFreeTextCorrect(step, answer)) {
+      setFeedback({ good: false, text: step.ko || 'La réponse ne correspond pas encore. Réessayez sans raccourcir votre phrase.' });
+      return;
+    }
+    prepareAnswer(answer, step.ok || step.insight || 'Réponse enregistrée. Vous pouvez continuer.');
+  };
+  const answerOrder = (values: string[], correct: boolean) => {
+    setHasAttempted(true);
+    if (correct) prepareAnswer(values, step.ok || step.insight || 'Ordre correct. Vous pouvez continuer.');
+    else setFeedback({ good: false, text: step.ko || 'L’ordre ne correspond pas encore à la réponse attendue. Réessayez.' });
+  };
   const revealHint = () => onDiscovery(step, { hint: true });
-  const targets: string[] = (step.data?.targets || []).map((target: string) => cleanAnswer(target));
+  const targets: string[] = (step.data?.targets || []).map((target: string) => normalizeLessonAnswer(target));
   const sourceLines = sourceBlock?.type === 'dialogue'
     ? (sourceBlock.content?.lines || []).map((line: any) => ({ speaker: line.speaker, text: line.it }))
     : step.data?.text ? [{ speaker: '', text: step.data.text }] : [];
@@ -236,8 +337,10 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     <div className="lesson-discovery-progress" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={stepIndex + (done ? 1 : 0)}><span style={{ width: `${Math.min(100, ((stepIndex + (done ? 1 : 0)) / Math.max(steps.length, 1)) * 100)}%` }} /></div>
     <h3 id={`discovery-${step.id}`}>{step.prompt}</h3>
     {step.kind === 'highlight' && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, i: number) => <p className="lesson-highlight-phrase" key={i}>{line.speaker && <strong>{line.speaker}</strong>}{cleanLessonSpeechText(line.text)}</p>)}</div>}
-    {['choose', 'guess_meaning', 'compare', 'free_text', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />}
     {step.kind === 'complete_table' && <DiscoveryTableExercise key={step.id} data={step.data} disabled={done} onResult={(answers, correct) => { setHasAttempted(true); if (correct) prepareAnswer(answers, step.ok || 'Le tableau est complet.'); else setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' }); }} />}
+    {step.kind === 'free_text' && <FreeTextAnswer key={step.id} onSubmit={answerFreeText} disabled={done} />}
+    {(step.kind === 'reorder' || step.kind === 'order') && <ReorderAnswer key={step.id} data={step.data} onSubmit={answerOrder} disabled={done} />}
+    {['choose', 'guess_meaning', 'compare', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />}
     {feedback && <Feedback good={feedback.good}>
       {feedback.text}
     </Feedback>}
@@ -289,6 +392,7 @@ export const LessonFullPreview: React.FC<{
     } else {
       if (!completed.includes(step.id)) completed.push(step.id);
       if (typeof value === 'string') answers[step.id] = value;
+      else if (Array.isArray(value)) answers[step.id] = JSON.stringify(value);
       if (step.insight && !notebook.includes(step.insight)) notebook.push(step.insight);
     }
     const next = { ...discovery, completed, hints, revealed, notebook, answers };
@@ -370,6 +474,16 @@ const LessonQuestionScreen: React.FC<{
     }
     report(choice.value, isLessonQuizChoiceCorrect(step, choice), choice.reply);
   };
+  const handleFreeText = (answer: string) => {
+    if (!answer.trim()) {
+      report(answer, false, 'Saisissez une réponse avant de vérifier.');
+      return;
+    }
+    report(answer, isLessonFreeTextCorrect(step, answer));
+  };
+  const handleOrder = (values: string[], correct: boolean) => {
+    report(values, correct);
+  };
 
   const handleTable = (answers: Record<string, string>, correct: boolean) => {
     report(JSON.stringify(answers), correct);
@@ -381,7 +495,11 @@ const LessonQuestionScreen: React.FC<{
     {step.kind === 'highlight' && sourceLines.length > 0 && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, index: number) => <p className="lesson-highlight-phrase" key={index}>{line.speaker && <strong>{line.speaker}</strong>}<RichText text={line.text} revealHighlights={completed} /></p>)}</div>}
     {step.kind === 'complete_table'
       ? <DiscoveryTableExercise key={step.id} data={step.data} disabled={completed} verifySignal={verifySignal} hideCheck onResult={handleTable} />
-      : <QuizDropdown key={step.id} choices={choices} onSubmit={handleChoice} disabled={completed} verifySignal={verifySignal} hideCheck />}
+      : step.kind === 'free_text'
+        ? <FreeTextAnswer key={step.id} onSubmit={handleFreeText} disabled={completed} verifySignal={verifySignal} hideCheck />
+        : step.kind === 'reorder' || step.kind === 'order'
+          ? <ReorderAnswer key={step.id} data={step.data} onSubmit={handleOrder} disabled={completed} verifySignal={verifySignal} hideCheck />
+          : <QuizDropdown key={step.id} choices={choices} onSubmit={handleChoice} disabled={completed} verifySignal={verifySignal} hideCheck />}
     {feedback && <Feedback good={feedback.good}>{feedback.text}</Feedback>}
     {completed && !feedback?.good && <Feedback good>Réponse déjà validée. Continuez.</Feedback>}
   </section>;
@@ -472,7 +590,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
   const handlePrimaryAction = () => {
     if (!screen) return;
     if (screen.kind === 'step') {
-      if (!questionPassed && !questionAttempted) {
+      if (!questionPassed) {
         setVerifySignal(value => value + 1);
         return;
       }
@@ -510,7 +628,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
   if (!screen) return null;
   const canRedo = reviewMode && getFirstDiscoveryScreenIndex(screens) < firstLessonIndex;
   const isQuestion = screen.kind === 'step';
-  const primaryLabel = screen.kind === 'done' ? 'Terminer la leçon' : isQuestion && !questionPassed && !questionAttempted ? 'Vérifier' : 'Continuer';
+  const primaryLabel = screen.kind === 'done' ? 'Terminer la leçon' : isQuestion && !questionPassed ? (questionAttempted ? 'Réessayer' : 'Vérifier') : 'Continuer';
 
   return <div className="lessons-root lesson-player-root" style={{ '--lesson-accent': meta.color, '--lesson-soft': meta.soft } as React.CSSProperties}>
     <div className="lesson-player-shell">
