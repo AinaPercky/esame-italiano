@@ -221,6 +221,169 @@
   line-height: 1.6;
 }
 
+.lesson-player-completion-actions {
+  display: grid;
+  width: min(100%, 420px);
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 5px;
+}
+
+.lesson-player-restart-guide,
+.lesson-player-read-course,
+.lesson-player-download-pdf,
+.lesson-direct-back,
+.lesson-direct-restart,
+.lesson-direct-download {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #d4e4ee;
+  border-radius: 13px;
+  padding: 10px 13px;
+  background: #fff;
+  color: #072a3f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.lesson-player-restart-guide {
+  grid-column: 1 / -1;
+  border-color: #b9d9ca;
+  background: #eaf7f0;
+  color: #145c3a;
+}
+
+.lesson-player-restart-guide:hover,
+.lesson-direct-restart:hover {
+  background: #d9f0e4;
+}
+
+.lesson-player-read-course,
+.lesson-direct-download {
+  border-color: #072a3f;
+  background: #072a3f;
+  color: #fff;
+  box-shadow: 0 7px 16px rgb(7 42 63 / 14%);
+}
+
+.lesson-player-read-course:hover,
+.lesson-direct-download:hover {
+  background: #0b3c5d;
+}
+
+.lesson-player-download-pdf:hover,
+.lesson-direct-back:hover {
+  background: #e6f0f7;
+}
+
+.lesson-player-read-course:active,
+.lesson-player-restart-guide:active,
+.lesson-player-download-pdf:active,
+.lesson-direct-back:active,
+.lesson-direct-restart:active,
+.lesson-direct-download:active {
+  transform: translateY(1px);
+}
+
+.lesson-player-download-pdf:disabled,
+.lesson-direct-download:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+.lesson-direct-reading-root {
+  min-height: 100dvh;
+  padding: 0 0 42px;
+  background: #f4f8fb;
+}
+
+.lesson-direct-toolbar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  width: min(100%, 760px);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 12px;
+  border-bottom: 1px solid #dce8ef;
+  padding: 10px 16px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 6px 20px rgb(7 42 63 / 6%);
+  backdrop-filter: blur(12px);
+}
+
+.lesson-direct-back {
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.lesson-direct-toolbar-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.lesson-direct-toolbar-copy > span {
+  color: #2fa36b;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.lesson-direct-toolbar-copy > strong {
+  overflow: hidden;
+  color: #072a3f;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-direct-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.lesson-direct-restart {
+  min-height: 40px;
+  padding: 8px 10px;
+  color: #145c3a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.lesson-direct-download {
+  min-height: 40px;
+  padding: 8px 11px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.lesson-pdf-error {
+  width: min(100% - 32px, 700px);
+  margin: 8px auto 12px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .lesson-player-done-mark {
   display: grid;
   width: 72px;
@@ -283,6 +446,48 @@
   .lesson-player-header {
     padding-right: 28px;
     padding-left: 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  .lesson-direct-toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 12px;
+  }
+
+  .lesson-direct-toolbar-copy {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .lesson-direct-back {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .lesson-direct-toolbar-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .lesson-direct-restart,
+  .lesson-direct-download {
+    min-width: 0;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 430px) {
+  .lesson-player-completion-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-direct-toolbar-copy > strong {
+    max-width: 48vw;
   }
 }
 

@@ -78,11 +78,21 @@ test('la progression reprend exactement à l’index sauvegardé', () => {
   assert.doesNotMatch(html, /Question 3 \?|Question 5 \?|lesson-formula/);
 });
 
-test('une leçon déjà terminée s’ouvre sur le premier écran de cours en révision', () => {
+test('une leçon déjà terminée s’ouvre directement sur le cours sans dialogue ni guide', () => {
   const html = renderAt(11, 'done');
+  assert.match(html, /lesson-direct-toolbar/);
+  assert.match(html, /Révision autonome/);
   assert.match(html, /lesson-formula/);
-  assert.match(html, /Refaire la découverte/);
-  assert.doesNotMatch(html, /lesson-dialogue|lesson-player-question|lesson-exceptions|lesson-chips|lesson-recap/);
+  assert.match(html, /Recommencer le guide/);
+  assert.doesNotMatch(html, /lesson-dialogue|lesson-player-question|lesson-discovery|Refaire la découverte/);
+});
+
+test('l’écran de fin propose la reprise guidée, la lecture directe et le téléchargement PDF A4', () => {
+  const html = renderAt(11);
+  assert.match(html, /Parcours terminé/);
+  assert.match(html, /Reprendre le parcours guidé depuis le début/);
+  assert.match(html, /Lire la leçon directement/);
+  assert.match(html, /Télécharger le PDF A4/);
 });
 
 test('le lecteur affiche le libellé complet des choix de plus de trois mots', () => {
