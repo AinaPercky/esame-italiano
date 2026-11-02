@@ -95,9 +95,12 @@ function sanitizeState(appState: AppState): AppState {
   );
 
   const validQuizzes = (appState.quizzes || []).filter(q => classIds.has(q.class_id));
-  // Keep quiz submissions even when the student's roster entry is missing or not synced.
-  const validSubmissions = (appState.quizSubmissions || [])
-    .filter(submission => !legacyStudentIds.has(submission.student_id));
+  // Ne conserver que les soumissions d'élèves actuellement enregistrés dans l'effectif
+  const validSubmissions = (appState.quizSubmissions || []).filter(submission => {
+    if (legacyStudentIds.has(submission.student_id)) return false;
+    if (studentIds.size > 0 && !studentIds.has(submission.student_id)) return false;
+    return true;
+  });
 
   return {
     classes: appState.classes,
@@ -276,7 +279,7 @@ export const dataService = {
     state.passOrder = state.passOrder.filter(po => !classExamIds.has(po.exam_id) && !classStudentIds.has(po.student_id));
     state.quizzes = (state.quizzes || []).filter(quiz => quiz.class_id !== id);
     state.quizSubmissions = (state.quizSubmissions || []).filter(submission =>
-      submission.class_id !== id && !classQuizIds.has(submission.quiz_id)
+      submission.class_id !== id && !classQuizIds.has(submission.quiz_id) && !classStudentIds.has(submission.student_id)
     );
     authService.removeStudentAccountsForClass(id);
 
@@ -1599,6 +1602,8 @@ export const dataService = {
 
   getStudentSubmissions(studentId: string, _studentName?: string, _studentNumber?: string, classId?: string): QuizSubmission[] {
     this.checkAndApplyExpiredQuizzes();
+    const studentExists = (state.students || []).some(s => s.id === studentId);
+    if (!studentExists && (state.students || []).length > 0) return [];
     const cleanId = (studentId || '').toLowerCase();
 
     return (state.quizSubmissions || []).filter(s => {
@@ -1610,10 +1615,15 @@ export const dataService = {
 
   /**
    * Calcule la note journalière en pondérant chaque quiz selon son barème.
+   * Filtre strictement pour n'inclure que les élèves actifs non supprimés.
    */
   getDailyGrades(classId?: string, targetDate?: string): DailyGrade[] {
     this.checkAndApplyExpiredQuizzes();
-    let submissions = state.quizSubmissions || [];
+    const activeStudentIds = new Set((state.students || []).map(s => s.id));
+    let submissions = (state.quizSubmissions || []).filter(s => {
+      if (activeStudentIds.size > 0 && !activeStudentIds.has(s.student_id)) return false;
+      return true;
+    });
 
     if (classId) {
       submissions = submissions.filter(s => s.class_id === classId);
@@ -1656,6 +1666,8 @@ export const dataService = {
 
   getStudentDailyGrades(studentId: string): DailyGrade[] {
     this.checkAndApplyExpiredQuizzes();
+    const studentExists = (state.students || []).some(s => s.id === studentId);
+    if (!studentExists && (state.students || []).length > 0) return [];
     const submissions = (state.quizSubmissions || []).filter(s => s.student_id === studentId);
 
     const groups: Record<string, QuizSubmission[]> = {};

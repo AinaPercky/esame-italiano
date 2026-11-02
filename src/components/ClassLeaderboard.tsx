@@ -48,33 +48,51 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
     initialClassId || classes[0]?.id || ''
   );
 
+  // Élèves actifs éligibles pour la classe sélectionnée (ou toutes les classes)
+  const activeClass = classes.find(c => c.id === selectedClassId);
+  const classStudents = useMemo(() => {
+    if (!selectedClassId) return students;
+    return students.filter(s => s.class_id === selectedClassId);
+  }, [students, selectedClassId]);
+
+  const eligibleStudentIds = useMemo(() => {
+    const list = selectedClassId ? classStudents : students;
+    return new Set(list.map(s => s.id));
+  }, [selectedClassId, classStudents, students]);
+
   const availableQuizzes = useMemo(() => {
     const quizzesById = new Map<string, string>();
     dailyGrades
       .filter(grade =>
         (selectedDate === ALL_DATES || grade.date === selectedDate) &&
-        (!selectedClassId || grade.class_id === selectedClassId)
+        (!selectedClassId || grade.class_id === selectedClassId) &&
+        (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
+      .filter(submission => students.length === 0 || eligibleStudentIds.has(submission.student_id))
       .forEach(submission => quizzesById.set(submission.quiz_id, submission.quiz_title));
     return Array.from(quizzesById, ([id, title]) => ({ id, title }))
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [dailyGrades, selectedClassId, selectedDate]);
+  }, [dailyGrades, selectedClassId, selectedDate, eligibleStudentIds, students.length]);
 
   const effectiveQuizId = availableQuizzes.some(quiz => quiz.id === selectedQuizId)
     ? selectedQuizId
     : '';
 
-  // Filtrer les dailyGrades pour la classe et la date sélectionnées
+  // Filtrer les dailyGrades pour la classe et la date sélectionnées, en excluant les élèves supprimés
   const filteredGrades = useMemo(() => {
     const submissionsByStudent = new Map<string, DailyGrade['submissions']>();
     dailyGrades
       .filter(grade =>
         (!selectedClassId || grade.class_id === selectedClassId) &&
-        (selectedDate === ALL_DATES || grade.date === selectedDate)
+        (selectedDate === ALL_DATES || grade.date === selectedDate) &&
+        (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
-      .filter(submission => !effectiveQuizId || submission.quiz_id === effectiveQuizId)
+      .filter(submission =>
+        (!effectiveQuizId || submission.quiz_id === effectiveQuizId) &&
+        (students.length === 0 || eligibleStudentIds.has(submission.student_id))
+      )
       .forEach(submission => {
         const key = `${submission.class_id}_${submission.student_id}`;
         const submissions = submissionsByStudent.get(key) || [];
@@ -101,14 +119,8 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         submissions
       };
     });
-  }, [dailyGrades, selectedClassId, selectedDate, effectiveQuizId]);
+  }, [dailyGrades, selectedClassId, selectedDate, effectiveQuizId, eligibleStudentIds, students.length]);
 
-  // Si on est dans une classe spécifique, on peut aussi lister les élèves qui n'ont pas encore de note aujourd'hui
-  const activeClass = classes.find(c => c.id === selectedClassId);
-  const classStudents = useMemo(() => {
-    if (!selectedClassId) return students;
-    return students.filter(s => s.class_id === selectedClassId);
-  }, [students, selectedClassId]);
   const getStudent = (studentId: string, _classId: string, _studentNumber?: string | null, _studentName?: string) => {
     return students.find(student => student.id === studentId);
   };
@@ -135,8 +147,9 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         gradesByIdentity.set(key, grade);
       }
     });
-    const uniqueGrades = Array.from(gradesByIdentity.values());
-    const gradedIdentityKeys = new Set(gradesByIdentity.keys());
+    const uniqueGrades = Array.from(gradesByIdentity.values())
+      .filter(grade => students.length === 0 || eligibleStudentIds.has(grade.student_id));
+    const gradedIdentityKeys = new Set(uniqueGrades.map(grade => gradeIdentityKey(grade, students)));
 
     // Entrées notées triées par note
     const gradedList = [...uniqueGrades].sort((a, b) => {
@@ -188,7 +201,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
       graded: gradedList,
       pending: unrankedList
     };
-  }, [filteredGrades, classStudents, selectedDate, activeClass, students, currentStudentId]);
+  }, [filteredGrades, classStudents, selectedDate, activeClass, students, currentStudentId, eligibleStudentIds]);
 
   const classAverage = useMemo(() => {
     if (leaderboardEntries.graded.length === 0) return null;

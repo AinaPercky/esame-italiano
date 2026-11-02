@@ -702,9 +702,25 @@ class SupabaseService {
   public async deleteStudent(id: string): Promise<void> {
     const client = this.getClient();
     if (!client || !isUUID(id)) return;
+
+    // 1. Nettoyer d'abord toutes les tables enfants liées à cet élève dans Supabase
+    try {
+      await Promise.allSettled([
+        client.from('quiz_submissions').delete().eq('student_id', id),
+        client.from('evaluations').delete().eq('student_id', id),
+        client.from('exam_pass_order').delete().eq('student_id', id),
+        client.from('student_accounts').delete().eq('student_id', id),
+        client.from('lesson_progress').delete().eq('student_id', id)
+      ]);
+    } catch (cleanupErr) {
+      console.warn('Supabase deleteStudent child records cleanup warning:', cleanupErr);
+    }
+
+    // 2. Supprimer la fiche élève principale
     const { error } = await client.from('students').delete().eq('id', id);
     if (error) throw new Error(`Suppression de l’élève impossible : ${error.message}`);
 
+    // 3. Supprimer les fichiers avatars éventuels
     const { error: avatarError } = await client.storage
       .from('student-avatars')
       .remove([`avatars/${id}.jpg`, `avatars/${id}.png`, `avatars/${id}.webp`]);
@@ -1490,7 +1506,27 @@ class SupabaseService {
         total_points: Number(q.total_points) || 20
       }));
 
-      const quizSubmissions: QuizSubmission[] = (quizSubmissionsData || []).map(s => ({
+      const existingStudentIds = new Set(students.map(s => s.id));
+      const activeSubmissionsData = (quizSubmissionsData || []).filter(s => existingStudentIds.has(s.student_id));
+
+      // Nettoyer en arrière-plan les soumissions orphelines d'élèves déjà supprimés dans Supabase
+      const orphanedStudentIds = Array.from(new Set(
+        (quizSubmissionsData || [])
+          .filter(s => !existingStudentIds.has(s.student_id))
+          .map(s => s.student_id)
+      ));
+      if (orphanedStudentIds.length > 0) {
+        void (async () => {
+          try {
+            await client.from('quiz_submissions').delete().in('student_id', orphanedStudentIds);
+            console.log(`[Supabase] Nettoyage : ${orphanedStudentIds.length} soumission(s) d'élève(s) supprimé(s) purgée(s).`);
+          } catch (err) {
+            console.warn('[Supabase] Nettoyage soumissions orphelines ignoré :', err);
+          }
+        })();
+      }
+
+      const quizSubmissions: QuizSubmission[] = activeSubmissionsData.map(s => ({
         id: s.id,
         quiz_id: s.quiz_id,
         quiz_title: s.quiz_title,
