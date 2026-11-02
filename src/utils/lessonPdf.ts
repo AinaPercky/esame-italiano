@@ -171,10 +171,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     ensureSpace(lines.length * 6 + 9);
     font(true); doc.setFontSize(size); doc.setTextColor(...BRAND.navy);
     doc.text(lines, MARGIN, y);
-    const lineY = y + lines.length * 5.5 + 2;
-    doc.setDrawColor(...(level === 1 ? BRAND.blue : BRAND.line)); doc.setLineWidth(level === 1 ? 0.6 : 0.35);
-    doc.line(MARGIN, lineY, PAGE_WIDTH - MARGIN, lineY);
-    y = lineY + 6;
+    y += lines.length * 5.5 + 6;
   };
 
   const addSection = (title: string, level = 1) => addHeading(title, level);
@@ -212,7 +209,6 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
       font(true); doc.setFontSize(8); doc.setTextColor(...BRAND.muted); doc.text(normalizePdfText(line.speaker || '—'), MARGIN, y);
       font(true); doc.setFontSize(10.2); doc.setTextColor(...BRAND.navy); doc.text(itLines, MARGIN + 18, y);
       font(false); doc.setFontSize(9.2); doc.setTextColor(...BRAND.muted); doc.text(frLines, MARGIN + CONTENT_WIDTH * 0.62, y);
-      doc.setDrawColor(...BRAND.line); doc.setLineWidth(0.25); doc.line(MARGIN + 18, y + h - 2, PAGE_WIDTH - MARGIN, y + h - 2);
       y += h + 2;
     });
   };
@@ -225,7 +221,6 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     ensureSpace(h);
     font(true); doc.setFontSize(10.3); doc.setTextColor(...BRAND.navy); doc.text(itLines, MARGIN, y);
     font(false); doc.setFontSize(9.2); doc.setTextColor(...BRAND.muted); doc.text(frLines, MARGIN + CONTENT_WIDTH * 0.62, y);
-    doc.setDrawColor(...BRAND.line); doc.setLineWidth(0.22); doc.line(MARGIN, y + h - 1.5, PAGE_WIDTH - MARGIN, y + h - 1.5);
     y += h + 2;
   };
 
