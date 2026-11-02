@@ -196,6 +196,29 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     y += height + 5;
   };
 
+  const addRecap = (bullets: string[], model?: any) => {
+    const items = bullets.filter(Boolean).map(point => wrapped(point, CONTENT_WIDTH - 17, 9.8));
+    const modelLines = model ? wrapped(model.it || '', CONTENT_WIDTH - 17, 9.8, true) : [];
+    const height = 13 + items.reduce((sum, lines) => sum + Math.max(1, lines.length) * 4.5 + 1.5, 0) + (modelLines.length ? modelLines.length * 4.5 + 5 : 0);
+    ensureSpace(height + 5);
+    doc.setFillColor(...BRAND.yellowPale); doc.setDrawColor(...BRAND.yellow); doc.setLineWidth(0.55);
+    doc.roundedRect(MARGIN, y - 2, CONTENT_WIDTH, height, 1.8, 1.8, 'FD');
+    doc.setFillColor(...BRAND.yellow); doc.rect(MARGIN, y - 2, 2.5, height, 'F');
+    font(true); doc.setFontSize(9); doc.setTextColor(...BRAND.navy); doc.text('À RETENIR', MARGIN + 8, y + 5);
+    let itemY = y + 11;
+    items.forEach(lines => {
+      font(true); doc.setFontSize(10); doc.setTextColor(...BRAND.orange); doc.text('•', MARGIN + 8, itemY);
+      font(false); doc.setFontSize(9.8); doc.setTextColor(...BRAND.ink); doc.text(lines, MARGIN + 13, itemY);
+      itemY += lines.length * 4.5 + 1.5;
+    });
+    if (modelLines.length) {
+      font(true); doc.setFontSize(8.5); doc.setTextColor(...BRAND.muted); doc.text('FORMULE', MARGIN + 8, itemY + 1);
+      font(true); doc.setFontSize(9.8); doc.setTextColor(...BRAND.navy); doc.text(modelLines, MARGIN + 30, itemY + 1);
+      itemY += modelLines.length * 4.5;
+    }
+    y += height + 5;
+  };
+
   const addDialogue = (lines: any[]) => {
     if (!lines?.length) return;
     addSection('Dialogue de départ', 1);
@@ -307,7 +330,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     if (block.type === 'example_list') { const title = content.title || 'Exemples d’utilisation'; addSection(`${sectionNo}. ${title}`, 1); (content.examples || []).forEach((example: any) => addExample(example.it, example.fr)); return; }
     if (block.type === 'steps_text') { addSection(`${sectionNo}. ${content.title || 'Étapes à suivre'}`, 1); (content.steps || []).forEach((step: any, index: number) => { addParagraph(`${index + 1}. ${step.title || step.it || ''}`, { bold: true, color: BRAND.navy }); if (step.it && step.title) addExample(step.it, step.fr); }); return; }
     if (block.type === 'key_value_list') { if (content.title) addSection(`${sectionNo}. ${content.title}`, 1); (content.rows || []).forEach((row: any) => addExample(`${row.key || ''} : ${row.it || ''}`, row.fr)); return; }
-    if (block.type === 'recap') { addCallout('À retenir', (content.bullets || []).map((point: string) => `• ${point}`).join('\n'), 'retenir'); if (content.model) addExample(content.model.it, content.model.fr); return; }
+    if (block.type === 'recap') { addRecap(content.bullets || [], content.model); return; }
     if (block.type === 'tip' || block.type === 'warning') { addCallout(block.type === 'tip' ? 'Conseil' : 'Attention', content.text, block.type === 'tip' ? 'conseil' : 'attention'); }
   };
 
