@@ -633,14 +633,16 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
     persist(discovery, next);
   };
 
-  const restartDiscovery = () => {
+  const restartGuidedFromBeginning = () => {
     const clean: DiscoveryState = { completed: [], hints: {}, revealed: [], notebook: [], answers: {} };
-    const first = getFirstDiscoveryScreenIndex(screens);
+    const first = 0;
     setDiscovery(clean);
     setScreenIndex(first);
     setQuestionPassed(false);
     setQuestionAttempted(false);
     setVerifySignal(0);
+    setDirectReading(false);
+    setPdfError('');
     onProgress?.(serialize(clean, first), false, first);
   };
 
@@ -681,6 +683,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
     if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
     return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
       <div className="lesson-player-completion-actions">
+        <button type="button" className="lesson-player-restart-guide" onClick={restartGuidedFromBeginning}><RotateCcw size={17} /> Reprendre le parcours guidé depuis le début</button>
         <button type="button" className="lesson-player-read-course" onClick={openDirectReading}><BookOpen size={17} /> Lire la leçon directement</button>
         <button type="button" className="lesson-player-download-pdf" onClick={() => void handlePdfDownload()} disabled={pdfDownloading}><Download size={17} /> {pdfDownloading ? 'Préparation du PDF…' : 'Télécharger le PDF A4'}</button>
       </div>
@@ -693,7 +696,10 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
     <header className="lesson-direct-toolbar">
       {showClose && <button type="button" className="lesson-direct-back" onClick={onExit}><X size={17} /> Retour aux leçons</button>}
       <div className="lesson-direct-toolbar-copy"><span>Révision autonome</span><strong>{lesson.title_it}</strong></div>
-      <button type="button" className="lesson-direct-download" onClick={() => void handlePdfDownload()} disabled={pdfDownloading}><Download size={17} /> {pdfDownloading ? 'Préparation…' : 'Télécharger le PDF A4'}</button>
+      <div className="lesson-direct-toolbar-actions">
+        <button type="button" className="lesson-direct-restart" onClick={restartGuidedFromBeginning} title="Reprendre le dialogue et les quiz guidés depuis le début"><RotateCcw size={16} /> Recommencer le guide</button>
+        <button type="button" className="lesson-direct-download" onClick={() => void handlePdfDownload()} disabled={pdfDownloading}><Download size={17} /> {pdfDownloading ? 'Préparation…' : 'Télécharger le PDF A4'}</button>
+      </div>
     </header>
     {pdfError && <p className="lesson-pdf-error" role="alert">{pdfError}</p>}
     <LessonFullPreview lesson={directLesson} progress={progress ? { ...progress, status: 'done' } : null} revealAll onQuiz={onQuiz} />
@@ -712,7 +718,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
           {phaseOrder.map((phase, index) => <div key={phase} className={`lesson-player-segment ${index <= activePhaseIndex ? 'active' : ''} ${phase === activeSegment ? 'current' : ''}`}><span /><small>{phase === 'dialogue' ? 'Dialogue' : phase === 'discovery' ? 'Découverte' : 'Leçon'}</small></div>)}
         </nav>
       </header>
-      {canRedo && <button type="button" className="lesson-player-redo" onClick={restartDiscovery}><RotateCcw size={14} /> Refaire la découverte</button>}
+      {canRedo && <button type="button" className="lesson-player-redo" onClick={restartGuidedFromBeginning}><RotateCcw size={14} /> Reprendre le parcours guidé depuis le début</button>}
       {screen.kind === 'step' && guidedComplete && <button type="button" className="lesson-player-skip" onClick={() => goTo(firstLessonIndex, false)}>Voir la règle directement</button>}
       <main className="lesson-player-content" key={screenIndex}>
         {screen.kind === 'dialogue' && <div className="lesson-player-dialogue-heading"><h1>{lesson.title_it}</h1><p>{lesson.title_fr}</p></div>}

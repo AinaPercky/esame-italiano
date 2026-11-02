@@ -83,12 +83,14 @@ test('une leçon déjà terminée s’ouvre directement sur le cours sans dialog
   assert.match(html, /lesson-direct-toolbar/);
   assert.match(html, /Révision autonome/);
   assert.match(html, /lesson-formula/);
+  assert.match(html, /Recommencer le guide/);
   assert.doesNotMatch(html, /lesson-dialogue|lesson-player-question|lesson-discovery|Refaire la découverte/);
 });
 
-test('l’écran de fin propose lecture directe et téléchargement PDF A4', () => {
+test('l’écran de fin propose la reprise guidée, la lecture directe et le téléchargement PDF A4', () => {
   const html = renderAt(11);
   assert.match(html, /Parcours terminé/);
+  assert.match(html, /Reprendre le parcours guidé depuis le début/);
   assert.match(html, /Lire la leçon directement/);
   assert.match(html, /Télécharger le PDF A4/);
 });
