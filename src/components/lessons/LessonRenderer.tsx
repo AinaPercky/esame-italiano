@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, LockKeyhole, MessageCircle, Sparkles, Volume2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, Lightbulb, LockKeyhole, MessageCircle, RotateCcw, Sparkles, Volume2, X } from 'lucide-react';
 import { Lesson, LessonBlock, LessonProgress, DiscoveryStep } from '../../types/lessons';
 import { cleanLessonSpeechText } from '../../utils/lessonSpeech';
 import { buildLessonQuizChoices, compactLessonAnswer, isLessonQuizChoiceCorrect, LessonQuizChoice } from '../../utils/lessonQuiz';
 import { isGuidedQuizComplete } from '../../utils/lessonProgress';
-import './lessonExperience.css';
-import './lessonGuidedQuiz.css';
+import { buildScreens, getFirstDiscoveryScreenIndex, getFirstLessonScreenIndex, lessonScreenSegment, LessonScreen } from '../../utils/lessonScreens';
 
 const TYPE_META: Record<string, { label: string; color: string; soft: string }> = {
   grammaire: { label: 'Grammaire', color: '#2f6fd6', soft: '#e8f1ff' },
@@ -38,22 +37,23 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const RichText: React.FC<{ text: string }> = ({ text }) => {
+const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text, revealHighlights = false }) => {
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
     if (!marked) return <React.Fragment key={i}>{part}</React.Fragment>;
+    if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
     return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
   })}</>;
 };
 
-const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
+const DialogueBlock: React.FC<{ content: any; revealHighlights?: boolean }> = ({ content, revealHighlights = false }) => (
   <section className="lesson-dialogue" aria-label="Dialogue en italien">
     {(content.lines || []).map((line: any, i: number) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} /></span>
+          <span className="lesson-italian"><RichText text={line.it} revealHighlights={revealHighlights} /></span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
@@ -83,16 +83,17 @@ function isBlockVisible(block: LessonBlock, guidedComplete: boolean): boolean {
   return true;
 }
 
-function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete }: {
+function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revealHighlights }: {
   block: LessonBlock;
   discovery: DiscoveryState;
   onDiscovery: DiscoveryCallback;
   allBlocks: LessonBlock[];
   guidedComplete: boolean;
+  revealHighlights?: boolean;
 }) {
   if (!isBlockVisible(block, guidedComplete)) return null;
   const c = block.content || {};
-  if (block.type === 'dialogue') return <DialogueBlock content={c} />;
+  if (block.type === 'dialogue') return <DialogueBlock content={c} revealHighlights={revealHighlights} />;
   if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b>{x.it}</b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
   if (block.type === 'rules_table') return <section className="lesson-table-section">{c.title && <h3>{c.title}</h3>}<div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th>{c.label || ''}</th>{(c.columns || []).map((x: string) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(c.rows || []).map((row: any, i: number) => <tr key={i}><th>{row.label}</th>{(row.cells || []).map((cell: string, j: number) => <td key={j}><button type="button" onClick={() => speak(cell)}>{cell}</button></td>)}</tr>)}</tbody></table></div></section>;
   if (block.type === 'rule_cards') return <div className="lesson-card-grid">{(c.cards || []).map((card: any, i: number) => <article className="lesson-rule-card" key={i}><h4>{card.title}</h4><p>{card.text}</p>{(card.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</article>)}</div>;
@@ -131,7 +132,7 @@ const Feedback: React.FC<{ good: boolean; children: React.ReactNode }> = ({ good
   </div>
 );
 
-const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<string, string>, correct: boolean) => void; disabled?: boolean }> = ({ data, onResult, disabled }) => {
+const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<string, string>, correct: boolean) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ data, onResult, disabled, verifySignal = 0, hideCheck = false }) => {
   const rows = data?.rows || [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const missing = rows.flatMap((row: any, rowIndex: number) => (row.cells || []).map((cell: string, cellIndex: number) => ({ rowIndex, cellIndex, cell })).filter(({ rowIndex, cellIndex }: any) => rows[rowIndex].given?.[cellIndex] !== true));
@@ -140,17 +141,19 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
     const correct = missing.every(({ rowIndex, cellIndex, cell }: any) => cleanAnswer(answers[`${rowIndex}-${cellIndex}`] || '') === cleanAnswer(cell));
     onResult(answers, correct);
   };
+  useEffect(() => { if (verifySignal > 0) validate(); }, [verifySignal]);
   return <div className="lesson-discovery-table-exercise"><div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th></th>{(data?.columns || []).map((column: string) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row: any, rowIndex: number) => <tr key={rowIndex}><th>{row.label}</th>{(row.cells || []).map((cell: string, cellIndex: number) => {
     const given = row.given?.[cellIndex] === true;
     const key = `${rowIndex}-${cellIndex}`;
     return <td key={cellIndex}>{given ? <span>{cell}</span> : <select disabled={disabled} aria-label={`${row.label}, ${data?.columns?.[cellIndex] || `colonne ${cellIndex + 1}`}`} value={answers[key] || ''} onChange={event => setAnswers(previous => ({ ...previous, [key]: event.target.value }))}><option value="">Choisir…</option>{choices.map(choice => <option key={`${key}-${choice.value}`} value={choice.value}>{choice.label}</option>)}</select>}</td>;
-  })}</tr>)}</tbody></table></div><button type="button" className="lesson-discovery-check" onClick={validate} disabled={disabled}>Vérifier le tableau</button></div>;
+  })}</tr>)}</tbody></table></div>{!hideCheck && <button type="button" className="lesson-discovery-check" onClick={validate} disabled={disabled}>Vérifier le tableau</button>}</div>;
 };
 
-const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: LessonQuizChoice) => void; disabled?: boolean }> = ({ choices, onSubmit, disabled }) => {
+const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: LessonQuizChoice | null) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ choices, onSubmit, disabled, verifySignal = 0, hideCheck = false }) => {
   const [selectedId, setSelectedId] = useState('');
   const selected = choices.find(choice => choice.id === selectedId);
-  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse (3 mots maximum)</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label><button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => selected && onSubmit(selected)}>Vérifier ma réponse</button>{choices.length === 0 && <small>Cette question doit être complétée par l’enseignant avec des choix de réponse.</small>}</div>;
+  useEffect(() => { if (verifySignal > 0) onSubmit(selected || null); }, [verifySignal]);
+  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse (3 mots maximum)</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>{!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => onSubmit(selected || null)}>Vérifier ma réponse</button>}{choices.length === 0 && <small>Cette question doit être complétée par l’enseignant avec des choix de réponse.</small>}</div>;
 };
 
 function flattenBlocks(blocks: LessonBlock[]): LessonBlock[] {
@@ -203,8 +206,12 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     setFeedback({ good: true, text: message });
     onDiscovery(step, answer);
   };
-  const answerOption = (choice: LessonQuizChoice) => {
+  const answerOption = (choice: LessonQuizChoice | null) => {
     setHasAttempted(true);
+    if (!choice) {
+      setFeedback({ good: false, text: 'Choisissez une réponse avant de vérifier.' });
+      return;
+    }
     if (!isLessonQuizChoiceCorrect(step, choice)) {
       setFeedback({ good: false, text: choice.reply || step.ko || 'Pas encore. Relisez l’exemple et réessayez.' });
       return;
@@ -249,13 +256,14 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
   </section>;
 };
 
-export const LessonRenderer: React.FC<{
+export const LessonFullPreview: React.FC<{
   lesson: Lesson;
   progress?: LessonProgress | null;
+  revealAll?: boolean;
   onProgress?: (progress: LessonProgress['discovery_state'], done?: boolean) => void;
   onQuiz?: (quizRef: string) => void;
   onNext?: () => void;
-}> = ({ lesson, progress, onProgress, onQuiz, onNext }) => {
+}> = ({ lesson, progress, revealAll = false, onProgress, onQuiz, onNext }) => {
   const meta = lessonTypeMeta(lesson.type);
   const savedState = progress?.discovery_state || {};
   const [discovery, setDiscovery] = useState<DiscoveryState>({
@@ -268,7 +276,7 @@ export const LessonRenderer: React.FC<{
   const allBlocks = flattenBlocks(lesson.blocks);
   const allSteps = allBlocks.flatMap(block => block.type === 'discovery' ? block.content?.steps || [] : []);
   const requiresGuidedQuiz = lesson.method === 'inductive' && allSteps.length > 0;
-  const guidedComplete = !requiresGuidedQuiz || isGuidedQuizComplete(allSteps, discovery.completed, progress?.status);
+  const guidedComplete = revealAll || !requiresGuidedQuiz || isGuidedQuizComplete(allSteps, discovery.completed, progress?.status);
   const handleDiscovery = (step: DiscoveryStep, value: any) => {
     const completed = [...discovery.completed];
     const revealed = [...discovery.revealed];
@@ -308,6 +316,222 @@ export const LessonRenderer: React.FC<{
         {lesson.quiz_ref && <button type="button" className="lesson-primary" onClick={() => onQuiz?.(lesson.quiz_ref!)}>Aller au quiz <ChevronRight size={18} /></button>}
         {onNext && <button type="button" className="lesson-secondary" onClick={onNext}>Leçon suivante <ChevronRight size={18} /></button>}
         {!completed && <button type="button" className="lesson-complete" disabled={!guidedComplete} onClick={() => onProgress?.(discovery, true)}><Check size={18} /> {guidedComplete ? 'Marquer comme terminée' : 'Terminez le quiz guidé d’abord'}</button>}
+      </footer>
+    </div>
+  </div>;
+};
+
+export const LessonRenderer = LessonFullPreview;
+
+type LessonPlayerProps = {
+  lesson: Lesson;
+  progress?: LessonProgress | null;
+  onProgress?: (progress: LessonProgress['discovery_state'], done?: boolean, screen?: number) => void;
+  onQuiz?: (quizRef: string) => void;
+  onExit?: () => void;
+  showClose?: boolean;
+};
+
+type StepScreen = Extract<LessonScreen, { kind: 'step' }>;
+
+const LessonQuestionScreen: React.FC<{
+  screen: StepScreen;
+  allBlocks: LessonBlock[];
+  completed: boolean;
+  verifySignal: number;
+  onResult: (correct: boolean, answer: unknown, feedback: string, insight?: string) => void;
+}> = ({ screen, allBlocks, completed, verifySignal, onResult }) => {
+  const { step, block, stepIndex, total } = screen;
+  const sourceId = block.content?.source || step.data?.source;
+  const sourceBlock = sourceId ? allBlocks.find(candidate => candidate.id === sourceId) : undefined;
+  const sourceLines = sourceBlock?.type === 'dialogue'
+    ? (sourceBlock.content?.lines || []).map((line: any) => ({ speaker: line.speaker, text: line.it }))
+    : step.data?.text ? [{ speaker: '', text: step.data.text }] : [];
+  const formulaBlock = step.data?.formula_block ? allBlocks.find(candidate => candidate.id === step.data.formula_block) : undefined;
+  const formula = formulaBlock?.content?.formulas?.[Number(step.data?.formula_index) || 0];
+  const formulaText = (step.data?.pieces || formula?.parts?.map((part: any) => part.text) || []).map((part: any) => typeof part === 'string' ? part : part?.text).join(' ');
+  const contextWords = sourceLines.flatMap((line: any) => cleanLessonSpeechText(line.text).match(/[\p{L}\p{M}]+/gu) || []);
+  const choices = buildLessonQuizChoices(step, contextWords, formulaText);
+  const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
+
+  const report = (answer: unknown, correct: boolean, choiceReply?: string) => {
+    const message = correct
+      ? [choiceReply || step.ok || 'Exact.', step.insight].filter(Boolean).join(' ')
+      : choiceReply || step.ko || 'Pas encore. Réessayez avec une autre réponse.';
+    setFeedback({ good: correct, text: message });
+    onResult(correct, answer, message, step.insight);
+  };
+
+  const handleChoice = (choice: LessonQuizChoice | null) => {
+    if (!choice) {
+      setFeedback({ good: false, text: 'Choisissez une réponse avant de vérifier.' });
+      onResult(false, null, 'Choisissez une réponse avant de vérifier.');
+      return;
+    }
+    report(choice.value, isLessonQuizChoiceCorrect(step, choice), choice.reply);
+  };
+
+  const handleTable = (answers: Record<string, string>, correct: boolean) => {
+    report(JSON.stringify(answers), correct);
+  };
+
+  return <section className="lesson-player-question" aria-labelledby={`player-question-${step.id}`}>
+    <div className="lesson-player-kicker">Découverte · Question {stepIndex} sur {total}</div>
+    <h1 id={`player-question-${step.id}`}>{step.prompt}</h1>
+    {step.kind === 'highlight' && sourceLines.length > 0 && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, index: number) => <p className="lesson-highlight-phrase" key={index}>{line.speaker && <strong>{line.speaker}</strong>}<RichText text={line.text} revealHighlights={completed} /></p>)}</div>}
+    {step.kind === 'complete_table'
+      ? <DiscoveryTableExercise key={step.id} data={step.data} disabled={completed} verifySignal={verifySignal} hideCheck onResult={handleTable} />
+      : <QuizDropdown key={step.id} choices={choices} onSubmit={handleChoice} disabled={completed} verifySignal={verifySignal} hideCheck />}
+    {feedback && <Feedback good={feedback.good}>{feedback.text}</Feedback>}
+    {completed && !feedback?.good && <Feedback good>Réponse déjà validée. Continuez.</Feedback>}
+  </section>;
+};
+
+export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, onProgress, onQuiz, onExit, showClose = true }) => {
+  const screens = useMemo(() => buildScreens(lesson), [lesson]);
+  const savedState = progress?.discovery_state || {};
+  const [discovery, setDiscovery] = useState<DiscoveryState>({
+    completed: savedState.completedSteps || [],
+    hints: savedState.hintsUsed || {},
+    revealed: savedState.revealedSteps || [],
+    notebook: savedState.notebook || [],
+    answers: savedState.freeTextAnswers || {}
+  });
+  const initialScreen = progress?.status === 'done'
+    ? getFirstLessonScreenIndex(screens)
+    : Math.min(Math.max(Number(savedState.screen) || 0, 0), screens.length - 1);
+  const [screenIndex, setScreenIndex] = useState(initialScreen);
+  const [verifySignal, setVerifySignal] = useState(0);
+  const [questionPassed, setQuestionPassed] = useState(false);
+  const [questionAttempted, setQuestionAttempted] = useState(false);
+  const screen = screens[screenIndex] || screens[0];
+  const meta = lessonTypeMeta(lesson.type);
+  const allBlocks = useMemo(() => flattenBlocks(lesson.blocks), [lesson.blocks]);
+  const allSteps = allBlocks.flatMap(candidate => candidate.type === 'discovery' ? candidate.content?.steps || [] : []);
+  const guidedComplete = !allSteps.length || isGuidedQuizComplete(allSteps, discovery.completed, progress?.status);
+  const reviewMode = progress?.status === 'done';
+
+  useEffect(() => {
+    setQuestionPassed(screen?.kind === 'step' && discovery.completed.includes(screen.step.id));
+  }, [screenIndex, screen?.kind, screen?.kind === 'step' ? screen.step.id : '', discovery.completed]);
+
+  const serialize = (state: DiscoveryState, index: number) => ({
+    screen: index,
+    completedSteps: state.completed,
+    hintsUsed: state.hints,
+    revealedSteps: state.revealed,
+    notebook: state.notebook,
+    freeTextAnswers: state.answers
+  });
+
+  const persist = (state: DiscoveryState, index: number, done = false) => {
+    onProgress?.(serialize(state, index), done, index);
+  };
+
+  const handleStepResult = (currentScreen: StepScreen, correct: boolean, answer: unknown) => {
+    setQuestionAttempted(true);
+    setQuestionPassed(correct);
+    if (!correct || discovery.completed.includes(currentScreen.step.id)) return;
+    const next: DiscoveryState = {
+      ...discovery,
+      completed: [...discovery.completed, currentScreen.step.id],
+      revealed: discovery.revealed.includes(currentScreen.step.id) ? discovery.revealed : [...discovery.revealed, currentScreen.step.id],
+      answers: { ...discovery.answers, [currentScreen.step.id]: typeof answer === 'string' ? answer : JSON.stringify(answer) },
+      notebook: currentScreen.step.insight && !discovery.notebook.includes(currentScreen.step.insight)
+        ? [...discovery.notebook, currentScreen.step.insight]
+        : discovery.notebook
+    };
+    setDiscovery(next);
+    persist(next, screenIndex);
+  };
+
+  const goTo = (nextIndex: number, enforceGuidedGate = true) => {
+    let next = Math.min(Math.max(nextIndex, 0), screens.length - 1);
+    if (enforceGuidedGate && !guidedComplete && (screens[next]?.kind === 'part' || screens[next]?.kind === 'done')) {
+      const firstIncomplete = screens.findIndex(candidate => candidate.kind === 'step' && !discovery.completed.includes(candidate.step.id));
+      if (firstIncomplete >= 0) next = firstIncomplete;
+    }
+    setScreenIndex(next);
+    setVerifySignal(0);
+    setQuestionAttempted(false);
+    setQuestionPassed(screens[next]?.kind === 'step' && discovery.completed.includes((screens[next] as StepScreen).step.id));
+    persist(discovery, next);
+  };
+
+  const restartDiscovery = () => {
+    const clean: DiscoveryState = { completed: [], hints: {}, revealed: [], notebook: [], answers: {} };
+    const first = getFirstDiscoveryScreenIndex(screens);
+    setDiscovery(clean);
+    setScreenIndex(first);
+    setQuestionPassed(false);
+    setQuestionAttempted(false);
+    setVerifySignal(0);
+    onProgress?.(serialize(clean, first), false, first);
+  };
+
+  const handlePrimaryAction = () => {
+    if (!screen) return;
+    if (screen.kind === 'step') {
+      if (!questionPassed && !questionAttempted) {
+        setVerifySignal(value => value + 1);
+        return;
+      }
+      goTo(screenIndex + 1);
+      return;
+    }
+    if (screen.kind === 'done') {
+      persist(discovery, screenIndex, true);
+      onExit?.();
+      return;
+    }
+    goTo(screenIndex + 1);
+  };
+
+  const firstLessonIndex = getFirstLessonScreenIndex(screens);
+  const activeSegment = screen ? lessonScreenSegment(screen) : 'lesson';
+  const phaseOrder = ['dialogue', 'discovery', 'lesson'];
+  const activePhaseIndex = phaseOrder.indexOf(activeSegment);
+  const discoveryBlockFor = (block: LessonBlock) => allBlocks.find(candidate => candidate.type === 'discovery' && (
+    candidate.content?.source === block.id || (candidate.content?.steps || []).some((step: DiscoveryStep) => step.data?.source === block.id)
+  ));
+  const highlightsRevealedFor = (block: LessonBlock) => {
+    const source = discoveryBlockFor(block);
+    return Boolean(source && (source.content?.steps || []).some((step: DiscoveryStep) => step.kind === 'highlight' && (discovery.completed.includes(step.id) || discovery.revealed.includes(step.id))));
+  };
+
+  const renderExtraBlocks = (extras: LessonBlock[]) => extras.map((extra, index) => <Block key={extra.id || `extra-${index}`} block={extra} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} />);
+  const renderScreen = (current: LessonScreen) => {
+    if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
+    if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
+    if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
+    return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Votre progression est enregistrée.</p>{lesson.quiz_ref && <button type="button" className="lesson-player-quiz-link" onClick={() => onQuiz?.(lesson.quiz_ref!)}>Accéder au quiz associé <ChevronRight size={16} /></button>}</section>;
+  };
+
+  if (!screen) return null;
+  const canRedo = reviewMode && getFirstDiscoveryScreenIndex(screens) < firstLessonIndex;
+  const isQuestion = screen.kind === 'step';
+  const primaryLabel = screen.kind === 'done' ? 'Terminer la leçon' : isQuestion && !questionPassed && !questionAttempted ? 'Vérifier' : 'Continuer';
+
+  return <div className="lessons-root lesson-player-root" style={{ '--lesson-accent': meta.color, '--lesson-soft': meta.soft } as React.CSSProperties}>
+    <div className="lesson-player-shell">
+      <header className="lesson-player-header">
+        {showClose && <button type="button" className="lesson-player-close" onClick={onExit} aria-label="Fermer la leçon"><X size={21} /></button>}
+        <nav className="lesson-player-segments" aria-label="Progression de la leçon">
+          {phaseOrder.map((phase, index) => <div key={phase} className={`lesson-player-segment ${index <= activePhaseIndex ? 'active' : ''} ${phase === activeSegment ? 'current' : ''}`}><span /><small>{phase === 'dialogue' ? 'Dialogue' : phase === 'discovery' ? 'Découverte' : 'Leçon'}</small></div>)}
+        </nav>
+      </header>
+      {canRedo && <button type="button" className="lesson-player-redo" onClick={restartDiscovery}><RotateCcw size={14} /> Refaire la découverte</button>}
+      {screen.kind === 'step' && guidedComplete && <button type="button" className="lesson-player-skip" onClick={() => goTo(firstLessonIndex, false)}>Voir la règle directement</button>}
+      <main className="lesson-player-content" key={screenIndex}>
+        {screen.kind === 'dialogue' && <div className="lesson-player-dialogue-heading"><h1>{lesson.title_it}</h1><p>{lesson.title_fr}</p></div>}
+        {screen.kind === 'part' && <div className="lesson-player-part-heading"><span>Leçon · {screen.index} / {screen.total}</span>{screen.block.type === 'chips' && <h1>Mots du dialogue</h1>}</div>}
+        {renderScreen(screen)}
+      </main>
+      <footer className="lesson-player-actionbar">
+        <div className="lesson-player-actionbar-inner">
+          <span>{screen.kind === 'step' ? `Question ${screen.stepIndex} sur ${screen.total}` : screen.kind === 'done' ? 'Fin de la leçon' : screen.kind === 'part' ? `Partie ${screen.index} sur ${screen.total}` : 'Prenez le temps d’observer'}</span>
+          <button type="button" onClick={handlePrimaryAction} className="lesson-player-primary"><span>{primaryLabel}</span><ChevronRight size={19} /></button>
+        </div>
       </footer>
     </div>
   </div>;

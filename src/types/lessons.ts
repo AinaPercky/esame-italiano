@@ -31,7 +31,7 @@ export interface Lesson {
 export interface LessonProgress {
   user_id: string; lesson_id: string; status: 'started' | 'done';
   discovery_state: {
-    currentStepId?: string; completedSteps?: string[]; hintsUsed?: Record<string, number>;
+    currentStepId?: string; screen?: number; completedSteps?: string[]; hintsUsed?: Record<string, number>;
     revealedSteps?: string[]; freeTextAnswers?: Record<string, string>; notebook?: string[];
   };
   updated_at: string;
