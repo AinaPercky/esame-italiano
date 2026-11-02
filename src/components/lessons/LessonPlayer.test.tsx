@@ -39,6 +39,17 @@ function renderAt(screen: number, status: 'started' | 'done' = 'started', comple
   }));
 }
 
+function renderCustomStep(step: any) {
+  const customLesson: Lesson = {
+    ...lesson,
+    blocks: [lesson.blocks[0], { id: 'custom-discovery', type: 'discovery', content: { source: 'dialogue', steps: [step] } }]
+  };
+  return renderToStaticMarkup(React.createElement(LessonPlayer, {
+    lesson: customLesson,
+    progress: { user_id: 'student-1', lesson_id: customLesson.id, status: 'started', discovery_state: { screen: 1 }, updated_at: '' }
+  }));
+}
+
 test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de cours ni quiz', () => {
   const html = renderAt(0);
   assert.match(html, /lesson-dialogue/);
@@ -72,4 +83,33 @@ test('une leçon déjà terminée s’ouvre sur le premier écran de cours en r�
   assert.match(html, /lesson-formula/);
   assert.match(html, /Refaire la découverte/);
   assert.doesNotMatch(html, /lesson-dialogue|lesson-player-question|lesson-exceptions|lesson-chips|lesson-recap/);
+});
+
+test('le lecteur affiche le libellé complet des choix de plus de trois mots', () => {
+  const html = renderCustomStep({ id: 'long-choice', kind: 'choose', prompt: 'Choisissez la règle complète.', data: {
+    options: [{ text: 'Il verbo ausiliare essere accompagna il participio', correct: true }]
+  } });
+  assert.match(html, /Il verbo ausiliare essere accompagna il participio/);
+  assert.doesNotMatch(html, /3 mots maximum/);
+});
+
+test('le lecteur affiche une zone de réponse libre sans limite de longueur', () => {
+  const html = renderCustomStep({ id: 'free-answer', kind: 'free_text', prompt: 'Expliquez la règle.', data: {
+    correct_answer: 'Una frase lunga che contiene più di tre parole.'
+  } });
+  assert.match(html, /<textarea/);
+  assert.match(html, /Saisissez votre réponse complète/);
+  assert.doesNotMatch(html, /maxlength=/i);
+});
+
+test('le lecteur affiche les éléments d’une question de réordonnancement', () => {
+  const html = renderCustomStep({ id: 'order-answer', kind: 'reorder', prompt: 'Mettez dans l’ordre.', data: {
+    items: ['Preparare gli ingredienti', 'Cuocere la pasta', 'Servire il piatto'],
+    correct_order: ['Preparare gli ingredienti', 'Cuocere la pasta', 'Servire il piatto']
+  } });
+  assert.match(html, /lesson-order-list/);
+  assert.match(html, /Preparare gli ingredienti/);
+  assert.match(html, /Cuocere la pasta/);
+  assert.match(html, /Servire il piatto/);
+  assert.match(html, /Faites glisser les éléments/);
 });

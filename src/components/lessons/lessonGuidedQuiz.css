@@ -33,6 +33,110 @@
   outline-offset: 1px;
 }
 
+.lesson-quiz-answer textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+  border: 2px solid var(--lesson-line);
+  border-radius: 13px;
+  padding: 12px;
+  background: var(--lesson-surface);
+  color: var(--lesson-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.lesson-quiz-answer textarea:focus-visible {
+  border-color: #2fa36b;
+  outline: 3px solid rgb(47 163 107 / 18%);
+  outline-offset: 1px;
+}
+
+.lesson-order-exercise {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+
+.lesson-order-instructions {
+  margin: 0;
+  color: var(--lesson-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.lesson-order-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-order-item {
+  min-width: 0;
+  border: 1px solid var(--lesson-line);
+  border-radius: 13px;
+  background: var(--lesson-surface);
+  transition: border-color .15s ease, background .15s ease, opacity .15s ease, transform .15s ease;
+}
+
+.lesson-order-item.is-dragging {
+  border-color: #2fa36b;
+  background: #edf8f2;
+  opacity: .72;
+  transform: scale(.99);
+}
+
+.lesson-order-handle {
+  display: grid;
+  grid-template-columns: 24px 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  border-radius: inherit;
+  padding: 9px 12px;
+  background: transparent;
+  color: var(--lesson-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.lesson-order-handle:active {
+  cursor: grabbing;
+}
+
+.lesson-order-handle:disabled {
+  cursor: default;
+}
+
+.lesson-order-handle:focus-visible {
+  outline: 3px solid rgb(47 163 107 / 35%);
+  outline-offset: 2px;
+}
+
+.lesson-order-position {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e6f0f7;
+  color: #072a3f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .lesson-quiz-answer .lesson-discovery-check {
   justify-self: start;
 }
