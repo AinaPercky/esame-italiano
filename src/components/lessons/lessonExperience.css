@@ -27,10 +27,10 @@
 
 .lesson-objective {
   align-items: flex-start;
-  border: 2px solid var(--lesson-line);
-  border-left: 8px solid var(--lesson-yellow);
-  border-radius: 16px;
-  padding: 13px 16px;
+  border: 1px solid var(--lesson-line);
+  border-left: 6px solid var(--lesson-accent, #2f6fd6);
+  border-radius: 20px;
+  padding: 14px 18px;
 }
 
 .lesson-objective > svg {
@@ -465,8 +465,11 @@
 .lesson-recap {
   position: relative;
   isolation: isolate;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   margin: 24px 0;
   border: 1px solid #d8e5fb;
@@ -551,18 +554,21 @@
 }
 
 .lesson-recap-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .lesson-recap-list li {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: start;
+  display: flex;
+  align-items: flex-start;
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid rgb(203 216 239 / 75%);
   border-radius: 15px;
   padding: 11px 12px;
@@ -580,13 +586,23 @@
 }
 
 .lesson-recap-marker {
-  display: grid;
+  flex-shrink: 0;
+  display: flex;
   width: 26px;
   height: 26px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border-radius: 9px;
   background: #e4efff;
   color: #2865ce;
+  margin-top: 1px;
+}
+
+.lesson-recap-list li > span:last-child {
+  flex: 1 1 0%;
+  min-width: 0;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .lesson-recap-list li:nth-child(4n + 2) .lesson-recap-marker {
@@ -605,6 +621,10 @@
 }
 
 .lesson-recap-model {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
   border: 1px solid rgb(255 255 255 / 22%);
   border-radius: 18px;
   padding: 14px 16px;
@@ -730,6 +750,20 @@
   .lesson-reader-footer > * {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  .lesson-card-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .lesson-vocab-card {
+    padding: 16px 52px 16px 18px;
+  }
+
+  .lesson-table-wrap {
+    margin: 12px -4px;
+    padding: 0 4px;
   }
 }
 

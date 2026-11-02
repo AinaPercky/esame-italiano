@@ -696,7 +696,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
 
   if (directReading) return <div className="lessons-root lesson-direct-reading-root" style={{ '--lesson-accent': meta.color, '--lesson-soft': meta.soft } as React.CSSProperties}>
     <header className="lesson-direct-toolbar">
-      {showClose && <button type="button" className="lesson-direct-back" onClick={onExit}><X size={17} /> Retour aux leçons</button>}
+      {showClose && <button type="button" className="lesson-direct-back" onClick={onExit}><X size={17} /> <span className="hidden sm:inline">Retour aux leçons</span><span className="sm:hidden">Retour</span></button>}
       <div className="lesson-direct-toolbar-copy"><span>Révision autonome</span><strong>{lesson.title_it}</strong></div>
       <div className="lesson-direct-toolbar-actions">
         <button type="button" className="lesson-direct-restart" onClick={restartGuidedFromBeginning} title="Reprendre le dialogue et les quiz guidés depuis le début"><RotateCcw size={16} /> Recommencer le guide</button>

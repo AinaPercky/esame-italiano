@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Mic, Shuffle, Award, Users, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Mic, Award, Users, BookOpen, Sparkles } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentTab: string;
@@ -12,11 +12,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
 
   const items = [
     { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard },
-    { id: 'quizzes', label: 'Quiz', icon: BookOpen },
+    { id: 'lessons', label: 'Cours', icon: BookOpen },
+    { id: 'quizzes', label: 'Quiz', icon: Sparkles },
     { id: 'evaluation', label: 'Évaluer', icon: Mic, highlight: true },
     { id: 'results', label: 'Notes', icon: Award },
-    { id: 'students', label: 'Élèves', icon: Users },
-    { id: 'lessons', label: 'Leçons', icon: BookOpen }
+    { id: 'students', label: 'Élèves', icon: Users }
   ];
 
   return (
@@ -49,14 +49,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
               key={item.id}
               type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 transition-colors ${
+              title={item.label}
+              className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-0.5 py-1 transition-colors ${
                 isActive 
                   ? 'bg-[#e6f0f7] font-bold text-[#072a3f]'
                   : 'text-slate-500 hover:text-[#072a3f] active:bg-[#f3f8fb]'
               }`}
             >
-              <Icon className={`mb-0.5 h-5 w-5 ${isActive ? 'text-[#2fa36b] stroke-[2.5]' : 'text-slate-400'}`} />
-              <span className="text-[9px] leading-tight">{item.label}</span>
+              <Icon className={`mb-0.5 h-4.5 w-4.5 sm:h-5 sm:w-5 ${isActive ? 'text-[#2fa36b] stroke-[2.5]' : 'text-slate-400'}`} />
+              <span className="text-[9px] leading-tight font-medium truncate max-w-full text-center">{item.label}</span>
             </button>
           );
         })}

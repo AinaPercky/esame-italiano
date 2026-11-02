@@ -13,6 +13,8 @@ import {
   Settings,
   LogOut,
   UserCheck,
+  Sparkles,
+  GraduationCap,
   QrCode
 } from 'lucide-react';
 import { AuthUser } from '../services/authService';
@@ -26,6 +28,15 @@ interface HeaderProps {
   pendingStudentsCount?: number;
 }
 
+interface HeaderNavItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  highlight?: boolean;
+  group: string;
+  badge?: string;
+}
+
 export const Header: React.FC<HeaderProps> = ({ 
   currentTab, 
   onSelectTab, 
@@ -36,17 +47,18 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'quizzes', label: 'Quiz en Direct', icon: BookOpen, highlight: true },
-    { id: 'pass-order', label: 'Ordre de passage', icon: Shuffle },
-    { id: 'evaluation', label: 'Évaluation orale', icon: Mic },
-    { id: 'results', label: 'Résultats', icon: Award },
-    { id: 'qrcode', label: 'Codes QR', icon: QrCode },
-    { id: 'classes', label: 'Classes', icon: School },
-    { id: 'students', label: 'Élèves', icon: Users },
-    { id: 'exams', label: 'Examens', icon: BookOpen },
-    { id: 'settings', label: 'Paramètres', icon: Settings }
+  const navItems: HeaderNavItem[] = [
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, group: 'Vue d\'ensemble' },
+    { id: 'lessons', label: 'Leçons de cours', icon: BookOpen, group: 'Quiz & Cours', badge: 'Cours' },
+    { id: 'quizzes', label: 'Quiz en Direct & Notes', icon: Sparkles, highlight: true, group: 'Quiz & Cours' },
+    { id: 'classes', label: 'Gestion des Classes', icon: School, group: 'Classes & Étudiants' },
+    { id: 'students', label: 'Gestion des Élèves', icon: Users, group: 'Classes & Étudiants' },
+    { id: 'exams', label: 'Examens & Rubriques', icon: GraduationCap, group: 'Examens Oraux' },
+    { id: 'pass-order', label: 'Ordre de passage', icon: Shuffle, group: 'Examens Oraux' },
+    { id: 'evaluation', label: 'Évaluation orale', icon: Mic, group: 'Examens Oraux' },
+    { id: 'results', label: 'Résultats & Fiches', icon: Award, group: 'Examens Oraux' },
+    { id: 'qrcode', label: 'Codes QR Élèves', icon: QrCode, group: 'Examens Oraux' },
+    { id: 'settings', label: 'Paramètres & Sécurité', icon: Settings, group: 'Configuration' }
   ];
 
   const handleMobileNav = (tabId: string) => {
@@ -56,8 +68,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="teacher-topbar sticky top-0 z-30 border-b border-[#d8e6ee] bg-white/90 px-3 py-2.5 backdrop-blur-xl sm:px-6 sm:py-3 no-print">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2">
+      <header className="teacher-topbar sticky top-0 z-30 border-b border-[#d8e6ee] bg-white/95 backdrop-blur-xl no-print">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3">
           {/* Zone 1: Brand Wordmark & Mobile Menu Trigger */}
           <div className="flex items-center gap-2">
             <button
@@ -166,6 +178,55 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         </div>
+
+        {/* Barre des menus mobile enseignant (défilement horizontal fluide) */}
+        <nav 
+          aria-label="Barre des menus mobile enseignant"
+          className="flex lg:hidden items-center gap-1.5 overflow-x-auto px-3 py-1.5 bg-[#f5f8fa] border-t border-[#e2edf3] no-scrollbar touch-scroll"
+        >
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentTab === item.id;
+            const shortLabelMap: Record<string, string> = {
+              dashboard: 'Accueil',
+              lessons: 'Cours',
+              quizzes: 'Quiz',
+              classes: 'Classes',
+              students: 'Élèves',
+              exams: 'Examens',
+              'pass-order': 'Ordre',
+              evaluation: 'Oral',
+              results: 'Notes',
+              qrcode: 'QR',
+              settings: 'Paramètres'
+            };
+            const label = shortLabelMap[item.id] || item.label;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSelectTab(item.id)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#072a3f] text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-[#d8e6ee] hover:bg-slate-50 hover:text-[#072a3f] active:bg-slate-100'
+                }`}
+              >
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-emerald-300' : 'text-slate-500'}`} />
+                <span>{label}</span>
+                {item.id === 'lessons' && !isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2fa36b]" />
+                )}
+                {item.id === 'students' && pendingStudentsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-600 text-white animate-pulse">
+                    {pendingStudentsCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
       </header>
 
       {/* Mobile Drawer Backdrop & Menu */}
@@ -208,30 +269,48 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              <div className="max-h-[calc(100dvh-14rem)] space-y-1 overflow-y-auto overscroll-contain">
-                {navItems.map((item) => {
+              <div className="max-h-[calc(100dvh-14rem)] space-y-1 overflow-y-auto overscroll-contain pr-1">
+                {navItems.map((item, idx) => {
                   const Icon = item.icon;
                   const isActive = currentTab === item.id;
+                  const showGroupHeader = idx === 0 || item.group !== navItems[idx - 1].group;
+
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleMobileNav(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors min-h-[48px] ${
-                        isActive
-                        ? 'bg-[#e6f0f7] font-semibold text-[#072a3f] ring-1 ring-[#d1e1ec]'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Icon className={`h-5 w-5 ${isActive ? 'text-[#2fa36b]' : 'text-slate-400'}`} />
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                      {item.id === 'students' && pendingStudentsCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-600 text-white animate-pulse">
-                          {pendingStudentsCount} en attente
-                        </span>
+                    <React.Fragment key={item.id}>
+                      {showGroupHeader && (
+                        <div className={`px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 ${idx > 0 ? 'mt-3 mb-1 pt-2 border-t border-slate-100' : 'mb-1'}`}>
+                          {item.group}
+                        </div>
                       )}
-                    </button>
+                      <button
+                        onClick={() => handleMobileNav(item.id)}
+                        className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${
+                          isActive
+                            ? 'bg-[#e6f0f7] font-bold text-[#072a3f] ring-1 ring-[#d1e1ec]'
+                            : 'text-slate-700 hover:bg-slate-50 active:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? 'text-[#2fa36b]' : 'text-slate-400'}`} />
+                          <span className="truncate text-xs sm:text-sm">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.badge && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              {item.badge}
+                            </span>
+                          )}
+                          {item.id === 'students' && pendingStudentsCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 text-white animate-pulse">
+                              {pendingStudentsCount}
+                            </span>
+                          )}
+                          {item.highlight && !item.badge && (
+                            <span className="h-2 w-2 rounded-full bg-[#2fa36b] animate-pulse" />
+                          )}
+                        </div>
+                      </button>
+                    </React.Fragment>
                   );
                 })}
               </div>
