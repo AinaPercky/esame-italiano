@@ -15,7 +15,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
     { id: 'quizzes', label: 'Quiz', icon: BookOpen },
     { id: 'evaluation', label: 'Évaluer', icon: Mic, highlight: true },
     { id: 'results', label: 'Notes', icon: Award },
-    { id: 'students', label: 'Élèves', icon: Users }
+    { id: 'students', label: 'Élèves', icon: Users },
+    { id: 'lessons', label: 'Leçons', icon: BookOpen }
   ];
 
   return (
@@ -48,7 +49,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
               key={item.id}
               type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`flex min-h-11 min-w-[54px] flex-col items-center justify-center rounded-xl px-2 py-1.5 transition-colors ${
+              className={`flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1.5 transition-colors ${
                 isActive 
                   ? 'bg-[#e6f0f7] font-bold text-[#072a3f]'
                   : 'text-slate-500 hover:text-[#072a3f] active:bg-[#f3f8fb]'

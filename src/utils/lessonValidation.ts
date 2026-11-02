@@ -11,6 +11,7 @@ export interface LessonValidationResult { valid: boolean; errors: string[]; valu
  * le format canonique { type, content }. */
 function normalizeLessonInput(input: any): any {
   if (!input || typeof input !== 'object') return input;
+  if (input.lesson && typeof input.lesson === 'object' && !input.slug) return normalizeLessonInput(input.lesson);
   return {
     ...input,
     blocks: Array.isArray(input.blocks) ? input.blocks.map((block: any) => {

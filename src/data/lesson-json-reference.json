@@ -1,0 +1,37 @@
+{
+  "_documentation": {
+    "format": "perckylingua-lesson-v1",
+    "description": "Pour importer, vous pouvez importer ce fichier directement : l'éditeur utilise automatiquement la clé lesson. Vous pouvez aussi fournir la leçon seule sans _documentation.",
+    "required_fields": ["slug", "type", "method", "level", "duration_min", "status", "access", "title_it", "title_fr", "objective", "blocks"],
+    "status": "draft est recommandé à l'import. Dans l'admin, utilisez Publier pour rendre la leçon visible côté étudiant, ou Dépublier pour la repasser en brouillon.",
+    "types": ["grammaire", "vocabulaire", "fonction", "theme", "prononciation"],
+    "levels": ["A1", "A2", "B1", "B2", "C1"],
+    "methods": ["inductive", "direct"],
+    "access": ["free", "pass"],
+    "block_format": "Le format canonique utilise { type, content }. Le format compact, avec les propriétés directement dans le bloc, est également accepté.",
+    "discovery_kinds": ["highlight", "choose", "compare", "complete_table", "guess_meaning", "build_formula", "free_text"],
+    "hints": "Chaque étape peut contenir au maximum 3 hints.",
+    "inline_markup": "Dans les phrases italiennes, ==mot== et ++mot++ peuvent servir à repérer des mots pendant la découverte."
+  },
+  "lesson": {
+    "slug": "exemple-lecon-a2",
+    "type": "grammaire",
+    "method": "inductive",
+    "level": "A2",
+    "duration_min": 15,
+    "status": "draft",
+    "access": "free",
+    "quiz_ref": null,
+    "title_it": "Titolo della lezione",
+    "title_fr": "Titre français de la leçon",
+    "objective": "Je sais…",
+    "blocks": [
+      { "type": "dialogue", "content": { "lines": [{ "speaker": "Luca", "side": "left", "it": "Dove vai?", "fr": "Où vas-tu ?" }] } },
+      { "type": "discovery", "content": { "steps": [{ "id": "s1", "kind": "choose", "prompt": "Que remarquez-vous ?", "data": { "options": [{ "text": "Réponse correcte", "correct": true }, { "text": "Distracteur", "correct": false }] }, "hints": ["Relisez le dialogue."], "ok": "Exact.", "ko": "Essayez encore.", "insight": "La règle part de l'observation." }] } },
+      { "type": "formula", "content": { "title": "Formule générale", "formulas": [{ "label": "Règle", "parts": [{ "text": "élément", "kind": "slot" }, { "text": "+", "kind": "operator" }, { "text": "résultat", "kind": "fixed" }], "examples": [{ "it": "Phrase italiana.", "fr": "Phrase française." }] }] } },
+      { "type": "exceptions", "content": { "title": "Exceptions", "items": [{ "rule": "Cas particulier", "explanation": "Explication.", "examples": [] }] } },
+      { "type": "chips", "content": { "title": "Mots du dialogue", "items": [{ "it": "mot", "fr": "traduction" }] } },
+      { "type": "recap", "content": { "bullets": ["Règle 1", "Règle 2"], "model": { "it": "Phrase modèle.", "fr": "Traduction modèle." } } }
+    ]
+  }
+}
