@@ -111,6 +111,20 @@ function courseBlocks(blocks: LessonBlock[] = []): LessonBlock[] {
   });
 }
 
+function blockRank(block: LessonBlock): number {
+  const ranks: Record<string, number> = {
+    vocab_cards: 1, chips: 1, rules_table: 2, formula: 3, rule_cards: 4, steps_text: 4,
+    exceptions: 5, example_list: 6, key_value_list: 6, tip: 7, warning: 7, recap: 8, module: 9
+  };
+  return ranks[block.type] ?? 8;
+}
+
+function orderedCourseBlocks(blocks: LessonBlock[] = []): LessonBlock[] {
+  return blocks
+    .filter(block => block.type !== 'dialogue' && block.type !== 'discovery')
+    .sort((a, b) => blockRank(a) - blockRank(b));
+}
+
 function lessonTypeLabel(type: string): string {
   return ({ grammaire: 'Grammaire', vocabulaire: 'Vocabulaire', fonction: 'Fonction', theme: 'Thème', prononciation: 'Prononciation' } as Record<string, string>)[type] || 'Leçon';
 }
@@ -222,7 +236,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
       startY: y, head: [['Italien', 'Français']], body: items.map(item => [normalizePdfText(item.it), normalizePdfText(item.fr)]),
       theme: 'plain', margin: { left: MARGIN, right: MARGIN, bottom: 22 }, pageBreak: 'auto', rowPageBreak: 'avoid',
       styles: { font: regularFont, fontSize: 10, cellPadding: { top: 2.5, right: 2, bottom: 2.5, left: 2 }, textColor: BRAND.ink, lineColor: BRAND.line, lineWidth: 0.25 },
-      headStyles: { font: boldFont, fillColor: [255, 255, 255], textColor: BRAND.navy, lineWidth: 0.45, lineColor: BRAND.navy },
+      headStyles: { font: boldFont, fillColor: BRAND.navy, textColor: [255, 255, 255], lineWidth: 0.45, lineColor: BRAND.navy },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: CONTENT_WIDTH * 0.48 }, 1: { fontStyle: 'normal', textColor: BRAND.muted, cellWidth: CONTENT_WIDTH * 0.52 } },
       didDrawPage: () => { y = TOP_CONTENT; }
     });
@@ -295,7 +309,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     if (block.type === 'rule_cards') { (content.cards || []).forEach((card: any, index: number) => { addSection(`${sectionNo}.${index + 1} ${card.title || 'Règle'}`, 2); addParagraph(card.text); (card.examples || []).forEach((example: any) => addExample(example.it, example.fr)); }); return; }
     if (block.type === 'exceptions') { addSection(`${sectionNo}. ${content.title || 'Exceptions'}`, 1); (content.items || []).forEach((item: any) => { addCallout(item.rule || 'Exception', `${item.explanation || ''}${item.examples?.length ? ` ${item.examples.map((e: any) => e.it).join(' · ')}` : ''}`, 'exception'); }); return; }
     if (block.type === 'vocab_cards' || block.type === 'chips') { addVocabTable(content.items || [], `${sectionNo}. ${content.title || (block.type === 'vocab_cards' ? 'Vocabulaire essentiel' : 'Expressions utiles')}`); return; }
-    if (block.type === 'example_list') { const title = content.title || 'Exemples'; if (/mettiamo in pratica|pratique|pratica/i.test(title)) { addWritingWorkshop(`${sectionNo}. ${title}`); return; } addSection(`${sectionNo}. ${title}`, 1); (content.examples || []).forEach((example: any) => addExample(example.it, example.fr)); return; }
+    if (block.type === 'example_list') { const title = content.title || 'Exemples d’utilisation'; addSection(`${sectionNo}. ${title}`, 1); (content.examples || []).forEach((example: any) => addExample(example.it, example.fr)); return; }
     if (block.type === 'steps_text') { addSection(`${sectionNo}. ${content.title || 'Étapes à suivre'}`, 1); (content.steps || []).forEach((step: any, index: number) => { addParagraph(`${index + 1}. ${step.title || step.it || ''}`, { bold: true, color: BRAND.navy }); if (step.it && step.title) addExample(step.it, step.fr); }); return; }
     if (block.type === 'key_value_list') { if (content.title) addSection(`${sectionNo}. ${content.title}`, 1); (content.rows || []).forEach((row: any) => addExample(`${row.key || ''} : ${row.it || ''}`, row.fr)); return; }
     if (block.type === 'recap') { addCallout('À retenir', (content.bullets || []).map((point: string) => `• ${point}`).join('\n'), 'retenir'); if (content.model) addExample(content.model.it, content.model.fr); return; }
@@ -310,14 +324,11 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
   y += Math.max(1, subtitleLines.length) * 4.8 + 3;
   font(true); doc.setFontSize(8.5); doc.setTextColor(...BRAND.blue); doc.text(`${lessonTypeLabel(lesson.type).toUpperCase()}  ·  ${lesson.level}  ·  ${lesson.duration_min} MIN`, MARGIN, y); y += 7;
   if (lesson.objective) addCallout('Objectif', lesson.objective, 'objectif');
+  addParagraph('Cette fiche rassemble les notions, tableaux et exemples utiles pour réviser la leçon de façon autonome.', { color: BRAND.muted, size: 10 });
 
-  const blocks = lesson.blocks || [];
-  const dialogue = blocks.find(block => block.type === 'dialogue');
-  if (dialogue) addDialogue(dialogue.content?.lines || []);
-  const discovery = blocks.find(block => block.type === 'discovery');
-  if (discovery) addDiscoveries(discovery);
+  // Les blocs dialogue/discovery restent interactifs dans l’application, mais ne sont pas imprimés.
   const numbering = { n: 0 };
-  blocks.filter(block => block !== dialogue && block !== discovery).forEach(block => renderBlock(block, numbering));
+  orderedCourseBlocks(lesson.blocks || []).forEach(block => renderBlock(block, numbering));
   if (y <= TOP_CONTENT + 5) addParagraph('Le contenu pédagogique de cette leçon sera bientôt disponible.');
 
   const pageCount = doc.getNumberOfPages();
@@ -325,7 +336,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     doc.setPage(page);
     // En-tête courant, clair et économe en encre.
     doc.setDrawColor(...BRAND.line); doc.setLineWidth(0.35); doc.line(MARGIN, 16, PAGE_WIDTH - MARGIN, 16);
-    font(true); doc.setFontSize(8); doc.setTextColor(...BRAND.navy); doc.text(`Leçon ${lesson.sort_order ? lesson.sort_order : 12} · ${normalizePdfText(lesson.title_it)}`, MARGIN, 12);
+    font(true); doc.setFontSize(8); doc.setTextColor(...BRAND.navy); doc.text(`Leçon ${(lesson.sort_order || 0) + 1} · ${normalizePdfText(lesson.title_it)}`, MARGIN, 12);
     if (logoData && page === 1) { const ratio = logoData.width / Math.max(1, logoData.height); const w = ratio >= 1 ? 14 : 14 * ratio; const h = ratio >= 1 ? 14 / ratio : 14; doc.addImage(logoData.data, 'PNG', PAGE_WIDTH - MARGIN - w, 4.5, w, h, undefined, 'FAST'); }
     if (avatarData && page === 1) { doc.addImage(avatarData.data, 'PNG', PAGE_WIDTH - MARGIN - 18, 18.5, 8, 8, undefined, 'FAST'); font(false); doc.setFontSize(7); doc.setTextColor(...BRAND.muted); doc.text(normalizePdfText(options.displayName || 'Mon profil'), PAGE_WIDTH - MARGIN - 20, 24, { align: 'right' }); }
     doc.setDrawColor(...BRAND.line); doc.setLineWidth(0.35); doc.line(MARGIN, FOOTER_Y, PAGE_WIDTH - MARGIN, FOOTER_Y);
