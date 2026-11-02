@@ -32,6 +32,15 @@ test('construit les choix de surbrillance et identifie les mots cibles', () => {
   assert.equal(isLessonQuizChoiceCorrect(step, choices[1]), false);
 });
 
+test('préfère les options highlight du JSON aux mots du dialogue source', () => {
+  const step = { kind: 'highlight', data: { targets: ['studiato'], options: ['Ho', 'studiato', 'italiano'] } };
+  const choices = buildLessonQuizChoices(step, ['Ciao', 'Ho', 'studiato', 'italiano', 'ieri']);
+  assert.deepEqual(choices.map(choice => [choice.label, choice.correct]), [
+    ['studiato', true], ['Ho', false], ['italiano', false]
+  ]);
+  assert.equal(isLessonQuizChoiceCorrect(step, choices[0]), true);
+});
+
 test('utilise la bonne option marquée et respecte la clé de réponse explicite', () => {
   const step = { kind: 'choose', data: { options: [{ text: 'con lui', correct: false }, { text: 'a lei', correct: true }] } };
   const choices = buildLessonQuizChoices(step);

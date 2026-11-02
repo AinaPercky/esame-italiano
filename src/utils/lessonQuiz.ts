@@ -49,9 +49,16 @@ export function buildLessonQuizChoices(step: any, contextWords: string[] = [], f
   const data = step?.data || {};
   let raw = firstNonEmptyArray(data.options, data.choices, data.answer_options, data.word_bank, data.answers, data.sentences);
 
-  if (step?.kind === 'highlight' && contextWords.length) {
-    const targets = new Set((data.targets || []).map((word: string) => word.toLocaleLowerCase('it')));
-    raw = contextWords.map((word, index) => ({ text: word, value: word, correct: targets.has(word.toLocaleLowerCase('it')), id: `word-${index}` }));
+  if (step?.kind === 'highlight') {
+    const targets = new Set((data.targets || []).map((word: string) => normalizeLessonAnswer(word)));
+    const candidates = raw.length ? raw : contextWords;
+    raw = candidates.map((candidate, index) => {
+      const choice = asChoice(candidate, index);
+      const correct = targets.size
+        ? targets.has(normalizeLessonAnswer(choice.value))
+        : choice.correct === true;
+      return { ...candidate, text: choice.label, value: choice.value, correct, id: `word-${index}` };
+    });
   }
 
   if (step?.kind === 'build_formula') {
