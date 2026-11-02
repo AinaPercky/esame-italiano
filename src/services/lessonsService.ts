@@ -1,6 +1,7 @@
 import { supabaseService, generateUUID } from './supabaseService';
 import { Lesson, LessonDraft, LessonProgress } from '../types/lessons';
 import { validateLessonDraft } from '../utils/lessonValidation';
+import { prepareLessonBlockRows } from '../utils/lessonPersistence';
 
 function mapLesson(row: any, blocks: any[] = []): Lesson {
   return {
@@ -55,19 +56,28 @@ class LessonsService {
     const validation = validateLessonDraft(draft);
     if (!validation.valid || !validation.value) throw new Error(validation.errors.join('\n'));
     const client = this.client();
-    const lessonId = id || generateUUID();
+    let existingCreatedBy: string | null = null;
+    let existingId: string | undefined;
+    if (!id) {
+      const { data: existing, error: lookupError } = await client
+        .from('lessons')
+        .select('id, created_by')
+        .eq('slug', validation.value.slug)
+        .maybeSingle();
+      if (lookupError) throw new Error(`Recherche de la leçon : ${lookupError.message}`);
+      existingId = existing?.id;
+      existingCreatedBy = existing?.created_by || null;
+    }
+    const lessonId = id || existingId || generateUUID();
     const now = new Date().toISOString();
-    const uniqueSlug = await this.ensureUniqueSlug(validation.value.slug, id);
-    const payload = { ...validation.value, slug: uniqueSlug, id: lessonId, created_by: createdBy || null, updated_at: now };
+    const uniqueSlug = await this.ensureUniqueSlug(validation.value.slug, lessonId);
+    const payload = { ...validation.value, slug: uniqueSlug, id: lessonId, created_by: createdBy || existingCreatedBy, updated_at: now };
     delete (payload as any).blocks;
     const { data, error } = await client.from('lessons').upsert(payload, { onConflict: 'id' }).select().single();
     if (error) throw new Error(`Enregistrement de la leçon : ${error.message}`);
     const { error: deleteError } = await client.from('lesson_blocks').delete().eq('lesson_id', lessonId);
     if (deleteError) throw new Error(`Blocs : ${deleteError.message}`);
-    const blocks = validation.value.blocks.map((block, position) => ({
-      id: block.id || generateUUID(), lesson_id: lessonId, position, type: block.type,
-      content: block.content, parent_block_id: block.parent_block_id || null
-    }));
+    const blocks = prepareLessonBlockRows(lessonId, validation.value.blocks, generateUUID);
     if (blocks.length) {
       const { error: blockError } = await client.from('lesson_blocks').insert(blocks);
       if (blockError) throw new Error(`Blocs : ${blockError.message}`);
@@ -78,10 +88,15 @@ class LessonsService {
     const { error } = await this.client().from('lessons').delete().eq('id', id);
     if (error) throw new Error(`Suppression : ${error.message}`);
   }
-  async setPublished(id: string, published: boolean): Promise<Lesson> {
-    const { data, error } = await this.client().from('lessons').update({ status: published ? 'published' : 'draft', updated_at: new Date().toISOString() }).eq('id', id).select('*, lesson_blocks(*)').single();
-    if (error) throw new Error(`Publication : ${error.message}`);
-    return mapLesson(data, data.lesson_blocks || []);
+  async updateStatus(id: string, status: Lesson['status']): Promise<void> {
+    const { data, error } = await this.client()
+      .from('lessons')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    if (error) throw new Error(`Publication de la leçon : ${error.message}`);
+    if (!data) throw new Error('Aucune leçon mise à jour. Vérifiez que la leçon existe et que vous avez les droits nécessaires.');
   }
   async duplicate(lesson: Lesson): Promise<Lesson> {
     const draft: LessonDraft = { ...lesson, slug: `${lesson.slug}-copie-${Date.now()}`, status: 'draft', title_fr: `${lesson.title_fr} (copie)`, blocks: lesson.blocks };
