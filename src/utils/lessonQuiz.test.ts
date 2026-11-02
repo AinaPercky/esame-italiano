@@ -37,3 +37,28 @@ test('préserve le choix correct lorsque la troncature crée des libellés ident
 test('ne propose aucun constructeur de phrase libre en absence de choix', () => {
   assert.deepEqual(buildLessonQuizChoices({ kind: 'free_text', data: {} }), []);
 });
+
+test('retombe sur les choix non vides si options est présent mais vide', () => {
+  const choices = buildLessonQuizChoices({ kind: 'choose', data: {
+    options: [],
+    choices: [{ text: 'Avere', correct: false }, { text: 'Essere', correct: true }]
+  } });
+  assert.deepEqual(choices.map(choice => choice.label), ['Essere', 'Avere']);
+});
+
+test('garde le libellé complet de trois mots si short_text en coupe le dernier mot', () => {
+  const choices = buildLessonQuizChoices({ kind: 'choose', data: { options: [
+    { text: 'Verbe de mouvement', short_text: 'Verbe de', correct: true }
+  ] } });
+  assert.equal(choices[0].label, 'Verbe de mouvement');
+  assert.equal(choices[0].value, 'Verbe de mouvement');
+});
+
+test('un tableau de distracteurs vide ne masque pas les choix de formule', () => {
+  const choices = buildLessonQuizChoices({ kind: 'build_formula', data: {
+    options: [{ text: 'Avoir seulement', correct: false }],
+    distractors: [],
+    correct_answer: 'Essere o avere',
+  } });
+  assert.deepEqual(choices.map(choice => choice.label), ['Essere o avere', 'Avoir seulement']);
+});
