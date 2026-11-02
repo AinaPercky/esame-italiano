@@ -139,11 +139,13 @@ export const authService = {
 
     let user: AuthUser;
     if (email === ADMIN_EMAIL.toLowerCase()) {
+      const profileAvatar = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture;
       user = {
         id: session.user.id,
         email,
         name: `${ADMIN_NAME} (Professeur)`,
         role: 'admin',
+        avatar: typeof profileAvatar === 'string' ? profileAvatar : undefined,
         loginAt: session.user.last_sign_in_at || new Date().toISOString()
       };
     } else {
@@ -291,6 +293,7 @@ export const authService = {
         email: authUser.email,
         name: `${ADMIN_NAME} (Professeur)`,
         role: 'admin',
+        avatar: authUser.avatar,
         loginAt: new Date().toISOString()
       };
       currentUser = user;

@@ -18,24 +18,66 @@ const MARGIN = 17;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const FOOTER_Y = PAGE_HEIGHT - 13;
 
-type LogoData = { data: string; width: number; height: number } | null;
+type RasterImageData = { data: string; width: number; height: number } | null;
 
-async function loadBrandLogo(): Promise<LogoData> {
-  if (typeof window === 'undefined' || typeof Image === 'undefined') return null;
+export interface LessonPdfOptions {
+  avatarUrl?: string | null;
+  displayName?: string;
+  logoDataUrl?: string | null;
+  avatarDataUrl?: string | null;
+}
+
+export function normalizePdfText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .replace(/[→⇒⟶➜]/g, ' devient ')
+    .replace(/[\t\r\n]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function loadImageAsPng(source: string, circular = false): Promise<RasterImageData> {
+  if (typeof window === 'undefined' || typeof Image === 'undefined') return Promise.resolve(null);
   return new Promise(resolve => {
     const image = new Image();
     image.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth || 768;
-      canvas.height = image.naturalHeight || 768;
+      const outputSize = 384;
+      canvas.width = circular ? outputSize : image.naturalWidth || 768;
+      canvas.height = circular ? outputSize : image.naturalHeight || 768;
       const context = canvas.getContext('2d');
       if (!context) return resolve(null);
-      context.drawImage(image, 0, 0);
-      resolve({ data: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height });
+      try {
+        if (circular) {
+          const scale = Math.max(outputSize / (image.naturalWidth || outputSize), outputSize / (image.naturalHeight || outputSize));
+          const width = (image.naturalWidth || outputSize) * scale;
+          const height = (image.naturalHeight || outputSize) * scale;
+          context.beginPath();
+          context.arc(outputSize / 2, outputSize / 2, outputSize / 2 - 2, 0, Math.PI * 2);
+          context.clip();
+          context.drawImage(image, (outputSize - width) / 2, (outputSize - height) / 2, width, height);
+        } else {
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        }
+        resolve({ data: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height });
+      } catch {
+        resolve(null);
+      }
     };
     image.onerror = () => resolve(null);
-    image.src = '/percky-lingua-logo.webp';
+    if (!source.startsWith('data:') && /^https?:\/\//i.test(source)) image.crossOrigin = 'anonymous';
+    image.src = source;
   });
+}
+
+async function loadBrandLogo(): Promise<RasterImageData> {
+  return loadImageAsPng('/percky-lingua-logo.webp');
+}
+
+async function loadProfileAvatar(source?: string | null): Promise<RasterImageData> {
+  if (!source) return null;
+  return loadImageAsPng(source, true);
 }
 
 function safeFilename(value: string): string {
@@ -58,18 +100,21 @@ function lessonTypeLabel(type: string): string {
   return ({ grammaire: 'Grammaire', vocabulaire: 'Vocabulaire', fonction: 'Fonction', theme: 'Thème', prononciation: 'Prononciation' } as Record<string, string>)[type] || 'Leçon';
 }
 
-export async function createLessonPdf(lesson: Lesson, logoOverride?: string | null): Promise<jsPDF> {
-  const logo = logoOverride === undefined ? await loadBrandLogo() : null;
-  const logoData = typeof logoOverride === 'string' ? { data: logoOverride, width: 1, height: 1 } : logo;
+export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions = {}): Promise<jsPDF> {
+  const logo = options.logoDataUrl === undefined ? await loadBrandLogo() : null;
+  const logoData = typeof options.logoDataUrl === 'string' ? { data: options.logoDataUrl, width: 1, height: 1 } : logo;
+  const avatar = options.avatarDataUrl === undefined ? await loadProfileAvatar(options.avatarUrl) : null;
+  const avatarData = typeof options.avatarDataUrl === 'string' ? { data: options.avatarDataUrl, width: 1, height: 1 } : avatar;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true, putOnlyUsedFonts: true });
   doc.setProperties({ title: `${lesson.title_it} — PerckyLingua`, subject: lesson.title_fr, creator: 'PerckyLingua' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  const titleLines = doc.splitTextToSize(lesson.title_it || 'Leçon d’italien', CONTENT_WIDTH);
+  doc.setCharSpace(0);
+  const titleLines = doc.splitTextToSize(normalizePdfText(lesson.title_it || 'Leçon d’italien'), CONTENT_WIDTH - 4);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  const subtitleLines = doc.splitTextToSize(lesson.title_fr || '', CONTENT_WIDTH);
+  const subtitleLines = doc.splitTextToSize(normalizePdfText(lesson.title_fr || ''), CONTENT_WIDTH - 4);
   const titleY = 34;
   const subtitleY = titleY + titleLines.length * 7.2 + 1;
   const metaY = subtitleY + Math.max(1, subtitleLines.length) * 4.6 + 5;
@@ -91,7 +136,42 @@ export async function createLessonPdf(lesson: Lesson, logoOverride?: string | nu
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(205, 223, 238);
-  doc.text('APPRENDRE L’ITALIEN, PAS À PAS', PAGE_WIDTH - MARGIN, 16, { align: 'right' });
+  doc.setCharSpace(0);
+  if (avatarData) {
+    const avatarX = PAGE_WIDTH - MARGIN - 16;
+    doc.addImage(avatarData.data, 'PNG', avatarX, 7, 16, 16, undefined, 'FAST');
+    const name = normalizePdfText(options.displayName || 'Mon profil');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    let fittedName = name;
+    while (doc.getTextWidth(fittedName) > 47 && fittedName.length > 5) fittedName = `${fittedName.slice(0, -4).trimEnd()}...`;
+    doc.text(fittedName, avatarX - 4, 13, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(205, 223, 238);
+    doc.text('FICHE PERSONNELLE', avatarX - 4, 20, { align: 'right' });
+  } else {
+    if (options.displayName) {
+      const initials = normalizePdfText(options.displayName).split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+      if (initials) {
+        const avatarX = PAGE_WIDTH - MARGIN - 16;
+        doc.setFillColor(...BRAND.green);
+        doc.circle(avatarX + 8, 17, 7.5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        doc.text(initials, avatarX + 8, 19.8, { align: 'center' });
+        let fittedName = normalizePdfText(options.displayName);
+        while (doc.getTextWidth(fittedName) > 47 && fittedName.length > 5) fittedName = `${fittedName.slice(0, -4).trimEnd()}...`;
+        doc.setFontSize(7);
+        doc.text(fittedName, avatarX - 4, 13, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(205, 223, 238);
+        doc.text('FICHE PERSONNELLE', avatarX - 4, 20, { align: 'right' });
+      }
+    } else doc.text('APPRENDRE L’ITALIEN, PAS À PAS', PAGE_WIDTH - MARGIN, 16, { align: 'right' });
+  }
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(titleLines.length > 1 ? 18 : 20);
@@ -127,7 +207,22 @@ export async function createLessonPdf(lesson: Lesson, logoOverride?: string | nu
     const previousSize = doc.getFontSize();
     doc.setFont('helvetica', style);
     doc.setFontSize(size);
-    const lines = doc.splitTextToSize(String(text ?? ''), width) as string[];
+    doc.setCharSpace(0);
+    const normalized = normalizePdfText(text);
+    const nativeLines = doc.splitTextToSize(normalized, Math.max(10, width - 1.5)) as string[];
+    const lines = nativeLines.flatMap(line => {
+      if (doc.getTextWidth(line) <= width - 1) return [line];
+      const pieces: string[] = [];
+      let current = '';
+      for (const character of Array.from(line)) {
+        if (current && doc.getTextWidth(current + character) > width - 1) {
+          pieces.push(current);
+          current = character;
+        } else current += character;
+      }
+      if (current) pieces.push(current);
+      return pieces;
+    });
     doc.setFont(previousFont.fontName, previousFont.fontStyle);
     doc.setFontSize(previousSize);
     return lines;
@@ -228,7 +323,7 @@ export async function createLessonPdf(lesson: Lesson, logoOverride?: string | nu
     const content = block.content || {};
     if (block.type === 'dialogue' || block.type === 'discovery') return;
     if (block.type === 'module') {
-      addSection(`${content.emoji || ''} ${content.title || 'Module'}`.trim());
+      addSection(content.title || 'Module');
       courseBlocks(content.blocks || []).forEach(renderBlock);
       return;
     }
@@ -240,8 +335,8 @@ export async function createLessonPdf(lesson: Lesson, logoOverride?: string | nu
       ensureSpace(16);
       autoTable(doc, {
         startY: y,
-        head: [[content.label || '', ...columns]],
-        body: rows.map((row: any) => [row.label || '', ...(row.cells || [])]),
+        head: [[normalizePdfText(content.label || ''), ...columns.map(normalizePdfText)]],
+        body: rows.map((row: any) => [normalizePdfText(row.label || ''), ...(row.cells || []).map(normalizePdfText)]),
         theme: 'grid',
         margin: { left: MARGIN, right: MARGIN, bottom: 19 },
         styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: BRAND.ink, lineColor: BRAND.line, lineWidth: .2, overflow: 'linebreak' },
@@ -348,8 +443,8 @@ export async function createLessonPdf(lesson: Lesson, logoOverride?: string | nu
   return doc;
 }
 
-export async function downloadLessonPdf(lesson: Lesson): Promise<void> {
-  const doc = await createLessonPdf(lesson);
+export async function downloadLessonPdf(lesson: Lesson, profile: Pick<LessonPdfOptions, 'avatarUrl' | 'displayName'> = {}): Promise<void> {
+  const doc = await createLessonPdf(lesson, profile);
   const date = new Date().toISOString().slice(0, 10);
   doc.save(`PerckyLingua-${safeFilename(lesson.title_it)}-${date}.pdf`);
 }

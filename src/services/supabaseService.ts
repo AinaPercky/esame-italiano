@@ -166,7 +166,7 @@ class SupabaseService {
     return this.loadStudentByEmail(email, client);
   }
 
-  public async authenticateAdmin(email: string, password: string): Promise<{ id: string; email: string }> {
+  public async authenticateAdmin(email: string, password: string): Promise<{ id: string; email: string; avatar?: string }> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase n’est pas configuré. Le compte professeur doit être créé dans Supabase Auth.');
 
@@ -186,7 +186,12 @@ class SupabaseService {
       await client.auth.signOut();
       throw new Error('L’adresse du compte Supabase Auth ne correspond pas au compte professeur attendu.');
     }
-    return { id: data.user.id, email: data.user.email || normalizedEmail };
+    const profileAvatar = data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture;
+    return {
+      id: data.user.id,
+      email: data.user.email || normalizedEmail,
+      avatar: typeof profileAvatar === 'string' ? profileAvatar : undefined
+    };
   }
 
   public async getStudentForAuthEmail(email: string): Promise<Student> {

@@ -466,6 +466,8 @@ export const LessonRenderer = LessonFullPreview;
 type LessonPlayerProps = {
   lesson: Lesson;
   progress?: LessonProgress | null;
+  avatarUrl?: string | null;
+  profileName?: string;
   onProgress?: (progress: LessonProgress['discovery_state'], done?: boolean, screen?: number) => void;
   onQuiz?: (quizRef: string) => void;
   onExit?: () => void;
@@ -541,7 +543,7 @@ const LessonQuestionScreen: React.FC<{
   </section>;
 };
 
-export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, onProgress, onQuiz, onExit, showClose = true }) => {
+export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, avatarUrl, profileName, onProgress, onQuiz, onExit, showClose = true }) => {
   const screens = useMemo(() => buildScreens(lesson), [lesson]);
   const savedState = progress?.discovery_state || {};
   const [discovery, setDiscovery] = useState<DiscoveryState>({
@@ -595,7 +597,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, on
     setPdfError('');
     setPdfDownloading(true);
     try {
-      await downloadLessonPdf(lesson);
+      await downloadLessonPdf(lesson, { avatarUrl, displayName: profileName });
     } catch (error) {
       setPdfError(error instanceof Error ? error.message : 'Le téléchargement du PDF a échoué.');
     } finally {
