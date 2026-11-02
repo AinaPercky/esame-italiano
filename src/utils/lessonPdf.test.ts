@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Lesson } from '../types/lessons';
-import { createLessonPdf } from './lessonPdf';
+import { createLessonPdf, normalizePdfText } from './lessonPdf';
 
 const sampleLesson: Lesson = {
   id: 'pdf-test', slug: 'passato-prossimo', type: 'grammaire', level: 'A1', duration_min: 10,
@@ -17,10 +17,23 @@ const sampleLesson: Lesson = {
 };
 
 test('génère un PDF A4 non vide à partir des contenus de leçon et des modules', async () => {
-  const doc = await createLessonPdf(sampleLesson, null);
+  const doc = await createLessonPdf(sampleLesson, { logoDataUrl: null });
   const output = doc.output('arraybuffer');
   assert.ok(Math.abs(doc.internal.pageSize.getWidth() - 210) < 0.1);
   assert.ok(Math.abs(doc.internal.pageSize.getHeight() - 297) < 0.1);
   assert.ok(output.byteLength > 1000);
   assert.match(new TextDecoder().decode(output.slice(0, 8)), /^%PDF-/);
+});
+
+test('normalise les caractères invisibles et les flèches qui ne sont pas disponibles dans la police PDF intégrée', () => {
+  assert.equal(normalizePdfText('partire → essere\u00a0\u200b'), 'partire devient essere');
+});
+
+test('intègre une image d’avatar et l’identité du profil dans le PDF', async () => {
+  const sharp = (await import('sharp')).default;
+  const image = await sharp({ create: { width: 48, height: 48, channels: 4, background: { r: 47, g: 163, b: 107, alpha: 1 } } }).png().toBuffer();
+  const avatarDataUrl = `data:image/png;base64,${image.toString('base64')}`;
+  const withoutPhoto = await createLessonPdf(sampleLesson, { logoDataUrl: null, displayName: 'Aina Percky' });
+  const withPhoto = await createLessonPdf(sampleLesson, { logoDataUrl: null, avatarDataUrl, displayName: 'Aina Percky' });
+  assert.ok(withPhoto.output('arraybuffer').byteLength > withoutPhoto.output('arraybuffer').byteLength + 20);
 });
