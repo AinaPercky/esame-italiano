@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Lesson } from '../../types/lessons';
-import { LessonPlayer } from './LessonRenderer';
+import { LessonFullPreview, LessonPlayer } from './LessonRenderer';
 
 const steps = Array.from({ length: 6 }, (_, index) => ({
   id: `q-${index + 1}`,
@@ -112,4 +112,26 @@ test('le lecteur affiche les éléments d’une question de réordonnancement', 
   assert.match(html, /Cuocere la pasta/);
   assert.match(html, /Servire il piatto/);
   assert.match(html, /Faites glisser les éléments/);
+});
+
+test('la synthèse affiche les repères et sépare visuellement la phrase modèle', () => {
+  const recapLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'recap-design',
+      type: 'recap',
+      content: {
+        bullets: ['Avere ou essere au présent', 'Ajouter le participe passé'],
+        model: { it: 'Ieri sono andata a Roma.', fr: 'Hier, je suis allée à Rome.' }
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: recapLesson, revealAll: true }));
+  assert.match(html, /lesson-recap-header/);
+  assert.match(html, /Fiche mémo/);
+  assert.match(html, /2 repères/);
+  assert.match(html, /Avere ou essere au présent/);
+  assert.match(html, /Phrase modèle/);
+  assert.match(html, /Ieri sono andata a Roma/);
+  assert.match(html, /Hier, je suis allée à Rome/);
 });

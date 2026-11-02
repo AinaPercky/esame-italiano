@@ -102,7 +102,31 @@ function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revea
   if (block.type === 'key_value_list') return <dl className="lesson-key-values">{(c.rows || []).map((x: any, i: number) => <React.Fragment key={i}><dt>{x.key}</dt><dd>{x.it}{x.fr && <small>{x.fr}</small>}</dd></React.Fragment>)}</dl>;
   if (block.type === 'chips') return <div className="lesson-chips">{(c.items || []).map((x: any, i: number) => <button type="button" key={i} onClick={() => speak(x.it)}><b>{x.it}</b><small>{x.fr}</small></button>)}</div>;
   if (block.type === 'tip' || block.type === 'warning') return <aside className={`lesson-callout ${block.type}`}><Lightbulb size={20} /><p>{c.text || ''}</p></aside>;
-  if (block.type === 'recap') return <aside className="lesson-recap"><Sparkles size={20} /><div><h3>À retenir</h3><ul>{(c.bullets || []).map((x: string, i: number) => <li key={i}>{x}</li>)}</ul>{c.model && <p><b>{c.model.it}</b> — {c.model.fr}</p>}</div></aside>;
+  if (block.type === 'recap') {
+    const keyPoints: string[] = Array.isArray(c.bullets) ? c.bullets : [];
+    return <aside className="lesson-recap" aria-label="À retenir">
+      <header className="lesson-recap-header">
+        <span className="lesson-recap-icon" aria-hidden="true"><Sparkles size={20} /></span>
+        <div className="lesson-recap-heading">
+          <span className="lesson-recap-eyebrow">Fiche mémo</span>
+          <h3>À retenir</h3>
+          <p>Les repères essentiels pour ancrer la leçon.</p>
+        </div>
+        <span className="lesson-recap-count">{keyPoints.length} {keyPoints.length === 1 ? 'repère' : 'repères'}</span>
+      </header>
+      {keyPoints.length > 0 && <ul className="lesson-recap-list">
+        {keyPoints.map((point, index) => <li key={`${index}-${point}`}>
+          <span className="lesson-recap-marker" aria-hidden="true"><Check size={15} /></span>
+          <span>{point}</span>
+        </li>)}
+      </ul>}
+      {c.model && <section className="lesson-recap-model" aria-label="Phrase modèle">
+        <span className="lesson-recap-model-label"><BookOpen size={15} /> Phrase modèle</span>
+        {c.model.it && <p className="lesson-recap-model-italian">{c.model.it}</p>}
+        {c.model.fr && <p className="lesson-recap-model-french">{c.model.fr}</p>}
+      </section>}
+    </aside>;
+  }
   if (block.type === 'formula') return <section className="lesson-formula"><h3>{c.title || 'Formule générale'}</h3>{(c.formulas || []).map((f: any, i: number) => <div key={i} className="lesson-formula-item"><b>{f.label}</b><div className="lesson-formula-parts">{(f.parts || []).map((part: any, j: number) => <span key={j} className={`formula-${part.kind}`}>{part.text}{part.hint && <small>{part.hint}</small>}</span>)}</div>{(f.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</div>)}</section>;
   if (block.type === 'exceptions') return <section className="lesson-exceptions"><h3>{c.title || 'Exceptions'}</h3>{(c.items || []).map((x: any, i: number) => <article key={i}><strong>{x.rule}</strong><p>{x.explanation}</p>{(x.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</article>)}</section>;
   if (block.type === 'module') return <ModuleBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />;
