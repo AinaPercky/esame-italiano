@@ -12,11 +12,23 @@ export function compactLessonAnswer(value: unknown, maxWords = 3): string {
   return text.split(' ').slice(0, maxWords).join(' ');
 }
 
+function firstNonEmptyArray(...values: unknown[]): any[] {
+  return values.find((value): value is any[] => Array.isArray(value) && value.length > 0) || [];
+}
+
 function asChoice(value: any, index: number): LessonQuizChoice {
-  const text = typeof value === 'string' ? value : value?.short_text || value?.label || value?.text || value?.it || value?.value || '';
+  const text = typeof value === 'string' ? value : value?.text || value?.it || value?.value || value?.label || value?.short_text || '';
+  const preferredLabel = typeof value === 'string' ? value : value?.short_text || value?.label || text;
+  const fullLabel = compactLessonAnswer(text);
+  const shortLabel = compactLessonAnswer(preferredLabel);
+  const fullWords = fullLabel.toLocaleLowerCase('it').split(' ').filter(Boolean);
+  const shortWords = shortLabel.toLocaleLowerCase('it').split(' ').filter(Boolean);
+  const isIncompletePrefix = fullWords.length <= 3
+    && shortWords.length < fullWords.length
+    && shortWords.every((word, wordIndex) => word === fullWords[wordIndex]);
   return {
     id: `choice-${index}`,
-    label: compactLessonAnswer(text),
+    label: isIncompletePrefix ? fullLabel : shortLabel,
     value: String(typeof value === 'string' ? value : value?.value ?? value?.text ?? value?.it ?? text),
     ...(typeof value === 'object' && typeof value?.correct === 'boolean' ? { correct: value.correct } : {}),
     ...(typeof value === 'object' && value?.reply ? { reply: String(value.reply) } : {})
@@ -25,8 +37,7 @@ function asChoice(value: any, index: number): LessonQuizChoice {
 
 export function buildLessonQuizChoices(step: any, contextWords: string[] = [], formulaText = ''): LessonQuizChoice[] {
   const data = step?.data || {};
-  let raw: any[] = data.options || data.choices || data.word_bank || [];
-  if (!Array.isArray(raw)) raw = [];
+  let raw = firstNonEmptyArray(data.options, data.choices, data.answer_options, data.word_bank, data.answers, data.sentences);
 
   if (step?.kind === 'highlight' && contextWords.length) {
     const targets = new Set((data.targets || []).map((word: string) => word.toLocaleLowerCase('it')));
@@ -35,8 +46,8 @@ export function buildLessonQuizChoices(step: any, contextWords: string[] = [], f
 
   if (step?.kind === 'build_formula') {
     const correct = data.correct_answer || data.correctAnswer || formulaText;
-    const distractors = data.distractors || data.formula_options || raw;
-    raw = [...(Array.isArray(distractors) ? distractors : []), ...(correct ? [{ text: correct, value: correct, correct: true }] : [])];
+    const distractors = firstNonEmptyArray(data.distractors, data.formula_options, raw);
+    raw = [...distractors, ...(correct ? [{ text: correct, value: correct, correct: true }] : [])];
   }
 
   if (!raw.length) {
