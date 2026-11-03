@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_launches (
 
 CREATE TABLE IF NOT EXISTS public.quiz_participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  launch_id UUID NOT NULL REFERENCES public.quiz_launches(id) ON DELETE CASCADE,
+  launch_id UUID NOT NULL,
   quiz_id TEXT NOT NULL,
   student_id TEXT NOT NULL,
   class_id TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_retry_grants (
   -- UUID de l’utilisateur Supabase ayant accordé la seconde chance.
   granted_by UUID,
   reason TEXT NOT NULL,
-  launch_id UUID REFERENCES public.quiz_launches(id),
+  launch_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ,
   used_at TIMESTAMPTZ,
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS public.quiz_retry_grants (
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quiz_id TEXT NOT NULL,
-  launch_id UUID REFERENCES public.quiz_launches(id),
-  participant_id UUID REFERENCES public.quiz_participants(id),
+  launch_id UUID,
+  participant_id UUID,
   student_id TEXT NOT NULL,
   attempt_number INTEGER NOT NULL,
   answers JSONB NOT NULL DEFAULT '{}'::jsonb,
