@@ -7,7 +7,8 @@ ALTER TABLE public.quizzes
 
 CREATE TABLE IF NOT EXISTS public.quiz_launches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  -- Identifiant du quiz legacy; existence vérifiée par les RPC.
+  quiz_id TEXT NOT NULL,
   launched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at TIMESTAMPTZ,
   -- UUID de l’utilisateur Supabase ayant lancé le quiz. La vérification est
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_launches (
 CREATE TABLE IF NOT EXISTS public.quiz_participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   launch_id UUID NOT NULL REFERENCES public.quiz_launches(id) ON DELETE CASCADE,
-  quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  quiz_id TEXT NOT NULL,
   student_id TEXT NOT NULL,
   class_id TEXT NOT NULL,
   presence_status TEXT NOT NULL DEFAULT 'pending'
@@ -37,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_participants (
 
 CREATE TABLE IF NOT EXISTS public.quiz_retry_grants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  quiz_id TEXT NOT NULL,
   student_id TEXT NOT NULL,
   -- UUID de l’utilisateur Supabase ayant accordé la seconde chance.
   granted_by UUID,
@@ -51,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.quiz_retry_grants (
 
 CREATE TABLE IF NOT EXISTS public.quiz_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  quiz_id TEXT NOT NULL,
   launch_id UUID REFERENCES public.quiz_launches(id),
   participant_id UUID REFERENCES public.quiz_participants(id),
   student_id TEXT NOT NULL,
