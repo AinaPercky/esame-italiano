@@ -184,6 +184,7 @@ export interface Quiz {
   id: string;
   public_id?: string; // UUID unique pour l'accès public via lien partageable
   is_public?: boolean; // Indique si le quiz est publié publiquement
+  attendance_mode?: 'legacy' | 'strict_presence';
   category?: QuizCategory;
   title: string;
   description?: string;
@@ -217,6 +218,41 @@ export interface QuizSubmission {
   status: 'completed' | 'timeout' | 'missed'; // 'missed' = non fait avant la clôture (note = 0)
   feedback?: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }>;
   date: string; // YYYY-MM-DD
+}
+
+export type QuizPresenceStatus = 'pending' | 'present' | 'absent' | 'completed' | 'timeout' | 'retry_authorized';
+
+export interface QuizLaunch {
+  id: string;
+  quiz_id: string;
+  launched_at: string;
+  closed_at?: string | null;
+  presence_deadline_at: string;
+  status: 'launched' | 'closed';
+}
+
+export interface QuizParticipant {
+  id: string;
+  launch_id: string;
+  quiz_id: string;
+  student_id: string;
+  class_id: string;
+  presence_status: QuizPresenceStatus;
+  presence_confirmed_at?: string | null;
+  attendance_locked_at?: string | null;
+  final_status?: string | null;
+  final_score?: number | null;
+}
+
+export interface QuizRetryGrant {
+  id: string;
+  quiz_id: string;
+  student_id: string;
+  reason: string;
+  launch_id?: string | null;
+  created_at: string;
+  used_at?: string | null;
+  max_attempts: number;
 }
 
 export interface DailyGrade {

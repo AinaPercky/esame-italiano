@@ -409,7 +409,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuizSubmissionError(null);
   };
 
-  const handleStartQuiz = (quiz: Quiz) => {
+  const handleStartQuiz = async (quiz: Quiz) => {
     // RÈGLE STRICTE : Une fois le quiz fait, l'élève ne peut plus le recommencer
     const { stId, stName, stNum, classId } = getStudentQueryInfo();
     const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
@@ -427,6 +427,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       return;
     }
 
+    if (quiz.attendance_mode === 'strict_presence' && !quiz.is_public && supabaseService.isConfigured()) {
+      try {
+        const activeLaunch = await supabaseService.getStudentActiveLaunch(quiz.id);
+        if (!activeLaunch) throw new Error('Ce quiz ne possède pas de lancement étudiant actif.');
+        await supabaseService.confirmQuizPresence(activeLaunch.launch.id);
+      } catch (error) {
+        setQuizSubmissionError(error instanceof Error ? error.message : 'Votre présence n’a pas pu être confirmée.');
+        return;
+      }
+    }
     startQuizSession(quiz, false);
   };
 

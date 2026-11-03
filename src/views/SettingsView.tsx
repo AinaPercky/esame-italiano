@@ -33,6 +33,7 @@ import {
 } from '../data/supabaseSqlSchema';
 import { authService, AUTHORIZED_EMAIL, AuthUser } from '../services/authService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL } from '../data/quizPresenceMigration';
 
 interface SettingsViewProps {
   onResetData: () => void;
@@ -47,6 +48,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedQuizMigration, setCopiedQuizMigration] = useState(false);
   const [copiedAtomicQuizMigration, setCopiedAtomicQuizMigration] = useState(false);
+  const [copiedPresenceMigration, setCopiedPresenceMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -128,6 +130,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration transactionnelle quiz:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration des fonctions RPC de quiz.' });
+    }
+  };
+
+  const handleCopyPresenceMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL);
+      setCopiedPresenceMigration(true);
+      setTimeout(() => setCopiedPresenceMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration présence quiz:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration présence/tentatives.' });
     }
   };
 
@@ -490,6 +503,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyPresenceMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-violet-700 hover:bg-violet-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedPresenceMigration ? '✓ Migration Présence copiée !' : 'Copier migration Présence & tentatives'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -520,6 +541,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-indigo-800">
               Avant d’utiliser la clôture transactionnelle, copiez puis exécutez « RPC Quiz anti-écrasement » dans Supabase &gt; SQL Editor. Le script ne supprime que les anciennes absences <code>missed</code> au lancement; les notes réelles sont conservées.
+            </span>
+            <span className="text-[11px] text-violet-800">
+              La migration Présence &amp; tentatives est additive : elle conserve les résultats historiques, verrouille les absences et ajoute les lancements, participations et autorisations de seconde chance.
             </span>
           </div>
         </div>
