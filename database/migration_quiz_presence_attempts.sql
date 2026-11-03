@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS public.quiz_launches (
   quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
   launched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at TIMESTAMPTZ,
-  launched_by UUID REFERENCES auth.users(id),
+  -- UUID de l’utilisateur Supabase ayant lancé le quiz. La vérification est
+  -- effectuée par auth.uid() dans les RPC afin de rester compatible avec les
+  -- projets où le schéma auth n’est pas exposé comme relation FK.
+  launched_by UUID,
   presence_deadline_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'launched' CHECK (status IN ('launched', 'closed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS public.quiz_retry_grants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quiz_id TEXT NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
   student_id TEXT NOT NULL,
-  granted_by UUID REFERENCES auth.users(id),
+  -- UUID de l’utilisateur Supabase ayant accordé la seconde chance.
+  granted_by UUID,
   reason TEXT NOT NULL,
   launch_id UUID REFERENCES public.quiz_launches(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
