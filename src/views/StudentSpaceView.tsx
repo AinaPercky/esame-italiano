@@ -43,6 +43,7 @@ import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, i
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
+import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION_SECONDS } from '../utils/quizPresence';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { LessonsStudentView } from './LessonsStudentView';
@@ -59,6 +60,13 @@ const STUDENT_TABS = [
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
   onLogout: () => void;
+}
+
+interface PresenceInitializationState {
+  quiz: Quiz;
+  phase: 'confirming' | 'initializing' | 'validating';
+  launchId?: string;
+  deadlineAt?: string;
 }
 
 export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
@@ -88,6 +96,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Quiz en cours de composition - Défilement Question par Question
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
+  const [presenceInitialization, setPresenceInitialization] = useState<PresenceInitializationState | null>(null);
+  const [presenceInitSecondsRemaining, setPresenceInitSecondsRemaining] = useState(QUIZ_PRESENCE_INITIALIZATION_SECONDS);
+  const [presenceStartError, setPresenceStartError] = useState<string | null>(null);
+  const [retryAuthorizedQuizIds, setRetryAuthorizedQuizIds] = useState<Set<string>>(() => new Set());
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [questionSecondsRemaining, setQuestionSecondsRemaining] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
@@ -225,6 +237,48 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       clearInterval(interval);
     };
   }, [currentUser]);
+
+  const strictPresenceQuizIdsKey = quizzes
+    .filter(quiz => quiz.status === 'launched' && quiz.attendance_mode === 'strict_presence' && !quiz.is_public)
+    .map(quiz => quiz.id)
+    .sort()
+    .join('|');
+
+  useEffect(() => {
+    const quizIds = strictPresenceQuizIdsKey ? strictPresenceQuizIdsKey.split('|') : [];
+    if (!supabaseService.isConfigured() || quizIds.length === 0) {
+      setRetryAuthorizedQuizIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    const refreshRetryAuthorizations = async () => {
+      const resolvedAuthorizations = new Map<string, boolean>();
+      await Promise.all(quizIds.map(async quizId => {
+        try {
+          const active = await supabaseService.getStudentActiveLaunch(quizId);
+          resolvedAuthorizations.set(quizId, active?.participant.presence_status === 'retry_authorized');
+        } catch (error) {
+          console.warn('Vérification de seconde chance indisponible:', error);
+        }
+      }));
+      if (!cancelled) setRetryAuthorizedQuizIds(previous => {
+        const next = new Set(previous);
+        resolvedAuthorizations.forEach((isAuthorized, quizId) => {
+          if (isAuthorized) next.add(quizId);
+          else next.delete(quizId);
+        });
+        return next;
+      });
+    };
+
+    void refreshRetryAuthorizations();
+    const interval = window.setInterval(() => void refreshRetryAuthorizations(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [strictPresenceQuizIdsKey]);
 
   useEffect(() => {
     if (!supabaseService.isConfigured()) return;
@@ -409,11 +463,92 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setQuizSubmissionError(null);
   };
 
+  useEffect(() => {
+    if (!presenceInitialization || presenceInitialization.phase !== 'initializing' || !presenceInitialization.deadlineAt || !presenceInitialization.launchId) return;
+
+    let timer: number | undefined;
+    let validationStarted = false;
+    const { quiz, launchId, deadlineAt } = presenceInitialization;
+    const checkLaunchAndStart = async () => {
+      if (validationStarted) return;
+      validationStarted = true;
+      setPresenceInitialization(current => current ? { ...current, phase: 'validating' } : current);
+      try {
+        const active = await supabaseService.getStudentActiveLaunch(quiz.id);
+        if (!active || active.launch.id !== launchId || !['present', 'retry_authorized'].includes(active.participant.presence_status)) {
+          throw new Error('Le professeur a clôturé ce quiz pendant l’initialisation. Vous ne pouvez plus le commencer.');
+        }
+        setPresenceStartError(null);
+        setPresenceInitialization(null);
+        startQuizSession(quiz, false);
+      } catch (error) {
+        setPresenceInitialization(null);
+        setPresenceStartError(error instanceof Error ? error.message : 'Impossible de démarrer ce quiz.');
+      }
+    };
+
+    const tick = () => {
+      const secondsRemaining = getPresenceInitializationRemainingSeconds(deadlineAt);
+      setPresenceInitSecondsRemaining(secondsRemaining);
+      if (secondsRemaining === 0) {
+        if (timer !== undefined) window.clearTimeout(timer);
+        void checkLaunchAndStart();
+        return;
+      }
+      timer = window.setTimeout(tick, 200);
+    };
+
+    tick();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [presenceInitialization]);
+
   const handleStartQuiz = async (quiz: Quiz) => {
-    // RÈGLE STRICTE : Une fois le quiz fait, l'élève ne peut plus le recommencer
+    // Un nouvel essai n'est possible qu'avec une autorisation serveur explicite.
     const { stId, stName, stNum, classId } = getStudentQueryInfo();
     const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
     const alreadySubmitted = mySubmissions.some(s => s.quiz_id === quiz.id) || freshSubs.some(s => s.quiz_id === quiz.id);
+    const strictPresence = quiz.attendance_mode === 'strict_presence' && !quiz.is_public && supabaseService.isConfigured();
+    setPresenceStartError(null);
+
+    if (strictPresence) {
+      primeTimerAudio();
+      setPresenceInitSecondsRemaining(QUIZ_PRESENCE_INITIALIZATION_SECONDS);
+      setPresenceInitialization({ quiz, phase: 'confirming' });
+      try {
+        const activeLaunch = await supabaseService.getStudentActiveLaunch(quiz.id);
+        if (!activeLaunch) throw new Error('Ce quiz a été clôturé ou vous n’êtes pas inscrit au lancement actif.');
+        const retryAuthorized = activeLaunch.participant.presence_status === 'retry_authorized';
+        if (alreadySubmitted && !retryAuthorized) {
+          setPresenceInitialization(null);
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Quiz déjà effectué',
+            message: 'Vous avez déjà passé cette évaluation. Une nouvelle tentative est possible uniquement si le professeur vous accorde une seconde chance.',
+            confirmLabel: 'J\'ai compris',
+            variant: 'primary',
+            action: () => {}
+          });
+          return;
+        }
+        const participant = await supabaseService.confirmQuizPresence(activeLaunch.launch.id);
+        if (!participant.presence_deadline_at || !Number.isFinite(Date.parse(participant.presence_deadline_at))) {
+          throw new Error('La migration « délai par élève » n’est pas encore appliquée dans Supabase.');
+        }
+        setPresenceInitSecondsRemaining(getPresenceInitializationRemainingSeconds(participant.presence_deadline_at));
+        setPresenceInitialization({
+          quiz,
+          phase: 'initializing',
+          launchId: activeLaunch.launch.id,
+          deadlineAt: participant.presence_deadline_at
+        });
+      } catch (error) {
+        setPresenceInitialization(null);
+        setPresenceStartError(error instanceof Error ? error.message : 'Votre présence n’a pas pu être confirmée.');
+      }
+      return;
+    }
 
     if (alreadySubmitted) {
       setConfirmDialog({
@@ -427,16 +562,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       return;
     }
 
-    if (quiz.attendance_mode === 'strict_presence' && !quiz.is_public && supabaseService.isConfigured()) {
-      try {
-        const activeLaunch = await supabaseService.getStudentActiveLaunch(quiz.id);
-        if (!activeLaunch) throw new Error('Ce quiz ne possède pas de lancement étudiant actif.');
-        await supabaseService.confirmQuizPresence(activeLaunch.launch.id);
-      } catch (error) {
-        setQuizSubmissionError(error instanceof Error ? error.message : 'Votre présence n’a pas pu être confirmée.');
-        return;
-      }
-    }
     startQuizSession(quiz, false);
   };
 
@@ -925,6 +1050,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         {activeTab === 'quizzes' && !activeQuiz && (
           <div className="space-y-6">
             
+            {presenceStartError && (
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-900">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{presenceStartError}</span>
+              </div>
+            )}
+
             {/* Timeout alert banner */}
             {timeoutNotice && (
               <div className="p-4 bg-rose-50 border border-rose-300 rounded-2xl flex items-start justify-between gap-3 animate-fade-in shadow-xs">
@@ -1048,7 +1180,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isCompleted = sub?.status === 'completed';
                     const isTimedOut = sub?.status === 'timeout';
                     const isMissed = sub?.status === 'missed';
-                    const isLive = quiz.status === 'launched' && !hasSubmission;
+                    const hasRetryAuthorization = retryAuthorizedQuizIds.has(quiz.id);
+                    const isLive = quiz.status === 'launched' && (!hasSubmission || hasRetryAuthorization);
 
                     return (
                       <div
@@ -1064,7 +1197,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               {isLive && (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
                                   <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                  <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">EN DIRECT • jusqu’à clôture</span>
+                                  <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">{hasRetryAuthorization ? 'SECONDE CHANCE • jusqu’à clôture' : 'EN DIRECT • jusqu’à clôture'}</span>
                                 </span>
                               )}
 
@@ -1128,7 +1261,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                               className="student-quiz-start"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
-                              <span>Commencer le Quiz ({formatQuizDuration(getQuizTotalTimeSeconds(quiz))})</span>
+                              <span>{hasRetryAuthorization ? 'Commencer la seconde chance' : 'Commencer le Quiz'} ({formatQuizDuration(getQuizTotalTimeSeconds(quiz))})</span>
                             </button>
                           )}
 
@@ -1142,9 +1275,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                                 {sub.score_20 > 0
                                   ? <Check className="h-3.5 w-3.5 text-emerald-600" />
                                   : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
-                                <span>Note définitive : {sub.score_20} / 20</span>
+                                <span>{hasRetryAuthorization ? 'Résultat précédent' : 'Note définitive'} : {sub.score_20} / 20</span>
                               </span>
-                              {sub.status !== 'missed' && (
+                              {hasRetryAuthorization ? (
+                                <span className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-800">
+                                  <RotateCcw className="h-3 w-3" />
+                                  <span>Seconde chance accordée</span>
+                                </span>
+                              ) : sub.status !== 'missed' && (
                                 <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500" title="Le quiz ne peut pas être repassé">
                                   <Lock className="h-3 w-3 text-slate-400" />
                                   <span>Tentative verrouillée</span>
@@ -1753,6 +1891,40 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       <footer className="student-footer">
         PerckyLingua • Apprendre et progresser en italien
       </footer>
+
+      {presenceInitialization && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4 text-white" role="status" aria-live="polite">
+          <section className="w-full max-w-md rounded-3xl border border-white/15 bg-slate-900 p-7 text-center shadow-2xl sm:p-9">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-400/10 text-emerald-300">
+              <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+            </div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
+              {presenceInitialization.phase === 'confirming' ? 'Sécurisation de votre participation' : 'Présence individuelle confirmée'}
+            </p>
+            <h2 className="mt-2 font-display text-xl font-extrabold sm:text-2xl">
+              {presenceInitialization.phase === 'confirming'
+                ? 'Confirmation de votre présence…'
+                : presenceInitialization.phase === 'validating'
+                  ? 'Vérification du lancement…'
+                  : 'Initialisation du quiz'}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              {presenceInitialization.phase === 'initializing'
+                ? 'Votre présence est enregistrée. Nous préparons votre session avant d’ouvrir la première question.'
+                : 'Le quiz est vérifié côté serveur avant de commencer.'}
+            </p>
+            {presenceInitialization.phase === 'initializing' && (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <span className="text-xs font-semibold text-slate-300">Ouverture dans</span>
+                <div className="mt-1 font-mono text-3xl font-black tabular-nums text-white">{presenceInitSecondsRemaining} s</div>
+              </div>
+            )}
+            <p className="mt-5 text-[11px] leading-relaxed text-slate-400">
+              Ces 10 secondes commencent à votre clic sur « Commencer », pas au lancement du professeur. Le quiz reste accessible tant qu’il n’est pas clôturé.
+            </p>
+          </section>
+        </div>
+      )}
 
       {/* In-App Confirm Dialog */}
       <ConfirmDialog

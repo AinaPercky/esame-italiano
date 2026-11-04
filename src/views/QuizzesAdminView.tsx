@@ -1206,6 +1206,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           </button>
                         )}
 
+                        {isClosed && !quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
+                          <button
+                            type="button"
+                            onClick={() => void handleGrantQuizRetry(quiz)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                            title="Accorder une seconde chance qui sera active à la prochaine relance"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Seconde chance</span>
+                          </button>
+                        )}
+
                         {isLive && (
                           <>
                             {!quiz.is_public && quiz.attendance_mode === 'strict_presence' && (

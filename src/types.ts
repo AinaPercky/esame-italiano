@@ -227,7 +227,8 @@ export interface QuizLaunch {
   quiz_id: string;
   launched_at: string;
   closed_at?: string | null;
-  presence_deadline_at: string;
+  /** Deprecated launch-level field; presence initialization is per participant. */
+  presence_deadline_at?: string | null;
   status: 'launched' | 'closed';
 }
 
@@ -239,6 +240,8 @@ export interface QuizParticipant {
   class_id: string;
   presence_status: QuizPresenceStatus;
   presence_confirmed_at?: string | null;
+  /** Server-calculated deadline for this student's 10-second initialization window. */
+  presence_deadline_at?: string | null;
   attendance_locked_at?: string | null;
   final_status?: string | null;
   final_score?: number | null;
