@@ -8,6 +8,9 @@ import {
   PassOrderItem,
   Quiz,
   QuizSubmission,
+  QuizLaunch,
+  QuizParticipant,
+  QuizRetryGrant,
   normalizeQuizCategory
 } from '../types';
 
@@ -960,6 +963,7 @@ class SupabaseService {
         id: quiz.id,
         public_id: publicId,
         is_public: Boolean(quiz.is_public),
+        attendance_mode: quiz.attendance_mode || (quiz.is_public ? 'legacy' : 'strict_presence'),
         class_id: quiz.class_id,
         class_ids: quiz.class_ids || [quiz.class_id],
         category: quiz.category || 'Autre',
@@ -1011,6 +1015,7 @@ class SupabaseService {
       id: q.id,
       public_id: q.public_id || undefined,
       is_public: true, // Force public for external access
+      attendance_mode: q.attendance_mode || 'legacy',
       class_id: q.class_id,
       class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
       category: normalizeQuizCategory(q.category),
@@ -1103,6 +1108,48 @@ class SupabaseService {
     return true;
   }
 
+  public async launchQuizWithPresence(quizId: string): Promise<{ quiz: Quiz; launch: QuizLaunch }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour lancer un quiz avec présence.');
+    const { data, error } = await client.rpc('launch_quiz_with_presence', { p_quiz_id: quizId });
+    if (error) throw new Error(`Lancement avec présence : ${error.message}`);
+    return { quiz: data.quiz as Quiz, launch: data.launch as QuizLaunch };
+  }
+
+  public async confirmQuizPresence(launchId: string): Promise<QuizParticipant> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour confirmer la présence.');
+    const { data, error } = await client.rpc('confirm_quiz_presence', { p_launch_id: launchId });
+    if (error) throw new Error(`Confirmation de présence : ${error.message}`);
+    return data as QuizParticipant;
+  }
+
+  public async getStudentActiveLaunch(quizId: string): Promise<{ launch: QuizLaunch; participant: QuizParticipant } | null> {
+    const client = this.getClient();
+    if (!client) return null;
+    const { data, error } = await client.rpc('get_student_active_launch', { p_quiz_id: quizId });
+    if (error) throw new Error(`Lecture de la présence : ${error.message}`);
+    return data?.launch && data?.participant ? { launch: data.launch as QuizLaunch, participant: data.participant as QuizParticipant } : null;
+  }
+
+  public async grantQuizRetry(quizId: string, studentId: string, reason: string, launchId?: string): Promise<QuizRetryGrant> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour accorder une seconde chance.');
+    const { data, error } = await client.rpc('grant_quiz_retry', {
+      p_quiz_id: quizId, p_student_id: studentId, p_reason: reason, p_launch_id: launchId || null
+    });
+    if (error) throw new Error(`Seconde chance : ${error.message}`);
+    return data as QuizRetryGrant;
+  }
+
+  public async closeQuizWithPresence(quizId: string): Promise<QuizSubmission[] | null> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour clôturer un quiz avec présence.');
+    const { data, error } = await client.rpc('close_quiz_with_presence', { p_quiz_id: quizId });
+    if (error) throw new Error(`Clôture avec présence : ${error.message}`);
+    return Array.isArray(data?.submissions) ? data.submissions as QuizSubmission[] : [];
+  }
+
   public async closeQuizAtomically(quizId: string): Promise<QuizSubmission[] | null> {
     const client = this.getClient();
     if (!client) {
@@ -1161,6 +1208,22 @@ class SupabaseService {
         status: submission.status,
         feedback: submission.feedback || {},
         date: submission.date
+      }
+    });
+    if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
+    return true;
+  }
+
+  public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<boolean> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour soumettre ce quiz.');
+    const { error } = await client.rpc('submit_quiz_presence_submission', {
+      p_submission: {
+        id: submission.id, quiz_id: submission.quiz_id, student_name: submission.student_name,
+        student_number: submission.student_number || null, class_id: submission.class_id,
+        class_name: submission.class_name || null, started_at: submission.started_at,
+        answers: submission.answers || {}, score: submission.score, max_score: submission.max_score,
+        score_20: submission.score_20, status: submission.status, feedback: submission.feedback || {}
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
@@ -1492,6 +1555,7 @@ class SupabaseService {
         id: q.id,
         public_id: q.public_id || undefined,
         is_public: Boolean(q.is_public),
+        attendance_mode: q.attendance_mode || (q.is_public ? 'legacy' : 'strict_presence'),
         class_id: q.class_id,
         class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
         category: normalizeQuizCategory(q.category),

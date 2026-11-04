@@ -1377,12 +1377,17 @@ export const dataService = {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
-    // En cloud, le RPC verrouille la ligne quiz et supprime les anciennes absences
-    // dans la même transaction que la relance. Les copies réelles sont conservées.
-    await supabaseService.launchQuizAtomically(id);
+    const quizBeforeLaunch = state.quizzes[idx];
+    // Les nouveaux quiz privés utilisent le parcours présence strict. Les quiz
+    // historiques/publics restent sur le RPC legacy sans réinterprétation.
+    if (quizBeforeLaunch.attendance_mode === 'strict_presence' && !quizBeforeLaunch.is_public) {
+      await supabaseService.launchQuizWithPresence(id);
+    } else {
+      await supabaseService.launchQuizAtomically(id);
+    }
 
     // Le service local reflète le même état que la transaction distante.
-    if (state.quizSubmissions) {
+    if (state.quizSubmissions && quizBeforeLaunch.attendance_mode !== 'strict_presence') {
       state.quizSubmissions = state.quizSubmissions.filter(sub => !(sub.quiz_id === id && sub.status === 'missed'));
     }
 
@@ -1407,9 +1412,9 @@ export const dataService = {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
-    // En cloud, statut et zéros manquants sont décidés atomiquement en base;
-    // les copies déjà présentes sont protégées par ON CONFLICT DO NOTHING.
-    const authoritativeSubmissions = await supabaseService.closeQuizAtomically(id);
+    const authoritativeSubmissions = state.quizzes[idx].attendance_mode === 'strict_presence' && !state.quizzes[idx].is_public
+      ? await supabaseService.closeQuizWithPresence(id)
+      : await supabaseService.closeQuizAtomically(id);
 
     state.quizzes[idx] = {
       ...state.quizzes[idx],
@@ -1577,7 +1582,9 @@ export const dataService = {
     // En cloud, la remise verrouille la même ligne quiz que la clôture.
     // Une seule des deux opérations gagne la course; une note réelle ne peut
     // pas être remplacée par un résultat manqué.
-    const savedAtomically = await supabaseService.submitQuizSubmissionAtomically(submission);
+    const savedAtomically = quiz.attendance_mode === 'strict_presence' && !quiz.is_public
+      ? await supabaseService.submitQuizPresenceSubmission(submission)
+      : await supabaseService.submitQuizSubmissionAtomically(submission);
     if (!savedAtomically) await supabaseService.saveQuizSubmission(submission);
 
     if (existingIdx !== -1) {

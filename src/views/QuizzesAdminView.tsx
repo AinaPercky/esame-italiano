@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory } from '../types';
 import { dataService } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
@@ -666,6 +667,20 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     });
   };
 
+  const handleGrantQuizRetry = async (quiz: Quiz) => {
+    const studentId = window.prompt('Identifiant de l’élève à autoriser :')?.trim();
+    if (!studentId) return;
+    const reason = window.prompt('Motif obligatoire de la seconde chance :')?.trim();
+    if (!reason) return;
+    try {
+      await supabaseService.grantQuizRetry(quiz.id, studentId, reason);
+      setQuizActionError(null);
+      loadData();
+    } catch (error) {
+      setQuizActionError(error instanceof Error ? error.message : 'Impossible d’accorder la seconde chance.');
+    }
+  };
+
   const trackingQuiz = activeTrackingQuizId 
     ? quizzes.find(q => q.id === activeTrackingQuizId) 
     : null;
@@ -1191,8 +1206,31 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           </button>
                         )}
 
+                        {isClosed && !quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
+                          <button
+                            type="button"
+                            onClick={() => void handleGrantQuizRetry(quiz)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                            title="Accorder une seconde chance qui sera active à la prochaine relance"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Seconde chance</span>
+                          </button>
+                        )}
+
                         {isLive && (
                           <>
+                            {!quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
+                              <button
+                                type="button"
+                                onClick={() => void handleGrantQuizRetry(quiz)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                title="Autoriser une seconde tentative pour un élève"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Seconde chance</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setActiveTrackingQuizId(quiz.id)}
