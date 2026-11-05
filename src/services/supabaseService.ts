@@ -1132,6 +1132,27 @@ class SupabaseService {
     return data?.launch && data?.participant ? { launch: data.launch as QuizLaunch, participant: data.participant as QuizParticipant } : null;
   }
 
+  public async getQuizLiveParticipants(quizId: string): Promise<QuizParticipant[]> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour consulter les présences en direct.');
+    const { data: launch, error: launchError } = await client
+      .from('quiz_launches')
+      .select('id')
+      .eq('quiz_id', quizId)
+      .eq('status', 'launched')
+      .order('launched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (launchError) throw new Error(`Lecture du lancement actif : ${launchError.message}`);
+    if (!launch) return [];
+    const { data, error } = await client
+      .from('quiz_participants')
+      .select('*')
+      .eq('launch_id', launch.id);
+    if (error) throw new Error(`Lecture des présences élèves : ${error.message}`);
+    return (data || []) as QuizParticipant[];
+  }
+
   public async grantQuizRetry(quizId: string, studentId: string, reason: string, launchId?: string): Promise<QuizRetryGrant> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour accorder une seconde chance.');
