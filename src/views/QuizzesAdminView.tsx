@@ -48,6 +48,7 @@ import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
 import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { createQuizReorderItem } from '../utils/quizReorder';
+import { isQuizRetryEligible } from '../utils/quizPresence';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 
@@ -1456,9 +1457,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                                     : sub?.status === 'completed'
                                       ? 'Quiz déjà effectué'
                                       : 'Non inscrit à ce lancement';
-                    const canGrantRetry = !trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' &&
-                      (status === 'absent' || status === 'timeout' ||
-                        (!participant && sub?.status !== 'completed'));
+                    const canGrantRetry = isQuizRetryEligible({
+                      isPublic: trackingQuiz.is_public,
+                      attendanceMode: trackingQuiz.attendance_mode,
+                      participantStatus: status,
+                      hasParticipant: Boolean(participant),
+                      latestSubmissionStatus: sub?.status
+                    });
                     return (
                       <div key={st.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs">
                         <div className="min-w-0">
