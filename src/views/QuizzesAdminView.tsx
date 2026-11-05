@@ -726,8 +726,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     try {
       setRetryBusy(true);
       setRetryMessage(null);
-      await supabaseService.grantQuizRetry(trackingQuiz.id, studentId, retryReason.trim(), launchId);
-      setRetryMessage('Seconde chance autorisée. L’élève pourra reprendre le quiz selon les règles du serveur.');
+      const granted = await supabaseService.grantQuizRetry(trackingQuiz.id, studentId, retryReason.trim(), launchId);
+      setRetryMessage(granted > 0
+        ? 'Seconde chance autorisée. L’élève pourra reprendre le quiz selon les règles du serveur.'
+        : 'Aucune autorisation créée : vérifiez que l’élève appartient à une classe du quiz.');
       loadData();
     } catch (error) {
       setRetryMessage(error instanceof Error ? error.message : 'Impossible d’autoriser la seconde chance.');
@@ -744,9 +746,24 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     try {
       setRetryBusy(true);
       setRetryMessage(null);
-      const count = await supabaseService.grantQuizRetryForClass(trackingQuiz.id, retryClassId, retryReason.trim());
+      let count: number;
+      try {
+        count = await supabaseService.grantQuizRetryForClass(trackingQuiz.id, retryClassId, retryReason.trim());
+      } catch (bulkError) {
+        // Les bases ayant uniquement l’ancienne migration peuvent encore autoriser
+        // les élèves un par un via la RPC individuelle.
+        if (!(bulkError instanceof Error) || !/function .*grant_quiz_retry_for_class.*not found|PGRST202/i.test(bulkError.message)) {
+          throw bulkError;
+        }
+        count = 0;
+        for (const student of trackingClassStudents.filter(item => item.class_id === retryClassId)) {
+          count += await supabaseService.grantQuizRetry(trackingQuiz.id, student.id, retryReason.trim());
+        }
+      }
       const className = classes.find(item => item.id === retryClassId)?.name || 'la classe sélectionnée';
-      setRetryMessage(`${count} autorisation(s) accordée(s) pour ${className}. Les anciennes tentatives sont conservées.`);
+      setRetryMessage(count > 0
+        ? `${count} autorisation(s) accordée(s) pour ${className}. Les anciennes tentatives sont conservées.`
+        : `Aucune autorisation nouvelle pour ${className}.`);
       loadData();
     } catch (error) {
       setRetryMessage(error instanceof Error ? error.message : 'Impossible d’autoriser la classe.');
@@ -1471,7 +1488,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     {quizActionError}
                   </div>
                 )}
-                {!trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' && (
+                <>
                   <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
                     <div>
                       <div className="text-xs font-bold text-violet-950">Seconde chance / reprise</div>
@@ -1510,7 +1527,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     </div>
                     {retryMessage && <p role="status" className="text-[11px] font-semibold text-violet-900">{retryMessage}</p>}
                   </div>
-                )}
+                </>
                 <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 rounded-xl border">
                   {trackingClassStudents.map(st => {
                     const sub = trackingSubmissions
@@ -1537,7 +1554,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                                     : sub?.status === 'completed'
                                       ? 'Quiz déjà effectué'
                                       : 'Non inscrit à ce lancement';
-                    const canGrantRetry = !trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' && status !== 'retry_authorized';
+                    const canGrantRetry = status !== 'retry_authorized';
                     return (
                       <div key={st.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs">
                         <div className="min-w-0">
