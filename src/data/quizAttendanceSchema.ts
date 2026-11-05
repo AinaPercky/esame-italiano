@@ -191,6 +191,9 @@ BEGIN
     IF NOT FOUND OR v_part.presence_status <> 'present' OR v_quiz.status <> 'launched' THEN
       RAISE EXCEPTION 'Présence non confirmée ou quiz clôturé.';
     END IF;
+    IF EXISTS (SELECT 1 FROM public.quiz_submissions s WHERE s.quiz_id = v_quiz_id AND s.student_id = v_student_id) THEN
+      RAISE EXCEPTION 'Ce quiz a déjà été soumis. Une autorisation de seconde chance est nécessaire.';
+    END IF;
   ELSIF v_quiz.status <> 'launched' THEN
     RAISE EXCEPTION 'Ce quiz est clôturé ou n''est pas lancé.';
   END IF;
