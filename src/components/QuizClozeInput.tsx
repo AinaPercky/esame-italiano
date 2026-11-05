@@ -54,7 +54,7 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
   onChange,
   disabled = false,
   theme = 'amber',
-  autoFocus = true,
+  autoFocus = false,
   onEnterPress,
   customSentence
 }) => {
