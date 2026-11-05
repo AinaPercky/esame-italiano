@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL } from '../data/quizPresenceMigration';
-import { getPresenceInitializationRemainingSeconds } from './quizPresence';
+import { getPresenceInitializationRemainingSeconds, isQuizRetryEligible } from './quizPresence';
 
 test('presence initialization counts down from the student-specific server deadline', () => {
   const now = Date.parse('2026-11-03T18:00:00.000Z');
@@ -45,4 +45,21 @@ test('the follow-up migration stores the deadline per participant at confirmatio
   assert.match(closeFunction, /WHERE quiz_submissions\.status = 'missed'/i);
   assert.match(closeFunction, /SET launch_id = NULL[\s\S]*?used_at IS NULL/i);
   assert.doesNotMatch(submissionFunction, /UPDATE public\.quiz_retry_grants/i);
+});
+
+test('a prior missed/timeout submission keeps retry available when a relaunch participant is still pending', () => {
+  const base = { isPublic: false, attendanceMode: 'strict_presence' as const, hasParticipant: true, participantStatus: 'pending' as const };
+  assert.equal(isQuizRetryEligible({ ...base, latestSubmissionStatus: 'missed' }), true);
+  assert.equal(isQuizRetryEligible({ ...base, latestSubmissionStatus: 'timeout' }), true);
+  assert.equal(isQuizRetryEligible({ ...base }), false);
+});
+
+test('retry stays hidden for active, completed, already-authorized, public and legacy participants', () => {
+  const base = { isPublic: false, attendanceMode: 'strict_presence' as const, hasParticipant: true, latestSubmissionStatus: 'missed' as const };
+  assert.equal(isQuizRetryEligible({ ...base, participantStatus: 'present' }), false);
+  assert.equal(isQuizRetryEligible({ ...base, participantStatus: 'completed' }), false);
+  assert.equal(isQuizRetryEligible({ ...base, participantStatus: 'retry_authorized' }), false);
+  assert.equal(isQuizRetryEligible({ ...base, participantStatus: 'pending', latestSubmissionStatus: 'completed' }), false);
+  assert.equal(isQuizRetryEligible({ ...base, isPublic: true }), false);
+  assert.equal(isQuizRetryEligible({ ...base, attendanceMode: 'legacy' }), false);
 });
