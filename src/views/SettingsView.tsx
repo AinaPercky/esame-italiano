@@ -37,6 +37,7 @@ import {
   QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL,
   QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL
 } from '../data/quizPresenceMigration';
+import { QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL } from '../data/quizAttemptSubmissionMigration';
 
 interface SettingsViewProps {
   onResetData: () => void;
@@ -53,6 +54,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedAtomicQuizMigration, setCopiedAtomicQuizMigration] = useState(false);
   const [copiedPresenceMigration, setCopiedPresenceMigration] = useState(false);
   const [copiedPresenceInitializationMigration, setCopiedPresenceInitializationMigration] = useState(false);
+  const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -156,6 +158,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration initialisation présence:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration corrective de présence.' });
+    }
+  };
+
+  const handleCopyQuizAttemptSubmissionMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL);
+      setCopiedQuizAttemptSubmissionMigration(true);
+      setTimeout(() => setCopiedQuizAttemptSubmissionMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration soumission multi-tentatives:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration corrective des soumissions de quiz.' });
     }
   };
 
@@ -534,6 +547,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyQuizAttemptSubmissionMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-amber-700 hover:bg-amber-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedQuizAttemptSubmissionMigration ? '✓ Correctif soumission copié !' : 'Corriger les soumissions multi-tentatives'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -570,6 +591,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-teal-800">
               Si la migration Présence &amp; tentatives a déjà été exécutée, exécutez ensuite « délai par élève » : ce patch est idempotent et conserve les données; il crée les 10 secondes au clic étudiant, jamais au lancement professeur.
+            </span>
+            <span className="text-[11px] text-amber-800">
+              Pour l’erreur « no unique or exclusion constraint matching the ON CONFLICT specification », copiez puis exécutez le correctif « soumissions multi-tentatives ». Il aligne les RPC sur la clé unique quiz/élève/tentative, conserve l’historique et ne supprime aucune note.
             </span>
           </div>
         </div>

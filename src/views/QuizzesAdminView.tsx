@@ -667,15 +667,16 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     });
   };
 
-  const handleGrantQuizRetry = async (quiz: Quiz) => {
-    const studentId = window.prompt('Identifiant de l’élève à autoriser :')?.trim();
+  const handleGrantQuizRetry = async (quiz: Quiz, selectedStudentId?: string) => {
+    const studentId = selectedStudentId || window.prompt('Identifiant de l’élève à autoriser :')?.trim();
     if (!studentId) return;
     const reason = window.prompt('Motif obligatoire de la seconde chance :')?.trim();
     if (!reason) return;
     try {
-      await supabaseService.grantQuizRetry(quiz.id, studentId, reason);
       setQuizActionError(null);
+      await supabaseService.grantQuizRetry(quiz.id, studentId, reason);
       loadData();
+      if (onRefresh) onRefresh();
     } catch (error) {
       setQuizActionError(error instanceof Error ? error.message : 'Impossible d’accorder la seconde chance.');
     }
@@ -1330,40 +1331,58 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           
           {/* Tracking Panel */}
           {trackingQuiz ? (
-            <div className="bg-white rounded-2xl p-5 border border-amber-300 shadow-md space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 sm:p-6"
+              onClick={() => setActiveTrackingQuizId(null)}
+            >
+              <section
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="live-quiz-tracking-title"
+                className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-amber-300 bg-white shadow-2xl"
+                onClick={event => event.stopPropagation()}
+              >
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 pb-3 pt-5">
                 <div>
                   <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Suivi en temps réel</span>
-                  <h3 className="font-bold text-slate-900 text-sm">{trackingQuiz.title}</h3>
+                  <h3 id="live-quiz-tracking-title" className="font-bold text-slate-900 text-sm">{trackingQuiz.title}</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveTrackingQuizId(null)}
-                  className="p-1 text-slate-400 hover:text-slate-700"
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Fermer le suivi du quiz"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="text-xs text-slate-600 space-y-1">
+              <div className="space-y-1 px-5 pt-4 text-xs text-slate-600">
                 <p>{trackingClassIds.length > 1 ? 'Classes' : 'Classe'} : <strong>{trackingClassLabel}</strong></p>
                 <p>Disponibilité : <strong>jusqu’à la clôture manuelle du professeur</strong></p>
               </div>
 
               {/* Roster participation checklist */}
-              <div className="space-y-2">
+              <div className="space-y-2 overflow-y-auto px-5 pb-5 pt-4">
                 <div className="text-xs font-bold text-slate-700">Participation des élèves :</div>
-                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 border rounded-xl">
+                {quizActionError && (
+                  <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                    {quizActionError}
+                  </div>
+                )}
+                <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 rounded-xl border">
                   {classStudents.map(st => {
-                    const sub = trackingSubmissions.find(s => s.student_id === st.id);
+                    const sub = trackingSubmissions
+                      .filter(s => s.student_id === st.id)
+                      .sort((a, b) => new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime())[0];
                     return (
-                      <div key={st.id} className="p-2.5 flex items-center justify-between text-xs">
-                        <div>
+                      <div key={st.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs">
+                        <div className="min-w-0">
                           <div className="font-bold text-slate-900">{st.first_name} {st.last_name}</div>
                           <div className="text-[10px] text-slate-400 font-mono">N° {st.student_number || '1'}</div>
                         </div>
 
-                        <div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           {sub ? (
                             sub.status === 'completed' ? (
                               <span className="px-2 py-0.5 rounded font-mono font-bold bg-emerald-100 text-emerald-800">
@@ -1379,12 +1398,24 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                               En attente...
                             </span>
                           )}
+                          {!trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' &&
+                            (sub?.status === 'missed' || sub?.status === 'timeout') && (
+                              <button
+                                type="button"
+                                onClick={() => void handleGrantQuizRetry(trackingQuiz, st.id)}
+                                className="rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-800"
+                                title={`Accorder une seconde chance à ${st.first_name} ${st.last_name}`}
+                              >
+                                Seconde chance
+                              </button>
+                            )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
+              </section>
             </div>
           ) : null}
 
