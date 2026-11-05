@@ -40,7 +40,7 @@ import {
   Search,
   SlidersHorizontal
 } from 'lucide-react';
-import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory } from '../types';
+import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QuizParticipant, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory } from '../types';
 import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -345,6 +345,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
   // Vue détail / Suivi en direct d'un quiz
   const [activeTrackingQuizId, setActiveTrackingQuizId] = useState<string | null>(null);
+  const [trackingClassFilter, setTrackingClassFilter] = useState('all');
+  const [trackingParticipants, setTrackingParticipants] = useState<QuizParticipant[]>([]);
+  const [trackingLoadError, setTrackingLoadError] = useState<string | null>(null);
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('');
 
@@ -451,6 +454,35 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       clearInterval(timer);
     };
   }, [selectedClassId]);
+
+  useEffect(() => {
+    if (!activeTrackingQuizId) {
+      setTrackingParticipants([]);
+      setTrackingLoadError(null);
+      return;
+    }
+    let cancelled = false;
+    const refreshParticipants = async () => {
+      try {
+        const participants = await supabaseService.getQuizLiveParticipants(activeTrackingQuizId);
+        if (!cancelled) {
+          setTrackingParticipants(participants);
+          setTrackingLoadError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTrackingParticipants([]);
+          setTrackingLoadError(error instanceof Error ? error.message : 'Impossible de charger les présences du lancement.');
+        }
+      }
+    };
+    void refreshParticipants();
+    const timer = window.setInterval(() => void refreshParticipants(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeTrackingQuizId]);
 
   const handleOpenCreate = () => {
     setEditingQuiz(null);
@@ -696,6 +728,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const classStudents = trackingQuiz
     ? students.filter(s => trackingClassIds.includes(s.class_id))
     : students.filter(s => s.class_id === selectedClassId);
+  const trackingClassStudents = trackingClassFilter === 'all'
+    ? classStudents
+    : classStudents.filter(student => student.class_id === trackingClassFilter);
+  const trackingParticipantsByStudent = new Map(trackingParticipants.map(participant => [participant.student_id, participant]));
+  const trackingClasses = classes.filter(classRoom => trackingClassIds.includes(classRoom.id));
   const trackingClassNames = classes
     .filter(c => trackingClassIds.includes(c.id))
     .map(c => c.name)
@@ -1234,7 +1271,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             )}
                             <button
                               type="button"
-                              onClick={() => setActiveTrackingQuizId(quiz.id)}
+                              onClick={() => {
+                                setTrackingClassFilter('all');
+                                setActiveTrackingQuizId(quiz.id);
+                              }}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1362,53 +1402,100 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                 <p>Disponibilité : <strong>jusqu’à la clôture manuelle du professeur</strong></p>
               </div>
 
-              {/* Roster participation checklist */}
+              {/* Suivi de la présence réelle, indépendant de l’existence d’une soumission */}
               <div className="space-y-2 overflow-y-auto px-5 pb-5 pt-4">
-                <div className="text-xs font-bold text-slate-700">Participation des élèves :</div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="text-xs font-bold text-slate-700">Participation des élèves ({trackingClassStudents.length})</div>
+                  <label className="block w-full sm:w-64">
+                    <span className="mb-1 block text-[11px] font-semibold text-slate-600">Filtrer par classe</span>
+                    <select
+                      value={trackingClassFilter}
+                      onChange={event => setTrackingClassFilter(event.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="all">Toutes les classes du quiz</option>
+                      {trackingClasses.map(classRoom => (
+                        <option key={classRoom.id} value={classRoom.id}>{classRoom.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {trackingLoadError && (
+                  <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                    {trackingLoadError}
+                  </div>
+                )}
                 {quizActionError && (
                   <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
                     {quizActionError}
                   </div>
                 )}
                 <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 rounded-xl border">
-                  {classStudents.map(st => {
+                  {trackingClassStudents.map(st => {
                     const sub = trackingSubmissions
                       .filter(s => s.student_id === st.id)
                       .sort((a, b) => new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime())[0];
+                    const participant = trackingParticipantsByStudent.get(st.id);
+                    const status = participant?.presence_status;
+                    const statusLabel = status === 'retry_authorized'
+                      ? 'Seconde chance autorisée'
+                      : status === 'pending'
+                        ? 'En attente de démarrage'
+                        : status === 'present'
+                          ? 'Présent · quiz en cours'
+                          : status === 'completed'
+                            ? 'Quiz terminé'
+                            : status === 'timeout'
+                              ? 'Temps dépassé'
+                              : status === 'absent'
+                                ? 'Absent'
+                                : sub?.status === 'missed'
+                                  ? 'Absent au lancement précédent'
+                                  : sub?.status === 'timeout'
+                                    ? 'Temps dépassé au lancement précédent'
+                                    : sub?.status === 'completed'
+                                      ? 'Quiz déjà effectué'
+                                      : 'Non inscrit à ce lancement';
+                    const canGrantRetry = !trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' &&
+                      (status === 'absent' || status === 'timeout' ||
+                        (!participant && sub?.status !== 'completed'));
                     return (
                       <div key={st.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs">
                         <div className="min-w-0">
                           <div className="font-bold text-slate-900">{st.first_name} {st.last_name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">N° {st.student_number || '1'}</div>
+                          <div className="text-[10px] text-slate-500">N° {st.student_number || '1'} · {classes.find(c => c.id === st.class_id)?.name || 'Classe inconnue'}</div>
                         </div>
-
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          {sub ? (
-                            sub.status === 'completed' ? (
-                              <span className="px-2 py-0.5 rounded font-mono font-bold bg-emerald-100 text-emerald-800">
-                                {sub.score_20}/20
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded font-mono font-bold bg-rose-100 text-rose-800">
-                                0/20 (Non fait)
-                              </span>
-                            )
-                          ) : (
-                            <span className="text-[11px] text-amber-700 font-medium animate-pulse">
-                              En attente...
-                            </span>
+                          <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
+                            status === 'present' || status === 'completed' || sub?.status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-800'
+                              : status === 'absent' || status === 'timeout' || sub?.status === 'missed' || sub?.status === 'timeout'
+                                ? 'bg-rose-50 text-rose-800'
+                                : status === 'retry_authorized'
+                                  ? 'bg-violet-50 text-violet-800'
+                                  : 'bg-amber-50 text-amber-800'
+                          }`}>
+                            {statusLabel}
+                          </span>
+                          {sub?.status === 'completed' && (
+                            <span className="rounded bg-emerald-100 px-2 py-0.5 font-mono font-bold text-emerald-800">{sub.score_20}/20</span>
                           )}
-                          {!trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' &&
-                            (sub?.status === 'missed' || sub?.status === 'timeout') && (
-                              <button
-                                type="button"
-                                onClick={() => void handleGrantQuizRetry(trackingQuiz, st.id)}
-                                className="rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-800"
-                                title={`Accorder une seconde chance à ${st.first_name} ${st.last_name}`}
-                              >
-                                Seconde chance
-                              </button>
-                            )}
+                          {(sub?.status === 'missed' || sub?.status === 'timeout') && (
+                            <span className="rounded bg-rose-100 px-2 py-0.5 font-mono font-bold text-rose-800">0/20</span>
+                          )}
+                          {status === 'retry_authorized' && (
+                            <span className="rounded bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800">Déjà autorisée</span>
+                          )}
+                          {canGrantRetry && (
+                            <button
+                              type="button"
+                              onClick={() => void handleGrantQuizRetry(trackingQuiz, st.id)}
+                              className="rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-800"
+                              title={`Accorder une seconde chance à ${st.first_name} ${st.last_name}`}
+                            >
+                              Seconde chance
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
