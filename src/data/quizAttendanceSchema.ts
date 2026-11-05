@@ -182,12 +182,13 @@ BEGIN
   SELECT * INTO v_quiz FROM public.quizzes WHERE id = v_quiz_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Quiz introuvable.'; END IF;
   IF coalesce(v_quiz.is_public, false) THEN NULL;
+  ELSIF (p_submission ->> 'retry_grant_id') IS NOT NULL THEN
+    SELECT * INTO v_grant FROM public.quiz_retry_grants WHERE id = (p_submission ->> 'retry_grant_id')::uuid AND quiz_id = v_quiz_id AND student_id = v_student_id AND revoked_at IS NULL AND used_attempts < max_attempts FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Seconde chance inexistante ou déjà utilisée.'; END IF;
+    SELECT * INTO v_part FROM public.quiz_participants WHERE quiz_id = v_quiz_id AND student_id = v_student_id FOR UPDATE;
   ELSIF v_quiz.attendance_mode = 'strict_presence' THEN
     SELECT * INTO v_part FROM public.quiz_participants WHERE quiz_id = v_quiz_id AND student_id = v_student_id FOR UPDATE;
-    IF (p_submission ->> 'retry_grant_id') IS NOT NULL THEN
-      SELECT * INTO v_grant FROM public.quiz_retry_grants WHERE id = (p_submission ->> 'retry_grant_id')::uuid AND quiz_id = v_quiz_id AND student_id = v_student_id AND revoked_at IS NULL AND used_attempts < max_attempts FOR UPDATE;
-      IF NOT FOUND THEN RAISE EXCEPTION 'Seconde chance inexistante ou déjà utilisée.'; END IF;
-    ELSIF NOT FOUND OR v_part.presence_status <> 'present' OR v_quiz.status <> 'launched' THEN
+    IF NOT FOUND OR v_part.presence_status <> 'present' OR v_quiz.status <> 'launched' THEN
       RAISE EXCEPTION 'Présence non confirmée ou quiz clôturé.';
     END IF;
   ELSIF v_quiz.status <> 'launched' THEN
@@ -200,11 +201,32 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.grant_quiz_retry_for_class(p_quiz_id TEXT, p_class_id TEXT, p_reason TEXT DEFAULT NULL, p_max_attempts INTEGER DEFAULT 1)
+RETURNS JSONB LANGUAGE plpgsql SECURITY INVOKER SET search_path = public AS $$
+DECLARE v_student TEXT; v_count INTEGER := 0;
+BEGIN
+  IF NOT public.is_quiz_teacher() THEN RAISE EXCEPTION 'Seul le professeur peut accorder une seconde chance.'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.quizzes q WHERE q.id = p_quiz_id AND p_class_id = ANY(coalesce(nullif(q.class_ids, ARRAY[]::text[]), ARRAY[q.class_id]))) THEN
+    RAISE EXCEPTION 'Cette classe ne fait pas partie du quiz sélectionné.';
+  END IF;
+  FOR v_student IN SELECT s.id::text FROM public.students s WHERE s.class_id::text = p_class_id LOOP
+    IF NOT EXISTS (SELECT 1 FROM public.quiz_retry_grants g WHERE g.quiz_id = p_quiz_id AND g.student_id = v_student AND g.revoked_at IS NULL AND g.used_attempts < g.max_attempts) THEN
+      INSERT INTO public.quiz_retry_grants (quiz_id, student_id, granted_by, reason, max_attempts)
+      VALUES (p_quiz_id, v_student, auth.uid(), nullif(trim(p_reason), ''), greatest(1, p_max_attempts));
+      v_count := v_count + 1;
+    END IF;
+  END LOOP;
+  RETURN jsonb_build_object('granted', v_count);
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.is_quiz_teacher() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.confirm_quiz_presence(TEXT, TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.grant_quiz_retry(TEXT, JSONB, TEXT, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.grant_quiz_retry_for_class(TEXT, TEXT, TEXT, INTEGER) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.confirm_quiz_presence(TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.grant_quiz_retry(TEXT, JSONB, TEXT, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_quiz_retry_for_class(TEXT, TEXT, TEXT, INTEGER) TO authenticated;
 
 ALTER TABLE public.quiz_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_retry_grants ENABLE ROW LEVEL SECURITY;
