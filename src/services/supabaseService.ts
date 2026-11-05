@@ -1153,14 +1153,31 @@ class SupabaseService {
     return (data || []) as QuizParticipant[];
   }
 
-  public async grantQuizRetry(quizId: string, studentId: string, reason: string, launchId?: string): Promise<QuizRetryGrant> {
+  public async grantQuizRetry(quizId: string, studentId: string, reason: string, _launchId?: string): Promise<number> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour accorder une seconde chance.');
     const { data, error } = await client.rpc('grant_quiz_retry', {
-      p_quiz_id: quizId, p_student_id: studentId, p_reason: reason, p_launch_id: launchId || null
+      p_quiz_id: quizId,
+      p_student_ids: [studentId],
+      p_reason: reason,
+      p_max_attempts: 1
     });
     if (error) throw new Error(`Seconde chance : ${error.message}`);
-    return data as QuizRetryGrant;
+    return Number(data?.granted ?? 0);
+  }
+
+  public async grantQuizRetryForClass(quizId: string, classId: string, reason: string, maxAttempts = 1): Promise<number> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour accorder une seconde chance à une classe.');
+    const { data, error } = await client.rpc('grant_quiz_retry_for_class', {
+      p_quiz_id: quizId,
+      p_class_id: classId,
+      p_reason: reason,
+      p_max_attempts: maxAttempts
+    });
+    if (error) throw new Error(`Seconde chance pour la classe : ${error.message}`);
+    if (typeof data === 'number') return data;
+    return Number(data?.granted ?? data?.count ?? 0);
   }
 
   public async closeQuizWithPresence(quizId: string): Promise<QuizSubmission[] | null> {

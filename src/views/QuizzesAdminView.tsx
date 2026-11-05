@@ -348,6 +348,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [trackingClassFilter, setTrackingClassFilter] = useState('all');
   const [trackingParticipants, setTrackingParticipants] = useState<QuizParticipant[]>([]);
   const [trackingLoadError, setTrackingLoadError] = useState<string | null>(null);
+  const [retryReason, setRetryReason] = useState('Incident technique ou fausse manipulation');
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [retryClassId, setRetryClassId] = useState('');
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('');
 
@@ -711,6 +715,43 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       if (onRefresh) onRefresh();
     } catch (error) {
       setQuizActionError(error instanceof Error ? error.message : 'Impossible d’accorder la seconde chance.');
+    }
+  };
+
+  const handleGrantRetryFromPanel = async (studentId: string, launchId?: string) => {
+    if (!trackingQuiz || !retryReason.trim()) {
+      setRetryMessage('Saisissez un motif avant d’autoriser une seconde chance.');
+      return;
+    }
+    try {
+      setRetryBusy(true);
+      setRetryMessage(null);
+      await supabaseService.grantQuizRetry(trackingQuiz.id, studentId, retryReason.trim(), launchId);
+      setRetryMessage('Seconde chance autorisée. L’élève pourra reprendre le quiz selon les règles du serveur.');
+      loadData();
+    } catch (error) {
+      setRetryMessage(error instanceof Error ? error.message : 'Impossible d’autoriser la seconde chance.');
+    } finally {
+      setRetryBusy(false);
+    }
+  };
+
+  const handleGrantRetryForClassFromPanel = async () => {
+    if (!trackingQuiz || !retryClassId || !retryReason.trim()) {
+      setRetryMessage('Choisissez une classe et saisissez un motif.');
+      return;
+    }
+    try {
+      setRetryBusy(true);
+      setRetryMessage(null);
+      const count = await supabaseService.grantQuizRetryForClass(trackingQuiz.id, retryClassId, retryReason.trim());
+      const className = classes.find(item => item.id === retryClassId)?.name || 'la classe sélectionnée';
+      setRetryMessage(`${count} autorisation(s) accordée(s) pour ${className}. Les anciennes tentatives sont conservées.`);
+      loadData();
+    } catch (error) {
+      setRetryMessage(error instanceof Error ? error.message : 'Impossible d’autoriser la classe.');
+    } finally {
+      setRetryBusy(false);
     }
   };
 
@@ -1430,6 +1471,46 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     {quizActionError}
                   </div>
                 )}
+                {!trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' && (
+                  <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                    <div>
+                      <div className="text-xs font-bold text-violet-950">Seconde chance / reprise</div>
+                      <p className="mt-1 text-[11px] leading-4 text-violet-900">
+                        Autorisez un élève absent, bloqué à 0/20 ou victime d’un incident. Le statut « Non inscrit à ce lancement » n’empêche plus l’autorisation exceptionnelle.
+                      </p>
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 block text-[11px] font-semibold text-violet-950">Motif obligatoire</span>
+                      <input
+                        value={retryReason}
+                        onChange={event => setRetryReason(event.target.value)}
+                        className="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500"
+                        placeholder="Ex. incident technique / capture involontaire"
+                      />
+                    </label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <select
+                        value={retryClassId}
+                        onChange={event => setRetryClassId(event.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800"
+                      >
+                        <option value="">Choisir une classe entière…</option>
+                        {trackingClasses.map(classRoom => (
+                          <option key={classRoom.id} value={classRoom.id}>{classRoom.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={retryBusy || !retryClassId || !retryReason.trim()}
+                        onClick={() => void handleGrantRetryForClassFromPanel()}
+                        className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {retryBusy ? 'Autorisation…' : 'Autoriser toute la classe'}
+                      </button>
+                    </div>
+                    {retryMessage && <p role="status" className="text-[11px] font-semibold text-violet-900">{retryMessage}</p>}
+                  </div>
+                )}
                 <div className="max-h-[55vh] overflow-y-auto divide-y divide-slate-100 rounded-xl border">
                   {trackingClassStudents.map(st => {
                     const sub = trackingSubmissions
@@ -1456,9 +1537,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                                     : sub?.status === 'completed'
                                       ? 'Quiz déjà effectué'
                                       : 'Non inscrit à ce lancement';
-                    const canGrantRetry = !trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' &&
-                      (status === 'absent' || status === 'timeout' ||
-                        (!participant && sub?.status !== 'completed'));
+                    const canGrantRetry = !trackingQuiz.is_public && trackingQuiz.attendance_mode === 'strict_presence' && status !== 'retry_authorized';
                     return (
                       <div key={st.id} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-xs">
                         <div className="min-w-0">
@@ -1489,7 +1568,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           {canGrantRetry && (
                             <button
                               type="button"
-                              onClick={() => void handleGrantQuizRetry(trackingQuiz, st.id)}
+                              disabled={retryBusy}
+                              onClick={() => void handleGrantRetryFromPanel(st.id, participant?.launch_id)}
                               className="rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-violet-800"
                               title={`Accorder une seconde chance à ${st.first_name} ${st.last_name}`}
                             >
