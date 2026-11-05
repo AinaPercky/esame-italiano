@@ -323,28 +323,59 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     };
   }, [currentUser.student_id, onLogout, studentRecord?.id]);
 
-  // Système anti-triche : si l'élève quitte la fenêtre / change d'onglet pendant le quiz
+  // Anti-triche : les événements blur sont particulièrement imprécis sur iOS,
+  // notamment lors de l'ouverture du clavier; ils ne sont donc jamais utilisés sur mobile.
   useEffect(() => {
     if (!activeQuiz) return;
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        handleSubmitQuiz(true);
-        setAntiCheatNotice(true);
+    const gracePeriodMs = 2000;
+    const debounceMs = 1500;
+    const startedAt = Date.now();
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    let violationTimer: number | null = null;
+
+    const clearViolationTimer = () => {
+      if (violationTimer !== null) {
+        window.clearTimeout(violationTimer);
+        violationTimer = null;
       }
     };
 
-    const handleBlur = () => {
-      handleSubmitQuiz(true);
-      setAntiCheatNotice(true);
+    const scheduleViolationCheck = () => {
+      clearViolationTimer();
+      const graceRemainingMs = Math.max(0, gracePeriodMs - (Date.now() - startedAt));
+      violationTimer = window.setTimeout(() => {
+        violationTimer = null;
+        const actuallyAway = document.hidden || (!isMobileDevice && !document.hasFocus());
+        if (actuallyAway) {
+          setAntiCheatNotice(true);
+          void handleSubmitQuiz(true);
+        }
+      }, graceRemainingMs + debounceMs);
     };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) scheduleViolationCheck();
+      else clearViolationTimer();
+    };
+
+    const handleBlur = () => {
+      // Sur téléphone, le clavier, les notifications et l’interface du navigateur peuvent produire blur.
+      if (!isMobileDevice) scheduleViolationCheck();
+    };
+
+    const handleFocus = () => clearViolationTimer();
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+      clearViolationTimer();
     };
   }, [activeQuiz, isPracticeMode]);
 
