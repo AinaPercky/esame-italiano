@@ -1156,14 +1156,25 @@ class SupabaseService {
   public async grantQuizRetry(quizId: string, studentId: string, reason: string, _launchId?: string): Promise<number> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour accorder une seconde chance.');
-    const { data, error } = await client.rpc('grant_quiz_retry', {
+    const result = await client.rpc('grant_quiz_retry', {
       p_quiz_id: quizId,
       p_student_ids: [studentId],
       p_reason: reason,
       p_max_attempts: 1
     });
-    if (error) throw new Error(`Seconde chance : ${error.message}`);
-    return Number(data?.granted ?? 0);
+    if (!result.error) return Number(result.data?.granted ?? 0);
+
+    // Compatibilité avec la migration de présence précédente (RPC à p_student_id).
+    const isMissingNewRpc = result.error.code === 'PGRST202' || /function .*grant_quiz_retry.*not found/i.test(result.error.message);
+    if (!isMissingNewRpc) throw new Error(`Seconde chance : ${result.error.message}`);
+    const legacy = await client.rpc('grant_quiz_retry', {
+      p_quiz_id: quizId,
+      p_student_id: studentId,
+      p_reason: reason,
+      p_launch_id: _launchId || null
+    });
+    if (legacy.error) throw new Error(`Seconde chance : ${legacy.error.message}`);
+    return legacy.data?.id || legacy.data?.granted ? 1 : 0;
   }
 
   public async grantQuizRetryForClass(quizId: string, classId: string, reason: string, maxAttempts = 1): Promise<number> {

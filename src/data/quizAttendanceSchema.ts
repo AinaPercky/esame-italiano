@@ -165,7 +165,16 @@ DECLARE v_student TEXT; v_count INTEGER := 0;
 BEGIN
   IF NOT public.is_quiz_teacher() THEN RAISE EXCEPTION 'Seul le professeur peut accorder une seconde chance.'; END IF;
   FOR v_student IN SELECT jsonb_array_elements_text(coalesce(p_student_ids, '[]'::jsonb)) LOOP
-    IF EXISTS (SELECT 1 FROM public.quiz_submissions s WHERE s.quiz_id = p_quiz_id AND s.student_id = v_student AND s.score_20 = 0)
+    IF (
+         EXISTS (SELECT 1 FROM public.quiz_submissions s WHERE s.quiz_id = p_quiz_id AND s.student_id = v_student AND s.score_20 = 0)
+         OR EXISTS (
+           SELECT 1
+           FROM public.students st
+           JOIN public.quizzes q ON q.id = p_quiz_id
+           WHERE st.id::text = v_student
+             AND st.class_id::text = ANY(coalesce(nullif(q.class_ids, ARRAY[]::text[]), ARRAY[q.class_id]))
+         )
+       )
        AND NOT EXISTS (SELECT 1 FROM public.quiz_retry_grants g WHERE g.quiz_id = p_quiz_id AND g.student_id = v_student AND g.revoked_at IS NULL AND g.used_attempts < g.max_attempts) THEN
       INSERT INTO public.quiz_retry_grants (quiz_id, student_id, granted_by, reason, max_attempts) VALUES (p_quiz_id, v_student, auth.uid(), nullif(trim(p_reason), ''), greatest(1, p_max_attempts));
       v_count := v_count + 1;
