@@ -185,6 +185,7 @@ export interface Quiz {
   public_id?: string; // UUID unique pour l'accès public via lien partageable
   is_public?: boolean; // Indique si le quiz est publié publiquement
   attendance_mode?: 'legacy' | 'strict_presence';
+  presence_window_seconds?: number;
   category?: QuizCategory;
   title: string;
   description?: string;
@@ -218,6 +219,11 @@ export interface QuizSubmission {
   status: 'completed' | 'timeout' | 'missed'; // 'missed' = non fait avant la clôture (note = 0)
   feedback?: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }>;
   date: string; // YYYY-MM-DD
+  attempt_number?: number;
+  launch_id?: string;
+  attendance_status?: 'unknown' | 'present' | 'absent';
+  retry_grant_id?: string;
+  is_counted?: boolean;
 }
 
 export type QuizPresenceStatus = 'pending' | 'present' | 'absent' | 'completed' | 'timeout' | 'retry_authorized';
