@@ -1282,6 +1282,8 @@ export const dataService = {
         ? Math.max(1, Math.ceil(totalTimeSeconds / 60))
         : Number(data.duration_minutes) || 10,
       status: 'draft',
+      attendance_mode: data.is_public ? 'legacy' : 'strict_presence',
+      presence_window_seconds: 10,
       questions: normalizedQuestions,
       total_points: totalPoints
     };
@@ -1497,7 +1499,8 @@ export const dataService = {
     studentNumber: string | null | undefined,
     classId: string,
     answers: Record<string, string>,
-    isTimeout = false
+    isTimeout = false,
+    retryGrantId?: string
   ): Promise<QuizSubmission> {
     const quiz = this.getQuizById(quizId);
     if (!quiz) throw new Error('Quiz introuvable');
@@ -1522,7 +1525,7 @@ export const dataService = {
       return s.quiz_id === quizId && Boolean(studentId) && s.student_id === studentId;
     });
 
-    if (existingIdx !== -1) {
+    if (existingIdx !== -1 && !retryGrantId) {
       throw new Error("Vous avez déjà soumis ce quiz et il est définitivement verrouillé.");
     }
 
@@ -1576,7 +1579,11 @@ export const dataService = {
       score_20: score20,
       status: isTimeout ? 'timeout' : 'completed',
       feedback,
-      date: today
+      date: today,
+      attempt_number: existingIdx === -1 ? 1 : Math.max(...state.quizSubmissions.filter(s => s.quiz_id === quizId && s.student_id === studentId).map(s => s.attempt_number || 1), 0) + 1,
+      retry_grant_id: retryGrantId,
+      attendance_status: existingIdx !== -1 ? (state.quizSubmissions[existingIdx].attendance_status || 'present') : 'present',
+      is_counted: true
     };
 
     // En cloud, la remise verrouille la même ligne quiz que la clôture.
@@ -1587,7 +1594,9 @@ export const dataService = {
       : await supabaseService.submitQuizSubmissionAtomically(submission);
     if (!savedAtomically) await supabaseService.saveQuizSubmission(submission);
 
-    if (existingIdx !== -1) {
+    if (existingIdx !== -1 && retryGrantId) {
+      state.quizSubmissions.unshift(submission);
+    } else if (existingIdx !== -1) {
       state.quizSubmissions[existingIdx] = submission;
     } else {
       state.quizSubmissions.unshift(submission);
@@ -1649,7 +1658,15 @@ export const dataService = {
 
     const result: DailyGrade[] = [];
     Object.keys(groups).forEach(key => {
-      const subs = groups[key];
+      const grouped = groups[key];
+      const bestByQuiz = new Map<string, QuizSubmission>();
+      grouped.forEach(sub => {
+        if (sub.is_counted === false) return;
+        const current = bestByQuiz.get(sub.quiz_id);
+        if (!current || sub.score_20 > current.score_20 || (sub.score_20 === current.score_20 && (sub.attempt_number || 1) > (current.attempt_number || 1))) bestByQuiz.set(sub.quiz_id, sub);
+      });
+      const subs = [...bestByQuiz.values()];
+      if (subs.length === 0) return;
       const first = subs[0];
       const totalScore = subs.reduce((acc, curr) => acc + curr.score, 0);
       const totalPossible = subs.reduce((acc, curr) => acc + curr.max_score, 0);
@@ -1685,7 +1702,15 @@ export const dataService = {
 
     const result: DailyGrade[] = [];
     Object.keys(groups).forEach(date => {
-      const subs = groups[date];
+      const grouped = groups[date];
+      const bestByQuiz = new Map<string, QuizSubmission>();
+      grouped.forEach(sub => {
+        if (sub.is_counted === false) return;
+        const current = bestByQuiz.get(sub.quiz_id);
+        if (!current || sub.score_20 > current.score_20 || (sub.score_20 === current.score_20 && (sub.attempt_number || 1) > (current.attempt_number || 1))) bestByQuiz.set(sub.quiz_id, sub);
+      });
+      const subs = [...bestByQuiz.values()];
+      if (subs.length === 0) return;
       const first = subs[0];
       const totalScore = subs.reduce((acc, curr) => acc + curr.score, 0);
       const totalPossible = subs.reduce((acc, curr) => acc + curr.max_score, 0);
