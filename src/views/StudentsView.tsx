@@ -226,8 +226,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     const bulletin = {
       student: { ...student, class_name: student.class_name || classes.find(item => item.id === student.class_id)?.name || 'Classe inconnue' },
       quizzes: classQuizzes,
-      submissions: quizSubmissions,
-      dailyGrades: dataService.getStudentDailyGrades(student.id)
+      submissions: quizSubmissions
     };
     if (format === 'pdf') exportStudentBulletinPDF(bulletin);
     else exportStudentBulletinPNG(bulletin);
