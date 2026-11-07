@@ -17,7 +17,9 @@ import {
   XCircle,
   UserCheck,
   UserX,
-  Clock
+  Clock,
+  FileDown,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Student, ClassRoom } from '../types';
 import { dataService } from '../services/dataService';
@@ -25,6 +27,7 @@ import { supabaseService } from '../services/supabaseService';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { exportStudentBulletinPDF, exportStudentBulletinPNG } from '../utils/exportUtils';
 
 interface StudentsViewProps {
   students: Student[];
@@ -213,6 +216,21 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setFormAvatar(student.avatar_url || student.avatar || '');
     setFormError(null);
     setIsAddModalOpen(true);
+  };
+
+  const handleExportBulletin = (student: Student, format: 'pdf' | 'png') => {
+    const quizSubmissions = dataService.getQuizSubmissions().filter(submission => submission.student_id === student.id);
+    const classQuizzes = dataService.getQuizzes().filter(quiz =>
+      quiz.class_id === student.class_id || quiz.class_ids?.includes(student.class_id)
+    );
+    const bulletin = {
+      student: { ...student, class_name: student.class_name || classes.find(item => item.id === student.class_id)?.name || 'Classe inconnue' },
+      quizzes: classQuizzes,
+      submissions: quizSubmissions,
+      dailyGrades: dataService.getStudentDailyGrades(student.id)
+    };
+    if (format === 'pdf') exportStudentBulletinPDF(bulletin);
+    else exportStudentBulletinPNG(bulletin);
   };
 
   const handleSaveStudent = async (e: React.FormEvent) => {
@@ -716,19 +734,26 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 </div>
               )}
 
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
                 <span className="text-[11px] text-slate-400">
                   Créé le {new Date(s.created_at).toLocaleDateString('fr-FR')}
                 </span>
-
-                <button
-                  type="button"
-                  onClick={() => onViewStudentSheet(s.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 rounded-md transition-colors min-h-[36px]"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Fiche & Notes</span>
-                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onViewStudentSheet(s.id)}
+                    className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 rounded-md transition-colors min-h-[38px]"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Fiche & notes</span>
+                  </button>
+                  <button type="button" onClick={() => handleExportBulletin(s, 'pdf')} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100 min-h-[38px]" title="Télécharger le bulletin PDF">
+                    <FileDown className="w-3.5 h-3.5" /><span>Bulletin PDF</span>
+                  </button>
+                  <button type="button" onClick={() => handleExportBulletin(s, 'png')} className="inline-flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs font-semibold text-violet-800 hover:bg-violet-100 min-h-[38px]" title="Télécharger le bulletin PNG">
+                    <ImageIcon className="w-3.5 h-3.5" /><span>Bulletin PNG</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -844,6 +869,25 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                             <span className="hidden md:inline">Ré-approuver</span>
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportBulletin(s, 'pdf')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs font-bold text-sky-800 transition-colors hover:bg-sky-100"
+                          title="Télécharger le bulletin PDF"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          <span className="hidden lg:inline">PDF</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleExportBulletin(s, 'png')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs font-bold text-violet-800 transition-colors hover:bg-violet-100"
+                          title="Télécharger le bulletin PNG"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span className="hidden lg:inline">PNG</span>
+                        </button>
 
                         <button
                           type="button"

@@ -1,6 +1,51 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Evaluation, Student, Exam } from '../types';
+import { DailyGrade, Evaluation, Exam, Quiz, QuizSubmission, Student } from '../types';
+
+export interface StudentBulletinData {
+  student: Student;
+  quizzes: Quiz[];
+  submissions: QuizSubmission[];
+  dailyGrades: DailyGrade[];
+  generatedAt?: Date;
+}
+
+const safeFilenamePart = (value: string): string => value
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '') || 'eleve';
+
+const downloadBlob = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const getBestQuizSubmissions = (submissions: QuizSubmission[]): QuizSubmission[] => {
+  const bestByQuiz = new Map<string, QuizSubmission>();
+  submissions.forEach(submission => {
+    if (submission.is_counted === false) return;
+    const current = bestByQuiz.get(submission.quiz_id);
+    if (!current || submission.score_20 > current.score_20 ||
+      (submission.score_20 === current.score_20 && (submission.attempt_number || 1) > (current.attempt_number || 1))) {
+      bestByQuiz.set(submission.quiz_id, submission);
+    }
+  });
+  return [...bestByQuiz.values()].sort((a, b) => a.quiz_title.localeCompare(b.quiz_title, 'fr'));
+};
+
+const bulletinAverage = (rows: Array<{ score: number; max: number }>): number => {
+  const max = rows.reduce((sum, row) => sum + row.max, 0);
+  const score = rows.reduce((sum, row) => sum + row.score, 0);
+  return max > 0 ? Number(((score / max) * 20).toFixed(2)) : 0;
+};
 
 /**
  * Format seconds to MM:SS
@@ -413,4 +458,169 @@ export const exportSingleStudentSheetPDF = (
   }
 
   doc.save(`fiche_${student.last_name.toLowerCase()}_${student.first_name.toLowerCase()}_${today}.pdf`);
+};
+
+/**
+ * Génère le bulletin annuel/récapitulatif d'un élève : meilleure tentative
+ * retenue pour chaque quiz, historique des cumuls journaliers et moyenne globale.
+ */
+export const exportStudentBulletinPDF = (data: StudentBulletinData): void => {
+  const { student, quizzes, submissions, dailyGrades } = data;
+  const bestSubmissions = getBestQuizSubmissions(submissions);
+  const quizRows = bestSubmissions.map((submission, index) => {
+    const quiz = quizzes.find(item => item.id === submission.quiz_id);
+    const attemptCount = submissions.filter(item => item.quiz_id === submission.quiz_id).length;
+    const status = submission.status === 'missed' ? 'Absent · 0/20'
+      : submission.status === 'timeout' ? 'Timeout · 0/20' : 'Terminé';
+    return [
+      String(index + 1),
+      quiz?.title || submission.quiz_title,
+      quiz?.category || '—',
+      `${submission.score_20}/20`,
+      `${attemptCount} tentative${attemptCount > 1 ? 's' : ''}`,
+      status
+    ];
+  });
+  const dailyRows = dailyGrades
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((grade, index) => [
+      String(index + 1),
+      new Date(`${grade.date}T12:00:00`).toLocaleDateString('fr-FR'),
+      String(grade.quizzes_count),
+      `${grade.average_score_20}/20`
+    ]);
+  const overall = bulletinAverage(bestSubmissions.map(submission => ({ score: submission.score, max: submission.max_score })));
+  const dailyAverage = dailyGrades.length
+    ? Number((dailyGrades.reduce((sum, grade) => sum + grade.average_score_20, 0) / dailyGrades.length).toFixed(2))
+    : 0;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const today = (data.generatedAt || new Date()).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  doc.setFillColor(15, 70, 87);
+  doc.rect(0, 0, pageWidth, 29, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  doc.text('BULLETIN DE L’ÉLÈVE', 14, 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`PerckyLingua · Italien · Généré le ${today}`, 14, 20);
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, 35, pageWidth - 28, 26, 2, 2, 'FD');
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`${student.last_name.toUpperCase()} ${student.first_name}`, 20, 45);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Classe : ${student.class_name || '—'}   ·   Matricule : ${student.student_number || '—'}`, 20, 53);
+
+  const summaryY = 67;
+  const summaryWidth = (pageWidth - 28 - 8) / 3;
+  [
+    ['QUIZ ÉVALUÉS', String(bestSubmissions.length)],
+    ['MOYENNE QUIZ', `${overall}/20`],
+    ['CUMUL JOURNALIER', `${dailyAverage}/20`]
+  ].forEach(([label, value], index) => {
+    const x = 14 + index * (summaryWidth + 4);
+    doc.setFillColor(index === 1 ? 236 : 248, index === 1 ? 253 : 250, index === 1 ? 245 : 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(x, summaryY, summaryWidth, 18, 2, 2, 'FD');
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7);
+    doc.text(label, x + 4, summaryY + 6);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(value, x + 4, summaryY + 14);
+    doc.setFont('helvetica', 'normal');
+  });
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Résultats des quiz — meilleure tentative retenue', 14, 94);
+  autoTable(doc, {
+    startY: 98,
+    head: [['N°', 'Quiz', 'Catégorie', 'Note', 'Tentatives', 'Statut']],
+    body: quizRows.length ? quizRows : [['—', 'Aucun quiz évalué', '—', '—', '—', '—']],
+    theme: 'striped',
+    headStyles: { fillColor: [15, 70, 87], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    styles: { fontSize: 7.5, cellPadding: 2.3, textColor: [30, 41, 59], lineColor: [226, 232, 240], lineWidth: 0.1 },
+    columnStyles: { 0: { halign: 'center', cellWidth: 9 }, 1: { cellWidth: 59 }, 2: { cellWidth: 34 }, 3: { halign: 'center', fontStyle: 'bold', cellWidth: 18 }, 4: { halign: 'center', cellWidth: 23 }, 5: { cellWidth: 31 } }
+  });
+  const quizTableEnd = (doc as any).lastAutoTable?.finalY || 105;
+  const dailyTitleY = Math.min(quizTableEnd + 13, pageHeight - 75);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Cumul des notes journalières', 14, dailyTitleY);
+  autoTable(doc, {
+    startY: dailyTitleY + 4,
+    head: [['N°', 'Date', 'Quiz comptés', 'Moyenne du jour']],
+    body: dailyRows.length ? dailyRows : [['—', 'Aucune note journalière', '—', '—']],
+    theme: 'grid',
+    headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 2.3, textColor: [30, 41, 59] },
+    columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { cellWidth: 42 }, 2: { halign: 'center', cellWidth: 38 }, 3: { halign: 'center', fontStyle: 'bold', cellWidth: 45 } }
+  });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Les tentatives précédentes restent conservées dans l’historique. Une seule meilleure note par quiz est retenue dans le cumul.', 14, pageHeight - 14);
+  doc.text('Document confidentiel · PerckyLingua', pageWidth - 14, pageHeight - 8, { align: 'right' });
+  doc.save(`bulletin_${safeFilenamePart(student.last_name)}_${safeFilenamePart(student.first_name)}.pdf`);
+};
+
+/** Génère une image PNG lisible et partageable du même bulletin. */
+export const exportStudentBulletinPNG = (data: StudentBulletinData): void => {
+  const { student, quizzes, submissions, dailyGrades } = data;
+  const bestSubmissions = getBestQuizSubmissions(submissions);
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  const width = 1200;
+  const rowHeight = 42;
+  const height = Math.max(980, 370 + bestSubmissions.length * rowHeight + dailyGrades.length * rowHeight);
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Le navigateur ne peut pas générer l’image du bulletin.');
+  ctx.scale(scale, scale);
+  const text = (value: string, x: number, y: number, size = 20, color = '#0f172a', weight = '400') => {
+    ctx.font = `${weight} ${size}px Arial, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.fillText(value, x, y);
+  };
+  const line = (x1: number, y: number, x2: number, color = '#e2e8f0') => { ctx.strokeStyle = color; ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke(); };
+  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#0f4657'; ctx.fillRect(0, 0, width, 150);
+  text('BULLETIN DE L’ÉLÈVE', 56, 62, 38, '#ffffff', '700');
+  text(`PerckyLingua · Italien · ${new Date().toLocaleDateString('fr-FR')}`, 56, 105, 20, '#dbeafe');
+  text(`${student.last_name.toUpperCase()} ${student.first_name}`, 56, 205, 32, '#0f172a', '700');
+  text(`Classe : ${student.class_name || '—'}   ·   Matricule : ${student.student_number || '—'}`, 56, 242, 20, '#475569');
+  const overall = bulletinAverage(bestSubmissions.map(submission => ({ score: submission.score, max: submission.max_score })));
+  const dailyAverage = dailyGrades.length ? Number((dailyGrades.reduce((sum, grade) => sum + grade.average_score_20, 0) / dailyGrades.length).toFixed(2)) : 0;
+  [['QUIZ ÉVALUÉS', String(bestSubmissions.length)], ['MOYENNE QUIZ', `${overall}/20`], ['CUMUL JOURNALIER', `${dailyAverage}/20`]].forEach(([label, value], index) => {
+    const x = 56 + index * 365;
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#cbd5e1'; ctx.fillRect(x, 275, 330, 78); ctx.strokeRect(x, 275, 330, 78);
+    text(label, x + 18, 303, 15, '#64748b', '700'); text(value, x + 18, 337, 25, '#0f172a', '700');
+  });
+  let y = 405;
+  text('RÉSULTATS DES QUIZ — MEILLEURE TENTATIVE', 56, y, 22, '#0f172a', '700'); y += 35;
+  text('Quiz', 56, y, 16, '#475569', '700'); text('Catégorie', 570, y, 16, '#475569', '700'); text('Note', 820, y, 16, '#475569', '700'); text('Statut', 960, y, 16, '#475569', '700'); y += 17; line(56, y, 1144); y += 30;
+  bestSubmissions.forEach(submission => {
+    const quiz = quizzes.find(item => item.id === submission.quiz_id);
+    text(quiz?.title || submission.quiz_title, 56, y, 17); text(quiz?.category || '—', 570, y, 16, '#475569'); text(`${submission.score_20}/20`, 820, y, 18, submission.score_20 >= 10 ? '#047857' : '#be123c', '700'); text(submission.status === 'missed' ? 'Absent' : submission.status === 'timeout' ? 'Timeout' : 'Terminé', 960, y, 16, '#475569'); line(56, y + 12, 1144); y += rowHeight;
+  });
+  y += 22; text('CUMUL DES NOTES JOURNALIÈRES', 56, y, 22, '#0f172a', '700'); y += 35;
+  text('Date', 56, y, 16, '#475569', '700'); text('Quiz comptés', 500, y, 16, '#475569', '700'); text('Moyenne du jour', 850, y, 16, '#475569', '700'); y += 17; line(56, y, 1144); y += 30;
+  dailyGrades.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach(grade => { text(new Date(`${grade.date}T12:00:00`).toLocaleDateString('fr-FR'), 56, y, 17); text(String(grade.quizzes_count), 500, y, 17); text(`${grade.average_score_20}/20`, 850, y, 18, grade.average_score_20 >= 10 ? '#047857' : '#be123c', '700'); line(56, y + 12, 1144); y += rowHeight; });
+  text('Les anciennes tentatives restent conservées ; une meilleure note par quiz est retenue.', 56, height - 42, 15, '#64748b');
+  canvas.toBlob(blob => { if (blob) downloadBlob(blob, `bulletin_${safeFilenamePart(student.last_name)}_${safeFilenamePart(student.first_name)}.png`); }, 'image/png');
 };
