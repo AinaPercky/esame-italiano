@@ -469,7 +469,6 @@ export const exportStudentBulletinPDF = (data: StudentBulletinData): void => {
   const bestSubmissions = getBestQuizSubmissions(submissions);
   const quizRows = bestSubmissions.map((submission, index) => {
     const quiz = quizzes.find(item => item.id === submission.quiz_id);
-    const attemptCount = submissions.filter(item => item.quiz_id === submission.quiz_id).length;
     const status = submission.status === 'missed' ? 'Absent · 0/20'
       : submission.status === 'timeout' ? 'Timeout · 0/20' : 'Terminé';
     return [
@@ -478,7 +477,6 @@ export const exportStudentBulletinPDF = (data: StudentBulletinData): void => {
       quiz?.category || '—',
       formatBulletinDate(submission.date),
       `${submission.score_20}/20`,
-      `${attemptCount} tentative${attemptCount > 1 ? 's' : ''}`,
       status
     ];
   });
@@ -536,12 +534,12 @@ export const exportStudentBulletinPDF = (data: StudentBulletinData): void => {
   doc.text('Résultats des quiz — meilleure tentative retenue', 14, 94);
   autoTable(doc, {
     startY: 98,
-    head: [['N°', 'Quiz', 'Catégorie', 'Date', 'Note', 'Tentatives', 'Statut']],
-    body: quizRows.length ? quizRows : [['—', 'Aucun quiz évalué', '—', '—', '—', '—', '—']],
+    head: [['N°', 'Quiz', 'Catégorie', 'Date', 'Note', 'Statut']],
+    body: quizRows.length ? quizRows : [['—', 'Aucun quiz évalué', '—', '—', '—', '—']],
     theme: 'striped',
     headStyles: { fillColor: [15, 70, 87], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
     styles: { fontSize: 7.5, cellPadding: 2.3, textColor: [30, 41, 59], lineColor: [226, 232, 240], lineWidth: 0.1 },
-    columnStyles: { 0: { halign: 'center', cellWidth: 8 }, 1: { cellWidth: 48 }, 2: { cellWidth: 27 }, 3: { halign: 'center', cellWidth: 23 }, 4: { halign: 'center', fontStyle: 'bold', cellWidth: 18 }, 5: { halign: 'center', cellWidth: 24 }, 6: { cellWidth: 27 } }
+    columnStyles: { 0: { halign: 'center', cellWidth: 8 }, 1: { cellWidth: 61 }, 2: { cellWidth: 31 }, 3: { halign: 'center', cellWidth: 25 }, 4: { halign: 'center', fontStyle: 'bold', cellWidth: 20 }, 5: { cellWidth: 31 } }
   });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
