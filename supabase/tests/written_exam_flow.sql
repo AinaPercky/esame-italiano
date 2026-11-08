@@ -183,7 +183,7 @@ begin
     where id=v_attempt_id;
     perform public.save_written_exam_question_answer(v_attempt_id,v_question_key,v_answers->v_question_key);
     update public.written_exam_attempts set question_timer_started_at=now()-make_interval(secs=>v_offset+31) where id=v_attempt_id;
-    v_result:=public.save_written_exam_question_answer(v_attempt_id,v_question_key,'\"late answer\"'::jsonb);
+    v_result:=public.save_written_exam_question_answer(v_attempt_id,v_question_key,'"late answer"'::jsonb);
     if coalesce((v_result->>'saved')::boolean,false) then raise exception 'A response was accepted after its individual question deadline.'; end if;
   end loop;
   v_result:=public.submit_written_exam(v_attempt_id);
