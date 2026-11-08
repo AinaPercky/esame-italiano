@@ -20,7 +20,7 @@ export const L135_TEMPLATE:WrittenExam={
  title:'L135 – Examen composite',description:'90 points · 1 h 30 · compréhension, grammaire, vocabulaire et réordonnement. Sans production écrite ni orale.',
  level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:null,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
- integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
+ integrity_settings:{fullscreen:true,warn_on_tab_switch:true,watermark:false},
  sections:[
   {...createSection('Compréhension écrite',20),instructions:'Ajoutez le texte source puis remplacez les dix énoncés de questions. Correction manuelle prévue pour ce canevas.',support_text:'{{TEXTE_DE_COMPREHENSION_AJOUTER}}',questions:Array.from({length:10},(_,i)=>({id:makeId(),type:'text' as const,prompt:'{{QUESTION_DE_COMPREHENSION_'+(i+1)+'}}',points:2,manual_review:true,answer_key:{}}))},
   {...createSection('Grammaire – Articles',10),category:'Articles',questions:[textQ('Completa con l’articolo corretto: ___ libro.',2,['il']),textQ('Ho comprato ___ arancia.',2,['un\'','un’']),textQ('___ studenti sono in classe.',2,['gli']),textQ('Vorrei ___ zaino nuovo.',2,['uno']),textQ('___ amica di Luca è gentile.',2,['l\'','l’'])]},
