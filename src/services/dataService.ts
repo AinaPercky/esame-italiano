@@ -1544,11 +1544,15 @@ export const dataService = {
           ? formatCorrectReorderAnswer(q)
           : q.type === 'text'
           ? formatCorrectTextAnswerForDisplay(q)
+          : q.type === 'verbes_trous' && q.verbes_trous
+          ? q.verbes_trous.phrases.map((phrase) => (phrase.verbe || '') + ' → ' + (phrase.reponses || []).join(' / ')).join(' · ')
           : (q.correct_answer || ''),
         studentAnswer: q.type === 'reorder'
           ? formatReorderAnswer(q, studentAns)
           : q.type === 'text'
           ? formatTextAnswerForDisplay(q, studentAns)
+          : q.type === 'verbes_trous' && q.verbes_trous
+          ? q.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return (response?.verbe_choisi || '—') + ' → ' + (response?.texte_saisi || '—'); }).join(' · ')
           : studentAns
       };
     });
