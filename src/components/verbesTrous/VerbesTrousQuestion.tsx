@@ -19,7 +19,7 @@ type Props = {
 const ACCENTS = ['à', 'è', 'é', 'ì', 'ò', 'ù'];
 
 export const VerbesTrousQuestion: React.FC<Props> = ({
-  definition, answer, onChange, disabled = false, showCorrection = false, answerKey, onSubmit
+  definition, answer, onChange, disabled = false, showCorrection = false, answerKey, onSubmit, onEnterPress
 }) => {
   const phrases = definition.phrases || [];
   const answers = useMemo(() => parseVerbesTrousAnswers(answer), [answer]);
