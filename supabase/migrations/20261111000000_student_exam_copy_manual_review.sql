@@ -21,9 +21,9 @@ begin
      'answer_key',k.answer_key,'explanation',k.explanation,
      'manual_review',q.manual_review,
      'manual_score',v_attempt.manual_scores->q.id::text
-   ) order by coalesce(array_position(array(select jsonb_array_elements_text(v_attempt.order_manifest->'questions'->s.id::text)),q.id::text),q.position)) from public.written_exam_questions q join public.written_exam_answer_keys k on k.question_id=q.id where q.section_id=s.id),'[]'::jsonb)
- ) order by coalesce(array_position(array(select jsonb_array_elements_text(v_attempt.order_manifest->'sections')),s.id::text),s.position)),'[]'::jsonb)
- into v_result from public.written_exam_sections s where s.version_id=v_attempt.version_id;
+   ) order by coalesce(ord.sequence,q.position)) from public.written_exam_questions q join public.written_exam_answer_keys k on k.question_id=q.id left join lateral jsonb_array_elements_text(coalesce(v_attempt.order_manifest->'questions'->s.id::text,'[]'::jsonb)) with ordinality as ord(question_id,sequence) on ord.question_id=q.id::text where q.section_id=s.id),'[]'::jsonb)
+ ) order by coalesce(section_order.sequence,s.position)),'[]'::jsonb)
+ into v_result from public.written_exam_sections s left join lateral jsonb_array_elements_text(coalesce(v_attempt.order_manifest->'sections','[]'::jsonb)) with ordinality as section_order(section_id,sequence) on section_order.section_id=s.id::text where s.version_id=v_attempt.version_id;
  return v_result;
 end $written$;
 revoke all on function public.get_my_written_exam_corrections(uuid) from public;
