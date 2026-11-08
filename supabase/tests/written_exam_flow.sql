@@ -23,6 +23,7 @@ declare
   v_text_id uuid;
   v_reorder_id uuid;
   v_manual_id uuid;
+  v_verbes_id uuid;
   v_saved jsonb;
   v_started jsonb;
   v_started_again jsonb;
@@ -80,6 +81,15 @@ begin
         ),
         jsonb_build_object('id','manual-one','type','text','prompt','Manual prompt','points',1,'manual_review',true,
           'answer_key','{}'::jsonb
+        ),
+        jsonb_build_object('id','verb-bank-one','type','verbes_trous','prompt','Verb bank prompt','points',6,
+          'verbes_trous',jsonb_build_object('titre','Verbi riflessivi','consigne','Scegli e coniuga','points_par_phrase',3,
+            'banque',jsonb_build_array('addormentarsi','bere','dire'),
+            'phrases',jsonb_build_array(jsonb_build_object('id',1,'debut','Io ','fin',' subito.'),jsonb_build_object('id',2,'debut','Noi ','fin',' caffè.'))),
+          'answer_key',jsonb_build_object('phrases',jsonb_build_array(
+            jsonb_build_object('id',1,'verbe','addormentarsi','reponses',jsonb_build_array('mi addormento')),
+            jsonb_build_object('id',2,'verbe','bere','reponses',jsonb_build_array('beviamo'))
+          ))
         )
       ))
     )
@@ -87,7 +97,7 @@ begin
 
   v_exam_id:=(v_saved->>'exam_id')::uuid;
   v_version_id:=(v_saved->>'version_id')::uuid;
-  if (v_saved->>'raw_max')::numeric<>8 then raise exception 'Expected raw maximum 8, got %',v_saved->>'raw_max'; end if;
+  if (v_saved->>'raw_max')::numeric<>14 then raise exception 'Expected raw maximum 14, got %',v_saved->>'raw_max'; end if;
 
   select count(*) into v_section_count from public.written_exam_sections where version_id=v_version_id;
   if v_section_count<>2 then raise exception 'Expected 2 sections, got %',v_section_count; end if;
@@ -129,8 +139,12 @@ begin
   from jsonb_array_elements(v_started->'sections') sec(value)
   cross join lateral jsonb_array_elements(sec.value->'questions') q(value)
   where q.value->>'prompt'='Manual prompt';
+  select (q.value->>'id')::uuid into v_verbes_id
+  from jsonb_array_elements(v_started->'sections') sec(value)
+  cross join lateral jsonb_array_elements(sec.value->'questions') q(value)
+  where q.value->>'prompt'='Verb bank prompt';
 
-  if v_qcm_id is null or v_text_id is null or v_reorder_id is null or v_manual_id is null then
+  if v_qcm_id is null or v_text_id is null or v_reorder_id is null or v_manual_id is null or v_verbes_id is null then
     raise exception 'A question was missing from the student payload.';
   end if;
 
@@ -138,7 +152,8 @@ begin
     v_qcm_id::text,'a',
     v_text_id::text,'["sono","wrong"]',
     v_reorder_id::text,'["i1","i3","i2"]',
-    v_manual_id::text,'free response'
+    v_manual_id::text,'free response',
+  v_verbes_id::text,'{\"1\":{\"verbe_choisi\":\"addormentarsi\",\"texte_saisi\":\"mi addormento\"},\"2\":{\"verbe_choisi\":\"dire\",\"texte_saisi\":\"beviamo\"}}'
   );
   perform public.save_written_exam_answers(v_attempt_id,v_answers);
   v_result:=public.submit_written_exam(v_attempt_id);
@@ -148,7 +163,7 @@ begin
 
   select status,auto_score into v_status,v_auto_score
   from public.written_exam_attempts where id=v_attempt_id;
-  if v_status<>'needs_review' or v_auto_score<>4 then
+  if v_status<>'needs_review' or v_auto_score<>9 then
     raise exception 'Unexpected automatic grading result: status %, score %',v_status,v_auto_score;
   end if;
 
@@ -159,10 +174,10 @@ begin
 
   select raw_score,normalized_score,status into v_raw_score,v_normalized,v_status
   from public.written_exam_attempts where id=v_attempt_id;
-  if v_status<>'graded' or v_raw_score<>5 or v_normalized<>62.5 then
+  if v_status<>'graded' or v_raw_score<>10 or v_normalized<>71.43 then
     raise exception 'Unexpected final grading result: status %, raw %, normalized %',v_status,v_raw_score,v_normalized;
   end if;
-  if (select coalesce(sum(raw_score),0) from public.written_exam_section_results where attempt_id=v_attempt_id)<>5 then
+  if (select coalesce(sum(raw_score),0) from public.written_exam_section_results where attempt_id=v_attempt_id)<>10 then
     raise exception 'Repeated manual grading changed the section total.';
   end if;
 
@@ -172,7 +187,7 @@ begin
 
   v_list:=public.list_available_written_exams();
   if jsonb_array_length(v_list)<>1 then raise exception 'Expected one available exam card after publication.'; end if;
-  if (v_list->0->>'raw_score')::numeric<>5 or (v_list->0->>'attempt_raw_max')::numeric<>8 then
+  if (v_list->0->>'raw_score')::numeric<>10 or (v_list->0->>'attempt_raw_max')::numeric<>14 then
     raise exception 'Published score or original attempt maximum is incorrect.';
   end if;
   v_corrections:=public.get_my_written_exam_corrections(v_exam_id);
