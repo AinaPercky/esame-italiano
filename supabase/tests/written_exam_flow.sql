@@ -274,6 +274,9 @@ declare
   v_corrections jsonb;
 begin
   select * into v_ctx from written_exam_ci_context limit 1;
+  -- Restore the first student's JWT after the multi-class scenario switched to student two.
+  perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci@example.test','sub',v_ctx.student_id::text)::text,true);
+  perform set_config('request.jwt.claim.sub',v_ctx.student_id::text,true);
   if exists(select 1 from public.written_exam_answer_keys) then raise exception 'Student can read private answer keys directly.'; end if;
   if exists(select 1 from public.written_exam_questions) then raise exception 'Student can read exam questions directly.'; end if;
   if exists(select 1 from public.written_exam_attempts) then raise exception 'Student can read attempts directly.'; end if;
