@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds } from './writtenExam';
 
 test('L135 model starts with a 90-point configurable allocation and 90-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
@@ -53,4 +53,12 @@ test('per-question clock resumes at the correct randomized question from the ser
  assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+8_000),1);
  assert.equal(getTimedQuestionRemainingSeconds(sections,1,startedAt,new Date(startedAt).getTime()+18_000),5);
  assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+33_000),3);
+});
+
+test('new manually created questions receive the 30-second default and invalid timer values are rejected',()=>{
+ assert.equal(createQuestion('qcm').time_limit_seconds,30);
+ const section=createSection('Timed');
+ section.questions=[{id:'bad-time',type:'text',prompt:'Ciao?',points:1,time_limit_seconds:3601,answer_key:{acceptedAnswers:['ciao']}}];
+ const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
+ assert.ok(errors.some(error=>error.includes('temps doit être compris entre 1 et 3600')));
 });
