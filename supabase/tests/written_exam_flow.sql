@@ -42,6 +42,7 @@ declare
   v_section_count integer;
   v_question_key text;
   v_offset integer;
+  v_duration integer;
   v_error text;
 begin
   insert into public.classes(id,name) values(v_class_id,'CI test class');
@@ -172,17 +173,17 @@ begin
       join public.written_exam_questions q on q.id::text=oq.question_id
       where a.id=v_attempt_id
     )
-    select coalesce(sum(previous.duration_seconds),0)::integer into v_offset
+    select coalesce(sum(previous.duration_seconds),0)::integer,current_question.duration_seconds into v_offset,v_duration
     from ordered_questions current_question
     left join ordered_questions previous on previous.question_order<current_question.question_order
     where current_question.question_id=v_question_key
-    group by current_question.question_order;
+    group by current_question.question_order,current_question.duration_seconds;
 
     update public.written_exam_attempts
     set question_timer_started_at=now()-make_interval(secs=>v_offset+1)
     where id=v_attempt_id;
     perform public.save_written_exam_question_answer(v_attempt_id,v_question_key,v_answers->v_question_key);
-    update public.written_exam_attempts set question_timer_started_at=now()-make_interval(secs=>v_offset+31) where id=v_attempt_id;
+    update public.written_exam_attempts set question_timer_started_at=now()-make_interval(secs=>v_offset+v_duration+1) where id=v_attempt_id;
     v_result:=public.save_written_exam_question_answer(v_attempt_id,v_question_key,'"late answer"'::jsonb);
     if coalesce((v_result->>'saved')::boolean,false) then raise exception 'A response was accepted after its individual question deadline.'; end if;
   end loop;
