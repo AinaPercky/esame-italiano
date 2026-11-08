@@ -450,7 +450,7 @@ begin
    'id',e.id,'title',v.title,'description',v.description,'level',v.level,
    'target_language',v.target_language,'instruction_language',v.instruction_language,
    'duration_minutes',v.duration_minutes,'display_scale',v.display_scale,'status',e.status,
-   'opens_at',v.opens_at,'closes_at',v.closes_at,'raw_max',v.raw_max,'version_id',v.id,
+   'opens_at',v.opens_at,'closes_at',v.closes_at,'raw_max',v.raw_max,'version_id',v.id,'class_eligible',exists(select 1 from public.written_exam_version_classes ec where ec.version_id=v.id and ec.class_id=v_student.class_id),
    'integrity_settings',v.integrity_settings,'max_attempts',v.max_attempts,'navigation_mode',v.navigation_mode,
    'sections',(select coalesce(jsonb_agg(jsonb_build_object('title',s.title,'group_name',s.group_name,'instructions',s.instructions,'max_points',s.max_points,'support_text',s.support_text,'support_url',s.support_url) order by s.position),'[]'::jsonb) from public.written_exam_sections s where s.version_id=v.id),
    'attempts_used',(select count(*) from public.written_exam_attempts x where x.exam_id=e.id and x.student_id=v_student.id),
