@@ -432,7 +432,7 @@ begin
  where (
    (a.status='in_progress' and e.status in ('published','scheduled','open'))
    or (e.status in ('published','scheduled','open') and (v.opens_at is null or v.opens_at<=now()) and (v.closes_at is null or v.closes_at>now()))
-   or (a.id is not null and e.status in ('closed','grading','results_published'))
+   or (a.id is not null and e.status in ('published','scheduled','open','closed','grading','results_published'))
  );
  return v_result;
 end $written$;
