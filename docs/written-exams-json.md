@@ -33,7 +33,7 @@ Un sujet contient des paramètres généraux, puis un tableau `sections`. Chaque
   "show_score_after_publish": true,
   "show_corrections_after_publish": false,
   "integrity_settings": {
-    "fullscreen": false,
+    "fullscreen": true,
     "warn_on_tab_switch": true,
     "watermark": false
   },
@@ -81,7 +81,7 @@ Un sujet contient des paramètres généraux, puis un tableau `sections`. Chaque
 
 ### Paramètres d’intégrité
 
-- `fullscreen` : propose le mode plein écran.
+- `fullscreen` : conservé pour compatibilité ; le plein écran est désormais demandé systématiquement pendant l’épreuve.
 - `warn_on_tab_switch` : journalise les changements d’onglet ou de focus.
 - `watermark` : active le filigrane dissuasif.
 
