@@ -219,6 +219,7 @@ declare
   v_question_added numeric;
   v_section_id uuid;
   v_display_scale numeric;
+  v_used_verbs text[];
 begin
   if old.status<>'in_progress' or new.status='in_progress' then
     return new;
@@ -237,6 +238,7 @@ begin
       v_student_answer := (v_student_answer#>>'{}')::jsonb;
     end if;
     v_question_added:=0;
+    v_used_verbs:=array[]::text[];
     for v_phrase in select value from jsonb_array_elements(v_q.answer_key->'phrases')
     loop
       v_phrase_answer:=v_student_answer->(v_phrase->>'id');
@@ -244,7 +246,8 @@ begin
       v_expected_verb:=lower(regexp_replace(btrim(coalesce(v_phrase->>'verbe','')),'\s+',' ','g'));
       v_typed:=lower(regexp_replace(btrim(coalesce(v_phrase_answer->>'texte_saisi','')),'\s+',' ','g'));
       v_phrase_points:=0;
-      if v_chosen_verb<>'' then
+      if v_chosen_verb<>'' and not (v_chosen_verb=any(v_used_verbs)) then
+        v_used_verbs:=array_append(v_used_verbs,v_chosen_verb);
         if v_chosen_verb=v_expected_verb then v_phrase_points:=v_phrase_points+1; end if;
         if v_typed<>'' and exists(
           select 1 from jsonb_array_elements_text(coalesce(v_phrase->'reponses','[]'::jsonb)) accepted(value)
