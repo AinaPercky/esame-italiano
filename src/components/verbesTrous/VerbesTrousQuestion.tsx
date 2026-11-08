@@ -38,12 +38,12 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
-    const update = () => setKeyboardOffset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)));
+    const update = () => setKeyboardOffset(focusedId ? Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)) : 0);
     update();
     viewport.addEventListener('resize', update);
     viewport.addEventListener('scroll', update);
     return () => { viewport.removeEventListener('resize', update); viewport.removeEventListener('scroll', update); };
-  }, []);
+  }, [focusedId]);
 
   const publish = useCallback((next: VerbesTrousAnswers) => onChange(JSON.stringify(next)), [onChange]);
   const choose = (verb: string) => {
