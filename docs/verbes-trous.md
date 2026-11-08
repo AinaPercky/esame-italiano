@@ -18,7 +18,7 @@ Règles de validation : au moins une phrase, banque de taille supérieure ou ég
 {
   "type": "verbes_trous",
   "question": "Esercizio 6 – Verbi riflessivi e presente indicativo",
-  "points": 15,
+  "points": 6,
   "verbes_trous": {
     "titre": "Esercizio 6 – Verbi riflessivi e presente indicativo",
     "consigne": "Choisissez le verbe qui convient, puis conjuguez-le au présent.",
