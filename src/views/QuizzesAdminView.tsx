@@ -207,8 +207,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         const item: any = {
           type: q.type,
           question: q.question,
-          points: type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
-          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+          points: q.type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
+          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' || q.type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
         };
         if (q.type === 'qcm') {
           item.options = q.options || ['', '', '', ''];
@@ -297,9 +297,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       verbes_trous: type === 'verbes_trous' ? q.verbes_trous : undefined,
       answers: type === 'text' && textAnswers && textAnswers.length > 1 ? textAnswers : undefined,
       correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
-      points: Number(q.points) || 1,
+      points: type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
       explanation: q.explanation || '',
-      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
     };
   };
 
