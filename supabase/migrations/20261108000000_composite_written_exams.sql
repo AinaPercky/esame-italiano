@@ -316,6 +316,9 @@ begin
    for v_question in select value from jsonb_array_elements(coalesce(v_section->'questions','[]'::jsonb)) loop
      if nullif(btrim(v_question->>'prompt'),'') is null then raise exception 'Une question ne possède pas d’énoncé.'; end if;
      if coalesce((v_question->>'points')::numeric,0) <= 0 then raise exception 'Barème de question invalide.'; end if;
+     if v_question ? 'blank_count' and (case when jsonb_typeof(v_question->'blank_count')='number' then (v_question->>'blank_count')::numeric<1 or (v_question->>'blank_count')::numeric<>trunc((v_question->>'blank_count')::numeric) else true end) then
+       raise exception 'Le nombre de trous doit être un entier positif.';
+     end if;
      v_key := coalesce(v_question->'answer_key',jsonb_strip_nulls(jsonb_build_object('correctOptionId',v_question->'correctOptionId','acceptedAnswers',v_question->'acceptedAnswers','correctOrder',v_question->'correctOrder','answers',v_question->'answers','correct_answer',v_question->'correct_answer')));
      if jsonb_typeof(v_key)<>'object' then raise exception 'La clé de correction doit être un objet JSON.'; end if;
      -- Allowlist only fields needed by the student UI; never forward arbitrary imported option/item properties.
