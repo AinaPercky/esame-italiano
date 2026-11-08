@@ -13,7 +13,7 @@ export const writtenExamService={
  async grade(attemptId:string,manualScores:Record<string,number>){const {data,error}=await client().rpc('grade_written_exam_attempt',{p_attempt_id:attemptId,p_manual_scores:manualScores});return unwrap<any>(data,error);},
  async publishResults(examId:string){const {data,error}=await client().rpc('publish_written_exam_results',{p_exam_id:examId});return unwrap<any>(data,error);},
  async listAvailable(){const {data,error}=await client().rpc('list_available_written_exams');return unwrap<any[]>(data||[],error);},
- async start(examId:string){const {data,error}=await client().rpc('start_written_exam',{p_exam_id:examId});return unwrap<WrittenAttempt>(data,error);},
+ async start(examId:string){const db=client();const {data,error}=await db.rpc('start_written_exam',{p_exam_id:examId});const attempt=unwrap<WrittenAttempt>(data,error);const {data:timer,error:timerError}=await db.rpc('get_or_start_written_exam_question_timer',{p_attempt_id:attempt.attempt_id});if(timerError)throw new Error(timerError.message||'Initialisation du chronomètre impossible.');return {...attempt,question_timer_started_at:timer?.question_timer_started_at||attempt.started_at};},
  async saveAnswers(attemptId:string,answers:Record<string,unknown>){const {data,error}=await client().rpc('save_written_exam_answers',{p_attempt_id:attemptId,p_answers:answers});return unwrap<any>(data,error);},
  async submit(attemptId:string){const {data,error}=await client().rpc('submit_written_exam',{p_attempt_id:attemptId});return unwrap<any>(data,error);},
  async getCorrections(examId:string){const {data,error}=await client().rpc('get_my_written_exam_corrections',{p_exam_id:examId});return unwrap<any[]>(data||[],error);},
