@@ -125,9 +125,9 @@ begin
   with ordered_questions as (
     select
       q.id::text as question_id,
-      coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,30) as seconds,
+      coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,case when q.question_type in ('text','verbes_trous') then 32 else 17 end) as seconds,
       coalesce(
-        sum(coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,30))
+        sum(coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,case when q.question_type in ('text','verbes_trous') then 32 else 17 end))
           over (
             order by sec.section_ord, oq.question_ord
             rows between unbounded preceding and 1 preceding
