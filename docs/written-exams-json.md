@@ -338,10 +338,11 @@ Le total réel reste calculé à partir des questions présentes. Si vous suppri
 
 1. Ouvrir l’espace enseignant, puis **Examens écrits**.
 2. Cliquer sur **Nouvel examen**.
-3. Dans l’éditeur, cliquer sur **Importer JSONC**.
-4. Sélectionner le fichier `.json` ou `.jsonc`.
-5. Vérifier le titre, le niveau, la durée, les classes et les dates.
-6. Vérifier chaque section, chaque énoncé, les points et les clés de correction.
-7. Enregistrer le brouillon, puis utiliser l’action de publication lorsque le sujet est prêt.
+3. Dans l’éditeur, cliquer sur **Importer / coller JSON** pour ouvrir la zone d’importation.
+4. Pour importer un fichier, utiliser **Fichier JSON/JSONC** et sélectionner le fichier `.json` ou `.jsonc` ; pour coller le contenu, copier le texte JSON/JSONC depuis votre éditeur, le coller dans la grande zone de texte, puis cliquer sur **Charger le sujet**.
+5. Consulter le **Guide rapide** affiché dans cette zone ou ouvrir le guide complet si nécessaire.
+6. Vérifier le titre, le niveau, la durée, les classes et les dates.
+7. Vérifier chaque section, chaque énoncé, les points et les clés de correction.
+8. Enregistrer le brouillon, puis utiliser l’action de publication lorsque le sujet est prêt.
 
 L’importateur analyse le contenu JSON/JSONC, mais ne remplace pas la validation pédagogique : relisez systématiquement les réponses attendues, les variantes, le nombre de trous, les identifiants et le barème avant de publier.
