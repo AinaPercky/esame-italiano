@@ -1,4 +1,6 @@
 import React from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {getDefaultWrittenQuestionTimeLimit} from '../utils/writtenExam';
 
 type Props={attempt:any;version:any;manualScores:Record<string,number>;onManualScore:(id:string,value:number)=>void};
@@ -71,12 +73,26 @@ const autoScore=(q:any,value:any)=>{
  return 0;
 };
 
+export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
+ const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+ const student=[attempt.students?.first_name,attempt.students?.last_name].filter(Boolean).join(' ')||'Élève';
+ doc.setFontSize(16);doc.text('Feuille de copie – '+(version?.title||attempt.exam?.title||'Examen écrit'),14,18);
+ doc.setFontSize(10);doc.text('Élève : '+student,14,26);doc.text('Date : '+(attempt.submitted_at?new Date(attempt.submitted_at).toLocaleString():'—'),14,32);
+ doc.text('Résultat : '+(attempt.raw_score??'—')+' / '+(attempt.raw_max??'—')+(attempt.normalized_score!=null?' · '+attempt.normalized_score:'') ,14,38);
+ const sourceSections=[...(version?.written_exam_sections||[])];const byId=new Map(sourceSections.map((s:any)=>[s.id,s]));
+ const sectionIds=Array.isArray(attempt.order_manifest?.sections)&&attempt.order_manifest.sections.length?attempt.order_manifest.sections:sourceSections.sort((a:any,b:any)=>a.position-b.position).map((s:any)=>s.id);
+ const rows:any[]=[];
+ sectionIds.forEach((sid:string)=>{const section:any=byId.get(sid);if(!section)return;rows.push([{content:section.title,colSpan:4,styles:{fontStyle:'bold',fillColor:[230,240,247],textColor:[7,42,63]}}]);const all=[...(section.written_exam_questions||[])];const map=new Map(all.map((q:any)=>[q.id,q]));const ids=attempt.order_manifest?.questions?.[sid]||all.sort((a:any,b:any)=>a.position-b.position).map((q:any)=>q.id);ids.forEach((id:string,idx:number)=>{const q:any=map.get(id);if(!q)return;const answer=answerOf(attempt,q);const score=autoScore(q,answer);const awarded=q.manual_review?Number(attempt.manual_scores?.[q.id]??0):Number(score??0);rows.push([String(idx+1)+'. '+q.prompt,'Élève : '+studentText(q,answer),'Attendu : '+(q.manual_review?'Correction manuelle':correctText(q)),awarded+' / '+q.points]);});});
+ autoTable(doc,{startY:44,head:[['Question','Réponse de l’élève','Réponse correcte / attendue','Points']],body:rows,styles:{fontSize:8,cellPadding:2.5,overflow:'linebreak',valign:'top'},headStyles:{fillColor:[11,60,93]},columnStyles:{0:{cellWidth:45},1:{cellWidth:49},2:{cellWidth:62},3:{cellWidth:22}},margin:{left:14,right:14}});
+ doc.save('feuille-copie-'+student.toLocaleLowerCase().replace(/[^a-z0-9]+/g,'-')+'.pdf');
+};
+
 export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onManualScore})=>{
  const sourceSections=[...(version?.written_exam_sections||[])];const sectionById=new Map(sourceSections.map((section:any)=>[section.id,section]));const manifestSections=attempt.order_manifest?.sections;const sectionIds=Array.isArray(manifestSections)&&manifestSections.length?manifestSections:sourceSections.sort((a:any,b:any)=>a.position-b.position).map((section:any)=>section.id);const sections=sectionIds.map((id:string)=>sectionById.get(id)).filter(Boolean).map((section:any)=>{const questions=[...(section.written_exam_questions||[])];const questionById=new Map(questions.map((question:any)=>[question.id,question]));const manifestQuestions=attempt.order_manifest?.questions?.[section.id];const ids=Array.isArray(manifestQuestions)&&manifestQuestions.length?manifestQuestions:questions.sort((a:any,b:any)=>a.position-b.position).map((question:any)=>question.id);return {...section,written_exam_questions:ids.map((id:string)=>questionById.get(id)).filter(Boolean)};});
  return <div className="mt-4 space-y-4">
   <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3"><div><h4 className="font-bold text-[#072a3f]">Feuille de copie détaillée</h4><p className="text-xs text-slate-500">Réponses de l’élève, corrigé attendu et points par question.</p></div><span className="rounded-lg bg-[#e6f0f7] px-3 py-1 text-xs font-bold text-[#0b3c5d]">{sections.reduce((n:number,s:any)=>n+(s.written_exam_questions||[]).length,0)} questions</span></div>
   {sections.map((section:any,si:number)=>{
-   const questions=[...(section.written_exam_questions||[])].sort((a:any,b:any)=>a.position-b.position);
+   const questions=[...(section.written_exam_questions||[])];
    const sectionResult=(attempt.written_exam_section_results||[]).find((r:any)=>r.section_id===section.id);
    return <section key={section.id} className="overflow-hidden rounded-xl border border-[#d8e6ee]">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f3f8fb] px-3 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#2fa36b]">Partie {si+1}</p><h5 className="font-bold text-[#072a3f]">{section.title}</h5></div><strong className="text-sm">{sectionResult?.raw_score??'—'} / {sectionResult?.raw_max??questions.reduce((n:number,q:any)=>n+Number(q.points||0),0)} pts</strong></div>
