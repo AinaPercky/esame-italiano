@@ -99,6 +99,7 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
         .vt-card{min-width:0;border:2px solid var(--vt-border);border-radius:16px;background:var(--vt-card);padding:14px;box-shadow:0 2px 8px #14285012}
         .vt-card.active{border-color:var(--vt-blue)}
         .vt-card.ok{border-color:var(--vt-ok)}.vt-card.ko{border-color:var(--vt-ko)}
+        .vt-feedback-ok{background:var(--vt-ok-bg);color:var(--vt-ok)}.vt-feedback-ko{background:var(--vt-ko-bg);color:var(--vt-ko)}
         .vt-sentence{font-size:1.08rem;line-height:2;overflow-wrap:anywhere}
         .vt-slot{display:inline-block;min-width:110px;max-width:100%;border-bottom:2px dashed var(--vt-blue);text-align:center;overflow-wrap:anywhere}
         .vt-input{width:100%;min-height:48px;font-size:16px;border:2px solid var(--vt-border);border-radius:12px;background:var(--vt-bg);padding:10px 12px;color:var(--vt-text)}
@@ -113,6 +114,7 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
         {definition.titre && <h3 className="text-base font-bold">{definition.titre}</h3>}
         {definition.consigne && <p className="mt-1 text-sm" style={{ color: 'var(--vt-muted)' }}>{definition.consigne}</p>}
       </div>}
+      <p className="sr-only" aria-live="polite">{remaining.length ? 'Verbes disponibles : ' + remaining.length : 'Tous les verbes sont placés'}. {phrases.filter((phrase) => answers[String(phrase.id)]?.verbe_choisi).length} phrases avec un verbe placé.</p>
       <div className="vt-layout">
         <aside className="min-w-0">
           <div className={'vt-bank ' + (keyboardOffset > 0 ? 'keyboard-open' : '')}>
@@ -143,10 +145,10 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
                 <label className="block text-xs font-semibold" htmlFor={'vt-' + id} style={{ color: 'var(--vt-muted)' }}>Conjugue « {chosen} » avec le sujet de la phrase</label>
                 <input ref={(node) => { inputRefs.current[id] = node; }} id={'vt-' + id} className="vt-input" lang="it" value={answers[id]?.texte_saisi || ''} disabled={disabled} autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" onFocus={() => setFocusedId(id)} onBlur={() => setFocusedId((current) => current === id ? null : current)} onChange={(event) => updateText(id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); const next = nextEmpty(id); if (next) { setActiveId(String(next.id)); requestAnimationFrame(() => inputRefs.current[String(next.id)]?.focus()); } else { (event.currentTarget as HTMLInputElement).blur(); onEnterPress?.(); } } }} />
               </div>}
-              {showCorrection && phraseScore && <div className={'mt-3 rounded-xl p-3 text-sm ' + (correct ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900')}>{phraseScore.total}/3 · Réponse : <strong>{phraseScore.expectedVerb} → {phraseScore.expectedAnswers[0] || '—'}</strong></div>}
+              {showCorrection && phraseScore && <div className={'vt-feedback-' + (correct ? 'ok' : 'ko') + ' mt-3 rounded-xl p-3 text-sm'}>{phraseScore.total}/3 · Réponse : <strong>{phraseScore.expectedVerb} → {phraseScore.expectedAnswers[0] || '—'}</strong></div>}
             </article>;
           })}
-          {showCorrection && score && <div className="rounded-2xl p-4 text-center" style={{ background: 'var(--vt-chip)' }}><p className="text-2xl font-black">{score.score} / {score.maxScore}</p><p className="text-sm">{score.score === score.maxScore ? 'Excellent !' : score.score >= score.maxScore * .6 ? 'Bien, continue !' : 'À retravailler'}</p></div>}
+          {showCorrection && score && <div className="rounded-2xl p-4 text-center" style={{ background: 'var(--vt-chip)' }}><p aria-live="polite" className="text-2xl font-black">{score.score} / {score.maxScore}</p><p className="text-sm">{score.score === score.maxScore ? 'Excellent !' : score.score >= score.maxScore * .6 ? 'Bien, continue !' : 'À retravailler'}</p></div>}
         </div>
       </div>
       {focusedId && !disabled && <div className="vt-actions lg:hidden">
