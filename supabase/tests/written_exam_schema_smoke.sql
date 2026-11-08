@@ -31,5 +31,14 @@ begin
   if not exists(select 1 from pg_trigger where tgname='written_answer_keys_immutable' and not tgisinternal) then
     raise exception 'Answer-key immutability trigger is missing';
   end if;
+  if not exists(select 1 from pg_constraint where conrelid='public.written_exam_questions'::regclass and pg_get_constraintdef(oid) like '%verbes_trous%') then
+    raise exception 'Verb-bank question type constraint is missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='written_exam_validate_verbes_trous' and not tgisinternal) then
+    raise exception 'Verb-bank publication validation trigger is missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='written_exam_verbes_trous_score' and not tgisinternal) then
+    raise exception 'Verb-bank attempt scoring trigger is missing';
+  end if;
 end
 $written$;
