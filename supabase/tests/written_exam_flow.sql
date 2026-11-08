@@ -162,7 +162,7 @@ begin
   for v_question_key in select key from jsonb_each(v_answers) loop
     with ordered_questions as (
       select q.id::text as question_id,
-        coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,30) as duration_seconds,
+        coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,case when q.question_type in ('text','verbes_trous') then 32 else 17 end) as duration_seconds,
         row_number() over(order by sec.section_ord,oq.question_ord) as question_order
       from public.written_exam_attempts a
       cross join lateral jsonb_array_elements_text(a.order_manifest->'sections')
