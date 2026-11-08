@@ -153,7 +153,7 @@ begin
     v_text_id::text,'["sono","wrong"]',
     v_reorder_id::text,'["i1","i3","i2"]',
     v_manual_id::text,'free response',
-  v_verbes_id::text,'{\"1\":{\"verbe_choisi\":\"addormentarsi\",\"texte_saisi\":\"mi addormento\"},\"2\":{\"verbe_choisi\":\"dire\",\"texte_saisi\":\"beviamo\"}}'
+    v_verbes_id::text,jsonb_build_object('1',jsonb_build_object('verbe_choisi','addormentarsi','texte_saisi','mi addormento'),'2',jsonb_build_object('verbe_choisi','dire','texte_saisi','beviamo'))
   );
   perform public.save_written_exam_answers(v_attempt_id,v_answers);
   v_result:=public.submit_written_exam(v_attempt_id);
