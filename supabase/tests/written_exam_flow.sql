@@ -188,7 +188,7 @@ begin
 
   v_list:=public.list_available_written_exams();
   if jsonb_array_length(v_list)<>1 then raise exception 'Expected one available exam card after publication.'; end if;
-  if (v_list->0->>'raw_score')::numeric<>10 or (v_list->0->>'attempt_raw_max')::numeric<>14 then
+  if (v_list->0->>'raw_score')::numeric<>10 or (v_list->0->>'attempt_raw_max')::numeric<>17 then
     raise exception 'Published score or original attempt maximum is incorrect.';
   end if;
   v_corrections:=public.get_my_written_exam_corrections(v_exam_id);
