@@ -53,7 +53,7 @@ begin
     'title','DB flow v1','description','PostgreSQL integration test','level','A1',
     'target_language','it','instruction_language','fr','duration_minutes',30,
     'class_ids',jsonb_build_array(v_class_id::text),'opens_at',null,'closes_at',null,
-    'display_scale',100,'max_attempts',1,'shuffle_sections',false,'shuffle_questions',false,
+    'display_scale',100,'max_attempts',2,'shuffle_sections',false,'shuffle_questions',false,
     'shuffle_options',false,'navigation_mode','free','show_score_after_publish',true,
     'show_corrections_after_publish',true,
     'integrity_settings',jsonb_build_object('fullscreen',false,'warn_on_tab_switch',true,'watermark',false),
@@ -204,6 +204,8 @@ $written$;
 do $written$
 declare
   v_admin_id uuid:=gen_random_uuid();
+  v_class_two uuid:=gen_random_uuid();
+  v_student_two uuid:=gen_random_uuid();
   v_ctx record;
   v_saved jsonb;
   v_started jsonb;
@@ -215,11 +217,14 @@ begin
   select * into v_ctx from written_exam_ci_context limit 1;
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin_id::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_admin_id::text,true);
+  insert into public.classes(id,name) values(v_class_two,'CI second class');
+  insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
+  values(v_student_two,v_class_two,'Second','Student','student-written-exam-ci-two@example.test','CI-002','approved');
 
   v_saved:=public.save_written_exam_definition(v_ctx.exam_id,jsonb_build_object(
-    'title','DB flow v2','description','Second immutable version','level','A1',
+    'title','DB flow v2','description','Second immutable version for another class','level','A1',
     'target_language','it','instruction_language','fr','duration_minutes',30,
-    'class_ids',jsonb_build_array(v_ctx.class_id::text),'opens_at',null,'closes_at',null,
+    'class_ids',jsonb_build_array(v_class_two::text),'opens_at',null,'closes_at',null,
     'display_scale',100,'max_attempts',2,'shuffle_sections',false,'shuffle_questions',false,
     'shuffle_options',false,'navigation_mode','free','show_score_after_publish',true,
     'show_corrections_after_publish',true,
@@ -234,19 +239,28 @@ begin
   v_version_id:=(v_saved->>'version_id')::uuid;
   perform public.publish_written_exam(v_ctx.exam_id,v_version_id);
 
+  -- The first student must still receive the older version assigned to class one.
   perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci@example.test','sub',v_ctx.student_id::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_ctx.student_id::text,true);
   v_list:=public.list_available_written_exams();
-  if jsonb_array_length(v_list)<>1 then raise exception 'Multiple versions created duplicate student exam cards.'; end if;
-  if v_list->0->>'title'<>'DB flow v2' or (v_list->0->>'attempts_used')::integer<>1 then
-    raise exception 'Student list did not select the latest version for the class.';
+  if jsonb_array_length(v_list)<>1 or v_list->0->>'title'<>'DB flow v1' then
+    raise exception 'Student in class one did not retain the version assigned to class one.';
   end if;
-
   v_started:=public.start_written_exam(v_ctx.exam_id);
   v_attempt_id:=(v_started->>'attempt_id')::uuid;
-  if v_started->'exam'->>'title'<>'DB flow v2' then raise exception 'New attempt did not use the latest class version.'; end if;
+  if v_started->'exam'->>'title'<>'DB flow v1' then raise exception 'Student in class one started a version assigned to another class.'; end if;
   v_started_again:=public.start_written_exam(v_ctx.exam_id);
   if (v_started_again->>'attempt_id')::uuid<>v_attempt_id then raise exception 'Resume created a second attempt instead of reusing the active attempt.'; end if;
+
+  -- The second student must receive and start the newer version assigned to class two.
+  perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci-two@example.test','sub',v_student_two::text)::text,true);
+  perform set_config('request.jwt.claim.sub',v_student_two::text,true);
+  v_list:=public.list_available_written_exams();
+  if jsonb_array_length(v_list)<>1 or v_list->0->>'title'<>'DB flow v2' then
+    raise exception 'Student in class two did not receive the latest version assigned to class two.';
+  end if;
+  v_started:=public.start_written_exam(v_ctx.exam_id);
+  if v_started->'exam'->>'title'<>'DB flow v2' then raise exception 'Student in class two did not start the class-specific latest version.'; end if;
 end
 $written$;
 
