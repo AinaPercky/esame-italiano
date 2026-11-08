@@ -30,6 +30,7 @@ import { normalizeFirstName, normalizeLastName } from '../utils/personName';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay, calculateQuestionPointsEarned, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
+import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 
 interface AppState {
   classes: ClassRoom[];
