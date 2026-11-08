@@ -26,6 +26,7 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
   const remaining = useMemo(() => banqueRestante(definition.banque || [], answers), [definition.banque, answers]);
   const [activeId, setActiveId] = useState<string>(String(phrases[0]?.id ?? ''));
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const activeInput = focusedId ? inputRefs.current[focusedId] : null;
   const score = useMemo(() => answerKey ? noterQuiz(definition, answer, answerKey) : null, [answerKey, answer, definition]);
@@ -33,6 +34,16 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
   useEffect(() => {
     if (!phrases.some((phrase) => String(phrase.id) === activeId)) setActiveId(String(phrases[0]?.id ?? ''));
   }, [phrases, activeId]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => setKeyboardOffset(Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop)));
+    update();
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    return () => { viewport.removeEventListener('resize', update); viewport.removeEventListener('scroll', update); };
+  }, []);
 
   const publish = useCallback((next: VerbesTrousAnswers) => onChange(JSON.stringify(next)), [onChange]);
   const choose = (verb: string) => {
@@ -80,6 +91,9 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
         .verbes-trous{--vt-bg:#f4f6fb;--vt-card:#fff;--vt-text:#17243a;--vt-muted:#62728a;--vt-blue:#1f4e8c;--vt-chip:#e7eef9;--vt-border:#d3dbe8;--vt-ok:#1a7a45;--vt-ok-bg:#e1f4e9;--vt-ko:#b3261e;--vt-ko-bg:#fbe6e4;color:var(--vt-text)}
         @media(prefers-color-scheme:dark){.verbes-trous{--vt-bg:#0f141c;--vt-card:#18212e;--vt-text:#e8edf5;--vt-muted:#9aa8bd;--vt-blue:#6ea4ee;--vt-chip:#25324a;--vt-border:#33425b;--vt-ok:#62d08f;--vt-ok-bg:#17332a;--vt-ko:#ff8a80;--vt-ko-bg:#3a1c1a}}
         .vt-bank{position:sticky;top:0;z-index:5;background:var(--vt-bg);padding:10px 0;border-bottom:1px solid var(--vt-border)}
+        .vt-slot{min-height:44px;padding:4px 8px;touch-action:manipulation}
+        @media(min-width:600px) and (max-width:1023px){.verbes-trous{max-width:720px;margin-inline:auto}}
+        @media(max-width:599px){.vt-bank.keyboard-open{padding:5px 0}.vt-bank.keyboard-open .vt-bank-list{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.vt-bank.keyboard-open .vt-chip{white-space:nowrap;min-height:40px;padding:7px 10px}}
         .vt-chip{min-height:46px;touch-action:manipulation;border:1px solid var(--vt-border);border-radius:12px;background:var(--vt-card);padding:9px 13px;font-size:1rem;font-weight:700}
         .vt-chip:active{transform:scale(.96)}
         .vt-card{min-width:0;border:2px solid var(--vt-border);border-radius:16px;background:var(--vt-card);padding:14px;box-shadow:0 2px 8px #14285012}
@@ -101,9 +115,9 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
       </div>}
       <div className="vt-layout">
         <aside className="min-w-0">
-          <div className="vt-bank">
+          <div className={'vt-bank ' + (keyboardOffset > 0 ? 'keyboard-open' : '')}>
             <p className="mb-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--vt-muted)' }}>Banque des verbes · utilisez chaque verbe une fois</p>
-            <div className="flex flex-wrap gap-2">
+            <div className={'vt-bank-list flex gap-2 ' + (keyboardOffset > 0 ? 'flex-nowrap overflow-x-auto' : 'flex-wrap')}>
               {remaining.length ? remaining.map((verb) => <button type="button" key={verb} className="vt-chip" disabled={disabled} onClick={() => choose(verb)}>{verb}</button>) : <p className="py-2 text-sm font-semibold" style={{ color: 'var(--vt-ok)' }}>✓ Tous les verbes sont placés</p>}
             </div>
             <div className="mt-3 flex justify-between gap-2 text-xs" style={{ color: 'var(--vt-muted)' }}>
@@ -113,7 +127,7 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
             <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--vt-chip)' }}><div className="h-full" style={{ width: (phrases.length ? phrases.filter((p) => answers[String(p.id)]?.verbe_choisi && answers[String(p.id)]?.texte_saisi?.trim()).length / phrases.length * 100 : 0) + '%', background: 'var(--vt-blue)' }} /></div>
           </div>
           <div className="vt-actions hidden lg:block">
-            {focusedId && !disabled && <div className="vt-accents">{ACCENTS.map((accent) => <button type="button" key={accent} onPointerDown={(event) => event.preventDefault()} onClick={() => insertAccent(accent)}>{accent}</button>)}</div>}
+            {focusedId && !disabled && <div className="vt-accents" style={{ position: keyboardOffset > 0 ? 'fixed' : 'relative', left: keyboardOffset > 0 ? 0 : undefined, right: keyboardOffset > 0 ? 0 : undefined, bottom: keyboardOffset > 0 ? keyboardOffset + 'px' : undefined, zIndex: 40, background: 'var(--vt-bg)', padding: '8px 12px' }}>{ACCENTS.map((accent) => <button type="button" key={accent} onPointerDown={(event) => event.preventDefault()} onClick={() => insertAccent(accent)}>{accent}</button>)}</div>}
             {onSubmit && <button type="button" onClick={onSubmit} className="w-full rounded-xl bg-[#1f4e8c] px-4 py-3 font-bold text-white">Terminer</button>}
           </div>
         </aside>
