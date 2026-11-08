@@ -17,6 +17,7 @@ const fromQuiz=(quiz:Quiz,q:QuizQuestion):WrittenQuestion=>{
  const base:any={id:makeId(),type:q.type,prompt:q.question,points:Number(q.points)||1,source_quiz_id:quiz.id,source_question_id:q.id,explanation:q.explanation};
  if(q.type==='qcm'){const options=(q.options||[]).map(label=>({id:makeId(),label}));const raw=String(q.correct_answer||'').trim();const letterIndex=/^[A-Z]$/i.test(raw)?raw.toUpperCase().charCodeAt(0)-65:-1;const numericIndex=/^\d+$/.test(raw)?Number(raw):-1;const index=options.findIndex(o=>o.label===raw);const correctIndex=index>=0?index:letterIndex>=0&&letterIndex<options.length?letterIndex:numericIndex>=0&&numericIndex<options.length?numericIndex:-1;return {...base,options,answer_key:{correctOptionId:correctIndex>=0?options[correctIndex].id:''}};}
  if(q.type==='reorder')return {...base,items:(q.items||[]).map(x=>({...x})),answer_key:{correctOrder:getCorrectReorderIds(q)}};
+ if(q.type==='verbes_trous')return {...base,points:(q.verbes_trous?.phrases?.length||0)*3,verbes_trous:q.verbes_trous,answer_key:{phrases:q.verbes_trous?.phrases||[]}};
  const expected=getQuestionExpectedAnswers(q);return expected.length>1?{...base,blank_count:expected.length,answer_key:{answers:expected.map(x=>x.split(/\s*[\/;|]\s*/).filter(Boolean))}}:{...base,answer_key:{acceptedAnswers:(expected[0]||'').split(/\s*[\/;|]\s*/).filter(Boolean)}};
 };
 const mapDefinition=(data:any):WrittenExam=>{
