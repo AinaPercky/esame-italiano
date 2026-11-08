@@ -113,7 +113,7 @@ Chaque question possède au minimum :
 - `type` : `qcm`, `text` ou `reorder` ;
 - `prompt` : énoncé non vide ;
 - `points` : nombre strictement supérieur à zéro ;
-- `time_limit_seconds` : temps individuel en secondes (1 à 3600 ; 30 secondes par défaut si le champ est absent) ;
+- `time_limit_seconds` : temps individuel en secondes (1 à 3600 ; 17 secondes par défaut pour les QCM/réordonnancements et 32 secondes pour les réponses texte/verbes à trous si le champ est absent) ;
 - `answer_key` : clé de correction, sauf question explicitement corrigée manuellement.
 
 ### Temps individuel et ordre anti-triche
@@ -139,7 +139,7 @@ Exemple de question avec 12 secondes :
 }
 ```
 
-Lorsqu’un quiz est copié dans un examen, sa valeur `time_limit_seconds` est conservée. Si le quiz n’en définit pas, la valeur par défaut est de 30 secondes. Le professeur peut ensuite ajuster le temps de chaque question dans l’éditeur.
+Lorsqu’un quiz est copié dans un examen, sa valeur `time_limit_seconds` est conservée. Si le quiz n’en définit pas, les valeurs par défaut du moteur de quiz sont reprises : 17 secondes pour les QCM/réordonnancements et 32 secondes pour les réponses texte/verbes à trous. Le professeur peut ensuite ajuster le temps de chaque question dans l’éditeur.
 
 ### 4.1. QCM et vrai/faux — `qcm`
 
