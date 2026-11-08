@@ -448,8 +448,16 @@ begin
  join lateral (
    select vv.* from public.written_exam_versions vv
    where vv.exam_id=e.id and vv.status='published'
-     and exists(select 1 from public.written_exam_version_classes ec where ec.version_id=vv.id and ec.class_id=v_student.class_id)
-   order by vv.version_number desc limit 1
+     and (
+       exists(select 1 from public.written_exam_version_classes ec where ec.version_id=vv.id and ec.class_id=v_student.class_id)
+       or exists(select 1 from public.written_exam_attempts aa where aa.exam_id=e.id and aa.student_id=v_student.id and aa.version_id=vv.id and aa.status='in_progress')
+       or (
+         not exists(select 1 from public.written_exam_versions vx join public.written_exam_version_classes cx on cx.version_id=vx.id where vx.exam_id=e.id and vx.status='published' and cx.class_id=v_student.class_id)
+         and vv.id=(select aa.version_id from public.written_exam_attempts aa where aa.exam_id=e.id and aa.student_id=v_student.id order by aa.attempt_number desc limit 1)
+       )
+     )
+   order by case when exists(select 1 from public.written_exam_attempts aa where aa.exam_id=e.id and aa.student_id=v_student.id and aa.version_id=vv.id and aa.status='in_progress') then 0 else 1 end,
+     vv.version_number desc limit 1
  ) v on true
  left join lateral (
    select * from public.written_exam_attempts aa
