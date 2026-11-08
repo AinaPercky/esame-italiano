@@ -491,7 +491,7 @@ begin
    select * into v_version from public.written_exam_versions where exam_id=p_exam_id and status='published' order by version_number desc limit 1;
  end if;
  if not found then raise exception 'Aucune version publiée.'; end if;
- if not exists(select 1 from public.written_exam_version_classes where version_id=v_version.id and class_id=v_student.class_id) then raise exception 'Cet examen n’est pas destiné à votre classe.'; end if;
+ if not v_has_attempt and not exists(select 1 from public.written_exam_version_classes where version_id=v_version.id and class_id=v_student.class_id) then raise exception 'Cet examen n’est pas destiné à votre classe.'; end if;
  if not v_has_attempt and v_version.opens_at is not null and v_version.opens_at>now() then raise exception 'L’examen n’est pas encore ouvert.'; end if;
  if not v_has_attempt and v_version.closes_at is not null and v_version.closes_at<=now() then raise exception 'La période de cet examen est terminée.'; end if;
  if v_has_attempt then
