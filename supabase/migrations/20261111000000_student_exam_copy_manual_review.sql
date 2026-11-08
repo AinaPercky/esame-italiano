@@ -21,8 +21,8 @@ begin
      'answer_key',k.answer_key,'explanation',k.explanation,
      'manual_review',q.manual_review,
      'manual_score',v_attempt.manual_scores->q.id::text
-   ) order by q.position) from public.written_exam_questions q join public.written_exam_answer_keys k on k.question_id=q.id where q.section_id=s.id),'[]'::jsonb)
- ) order by s.position),'[]'::jsonb)
+   ) order by coalesce(array_position(array(select jsonb_array_elements_text(v_attempt.order_manifest->'questions'->s.id::text)),q.id::text),q.position)) from public.written_exam_questions q join public.written_exam_answer_keys k on k.question_id=q.id where q.section_id=s.id),'[]'::jsonb)
+ ) order by coalesce(array_position(array(select jsonb_array_elements_text(v_attempt.order_manifest->'sections')),s.id::text),s.position)),'[]'::jsonb)
  into v_result from public.written_exam_sections s where s.version_id=v_attempt.version_id;
  return v_result;
 end $written$;
