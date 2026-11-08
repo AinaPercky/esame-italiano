@@ -64,7 +64,7 @@ const autoScore=(q:any,value:any)=>{
  }
  if(q.question_type==='verbes_trous'){
   const actual=parseObject(value);const phrases=key.phrases||[];const bank=(pub.verbes_trous?.banque||[]).map((x:any)=>normalize(x));const used=new Set<string>();let score=0;
-  phrases.forEach((phrase:any)=>{const answer=actual[String(phrase.id)]||{};const chosen=normalize(answer.verbe_choisi);const expected=normalize(phrase.verbe);const unique=!!chosen&&!used.has(chosen)&&bank.includes(chosen);if(unique){used.add(chosen);score+=2;}if(unique&&chosen===expected&&(phrase.reponses||[]).some((x:any)=>normalize(x)===normalize(answer.texte_saisi)))score+=1;});
+  phrases.forEach((phrase:any)=>{const answer=actual[String(phrase.id)]||{};const chosen=normalize(answer.verbe_choisi);const expected=normalize(phrase.verbe);const unique=!!chosen&&!used.has(chosen)&&bank.includes(chosen);if(unique){used.add(chosen);if(chosen===expected)score+=1;if((phrase.reponses||[]).some((x:any)=>normalize(x)===normalize(answer.texte_saisi)))score+=2;}});
   return Math.min(points,score);
  }
  return 0;
