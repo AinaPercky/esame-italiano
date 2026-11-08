@@ -47,6 +47,7 @@ import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { LessonsStudentView } from './LessonsStudentView';
+import { StudentWrittenExamsView } from './StudentWrittenExamsView';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
@@ -54,7 +55,8 @@ const STUDENT_TABS = [
   { id: 'lessons', label: 'Leçons de cours', shortLabel: 'Leçons', icon: Sparkles },
   { id: 'daily_grades', label: 'Notes journalières', shortLabel: 'Notes', icon: TrendingUp },
   { id: 'leaderboard', label: 'Classement de classe', shortLabel: 'Classe', icon: Trophy },
-  { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award }
+  { id: 'oral_exam', label: 'Examen oral', shortLabel: 'Oral', icon: Award },
+  { id: 'written_exams', label: 'Examens écrits', shortLabel: 'Écrit', icon: FileText }
 ] as const;
 
 interface StudentSpaceViewProps {
@@ -73,7 +75,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'profile'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
   const [classStudentsList, setClassStudentsList] = useState<Student[]>([]);
@@ -1076,6 +1078,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             onOpenQuiz={() => setActiveTab('quizzes')}
           />
         )}
+
+        {activeTab === 'written_exams' && <StudentWrittenExamsView currentUser={currentUser} />}
 
         {/* TAB 1: QUIZZES EN DIRECT & HISTORIQUE */}
         {activeTab === 'quizzes' && !activeQuiz && (

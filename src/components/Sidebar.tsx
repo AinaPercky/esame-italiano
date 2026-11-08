@@ -4,6 +4,7 @@ import {
   School, 
   Users, 
   BookOpen, 
+  FileText,
   Mic, 
   Shuffle, 
   Award, 
@@ -67,6 +68,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'quizzes', label: 'Quiz en Direct & Notes', icon: Sparkles, highlight: true },
         { id: 'lessons', label: 'Leçons de cours', icon: BookOpen }
+      ]
+    },
+    {
+      title: 'Examens écrits',
+      items: [
+        { id: 'written-exams', label: 'Examens écrits', icon: FileText }
       ]
     },
     {
