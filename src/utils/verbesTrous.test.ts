@@ -37,7 +37,7 @@ test('note séparément le verbe et la conjugaison, même si la phrase est incom
     '1': { verbe_choisi: 'dire', texte_saisi: 'mi addormento' },
     '2': { verbe_choisi: 'bere', texte_saisi: '' }
   });
-  assert.equal(score.score, 2);
+  assert.equal(score.score, 3);
   assert.deepEqual(score.phrases.map((phrase) => phrase.total), [2, 1]);
 });
 test('une phrase vide, un verbe en trop ou un verbe réutilisé ne rapportent pas de points supplémentaires', () => {
