@@ -15,6 +15,7 @@ import {
   UserCheck,
   Sparkles,
   GraduationCap,
+  FileText,
   QrCode
 } from 'lucide-react';
 import { AuthUser } from '../services/authService';
@@ -53,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'quizzes', label: 'Quiz en Direct & Notes', icon: Sparkles, highlight: true, group: 'Quiz & Cours' },
     { id: 'classes', label: 'Gestion des Classes', icon: School, group: 'Classes & Étudiants' },
     { id: 'students', label: 'Gestion des Élèves', icon: Users, group: 'Classes & Étudiants' },
+    { id: 'written-exams', label: 'Examens écrits', icon: FileText, group: 'Examens écrits' },
     { id: 'exams', label: 'Examens & Rubriques', icon: GraduationCap, group: 'Examens Oraux' },
     { id: 'pass-order', label: 'Ordre de passage', icon: Shuffle, group: 'Examens Oraux' },
     { id: 'evaluation', label: 'Évaluation orale', icon: Mic, group: 'Examens Oraux' },
@@ -194,6 +196,7 @@ export const Header: React.FC<HeaderProps> = ({
               classes: 'Classes',
               students: 'Élèves',
               exams: 'Examens',
+              'written-exams': 'Écrit',
               'pass-order': 'Ordre',
               evaluation: 'Oral',
               results: 'Notes',

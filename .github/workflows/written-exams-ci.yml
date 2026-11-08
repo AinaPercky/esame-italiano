@@ -1,0 +1,66 @@
+name: Written exams CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+  push:
+    branches: [feat/written-composite-exams]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Type check
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: written_exam_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d written_exam_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: written_exam_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap minimal application schema
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_ci_bootstrap.sql
+      - name: Apply written exam migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261108000000_composite_written_exams.sql
+      - name: Apply verb-bank question migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261109000000_verbes_trous_written_exams.sql
+      - name: Verify schema and RLS
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
+      - name: Test complete exam lifecycle and student isolation
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_flow.sql

@@ -11,7 +11,7 @@ export function getQuestionTimeSeconds(question?: Pick<QuizQuestion, 'type' | 't
     return Math.max(1, Math.floor(configuredTime));
   }
 
-  return question.type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS;
+  return question.type === 'text' || question.type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS;
 }
 
 export function getQuizTotalTimeSeconds(quiz: Pick<Quiz, 'questions' | 'duration_minutes'>): number {

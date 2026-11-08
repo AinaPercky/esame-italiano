@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   isTextAnswerCorrect,
+  calculateQuestionPointsEarned,
   normalizeAnswerText,
   parseStudentAnswers
 } from './quizAnswerMatcher';
@@ -35,5 +36,28 @@ describe('normalisation des réponses textuelles de quiz', () => {
   it('conserve les espaces finaux de chaque case dans les réponses multi-trous', () => {
     const serialized = JSON.stringify(['Io ', 'vado a scuola ']);
     assert.deepEqual(parseStudentAnswers(serialized, 2), ['Io ', 'vado a scuola ']);
+  });
+});
+describe('notation des questions verbes_trous', () => {
+  it('attribue séparément le point du verbe et les deux points de conjugaison', () => {
+    const question: any = {
+      id: 'verbs-1', type: 'verbes_trous', question: 'Verbi riflessivi', points: 6, correct_answer: '',
+      verbes_trous: {
+        points_par_phrase: 3,
+        banque: ['addormentarsi', 'bere', 'dire'],
+        phrases: [
+          { id: 1, debut: 'Io ', fin: '.', verbe: 'addormentarsi', reponses: ['mi addormento'] },
+          { id: 2, debut: 'Noi ', fin: '.', verbe: 'bere', reponses: ['beviamo'] }
+        ]
+      }
+    };
+    const answer = JSON.stringify({
+      '1': { verbe_choisi: 'addormentarsi', texte_saisi: 'mi addormento' },
+      '2': { verbe_choisi: 'dire', texte_saisi: 'beviamo' }
+    });
+    const result = calculateQuestionPointsEarned(question, answer);
+    assert.equal(result.awardedPoints, 5);
+    assert.equal(result.maxPoints, 6);
+    assert.equal(result.isFullyCorrect, false);
   });
 });

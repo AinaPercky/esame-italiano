@@ -11,6 +11,7 @@ import { DashboardView } from './views/DashboardView';
 import { ClassesView } from './views/ClassesView';
 import { StudentsView } from './views/StudentsView';
 import { ExamsView } from './views/ExamsView';
+import { WrittenExamsView } from './views/WrittenExamsView';
 import { OralEvaluationView } from './views/OralEvaluationView';
 import { PassOrderView } from './views/PassOrderView';
 import { ResultsView } from './views/ResultsView';
@@ -380,6 +381,8 @@ export default function App() {
               onViewStudentSheet={handleViewStudentSheet}
             />
           )}
+
+          {currentTab === 'written-exams' && <WrittenExamsView classes={classes} />}
 
           {currentTab === 'exams' && (
             <ExamsView

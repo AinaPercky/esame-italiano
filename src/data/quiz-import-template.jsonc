@@ -20,6 +20,34 @@
 // - reorder : items (au moins deux éléments DISTINCTS, déjà rangés dans l’ordre correct).
 //   L’application mélange ces éléments pour l’élève; la correction vérifie la séquence exacte.
 //
+// - verbes_trous : exercice « Verbes à trous avec banque ».
+//   - question : titre affiché pour la question.
+//   - points : 3 points par phrase (1 point pour le choix du verbe + 2 points pour la conjugaison).
+//   - verbes_trous.titre et verbes_trous.consigne : titre et consigne de l’exercice.
+//   - verbes_trous.points_par_phrase : toujours 3.
+//   - verbes_trous.banque : liste de verbes sans doublon; elle contient au moins autant de verbes que de phrases.
+//   - verbes_trous.phrases : tableau des phrases; chaque élément contient id, debut, fin, verbe et reponses.
+//   - verbe : infinitif attendu, présent une seule fois dans la banque et différent pour chaque phrase.
+//   - reponses : tableau d’une ou plusieurs conjugaisons acceptées. La casse et les espaces superflus sont ignorés; les accents restent significatifs.
+//   - Les verbes supplémentaires de la banque servent de pièges et ne rapportent aucun point.
+//   Exemple de question :
+//   {
+//     "type": "verbes_trous",
+//     "question": "Presente indicativo – completa le frasi",
+//     "points": 6,
+//     "verbes_trous": {
+//       "titre": "Presente indicativo",
+//       "consigne": "Scegli un verbo dalla banca, poi scrivi la forma corretta.",
+//       "points_par_phrase": 3,
+//       "banque": ["parlare", "leggere", "dormire", "scrivere"],
+//       "phrases": [
+//         { "id": 1, "debut": "Io ", "fin": " italiano.", "verbe": "parlare", "reponses": ["parlo", "io parlo"] },
+//         { "id": 2, "debut": "Noi ", "fin": " un libro.", "verbe": "leggere", "reponses": ["leggiamo"] }
+//       ]
+//     }
+//   }
+//   - Le nombre de points de la question doit être égal à 3 × le nombre de phrases.
+//
 // time_limit_seconds est facultatif : valeur par défaut 17 s pour qcm/reorder, 32 s pour text.
 // points détermine le barème; explanation (facultative) est montrée dans la correction.
 // Les commentaires sont ignorés par l’importateur et ne modifient pas les données du quiz.

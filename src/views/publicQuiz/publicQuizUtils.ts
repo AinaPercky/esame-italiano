@@ -1,5 +1,6 @@
 import { Quiz, QuizQuestion } from '../../types';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../../utils/quizReorder';
+import { noterQuiz, parseVerbesTrousAnswers, type VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
 import { isTextAnswerCorrect, isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../../utils/quizAnswerMatcher';
 
 export { isTextAnswerCorrect, isQuestionAnswerCorrect };
@@ -28,6 +29,24 @@ export function evaluateQuizAnswers(
   (quiz.questions || []).forEach((question) => {
     const studentAnswer = (answers[question.id] || '').trim();
     const expectedAnswer = (question.correct_answer || '').trim();
+    if (question.type === 'verbes_trous' && question.verbes_trous) {
+      const definition = question.verbes_trous;
+      const keys = definition.phrases.filter((phrase) => phrase.verbe && Array.isArray(phrase.reponses)) as VerbesTrousAnswerKeyPhrase[];
+      const scored = noterQuiz(definition, studentAnswer, keys);
+      rawScore += scored.score;
+      const parsed = parseVerbesTrousAnswers(studentAnswer);
+      feedback[question.id] = {
+        correct: scored.score === scored.maxScore,
+        points: scored.score,
+        expected: keys.map((phrase) => phrase.verbe + ' → ' + phrase.reponses.join(' / ')).join(' · '),
+        studentAnswer: definition.phrases.map((phrase) => {
+          const value = parsed[String(phrase.id)];
+          return (value?.verbe_choisi || '—') + ' → ' + (value?.texte_saisi || '—');
+        }).join(' · ')
+      };
+      return;
+    }
+
     const correct = isQuestionAnswerCorrect(question, studentAnswer);
     const points = correct ? (Number(question.points) || 1) : 0;
 

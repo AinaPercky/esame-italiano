@@ -139,7 +139,7 @@ export interface ExamStatistics {
 
 export interface QuizQuestion {
   id: string;
-  type: 'qcm' | 'text' | 'reorder'; // QCM, réponse saisie ou remise en ordre
+  type: 'qcm' | 'text' | 'reorder' | 'verbes_trous'; // QCM, réponse saisie, remise en ordre ou banque de verbes
   question: string;
   options?: string[]; // Pour QCM (ex: 4 options)
   items?: QuizReorderItem[]; // Éléments d'un exercice de remise en ordre, rangés par le professeur dans l'ordre correct
@@ -148,6 +148,7 @@ export interface QuizQuestion {
   points: number; // Barème pour cette question (ex: 2, 4, 5 points)
   explanation?: string; // Explication pédagogique affichée lors de la correction
   time_limit_seconds?: number; // Temps individuel de réponse; valeur par défaut selon le type si absent
+  verbes_trous?: { titre?: string; consigne?: string; points_par_phrase?: number; banque: string[]; phrases: Array<{ id: string | number; debut: string; fin: string; verbe?: string; reponses?: string[] }> };
 }
 
 export interface QuizReorderItem {

@@ -50,6 +50,7 @@ import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration
 import { createQuizReorderItem } from '../utils/quizReorder';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
+import { VerbesTrousEditor } from '../components/verbesTrous/VerbesTrousEditor';
 
 interface QuizzesAdminViewProps {
   classes: ClassRoom[];
@@ -206,8 +207,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         const item: any = {
           type: q.type,
           question: q.question,
-          points: Number(q.points) || 1,
-          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+          points: q.type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
+          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' || q.type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
         };
         if (q.type === 'qcm') {
           item.options = q.options || ['', '', '', ''];
@@ -215,6 +216,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         } else if (q.type === 'reorder') {
           item.items = q.items || [];
           item.correct_answer = q.correct_answer || '';
+        } else if (q.type === 'verbes_trous') {
+          item.verbes_trous = q.verbes_trous || {};
         } else {
           item.correct_answer = q.correct_answer || '';
           if (Array.isArray(q.answers) && q.answers.length > 0) {
@@ -255,7 +258,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   };
 
   const normalizeImportedQuestion = (q: any, i: number): QuizQuestion => {
-    const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : 'qcm';
+    const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : q.type === 'verbes_trous' ? 'verbes_trous' : 'qcm';
     const sourceItems = type === 'reorder'
       ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
       : [];
@@ -291,11 +294,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       question: q.question || '',
       options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
       items: type === 'reorder' ? items : undefined,
+      verbes_trous: type === 'verbes_trous' ? q.verbes_trous : undefined,
       answers: type === 'text' && textAnswers && textAnswers.length > 1 ? textAnswers : undefined,
       correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
-      points: Number(q.points) || 1,
+      points: type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
       explanation: q.explanation || '',
-      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
     };
   };
 
@@ -528,17 +532,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setIsEditorOpen(true);
   };
 
-  const handleAddQuestion = (type: 'qcm' | 'text' | 'reorder') => {
+  const handleAddQuestion = (type: 'qcm' | 'text' | 'reorder' | 'verbes_trous') => {
     const newQ: QuizQuestion = {
       id: `q_${Date.now()}_${questions.length + 1}`,
       type,
       question: '',
       options: type === 'qcm' ? ['', '', '', ''] : undefined,
       items: type === 'reorder' ? Array.from({ length: 5 }, () => createQuizReorderItem()) : undefined,
+      verbes_trous: type === 'verbes_trous' ? { titre: 'Esercizio 6 – Verbi riflessivi e presente indicativo', consigne: 'Choisissez le verbe qui convient, puis conjuguez-le au présent.', points_par_phrase: 3, banque: [], phrases: [] } : undefined,
       correct_answer: '',
-      points: 5,
+      points: type === 'verbes_trous' ? 0 : 5,
       explanation: '',
-      time_limit_seconds: type === 'text' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS
+      time_limit_seconds: type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS
     };
     setQuestions([...questions, newQ]);
   };
@@ -574,7 +579,33 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         setFormError(`La question #${i + 1} n'a pas d'énoncé.`);
         return;
       }
-      if (q.type === 'reorder') {
+      if (q.type === 'verbes_trous') {
+        const data = q.verbes_trous;
+        const bank = data?.banque || [];
+        const phrases = data?.phrases || [];
+        if (!phrases.length || bank.length < phrases.length) {
+          setFormError(`La question #${i + 1} doit avoir au moins autant de verbes que de phrases.`);
+          return;
+        }
+        if (new Set(bank).size !== bank.length) {
+          setFormError(`La banque de la question #${i + 1} contient des doublons.`);
+          return;
+        }
+        const expected = phrases.map((phrase) => phrase.verbe?.trim() || '');
+        if (expected.some((verb) => !verb) || new Set(expected.map((verb) => verb.toLocaleLowerCase('it-IT'))).size !== expected.length) {
+          setFormError(`Chaque phrase de la question #${i + 1} doit avoir un verbe attendu différent.`);
+          return;
+        }
+        if (phrases.some((phrase) => !phrase.reponses?.some((answer) => answer.trim()))) {
+          setFormError(`Ajoutez au moins une conjugaison acceptée pour chaque phrase de la question #${i + 1}.`);
+          return;
+        }
+        if (expected.some((verb) => !bank.includes(verb))) {
+          setFormError(`Un verbe attendu de la question #${i + 1} est absent de la banque.`);
+          return;
+        }
+        q.points = phrases.length * 3;
+      } else if (q.type === 'reorder') {
         const items = q.items || [];
         if (items.length < 2 || items.some((item) => !item.text.trim())) {
           setFormError(`La question réarrangement #${i + 1} doit contenir au moins deux éléments, tous renseignés.`);
@@ -2019,6 +2050,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     >
                       + Réarranger
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('verbes_trous')}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-900 text-xs font-bold"
+                    >
+                      + Verbes à trous avec banque
+                    </button>
                   </div>
                 </div>
 
@@ -2030,7 +2068,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           {idx + 1}
                         </span>
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : q.type === 'text' ? 'Réponse Saisie (Texte)' : 'Réarranger les éléments'}
+                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : q.type === 'text' ? 'Réponse Saisie (Texte)' : q.type === 'verbes_trous' ? 'Verbes à trous avec banque' : 'Réarranger les éléments'}
                         </span>
                       </div>
 
@@ -2313,6 +2351,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       </div>
                     )}
 
+                    {q.type === 'verbes_trous' && (
+                      <VerbesTrousEditor
+                        definition={{ ...(q.verbes_trous || { titre: '', consigne: '', points_par_phrase: 3, banque: [], phrases: [] }), phrases: (q.verbes_trous?.phrases || []).map((phrase) => ({ id: phrase.id, debut: phrase.debut, fin: phrase.fin })) }}
+                        answerKey={(q.verbes_trous?.phrases || []).map((phrase) => ({ ...phrase, verbe: phrase.verbe || '', reponses: phrase.reponses || [] })) as any}
+                        onChange={(definition, keys) => {
+                          const updated = [...questions];
+                          updated[idx] = { ...updated[idx], verbes_trous: { ...definition, phrases: definition.phrases.map((phrase, phraseIndex) => ({ ...phrase, verbe: keys[phraseIndex]?.verbe || '', reponses: keys[phraseIndex]?.reponses || [] })) }, points: definition.phrases.length * 3 };
+                          setQuestions(updated);
+                        }}
+                      />
+                    )}
+
                     {/* Explanation */}
                     <div>
                       <input
@@ -2422,7 +2472,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Le modèle intègre les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous ex: 4 verbes via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>) et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés.
+                  Le modèle intègre les quatre types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>), <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">verbes_trous</code> (banque de verbes, un verbe par phrase et conjugaison). Les commentaires de documentation sont acceptés.
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
 {quizImportTemplate}

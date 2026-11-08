@@ -16,6 +16,7 @@ Lors d'un examen oral (par exemple la description de l'animal « Lo zébu »), l
 - **Évaluation en direct en 1 clic** : calcul instantané de la note, des points, du % de réussite.
 - **Tirage au sort de l'ordre de passage** : algorithme Fisher-Yates avec suivi des statuts (_En attente, Évalué, Absent_).
 - **Quiz en ligne** : création et lancement des quiz, enregistrement des réponses et des notes, suivi des résultats et classement journalier.
+- **Examens écrits composites** : création de sujets par sections, import/export JSON/JSONC, QCM, réponses texte, questions à trous, réordonnement et correction manuelle. Voir le [guide de création des sujets JSON/JSONC](docs/written-exams-json.md).
 - **Dashboard statistique** : indicateurs clés, histogramme des notes, taux de réussite par rubrique linguistique.
 - **Fiches individuelles & Exports** : consultation détaillée, exports CSV, JSON et impression PDF.
 
@@ -163,3 +164,8 @@ SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role
 ## 7. Licence
 
 Apache-2.0
+
+
+## 8. Exercices « Verbes à trous avec banque »
+
+Le nouveau type de question est disponible dans les quiz et les examens écrits. Le guide de création, le format JSON, les règles de notation et le diagramme de séquence sont documentés dans [docs/verbes-trous.md](docs/verbes-trous.md).
