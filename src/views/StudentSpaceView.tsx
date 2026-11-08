@@ -201,6 +201,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const updatedAnswers = { ...quizAnswersRef.current, [questionId]: answer };
     quizAnswersRef.current = updatedAnswers;
     setQuizAnswers(updatedAnswers);
+    if (activeQuiz) { try { localStorage.setItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers)); } catch { /* stockage local indisponible */ } }
   };
 
   const loadData = () => {
@@ -482,8 +483,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setAntiCheatNotice(false);
     questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
     finalQuizBeepSecondRef.current = -1;
-    quizAnswersRef.current = {};
-    setQuizAnswers({});
+    let restoredAnswers: Record<string, string> = {};
+    if (!practiceMode) { try { const saved = localStorage.getItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + quiz.id); if (saved) { const parsed = JSON.parse(saved); if (parsed && typeof parsed === 'object') restoredAnswers = parsed; } } catch { /* ignorer un brouillon illisible */ } }
+    quizAnswersRef.current = restoredAnswers;
+    setQuizAnswers(restoredAnswers);
+    setIncompletePhraseConfirmation(null);
     setIncorrectFeedback(null);
     setCurrentQuestionIndex(0);
     const randomizedQuiz = {
@@ -735,6 +739,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     quizAnswersRef.current = answers;
     setQuizAnswers(answers);
     setTutorialResult(scoreTutorialQuiz(activeQuiz, answers));
+    try { localStorage.removeItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id); } catch { /* stockage local indisponible */ }
     setLastSubmissionResult(null);
     setQuizSubmissionError(null);
     setActiveQuiz(null);
@@ -776,6 +781,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isAutoTimeout
       );
 
+      try { localStorage.removeItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id); } catch { /* stockage local indisponible */ }
       setActiveQuiz(null);
       setCurrentQuestionIndex(0);
       setLastSubmissionResult(result);
