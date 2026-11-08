@@ -77,7 +77,7 @@ export function validateWrittenExam(exam:WrittenExam):string[]{
   if(!s.title.trim())errors.push('Section '+(i+1)+' : titre manquant.');
   if(!s.questions.length)errors.push('Section « '+s.title+' » : ajoutez au moins une question.');
   if((s.support_text||'').includes('{{'))errors.push('Section « '+s.title+' » : remplacez le texte-support de démonstration.');
-  if(s.support_url&&!/^https?:\\/\\//i.test(s.support_url))errors.push('Section « '+s.title+' » : le document support doit utiliser HTTP ou HTTPS.');
+  if(s.support_url&&!/^https?:\/\//i.test(s.support_url))errors.push('Section « '+s.title+' » : le document support doit utiliser HTTP ou HTTPS.');
   const points=s.questions.reduce((n,q)=>n+Number(q.points||0),0);
   if(s.points>0&&points>s.points)errors.push('Section « '+s.title+' » : '+points+' points dépassent le plafond de '+s.points+'.');
   s.questions.forEach((q,j)=>{
