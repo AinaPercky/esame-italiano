@@ -224,6 +224,7 @@ begin
   v_corrections:=public.get_my_written_exam_corrections(v_exam_id);
   if jsonb_array_length(v_corrections)<>2 then raise exception 'Expected two correction sections.'; end if;
   if not (v_corrections->0->'questions'->0 ? 'answer_key') then raise exception 'Published corrections do not include the answer key. '; end if;
+  if not (v_corrections->0->'questions'->0 ? 'manual_review') then raise exception 'Student corrections do not expose manual-review state.'; end if;
 
   insert into written_exam_ci_context(exam_id,version_id,student_id,class_id,attempt_id)
   values(v_exam_id,v_version_id,v_student_id,v_class_id,v_attempt_id);
