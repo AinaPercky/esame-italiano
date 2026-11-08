@@ -181,11 +181,16 @@ begin
     loop
       if nullif(btrim(v_expected.value->>'verbe'),'') is null
         or not exists(select 1 from jsonb_array_elements_text(v_bank) b where lower(btrim(b))=lower(btrim(v_expected.value->>'verbe')))
-        or jsonb_typeof(v_expected.value->'reponses') is distinct from 'array'
-        or jsonb_array_length(v_expected.value->'reponses')<1
+      then
+        raise exception 'Question « verbes à trous » : chaque phrase doit avoir un verbe présent dans la banque.';
+      end if;
+      if jsonb_typeof(v_expected.value->'reponses') is distinct from 'array' then
+        raise exception 'Question « verbes à trous » : ajoutez une liste de conjugaisons acceptées pour chaque phrase.';
+      end if;
+      if jsonb_array_length(v_expected.value->'reponses')<1
         or not exists(select 1 from jsonb_array_elements_text(v_expected.value->'reponses') a where nullif(btrim(a),'') is not null)
       then
-        raise exception 'Question « verbes à trous » : chaque phrase doit avoir un verbe présent dans la banque et au moins une conjugaison acceptée.';
+        raise exception 'Question « verbes à trous » : chaque phrase doit avoir au moins une conjugaison acceptée.';
       end if;
     end loop;
   end loop;
