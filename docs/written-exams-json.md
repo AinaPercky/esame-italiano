@@ -348,8 +348,52 @@ Le total réel reste calculé à partir des questions présentes. Si vous suppri
 L’importateur analyse le contenu JSON/JSONC, mais ne remplace pas la validation pédagogique : relisez systématiquement les réponses attendues, les variantes, le nombre de trous, les identifiants et le barème avant de publier.
 
 
-## 11. Question « Verbes à trous avec banque »
+## 11. Question « Verbes à trous avec banque » — `verbes_trous`
 
-Le type `verbes_trous` est disponible dans l’éditeur. Il attend une banque sans doublon, au moins autant de verbes que de phrases, un verbe attendu différent par phrase et une ou plusieurs conjugaisons acceptées. Le barème est fixé à 3 points par phrase (1 point pour le verbe, 2 points pour la conjugaison). Les données visibles par l’élève sont séparées des clés de correction privées.
+Ce type de question peut être utilisé dans `sections[].questions[]`. Il présente une banque de verbes : l’élève place un verbe dans chaque phrase, puis saisit sa conjugaison. La banque contient au moins autant de verbes que de phrases; les verbes supplémentaires sont des pièges.
 
-Consultez [le guide Verbes à trous avec banque](verbes-trous.md) pour le format JSON complet, les règles de correction et le diagramme de séquence.
+### Structure JSON
+
+Dans un examen composite, les données de présentation et la clé de correction sont séparées. La propriété `verbes_trous` contient les informations nécessaires à l’affichage. La propriété `answer_key.phrases` contient les réponses attendues, repérées par le même `id`.
+
+```json
+{
+  "id": "verbes_01",
+  "type": "verbes_trous",
+  "prompt": "Presente indicativo – completa le frasi",
+  "points": 6,
+  "verbes_trous": {
+    "titre": "Presente indicativo",
+    "consigne": "Scegli un verbo dalla banca, poi scrivi la forma corretta.",
+    "points_par_phrase": 3,
+    "banque": ["parlare", "leggere", "dormire", "scrivere"],
+    "phrases": [
+      { "id": 1, "debut": "Io ", "fin": " italiano." },
+      { "id": 2, "debut": "Noi ", "fin": " un libro." }
+    ]
+  },
+  "answer_key": {
+    "phrases": [
+      { "id": 1, "verbe": "parlare", "reponses": ["parlo", "io parlo"] },
+      { "id": 2, "verbe": "leggere", "reponses": ["leggiamo"] }
+    ]
+  }
+}
+```
+
+### Règles et validation
+
+- `verbes_trous.titre` et `verbes_trous.consigne` sont des chaînes de caractères.
+- `points_par_phrase` vaut **3**. Le champ global `points` vaut donc le nombre de phrases multiplié par 3.
+- `banque` est une liste de verbes sans doublon.
+- `phrases` contient au moins une phrase et la banque contient au moins autant de verbes que de phrases.
+- Chaque phrase possède un `id` unique, un `debut` et une `fin`.
+- Chaque identifiant de phrase possède une entrée correspondante dans `answer_key.phrases` avec un `verbe` attendu et au moins une `reponses` acceptée.
+- Chaque verbe attendu apparaît une seule fois et doit être présent dans la banque.
+- Les réponses sont comparées sans tenir compte de la casse ni des espaces superflus; les accents restent significatifs.
+
+### Barème
+
+Chaque phrase rapporte 3 points : **1 point** si le verbe attendu est correctement placé et **2 points** si la conjugaison correspond à l’une des réponses acceptées. Une phrase sans verbe placé rapporte zéro. Les verbes pièges non utilisés ne rapportent aucun point.
+
+Pour le format détaillé, le comportement de l’exercice et le diagramme de séquence, consultez [le guide Verbes à trous avec banque](verbes-trous.md).
