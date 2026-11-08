@@ -1,4 +1,5 @@
 import React from 'react';
+import {getDefaultWrittenQuestionTimeLimit} from '../utils/writtenExam';
 
 type Props={attempt:any;version:any;manualScores:Record<string,number>;onManualScore:(id:string,value:number)=>void};
 
@@ -83,7 +84,7 @@ export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onMa
      const answer=answerOf(attempt,q);const score=autoScore(q,answer);const manual=Number(attempt.manual_scores?.[q.id]??manualScores[q.id]??0);const awarded=q.manual_review?manual:score;
      const publicData=publicOf(q);
      return <article key={q.id} className="space-y-3 p-3 sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question {qi+1} · {q.question_type==='qcm'?'QCM':q.question_type==='text'?'Réponse texte':q.question_type==='reorder'?'Réordonnement':'Verbes à trous'} · {publicData.time_limit_seconds||30} s</p><p className="mt-1 text-sm font-semibold text-[#072a3f]">{q.prompt}</p></div><span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold">{q.points} pt{Number(q.points)===1?'':'s'}</span></div>
+      <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question {qi+1} · {q.question_type==='qcm'?'QCM':q.question_type==='text'?'Réponse texte':q.question_type==='reorder'?'Réordonnement':'Verbes à trous'} · {publicData.time_limit_seconds||getDefaultWrittenQuestionTimeLimit({type:q.question_type})} s</p><p className="mt-1 text-sm font-semibold text-[#072a3f]">{q.prompt}</p></div><span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold">{q.points} pt{Number(q.points)===1?'':'s'}</span></div>
       {publicData.verbes_trous?.titre&&<p className="text-xs text-slate-500">{publicData.verbes_trous.titre}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
        <div className="rounded-lg border border-slate-200 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Réponse de l’élève</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{studentText(q,answer)}</p></div>
