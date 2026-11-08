@@ -57,7 +57,7 @@ test('per-question clock resumes at the correct randomized question from the ser
  assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+33_000),3);
 });
 
-test('new manually created questions receive the 30-second default and invalid timer values are rejected',()=>{
+test('new manually created questions receive quiz-compatible defaults and invalid timer values are rejected',()=>{
  assert.equal(createQuestion('qcm').time_limit_seconds,17);
  assert.equal(createQuestion('text').time_limit_seconds,32);
  const section=createSection('Timed');
