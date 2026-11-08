@@ -2,6 +2,7 @@ name: Written exams CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
   push:
     branches: [feat/written-composite-exams]
