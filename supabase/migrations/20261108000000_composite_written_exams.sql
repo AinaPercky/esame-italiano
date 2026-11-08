@@ -392,6 +392,18 @@ begin
    (case when jsonb_typeof(k.answer_key->'acceptedAnswers')='array' then jsonb_array_length(k.answer_key->'acceptedAnswers')>0 else false end) or
    (case when jsonb_typeof(k.answer_key->'answers')='array' then jsonb_array_length(k.answer_key->'answers')>0 else false end)
  )) then raise exception 'Une question texte ne possède aucune réponse acceptée.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='text' and not q.manual_review and (
+   (k.answer_key ? 'acceptedAnswers' and (
+     jsonb_typeof(k.answer_key->'acceptedAnswers')<>'array'
+     or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(k.answer_key->'acceptedAnswers')='array' then k.answer_key->'acceptedAnswers' else '[]'::jsonb end) a where jsonb_typeof(a)<>'string' or nullif(btrim(a#>>'{}'),'') is null)
+   ))
+   or (k.answer_key ? 'answers' and (
+     jsonb_typeof(k.answer_key->'answers')<>'array'
+     or (q.public_data ? 'blank_count' and (case when jsonb_typeof(k.answer_key->'answers')='array' then jsonb_array_length(k.answer_key->'answers') else 0 end)<>(q.public_data->>'blank_count')::integer)
+     or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(k.answer_key->'answers')='array' then k.answer_key->'answers' else '[]'::jsonb end) blank where jsonb_typeof(blank)<>'array' or jsonb_array_length(blank)=0 or exists(select 1 from jsonb_array_elements(blank) variant where jsonb_typeof(variant)<>'string' or nullif(btrim(variant#>>'{}'),'') is null))
+   ))
+ )) then raise exception 'Les réponses acceptées ou variantes de trous sont invalides.'; end if;
+
  if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='reorder' and not q.manual_review and (
    (case when jsonb_typeof(k.answer_key->'correctOrder')='array' then jsonb_array_length(k.answer_key->'correctOrder') else -1 end)<>(case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end) or
    exists(select 1 from jsonb_array_elements_text(case when jsonb_typeof(k.answer_key->'correctOrder')='array' then k.answer_key->'correctOrder' else '[]'::jsonb end) id where not exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'items')='array' then q.public_data->'items' else '[]'::jsonb end) item where item->>'id'=id)) or
