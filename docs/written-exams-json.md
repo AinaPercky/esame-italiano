@@ -151,6 +151,7 @@ Il faut au moins deux options. Chaque option possède un identifiant unique et u
   "type": "qcm",
   "prompt": "Marco vive a Roma. Vero o falso?",
   "points": 2,
+  "time_limit_seconds": 30,
   "options": [
     { "id": "vero", "label": "Vero" },
     { "id": "falso", "label": "Falso" }
@@ -279,7 +280,7 @@ Cet exemple peut être enregistré sous `examen-a1.json`. Remplacer `UUID_REEL_D
   "display_scale": null,
   "max_attempts": 1,
   "shuffle_sections": false,
-  "shuffle_questions": false,
+  "shuffle_questions": true,
   "shuffle_options": false,
   "navigation_mode": "free",
   "show_score_after_publish": true,
@@ -297,7 +298,7 @@ Cet exemple peut être enregistré sous `examen-a1.json`. Remplacer `UUID_REEL_D
       "category": "Grammaire",
       "group_name": "",
       "points": 3,
-      "shuffle": false,
+      "shuffle": true,
       "fixed_position": false,
       "support_text": "",
       "support_url": "",
