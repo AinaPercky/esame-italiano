@@ -33,14 +33,14 @@ const a1TF=[
  ['Marco vive a Roma.',2,0],['Marco ha venticinque anni.',2,1],['Marco studia italiano.',2,0],['Marco va a lezione in treno.',2,1],['Nel fine settimana gioca a calcio.',2,0]
 ] as const;
 export const A1_TEMPLATE:WrittenExam={
- title:'Esame bianco – Italiano A1',description:'65 points · 2 heures · compréhension, grammaire, vocabulaire et phrases à compléter. Sans production écrite ni orale.',
- level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:120,class_ids:[],status:'draft',display_scale:100,max_attempts:1,
+ title:'Esame bianco – Italiano A1',description:'80 points · 1 h 10 · compréhension, grammaire, vocabulaire et phrases à compléter. Sans production écrite ni orale.',
+ level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:80,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
  sections:[
-  {...createSection('Compréhension écrite',15),instructions:'Leggi il testo e rispondi alle dieci domande.',support_text:a1Text,questions:[
+  {...createSection('Compréhension écrite',20),instructions:'Leggi il testo e rispondi alle dieci domande.',support_text:a1Text,questions:[
    ...a1TF.map(([prompt,points,correct])=>qcmQ(prompt,points,['Vero','Falso'],correct)),
-   textQ('Dove vive Marco?',1,['Roma']),textQ('Quanti anni ha Marco?',1,['venti','20']),textQ('Che cosa studia?',1,['italiano']),textQ('Come va a lezione?',1,['in autobus','autobus']),textQ('Con chi gioca a calcio?',1,['con i suoi amici','con gli amici'])
+   textQ('Dove vive Marco?',2,['Roma']),textQ('Quanti anni ha Marco?',2,['venti','20']),textQ('Che cosa studia?',2,['italiano']),textQ('Come va a lezione?',2,['in autobus','autobus']),textQ('Con chi gioca a calcio?',2,['con i suoi amici','con gli amici'])
   ]},
   {...createSection('Grammaire – Articles',5),category:'Articles',questions:[textQ('___ casa è grande.',1,['la']),textQ('Ho ___ libro.',1,['un']),textQ('___ studenti arrivano.',1,['gli']),textQ('Vorrei ___ zaino.',1,['uno']),textQ('___ amica telefona.',1,['un\'','un’'])]},
   {...createSection('Grammaire – Essere / Avere / Stare',5),category:'Essere, avere, stare',questions:[textQ('Io ___ italiano.',1,['sono']),textQ('Tu ___ un fratello.',1,['hai']),textQ('Noi ___ bene.',1,['stiamo']),textQ('Loro ___ studenti.',1,['sono']),textQ('Lei ___ una penna.',1,['ha'])]},
@@ -56,8 +56,8 @@ export const A1_TEMPLATE:WrittenExam={
    qcmQ('Quale parola significa «eau»?',1,['pane','acqua','latte'],1)
   ]},
   {...createSection('Vocabulaire – Antonymes',5),category:'Antonymes',questions:[textQ('Il contrario di «caldo» è…',1,['freddo']),textQ('Il contrario di «alto» è…',1,['basso']),textQ('Il contrario di «grande» è…',1,['piccolo']),textQ('Il contrario di «facile» è…',1,['difficile']),textQ('Il contrario di «vicino» è…',1,['lontano'])]},
-  {...createSection('Compléter les phrases',10),instructions:'Completa ogni frase con la forma corretta.',questions:[
-   textQ('Io ___ studente.',1,['sono']),textQ('Tu ___ un libro.',1,['hai']),textQ('Noi ___ a scuola.',1,['andiamo']),textQ('Lei ___ a Roma.',1,['vive']),textQ('Loro ___ italiano.',1,['parlano']),textQ('Voi ___ amici.',1,['siete']),textQ('Lui ___ colazione.',1,['fa']),textQ('Io ___ il treno.',1,['prendo']),textQ('Noi ___ una casa.',1,['abbiamo']),textQ('Tu ___ italiano.',1,['studi'])
+  {...createSection('Compléter les phrases',20),instructions:'Completa ogni frase con la forma corretta.',questions:[
+   textQ('Io ___ studente.',2,['sono']),textQ('Tu ___ un libro.',2,['hai']),textQ('Noi ___ a scuola.',2,['andiamo']),textQ('Lei ___ a Roma.',2,['vive']),textQ('Loro ___ italiano.',2,['parlano']),textQ('Voi ___ amici.',2,['siete']),textQ('Lui ___ colazione.',2,['fa']),textQ('Io ___ il treno.',2,['prendo']),textQ('Noi ___ una casa.',2,['abbiamo']),textQ('Tu ___ italiano.',2,['studi'])
   ]}
  ]
 };
