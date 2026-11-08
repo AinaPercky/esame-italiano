@@ -33,6 +33,46 @@ create trigger written_exam_section_question_shuffle_required
 before insert or update on public.written_exam_sections
 for each row execute function public.force_written_exam_section_question_shuffle();
 
+alter table public.written_exam_attempts
+  add column if not exists question_timer_started_at timestamptz;
+
+create or replace function public.get_or_start_written_exam_question_timer(p_attempt_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $written$
+declare
+  v_student_id uuid;
+  v_started_at timestamptz;
+begin
+  select id into v_student_id
+  from public.students
+  where lower(email)=lower(auth.jwt()->>'email')
+    and coalesce(validation_status,'approved')='approved'
+  limit 1;
+  if v_student_id is null then
+    raise exception 'Fiche élève active introuvable.';
+  end if;
+
+  update public.written_exam_attempts
+  set question_timer_started_at=coalesce(question_timer_started_at,now()),
+      updated_at=now()
+  where id=p_attempt_id
+    and student_id=v_student_id
+    and status='in_progress'
+  returning question_timer_started_at into v_started_at;
+
+  if v_started_at is null then
+    raise exception 'Tentative introuvable ou déjà terminée.';
+  end if;
+  return jsonb_build_object('question_timer_started_at',v_started_at);
+end
+$written$;
+
+revoke all on function public.get_or_start_written_exam_question_timer(uuid) from public;
+grant execute on function public.get_or_start_written_exam_question_timer(uuid) to authenticated;
+
 create or replace function public.save_written_exam_question_time_limits(
   p_version_id uuid,
   p_time_limits jsonb
