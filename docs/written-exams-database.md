@@ -58,7 +58,9 @@ erDiagram
 ## Installation Supabase
 
 1. Ouvrir le SQL Editor du projet Supabase utilisé par PerckyLingua.
-2. Examiner puis exécuter **uniquement** `supabase/migrations/20261108000000_composite_written_exams.sql`.
+2. Exécuter dans l'ordre, une seule fois chacune, les deux migrations :
+   - `supabase/migrations/20261108000000_composite_written_exams.sql` (schéma des examens écrits composites).
+   - `supabase/migrations/20261109000000_verbes_trous_written_exams.sql` (type de question « verbes à trous avec banque » et notation serveur).
 3. Vérifier la création des tables `written_*`, les fonctions RPC et les politiques RLS.
 4. Tester avec un compte enseignant et deux comptes élèves appartenant à des classes différentes.
 5. Vérifier qu'un élève ne peut ni sélectionner directement `written_exam_answer_keys`, ni appeler une tentative pour une autre classe.
