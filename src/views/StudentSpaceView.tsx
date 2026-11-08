@@ -40,12 +40,14 @@ import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
-import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
+import { isQuestionAnswerCorrect, calculateQuestionPointsEarned, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
+import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION_SECONDS } from '../utils/quizPresence';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
+import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
 import { LessonsStudentView } from './LessonsStudentView';
 import { StudentWrittenExamsView } from './StudentWrittenExamsView';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
@@ -116,6 +118,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
+  const [incompletePhraseConfirmation, setIncompletePhraseConfirmation] = useState<number | null>(null);
 
   // Correction & Explication si la réponse est fausse (affichée 13 secondes, suspend les chronomètres)
   const [incorrectFeedback, setIncorrectFeedback] = useState<{
@@ -128,6 +131,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     countdown: number; // 13 secondes par défaut
     pendingNextAnswers: Record<string, string>;
     isTimeout: boolean;
+    points?: number;
+    maxPoints?: number;
   } | null>(null);
 
   // Profile edit form
@@ -674,16 +679,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           ? formatReorderAnswer(currentQ, studentAns)
           : currentQ.type === 'text'
           ? formatTextAnswerForDisplay(currentQ, studentAns)
+          : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
+          ? currentQ.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return (response?.verbe_choisi || '—') + ' → ' + (response?.texte_saisi || '—'); }).join(' · ')
           : studentAns,
         correctAnswer: currentQ.type === 'reorder'
           ? formatCorrectReorderAnswer(currentQ)
           : currentQ.type === 'text'
           ? formatCorrectTextAnswerForDisplay(currentQ)
+          : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
+          ? currentQ.verbes_trous.phrases.map((phrase) => (phrase.verbe || '') + ' → ' + (phrase.reponses || []).join(' / ')).join(' · ')
           : currentQ.correct_answer,
         explanation: currentQ.explanation,
         countdown: CORRECTION_DISPLAY_SECONDS,
         pendingNextAnswers: updatedAnswers,
-        isTimeout
+        isTimeout,
+        points: calculateQuestionPointsEarned(currentQ, studentAns).awardedPoints,
+        maxPoints: calculateQuestionPointsEarned(currentQ, studentAns).maxPoints
       });
     }
   };
@@ -705,6 +716,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   // L'élève valide sa réponse pour la question courante et passe à la suite
   const handleAnswerAndNext = () => {
     if (!activeQuiz) return;
+    const currentQ = activeQuiz.questions[currentQuestionIndex];
+    if (currentQ?.type === 'verbes_trous' && currentQ.verbes_trous) {
+      const response = parseVerbesTrousAnswers(quizAnswersRef.current[currentQ.id] || '');
+      const missing = currentQ.verbes_trous.phrases.filter((phrase) => !response[String(phrase.id)]?.verbe_choisi).length;
+      if (missing > 0) {
+        setIncompletePhraseConfirmation(missing);
+        return;
+      }
+    }
+    setIncompletePhraseConfirmation(null);
     processQuestionProgression(quizAnswersRef.current, false);
   };
 
@@ -1500,9 +1521,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                           <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
                             {currentQ.type === 'qcm' 
                               ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
-                              : currentQ.type === 'reorder'
+                               : currentQ.type === 'reorder'
                                 ? '👉 Glissez-déposez les éléments dans l’ordre correct :'
-                                : '👉 Complétez directement les cases vides dans la phrase ci-dessous :'}
+                                : currentQ.type === 'verbes_trous'
+                                  ? '👉 Choisissez un verbe dans la banque, puis conjuguez-le :'
+                                  : '👉 Complétez directement les cases vides dans la phrase ci-dessous :'}
                           </div>
 
                           {/* QCM Options */}
@@ -1540,6 +1563,18 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                                 answer={currentAnswer}
                                 onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
                                 theme="amber"
+                              />
+                            </div>
+                          )}
+
+                          {currentQ.type === 'verbes_trous' && currentQ.verbes_trous && (
+                            <div className="pt-4 sm:pl-16">
+                              <VerbesTrousQuestion
+                                definition={currentQ.verbes_trous}
+                                answer={currentAnswer}
+                                onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
+                                onEnterPress={handleAnswerAndNext}
+                                showCorrection={false}
                               />
                             </div>
                           )}
@@ -1595,6 +1630,19 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 </div>
               ) : null}
 
+              {incompletePhraseConfirmation !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+                  <section role="alertdialog" aria-modal="true" aria-labelledby="student-vt-confirm" className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+                    <h2 id="student-vt-confirm" className="text-base font-extrabold text-slate-900">Il reste {incompletePhraseConfirmation} phrase{incompletePhraseConfirmation > 1 ? 's' : ''} sans réponse.</h2>
+                    <p className="mt-2 text-sm text-slate-600">Corriger quand même ?</p>
+                    <div className="mt-5 flex gap-2">
+                      <button type="button" onClick={() => setIncompletePhraseConfirmation(null)} className="min-h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700">Continuer</button>
+                      <button type="button" onClick={() => { setIncompletePhraseConfirmation(null); processQuestionProgression(quizAnswersRef.current, false); }} className="min-h-11 flex-1 rounded-xl bg-[#072a3f] px-3 text-sm font-bold text-white">Corriger</button>
+                    </div>
+                  </section>
+                </div>
+              )}
+
               {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (13 SECONDES) */}
               {incorrectFeedback && incorrectFeedback.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
@@ -1611,7 +1659,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             Correction Pédagogique
                           </span>
                           <h3 className="font-display font-extrabold text-base text-white">
-                            {incorrectFeedback.isTimeout ? 'Temps écoulé' : 'Réponse incorrecte !'}
+                            {incorrectFeedback.isTimeout ? 'Temps écoulé' : (incorrectFeedback.points || 0) > 0 ? 'Réponse partiellement correcte' : 'Réponse incorrecte !'}
                           </h3>
                         </div>
                       </div>
@@ -1655,7 +1703,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             {incorrectFeedback.studentAnswer ? `« ${incorrectFeedback.studentAnswer} »` : '(Aucune réponse saisie)'}
                           </div>
                           <span className="text-[10px] text-rose-600 font-bold block mt-1">
-                            0 point
+                            {incorrectFeedback.points ?? 0} / {incorrectFeedback.maxPoints ?? 0} point{(incorrectFeedback.maxPoints ?? 0) > 1 ? 's' : ''}
                           </span>
                         </div>
 
