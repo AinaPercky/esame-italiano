@@ -341,7 +341,9 @@ begin
      if v_key='{}'::jsonb and coalesce((v_question->>'manual_review')::boolean,false)=false then raise exception 'Clé de correction manquante pour la question %.',v_question->>'prompt'; end if;
      insert into public.written_exam_answer_keys(question_id,answer_key,explanation) values(v_question_id,v_key,nullif(v_question->>'explanation',''));
      v_raw := v_raw + (v_question->>'points')::numeric;
+     v_question_position:=v_question_position+1;
    end loop;
+   v_section_position:=v_section_position+1;
  end loop;
  update public.written_exam_versions set raw_max=v_raw,
  title=btrim(p_definition->>'title'),description=coalesce(p_definition->>'description',''),level=nullif(p_definition->>'level',''),target_language=coalesce(p_definition->>'target_language','it'),instruction_language=coalesce(p_definition->>'instruction_language','fr'),
