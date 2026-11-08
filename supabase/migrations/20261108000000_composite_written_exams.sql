@@ -279,7 +279,7 @@ declare
  v_exam_id uuid := coalesce(p_exam_id,gen_random_uuid());
  v_version_id uuid; v_version_no integer; v_section jsonb; v_question jsonb;
  v_section_id uuid; v_question_id uuid; v_key jsonb; v_public jsonb; v_raw numeric:=0;
- v_class_id uuid; v_status text;
+ v_class_id uuid; v_status text; v_section_position integer:=0; v_question_position integer:=0;
 begin
  if not public.written_exam_is_teacher() then raise exception 'Accès enseignant requis.'; end if;
  if nullif(btrim(p_definition->>'title'),'') is null then raise exception 'Le titre est obligatoire.'; end if;
@@ -310,8 +310,9 @@ begin
 
  for v_section in select value from jsonb_array_elements(p_definition->'sections') loop
    insert into public.written_exam_sections(version_id,section_key,title,instructions,category,max_points,position,shuffle,fixed_position,support_text,support_url,group_name)
-   values(v_version_id,coalesce(v_section->>'id',gen_random_uuid()::text),btrim(v_section->>'title'),coalesce(v_section->>'instructions',''),nullif(v_section->>'category',''),coalesce((v_section->>'points')::numeric,0),coalesce((v_section->>'position')::integer,0),coalesce((v_section->>'shuffle')::boolean,true),coalesce((v_section->>'fixed_position')::boolean,false),nullif(v_section->>'support_text',''),nullif(v_section->>'support_url',''),nullif(v_section->>'group_name',''))
+   values(v_version_id,coalesce(v_section->>'id',gen_random_uuid()::text),btrim(v_section->>'title'),coalesce(v_section->>'instructions',''),nullif(v_section->>'category',''),coalesce((v_section->>'points')::numeric,0),v_section_position,coalesce((v_section->>'shuffle')::boolean,true),coalesce((v_section->>'fixed_position')::boolean,false),nullif(v_section->>'support_text',''),nullif(v_section->>'support_url',''),nullif(v_section->>'group_name',''))
    returning id into v_section_id;
+   v_question_position:=0;
    for v_question in select value from jsonb_array_elements(coalesce(v_section->'questions','[]'::jsonb)) loop
      if nullif(btrim(v_question->>'prompt'),'') is null then raise exception 'Une question ne possède pas d’énoncé.'; end if;
      if coalesce((v_question->>'points')::numeric,0) <= 0 then raise exception 'Barème de question invalide.'; end if;
@@ -321,12 +322,14 @@ begin
      v_public := jsonb_strip_nulls(jsonb_build_object(
        'type',v_question->>'type',
        'blank_count',case when coalesce(v_question->>'blank_count','') ~ '^[0-9]+(section_id,question_key,position,question_type,prompt,points,public_data,manual_review,shuffle_options,source_quiz_id,source_question_id)
-     values(v_section_id,coalesce(v_question->>'id',gen_random_uuid()::text),coalesce((v_question->>'position')::integer,0),v_question->>'type',btrim(v_question->>'prompt'),(v_question->>'points')::numeric,v_public,coalesce((v_question->>'manual_review')::boolean,false),coalesce((v_question->>'shuffle_options')::boolean,true),nullif(v_question->>'source_quiz_id',''),nullif(v_question->>'source_question_id',''))
+     values(v_section_id,coalesce(v_question->>'id',gen_random_uuid()::text),v_question_position,v_question->>'type',btrim(v_question->>'prompt'),(v_question->>'points')::numeric,v_public,coalesce((v_question->>'manual_review')::boolean,false),coalesce((v_question->>'shuffle_options')::boolean,true),nullif(v_question->>'source_quiz_id',''),nullif(v_question->>'source_question_id',''))
      returning id into v_question_id;
      if v_key='{}'::jsonb and coalesce((v_question->>'manual_review')::boolean,false)=false then raise exception 'Clé de correction manquante pour la question %.',v_question->>'prompt'; end if;
      insert into public.written_exam_answer_keys(question_id,answer_key,explanation) values(v_question_id,v_key,nullif(v_question->>'explanation',''));
      v_raw := v_raw + (v_question->>'points')::numeric;
+     v_question_position:=v_question_position+1;
    end loop;
+   v_section_position:=v_section_position+1;
  end loop;
  update public.written_exam_versions set raw_max=v_raw,
  title=btrim(p_definition->>'title'),description=coalesce(p_definition->>'description',''),level=nullif(p_definition->>'level',''),target_language=coalesce(p_definition->>'target_language','it'),instruction_language=coalesce(p_definition->>'instruction_language','fr'),
