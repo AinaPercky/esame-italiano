@@ -142,19 +142,22 @@ begin
   loop
     v_public := v_q.public_data->'verbes_trous';
     v_key := v_q.answer_key;
-    if jsonb_typeof(v_public)<>'object' or jsonb_typeof(v_key->'phrases')<>'array' then
+    if jsonb_typeof(v_public) is distinct from 'object' or jsonb_typeof(v_key->'phrases') is distinct from 'array' then
       raise exception 'Question « verbes à trous » : configuration ou corrigé manquant.';
     end if;
     v_bank := v_public->'banque';
     v_phrases := v_public->'phrases';
     v_keys := v_key->'phrases';
-    if jsonb_typeof(v_bank)<>'array' or jsonb_typeof(v_phrases)<>'array' or jsonb_typeof(v_keys)<>'array' then
+    if jsonb_typeof(v_bank) is distinct from 'array' or jsonb_typeof(v_phrases) is distinct from 'array' or jsonb_typeof(v_keys) is distinct from 'array' then
       raise exception 'Question « verbes à trous » : banque et phrases doivent être des listes.';
     end if;
     v_count := jsonb_array_length(v_phrases);
     v_bank_count := jsonb_array_length(v_bank);
     if v_count<1 or v_bank_count<v_count or jsonb_array_length(v_keys)<>v_count then
       raise exception 'Question « verbes à trous » : la banque doit contenir au moins autant de verbes que de phrases.';
+    end if;
+    if exists(select 1 from jsonb_array_elements_text(v_bank) b where nullif(btrim(b),'') is null) then
+      raise exception 'Question « verbes à trous » : la banque contient un verbe vide.';
     end if;
     select count(distinct lower(btrim(value))) into v_unique_bank
     from jsonb_array_elements_text(v_bank);
@@ -166,6 +169,11 @@ begin
     if v_unique_expected<>v_count then
       raise exception 'Question « verbes à trous » : chaque phrase doit avoir un verbe attendu différent.';
     end if;
+    if (select count(distinct value->>'id') from jsonb_array_elements(v_phrases))<>v_count
+      or exists(select 1 from jsonb_array_elements(v_phrases) p where nullif(btrim(p.value->>'id'),'') is null)
+      or exists(select 1 from jsonb_array_elements(v_keys) k where not exists(select 1 from jsonb_array_elements(v_phrases) p where p.value->>'id'=k.value->>'id')) then
+      raise exception 'Question « verbes à trous » : les identifiants des phrases doivent être présents et uniques.';
+    end if;
     if v_q.points<>v_count*3 then
       raise exception 'Question « verbes à trous » : le barème doit être de 3 points par phrase.';
     end if;
@@ -173,7 +181,7 @@ begin
     loop
       if nullif(btrim(v_expected.value->>'verbe'),'') is null
         or not exists(select 1 from jsonb_array_elements_text(v_bank) b where lower(btrim(b))=lower(btrim(v_expected.value->>'verbe')))
-        or jsonb_typeof(v_expected.value->'reponses')<>'array'
+        or jsonb_typeof(v_expected.value->'reponses') is distinct from 'array'
         or jsonb_array_length(v_expected.value->'reponses')<1
         or not exists(select 1 from jsonb_array_elements_text(v_expected.value->'reponses') a where nullif(btrim(a),'') is not null)
       then
