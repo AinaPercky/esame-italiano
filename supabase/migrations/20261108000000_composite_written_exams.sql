@@ -467,7 +467,10 @@ begin
  left join public.written_exam_versions av on av.id=a.version_id
  where (
    (a.status='in_progress' and e.status in ('published','scheduled','open'))
-   or (e.status in ('published','scheduled','open') and (v.opens_at is null or v.opens_at<=now()) and (v.closes_at is null or v.closes_at>now()))
+   or (e.status in ('published','scheduled','open') and (
+     ((v.opens_at is null or v.opens_at<=now()) and (v.closes_at is null or v.closes_at>now()))
+     or (e.status='scheduled' and v.opens_at>now())
+   ))
    or (a.id is not null and e.status in ('published','scheduled','open','closed','grading','results_published'))
  );
  return v_result;
