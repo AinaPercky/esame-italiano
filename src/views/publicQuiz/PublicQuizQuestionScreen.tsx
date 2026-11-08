@@ -12,6 +12,8 @@ import { QuizFeedbackEntry, formatQuizTime } from './publicQuizUtils';
 import { CORRECTION_DISPLAY_SECONDS } from '../../utils/quizTiming';
 import { QuizReorderList } from '../../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../../components/QuizClozeInput';
+import { VerbesTrousQuestion } from '../../components/verbesTrous/VerbesTrousQuestion';
+import type { VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
 
 interface PublicQuizQuestionScreenProps {
   question: QuizQuestion;
@@ -168,7 +170,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#0b3c5d] sm:text-[11px]">
-                      {question.type === 'qcm' ? 'Choix unique' : question.type === 'reorder' ? 'Réarranger les éléments' : 'Réponse écrite'} · {question.points} point{question.points > 1 ? 's' : ''}
+                      {question.type === 'qcm' ? 'Choix unique' : question.type === 'reorder' ? 'Réarranger les éléments' : question.type === 'verbes_trous' ? 'Banque de verbes et conjugaison' : 'Réponse écrite'} · {question.points} point{question.points > 1 ? 's' : ''}
                     </p>
                     <h2 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">
                       {clozeInfo?.hasBlanks ? clozeInfo.prompt : question.question}
@@ -179,9 +181,11 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
                 <p className="pl-0 text-xs italic text-slate-500 sm:pl-14">
                   {question.type === 'qcm' 
                     ? 'Sélectionnez la bonne réponse parmi les choix proposés :' 
-                    : question.type === 'reorder'
+                     : question.type === 'reorder'
                       ? 'Glissez-déposez les éléments dans l’ordre correct :'
-                      : 'Complétez directement les cases vides dans la phrase ci-dessous :'}
+                      : question.type === 'verbes_trous'
+                        ? 'Choisissez un verbe dans la banque, puis conjuguez-le au présent :'
+                        : 'Complétez directement les cases vides dans la phrase ci-dessous :'}
                 </p>
 
                 {question.type === 'qcm' ? (
@@ -217,6 +221,15 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
                     onChange={onAnswerChange}
                     disabled={isValidated}
                     theme="navy"
+                  />
+                ) : question.type === 'verbes_trous' && question.verbes_trous ? (
+                  <VerbesTrousQuestion
+                    definition={question.verbes_trous}
+                    answer={answer}
+                    onChange={onAnswerChange}
+                    disabled={isValidated}
+                    showCorrection={isValidated}
+                    answerKey={question.verbes_trous.phrases as VerbesTrousAnswerKeyPhrase[]}
                   />
                 ) : (
                   <QuizClozeInput
