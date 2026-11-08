@@ -8,11 +8,13 @@ test('L135 model starts with a 90-point configurable allocation and 90-minute du
  assert.equal(L135_TEMPLATE.duration_minutes,90);
  assert.deepEqual(L135_TEMPLATE.sections.map(s=>s.points),[20,10,10,10,10,10,10,10]);
 });
-test('A1 model preserves 65 raw allocated points and optional /100 scale',()=>{
- assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),65);
- assert.equal(getWrittenExamTotals(A1_TEMPLATE).raw,65);
- assert.equal(A1_TEMPLATE.duration_minutes,120);
- assert.equal(A1_TEMPLATE.display_scale,100);
+test('A1 model preserves its 60 questions with an 80-point scale and 70-minute duration',()=>{
+ assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),80);
+ assert.equal(getWrittenExamTotals(A1_TEMPLATE).raw,80);
+ assert.equal(A1_TEMPLATE.duration_minutes,70);
+ assert.equal(A1_TEMPLATE.display_scale,80);
+ assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.questions.length,0),60);
+ assert.deepEqual(A1_TEMPLATE.sections.map(s=>s.points),[20,5,5,5,5,5,5,5,5,20]);
  assert.deepEqual(validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1']}),[]);
 });
 test('raw maximum follows actual question points, not a fixed template total',()=>{
