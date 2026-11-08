@@ -81,7 +81,7 @@ export function noterPhrase(
   const typed = normalizeVerbesTrousAnswer(answer?.texte_saisi);
   const points_verbe = chosen && chosen === expectedVerb ? 1 : 0;
   const accepted = (phrase.reponses || []).map(normalizeVerbesTrousAnswer).filter(Boolean);
-  const points_conjugaison = typed && accepted.includes(typed) ? 2 : 0;
+  const points_conjugaison = chosen && typed && accepted.includes(typed) ? 2 : 0;
   const total = points_verbe + points_conjugaison;
   return {
     id: phrase.id,
@@ -102,7 +102,14 @@ export function noterQuiz(
   const answers = parseVerbesTrousAnswers(answerValue);
   const keyPhrases = answerKeyPhrases || (definition.phrases as VerbesTrousAnswerKeyPhrase[]);
   const pointsParPhrase = Number(definition.points_par_phrase) || 3;
-  const phrases = keyPhrases.map((phrase) => noterPhrase(phrase, answers[String(phrase.id)], pointsParPhrase));
+  const usedVerbs = new Set<string>();
+  const phrases = keyPhrases.map((phrase) => {
+    const answer = answers[String(phrase.id)];
+    const chosen = normalizeVerbesTrousAnswer(answer?.verbe_choisi);
+    if (chosen && usedVerbs.has(chosen)) return noterPhrase(phrase, undefined, pointsParPhrase);
+    if (chosen) usedVerbs.add(chosen);
+    return noterPhrase(phrase, answer, pointsParPhrase);
+  });
   return {
     score: phrases.reduce((sum, phrase) => sum + phrase.total, 0),
     maxScore: keyPhrases.length * pointsParPhrase,
