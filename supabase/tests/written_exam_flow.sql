@@ -82,13 +82,14 @@ begin
         jsonb_build_object('id','manual-one','type','text','prompt','Manual prompt','points',1,'manual_review',true,
           'answer_key','{}'::jsonb
         ),
-        jsonb_build_object('id','verb-bank-one','type','verbes_trous','prompt','Verb bank prompt','points',6,
+        jsonb_build_object('id','verb-bank-one','type','verbes_trous','prompt','Verb bank prompt','points',9,
           'verbes_trous',jsonb_build_object('titre','Verbi riflessivi','consigne','Scegli e coniuga','points_par_phrase',3,
             'banque',jsonb_build_array('addormentarsi','bere','dire'),
-            'phrases',jsonb_build_array(jsonb_build_object('id',1,'debut','Io ','fin',' subito.'),jsonb_build_object('id',2,'debut','Noi ','fin',' caffè.'))),
+            'phrases',jsonb_build_array(jsonb_build_object('id',1,'debut','Io ','fin',' subito.'),jsonb_build_object('id',2,'debut','Noi ','fin',' caffè.'),jsonb_build_object('id',3,'debut','Io ','fin',' quello che penso.'))),
           'answer_key',jsonb_build_object('phrases',jsonb_build_array(
             jsonb_build_object('id',1,'verbe','addormentarsi','reponses',jsonb_build_array('mi addormento')),
-            jsonb_build_object('id',2,'verbe','bere','reponses',jsonb_build_array('beviamo'))
+            jsonb_build_object('id',2,'verbe','bere','reponses',jsonb_build_array('beviamo')),
+            jsonb_build_object('id',3,'verbe','dire','reponses',jsonb_build_array('dico'))
           ))
         )
       ))
@@ -97,7 +98,7 @@ begin
 
   v_exam_id:=(v_saved->>'exam_id')::uuid;
   v_version_id:=(v_saved->>'version_id')::uuid;
-  if (v_saved->>'raw_max')::numeric<>14 then raise exception 'Expected raw maximum 14, got %',v_saved->>'raw_max'; end if;
+  if (v_saved->>'raw_max')::numeric<>17 then raise exception 'Expected raw maximum 17, got %',v_saved->>'raw_max'; end if;
 
   select count(*) into v_section_count from public.written_exam_sections where version_id=v_version_id;
   if v_section_count<>2 then raise exception 'Expected 2 sections, got %',v_section_count; end if;
@@ -153,7 +154,7 @@ begin
     v_text_id::text,'["sono","wrong"]',
     v_reorder_id::text,'["i1","i3","i2"]',
     v_manual_id::text,'free response',
-    v_verbes_id::text,jsonb_build_object('1',jsonb_build_object('verbe_choisi','addormentarsi','texte_saisi','mi addormento'),'2',jsonb_build_object('verbe_choisi','dire','texte_saisi','beviamo'))
+    v_verbes_id::text,jsonb_build_object('1',jsonb_build_object('verbe_choisi','addormentarsi','texte_saisi','mi addormento'),'2',jsonb_build_object('verbe_choisi','dire','texte_saisi','beviamo'),'3',jsonb_build_object('verbe_choisi','not_in_bank','texte_saisi','dico'))
   );
   perform public.save_written_exam_answers(v_attempt_id,v_answers);
   v_result:=public.submit_written_exam(v_attempt_id);
@@ -174,7 +175,7 @@ begin
 
   select raw_score,normalized_score,status into v_raw_score,v_normalized,v_status
   from public.written_exam_attempts where id=v_attempt_id;
-  if v_status<>'graded' or v_raw_score<>10 or v_normalized<>71.43 then
+  if v_status<>'graded' or v_raw_score<>10 or v_normalized<>58.82 then
     raise exception 'Unexpected final grading result: status %, raw %, normalized %',v_status,v_raw_score,v_normalized;
   end if;
   if (select coalesce(sum(raw_score),0) from public.written_exam_section_results where attempt_id=v_attempt_id)<>10 then
