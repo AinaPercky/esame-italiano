@@ -518,6 +518,8 @@ begin
  select id into v_student_id from public.students where lower(email)=lower(auth.jwt()->>'email') and coalesce(validation_status,'approved')='approved' limit 1;
  select * into v_attempt from public.written_exam_attempts where id=p_attempt_id and student_id=v_student_id for update;
  if not found or v_attempt.status<>'in_progress' then raise exception 'Tentative introuvable ou terminée.'; end if;
+ if jsonb_typeof(coalesce(p_answers,'{}'::jsonb))<>'object' then raise exception 'Les réponses doivent être un objet JSON.'; end if;
+ if pg_column_size(coalesce(p_answers,'{}'::jsonb))>65536 then raise exception 'Les réponses dépassent la taille autorisée.'; end if;
  if not exists(select 1 from public.written_exams where id=v_attempt.exam_id and status in ('published','open','scheduled')) then raise exception 'Examen clôturé.'; end if;
  if v_attempt.deadline_at<=now() then update public.written_exam_attempts set status='timed_out',submitted_at=now() where id=p_attempt_id; raise exception 'Temps écoulé.'; end if;
  for v_key in select jsonb_object_keys(coalesce(p_answers,'{}'::jsonb)) loop
