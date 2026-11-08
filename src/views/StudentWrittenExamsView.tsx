@@ -8,7 +8,7 @@ import {QuizReorderList} from '../components/QuizReorderList';
 import {VerbesTrousQuestion} from '../components/verbesTrous/VerbesTrousQuestion';
 import {WrittenExamStudentCopy} from '../components/WrittenExamStudentCopy';
 import type {QuizQuestion} from '../types';
-import { noterPhrase, parseVerbesTrousAnswers, type VerbesTrousAnswerKeyPhrase } from '../utils/verbesTrous';
+import {parseVerbesTrousAnswers} from '../utils/verbesTrous';
 
 type ExamCard={id:string;title:string;description:string;level:string;target_language:string;instruction_language:string;duration_minutes:number;raw_max:number;display_scale:number|null;status:string;opens_at?:string;closes_at?:string;class_eligible?:boolean;attempt_status?:string;attempts_used:number;max_attempts:number;results_published:boolean;show_score_after_publish:boolean;show_corrections_after_publish:boolean;integrity_settings:any;navigation_mode:'free'|'sequential';sections:any[];raw_score?:number|null;normalized_score?:number|null;attempt_raw_max?:number|null;attempt_display_scale?:number|null;}
 const fmt=(seconds:number)=>{const safe=Math.max(0,seconds);return String(Math.floor(safe/3600)).padStart(2,'0')+':'+String(Math.floor((safe%3600)/60)).padStart(2,'0')+':'+String(safe%60).padStart(2,'0');};
