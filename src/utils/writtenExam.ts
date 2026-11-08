@@ -88,6 +88,7 @@ export function validateWrittenExam(exam:WrittenExam):string[]{
   s.questions.forEach((q,j)=>{
    if(!q.prompt.trim()||q.prompt.includes('{{'))errors.push('Question '+(j+1)+' de « '+s.title+' » : énoncé manquant ou canevas à compléter.');
    if(!Number.isFinite(q.points)||q.points<=0)errors.push('Question '+(j+1)+' : barème invalide.');
+    if(q.time_limit_seconds!==undefined&&(!Number.isInteger(q.time_limit_seconds)||q.time_limit_seconds<1||q.time_limit_seconds>3600))errors.push('Question '+(j+1)+' : le temps doit être compris entre 1 et 3600 secondes.');
    if(q.type==='qcm'&&((q.options||[]).length<2||(!q.manual_review&&(!q.answer_key.correctOptionId||(q.options||[]).every(o=>o.id!==q.answer_key.correctOptionId)))))errors.push('QCM '+(j+1)+' : options ou bonne réponse manquante.');
    if(q.type==='text'&&!q.manual_review&&!(q.answer_key.acceptedAnswers?.length||q.answer_key.answers?.length))errors.push('Question texte '+(j+1)+' : ajoutez une réponse acceptée ou activez la correction manuelle.');
    if(q.type==='reorder'&&((q.items||[]).length<2||(!q.manual_review&&(q.answer_key.correctOrder||[]).length!==(q.items||[]).length)))errors.push('Réordonnement '+(j+1)+' : définissez l’ordre attendu de chaque élément.');
