@@ -164,3 +164,8 @@ SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role
 ## 7. Licence
 
 Apache-2.0
+
+
+## 8. Exercices « Verbes à trous avec banque »
+
+Le nouveau type de question est disponible dans les quiz et les examens écrits. Le guide de création, le format JSON, les règles de notation et le diagramme de séquence sont documentés dans [docs/verbes-trous.md](docs/verbes-trous.md).
