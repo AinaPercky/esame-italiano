@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds } from './writtenExam';
 
 test('L135 model starts with a 90-point configurable allocation and 90-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
@@ -37,4 +37,20 @@ test('question order restores the exact stored attempt order and option order',(
  const sections=[{id:'s1',questions:[{id:'q1',public_data:{options:[{id:'a'},{id:'b'}]}}]}];
  const ordered=applyWrittenExamOrder(sections,{sections:['s1'],questions:{s1:['q1']},options:{q1:['b','a']},items:{}});
  assert.deepEqual(ordered[0].questions[0].options.map((x:any)=>x.id),['b','a']);
+});
+
+test('quiz-imported questions preserve their individual time limit and use a safe default',()=>{
+ assert.equal(getWrittenQuestionTimeLimit({time_limit_seconds:8}),8);
+ assert.equal(getWrittenQuestionTimeLimit({public_data:{time_limit_seconds:45}}),45);
+ assert.equal(getWrittenQuestionTimeLimit({}),30);
+ assert.equal(getWrittenQuestionTimeLimit({time_limit_seconds:0}),30);
+});
+test('per-question clock resumes at the correct randomized question from the server start time',()=>{
+ const sections=[{questions:[{id:'q-b',time_limit_seconds:8},{id:'q-a',time_limit_seconds:15},{id:'q-c',time_limit_seconds:10}]}];
+ const startedAt='2026-11-08T10:00:00.000Z';
+ assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+7_000),0);
+ assert.equal(getTimedQuestionRemainingSeconds(sections,0,startedAt,new Date(startedAt).getTime()+7_000),1);
+ assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+8_000),1);
+ assert.equal(getTimedQuestionRemainingSeconds(sections,1,startedAt,new Date(startedAt).getTime()+18_000),5);
+ assert.equal(getTimedQuestionIndex(sections,startedAt,new Date(startedAt).getTime()+33_000),3);
 });
