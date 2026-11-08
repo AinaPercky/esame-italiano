@@ -416,18 +416,24 @@ begin
    'normalized_score',case when a.results_published and coalesce(av.show_score_after_publish,v.show_score_after_publish) then a.normalized_score else null end,
    'show_score_after_publish',coalesce(av.show_score_after_publish,v.show_score_after_publish),'show_corrections_after_publish',coalesce(av.show_corrections_after_publish,v.show_corrections_after_publish)
  ) order by v.opens_at nulls first,e.created_at desc),'[]'::jsonb) into v_result
- from public.written_exam_versions v
- join public.written_exam_version_classes ec on ec.version_id=v.id and ec.class_id=v_student.class_id
- join public.written_exams e on e.id=v.exam_id
+ from public.written_exams e
+ join lateral (
+   select vv.* from public.written_exam_versions vv
+   where vv.exam_id=e.id and vv.status='published'
+     and exists(select 1 from public.written_exam_version_classes ec where ec.version_id=vv.id and ec.class_id=v_student.class_id)
+   order by vv.version_number desc limit 1
+ ) v on true
  left join lateral (
    select * from public.written_exam_attempts aa
    where aa.exam_id=e.id and aa.student_id=v_student.id
    order by aa.attempt_number desc limit 1
  ) a on true
  left join public.written_exam_versions av on av.id=a.version_id
- where v.status='published'
- and ((e.status in ('published','scheduled','open') and (v.opens_at is null or v.opens_at<=now()) and (v.closes_at is null or v.closes_at>now()))
-   or (a.id is not null and e.status in ('closed','grading','results_published')));
+ where (
+   (a.status='in_progress' and e.status in ('published','scheduled','open'))
+   or (e.status in ('published','scheduled','open') and (v.opens_at is null or v.opens_at<=now()) and (v.closes_at is null or v.closes_at>now()))
+   or (a.id is not null and e.status in ('closed','grading','results_published'))
+ );
  return v_result;
 end $written$;
 
@@ -567,20 +573,24 @@ begin
  if not public.written_exam_is_teacher() then raise exception 'Accès enseignant requis.'; end if;
  select * into v_attempt from public.written_exam_attempts where id=p_attempt_id for update;
  if not found or v_attempt.status not in ('needs_review','submitted','graded','timed_out') then raise exception 'Tentative non corrigeable.'; end if;
+ if jsonb_typeof(coalesce(p_manual_scores,'{}'::jsonb))<>'object' then raise exception 'Les notes manuelles doivent être un objet JSON.'; end if;
  for v_entry in select key,value from jsonb_each(coalesce(p_manual_scores,'{}'::jsonb)) loop
-   select q.points into v_points from public.written_exam_questions q where q.id::text=v_entry.key and q.manual_review;
-   if v_points is null then raise exception 'Question de correction manuelle inconnue.'; end if;
-   if (v_entry.value#>>'{}')::numeric<0 or (v_entry.value#>>'{}')::numeric>v_points then raise exception 'Note manuelle hors barème.'; end if;
+   select q.points into v_points
+   from public.written_exam_questions q
+   join public.written_exam_sections s on s.id=q.section_id
+   where q.id::text=v_entry.key and q.manual_review and s.version_id=v_attempt.version_id;
+   if v_points is null then raise exception 'Question de correction manuelle inconnue pour cette tentative.'; end if;
+   if jsonb_typeof(v_entry.value) not in ('number','string') or (v_entry.value#>>'{}')::numeric<0 or (v_entry.value#>>'{}')::numeric>v_points then raise exception 'Note manuelle hors barème.'; end if;
  end loop;
  select count(*) into v_required from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id where s.version_id=v_attempt.version_id and q.manual_review;
  select count(*) into v_provided from jsonb_each(coalesce(p_manual_scores,'{}'::jsonb));
- if v_provided<v_required then raise exception 'Attribuez une note à chaque question en correction manuelle.'; end if;
+ if v_provided<>v_required then raise exception 'Attribuez une note à chaque question en correction manuelle.'; end if;
  update public.written_exam_attempts set manual_scores=coalesce(p_manual_scores,'{}'::jsonb) where id=p_attempt_id returning * into v_attempt;
  select coalesce(sum((value#>>'{}')::numeric),0) into v_total from jsonb_each(v_attempt.manual_scores);
  select * into v_version from public.written_exam_versions where id=v_attempt.version_id;
  update public.written_exam_section_results sr set
   manual_score=coalesce((select sum((entry.value#>>'{}')::numeric) from jsonb_each(coalesce(v_attempt.manual_scores,'{}'::jsonb)) entry join public.written_exam_questions q on q.id::text=entry.key where q.section_id=sr.section_id),0),
-  raw_score=sr.raw_score+coalesce((select sum((entry.value#>>'{}')::numeric) from jsonb_each(coalesce(v_attempt.manual_scores,'{}'::jsonb)) entry join public.written_exam_questions q on q.id::text=entry.key where q.section_id=sr.section_id),0)
+  raw_score=sr.raw_score-sr.manual_score+coalesce((select sum((entry.value#>>'{}')::numeric) from jsonb_each(coalesce(v_attempt.manual_scores,'{}'::jsonb)) entry join public.written_exam_questions q on q.id::text=entry.key where q.section_id=sr.section_id),0)
  where sr.attempt_id=p_attempt_id;
  update public.written_exam_attempts set raw_score=auto_score+v_total,
   normalized_score=case when raw_max>0 and v_version.display_scale is not null then round((auto_score+v_total)/raw_max*v_version.display_scale,2) else null end,
