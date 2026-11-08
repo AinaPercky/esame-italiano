@@ -27,9 +27,9 @@ export const VerbesTrousEditor: React.FC<Props> = ({ definition, answerKey, onCh
     onChange({ ...definition, phrases: definition.phrases.filter((_, i) => i !== index) }, answerKey.filter((_, i) => i !== index));
   };
   const expectedVerbs = answerKey.map((phrase) => phrase.verbe.trim()).filter(Boolean);
-  const duplicateExpected = expectedVerbs.some((verb, i) => expectedVerbs.indexOf(verb) !== i);
-  const duplicateBank = definition.banque.some((verb, i) => definition.banque.indexOf(verb) !== i);
-  const missing = expectedVerbs.filter((verb) => !definition.banque.includes(verb));
+  const duplicateExpected = expectedVerbs.some((verb, i) => expectedVerbs.findIndex((candidate) => candidate.toLocaleLowerCase('it-IT') === verb.toLocaleLowerCase('it-IT')) !== i);
+  const duplicateBank = definition.banque.some((verb, i) => definition.banque.findIndex((candidate) => candidate.toLocaleLowerCase('it-IT') === verb.toLocaleLowerCase('it-IT')) !== i);
+  const missing = expectedVerbs.filter((verb) => !definition.banque.some((candidate) => candidate.toLocaleLowerCase('it-IT') === verb.toLocaleLowerCase('it-IT')));
 
   return <div className="mt-3 space-y-4 rounded-xl border border-[#b8cce2] bg-[#f7faff] p-3">
     <p className="text-sm font-bold text-[#1f4e8c]">Verbes à trous avec banque</p>
