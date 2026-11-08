@@ -13,6 +13,7 @@ type Props = {
   showCorrection?: boolean;
   answerKey?: VerbesTrousAnswerKeyPhrase[];
   onSubmit?: () => void;
+  onEnterPress?: () => void;
 };
 
 const ACCENTS = ['à', 'è', 'é', 'ì', 'ò', 'ù'];
@@ -126,7 +127,7 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
               <div className="vt-sentence"><span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold" style={{ background: 'var(--vt-chip)', color: 'var(--vt-blue)' }}>{index + 1}</span>{phrase.debut}{chosen ? <button type="button" disabled={disabled} className="vt-chip inline-flex items-center gap-2 align-middle" aria-label={'Retirer le verbe ' + chosen} onClick={(event) => { event.stopPropagation(); remove(id); }}>{chosen}{!disabled && ' ✕'}</button> : <button type="button" className="vt-slot" disabled={disabled} onClick={(event) => { event.stopPropagation(); setActiveId(id); }}>{'touche un verbe'}</button>}{phrase.fin}</div>
               {chosen && <div className="mt-2 space-y-1">
                 <label className="block text-xs font-semibold" htmlFor={'vt-' + id} style={{ color: 'var(--vt-muted)' }}>Conjugue « {chosen} » avec le sujet de la phrase</label>
-                <input ref={(node) => { inputRefs.current[id] = node; }} id={'vt-' + id} className="vt-input" lang="it" value={answers[id]?.texte_saisi || ''} disabled={disabled} autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" onFocus={() => setFocusedId(id)} onBlur={() => setFocusedId((current) => current === id ? null : current)} onChange={(event) => updateText(id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); const next = nextEmpty(id); if (next) { setActiveId(String(next.id)); requestAnimationFrame(() => inputRefs.current[String(next.id)]?.focus()); } else { (event.currentTarget as HTMLInputElement).blur(); } } }} />
+                <input ref={(node) => { inputRefs.current[id] = node; }} id={'vt-' + id} className="vt-input" lang="it" value={answers[id]?.texte_saisi || ''} disabled={disabled} autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" onFocus={() => setFocusedId(id)} onBlur={() => setFocusedId((current) => current === id ? null : current)} onChange={(event) => updateText(id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); const next = nextEmpty(id); if (next) { setActiveId(String(next.id)); requestAnimationFrame(() => inputRefs.current[String(next.id)]?.focus()); } else { (event.currentTarget as HTMLInputElement).blur(); onEnterPress?.(); } } }} />
               </div>}
               {showCorrection && phraseScore && <div className={'mt-3 rounded-xl p-3 text-sm ' + (correct ? 'bg-emerald-50 text-emerald-900' : 'bg-rose-50 text-rose-900')}>{phraseScore.total}/3 · Réponse : <strong>{phraseScore.expectedVerb} → {phraseScore.expectedAnswers[0] || '—'}</strong></div>}
             </article>;
