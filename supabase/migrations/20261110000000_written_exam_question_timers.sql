@@ -73,6 +73,93 @@ $written$;
 revoke all on function public.get_or_start_written_exam_question_timer(uuid) from public;
 grant execute on function public.get_or_start_written_exam_question_timer(uuid) to authenticated;
 
+create or replace function public.save_written_exam_question_answer(
+  p_attempt_id uuid,
+  p_question_id text,
+  p_answer jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $written$
+declare
+  v_student_id uuid;
+  v_attempt public.written_exam_attempts%rowtype;
+  v_current_question_id text;
+begin
+  select id into v_student_id
+  from public.students
+  where lower(email)=lower(auth.jwt()->>'email')
+    and coalesce(validation_status,'approved')='approved'
+  limit 1;
+  if v_student_id is null then
+    raise exception 'Fiche élève active introuvable.';
+  end if;
+
+  select * into v_attempt
+  from public.written_exam_attempts
+  where id=p_attempt_id and student_id=v_student_id
+  for update;
+  if not found or v_attempt.status<>'in_progress' then
+    raise exception 'Tentative introuvable ou déjà terminée.';
+  end if;
+  if v_attempt.deadline_at<=now() then
+    return jsonb_build_object('saved',false,'expired',true);
+  end if;
+  if v_attempt.question_timer_started_at is null then
+    raise exception 'Chronomètre individuel non initialisé.';
+  end if;
+
+  with ordered_questions as (
+    select
+      q.id::text as question_id,
+      coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,30) as seconds,
+      coalesce(
+        sum(coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,30))
+          over (
+            order by sec.section_ord, oq.question_ord
+            rows between unbounded preceding and 1 preceding
+          ),
+        0
+      ) as offset_seconds
+    from jsonb_array_elements_text(v_attempt.order_manifest->'sections')
+      with ordinality as sec(section_id,section_ord)
+    cross join lateral jsonb_array_elements_text(
+      v_attempt.order_manifest->'questions'->(sec.section_id)
+    ) with ordinality as oq(question_id,question_ord)
+    join public.written_exam_questions q on q.id::text=oq.question_id
+  )
+  select question_id into v_current_question_id
+  from ordered_questions
+  where now() >= v_attempt.question_timer_started_at + make_interval(secs=>offset_seconds)
+    and now() < v_attempt.question_timer_started_at + make_interval(secs=>(offset_seconds+seconds))
+  limit 1;
+
+  if v_current_question_id is null or v_current_question_id<>p_question_id then
+    return jsonb_build_object('saved',false,'expired',true);
+  end if;
+
+  update public.written_exam_attempts
+  set answers=jsonb_set(
+        coalesce(answers,'{}'::jsonb),
+        array[p_question_id],
+        coalesce(p_answer,'null'::jsonb),
+        true
+      ),
+      updated_at=now()
+  where id=p_attempt_id;
+
+  return jsonb_build_object('saved',true);
+end
+$written$;
+
+revoke all on function public.save_written_exam_question_answer(uuid,text,jsonb) from public;
+grant execute on function public.save_written_exam_question_answer(uuid,text,jsonb) to authenticated;
+
+-- Students must save only the question whose server-side timer is currently active.
+revoke all on function public.save_written_exam_answers(uuid,jsonb) from authenticated;
+
 create or replace function public.save_written_exam_question_time_limits(
   p_version_id uuid,
   p_time_limits jsonb
