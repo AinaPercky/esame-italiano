@@ -29,7 +29,7 @@ Un sujet contient des paramètres généraux, puis un tableau `sections`. Chaque
   "shuffle_sections": true,
   "shuffle_questions": true,
   "shuffle_options": true,
-  "navigation_mode": "free",
+  "navigation_mode": "sequential",
   "show_score_after_publish": true,
   "show_corrections_after_publish": false,
   "integrity_settings": {
@@ -71,9 +71,9 @@ Un sujet contient des paramètres généraux, puis un tableau `sections`. Chaque
 | `display_scale` | nombre ou `null` | Échelle de présentation facultative, par exemple `100`. `null` conserve la note brute. |
 | `max_attempts` | entier | Nombre de tentatives, de 1 à 10. |
 | `shuffle_sections` | booléen | Autorise le mélange des sections. |
-| `shuffle_questions` | booléen | Autorise le mélange des questions. |
+| `shuffle_questions` | booléen | Conservé pour compatibilité JSON ; le mélange des questions est désormais obligatoire et propre à chaque tentative. |
 | `shuffle_options` | booléen | Autorise le mélange des options et des éléments à réordonner. |
-| `navigation_mode` | chaîne | `free` : navigation libre ; `sequential` : progression séquentielle sans retour. |
+| `navigation_mode` | chaîne | Conservé pour compatibilité ; l’examen utilise désormais une progression séquentielle sans retour. |
 | `show_score_after_publish` | booléen | Autorise l’affichage du score après publication des résultats. |
 | `show_corrections_after_publish` | booléen | Autorise l’affichage des corrections après publication. |
 | `integrity_settings` | objet | Paramètres de suivi décrits ci-dessous. |
@@ -97,7 +97,7 @@ Ces options ne remplacent pas une surveillance physique et ne garantissent pas �
 | `category` | chaîne | Catégorie libre, par exemple « Conjugaison ». |
 | `group_name` | chaîne | Groupe facultatif pour regrouper visuellement plusieurs sections et les mélanger ensemble. |
 | `points` | nombre | Plafond indicatif de la section ; `0` signifie sans plafond. |
-| `shuffle` | booléen | Autorise le mélange des questions de cette section. |
+| `shuffle` | booléen | Conservé pour compatibilité ; les questions sont mélangées automatiquement dans chaque section. |
 | `fixed_position` | booléen | Si `true`, conserve la position de la section. |
 | `support_text` | chaîne | Texte partagé par les questions de la section. |
 | `support_url` | chaîne | Lien HTTP ou HTTPS vers un document externe. |
@@ -113,7 +113,33 @@ Chaque question possède au minimum :
 - `type` : `qcm`, `text` ou `reorder` ;
 - `prompt` : énoncé non vide ;
 - `points` : nombre strictement supérieur à zéro ;
+- `time_limit_seconds` : temps individuel en secondes (1 à 3600 ; 30 secondes par défaut si le champ est absent) ;
 - `answer_key` : clé de correction, sauf question explicitement corrigée manuellement.
+
+### Temps individuel et ordre anti-triche
+
+Chaque question dispose de son propre compte à rebours via `time_limit_seconds`. À la fin du délai, la réponse déjà saisie est conservée et l’application passe automatiquement à la question suivante. Le chronomètre reprend au bon endroit si l’élève recharge la page ou reprend une tentative. La durée globale de l’examen reste une limite supérieure : si elle expire avant les chronomètres individuels, l’épreuve est remise.
+
+L’ordre des questions est mélangé côté serveur à chaque tentative, indépendamment pour chaque élève. La progression est séquentielle : une seule question à la fois, sans retour en arrière ni accès direct à une autre question. Le corrigé n’est jamais envoyé pendant l’épreuve.
+
+Exemple de question avec 12 secondes :
+
+```json
+{
+  "id": "qcm_rapide",
+  "type": "qcm",
+  "prompt": "Scegli la risposta corretta.",
+  "points": 1,
+  "time_limit_seconds": 12,
+  "options": [
+    { "id": "a", "label": "Opzione A" },
+    { "id": "b", "label": "Opzione B" }
+  ],
+  "answer_key": { "correctOptionId": "a" }
+}
+```
+
+Lorsqu’un quiz est copié dans un examen, sa valeur `time_limit_seconds` est conservée. Si le quiz n’en définit pas, la valeur par défaut est de 30 secondes. Le professeur peut ensuite ajuster le temps de chaque question dans l’éditeur.
 
 ### 4.1. QCM et vrai/faux — `qcm`
 
