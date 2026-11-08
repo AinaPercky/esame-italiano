@@ -2,7 +2,7 @@ import React from 'react';
 
 type Props={attempt:any;version:any;manualScores:Record<string,number>;onManualScore:(id:string,value:number)=>void};
 
-const normalize=(value:any)=>String(value??'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('it-IT');
+const normalize=(value:any)=>String(value??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('it-IT');
 const parseArray=(value:any):any[]=>{
  if(Array.isArray(value))return value;
  if(typeof value==='string'){try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch{return value? [value]:[];}}
