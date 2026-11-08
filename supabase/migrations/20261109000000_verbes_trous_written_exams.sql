@@ -56,7 +56,7 @@ begin
      if jsonb_typeof(v_key)<>'object' then raise exception 'La clé de correction doit être un objet JSON.'; end if;
      -- Allowlist only fields needed by the student UI; never forward arbitrary imported option/item properties.
      v_public := jsonb_strip_nulls(jsonb_build_object(
-       'type',case when v_question->>'type'='verbes_trous' then 'text' else v_question->>'type' end,
+       'type',v_question->>'type',
        'blank_count',case when jsonb_typeof(v_question->'blank_count')='number' then (v_question->>'blank_count')::integer else null end,
        'shuffle_options',coalesce((v_question->>'shuffle_options')::boolean,true),
        'verbes_trous',case when v_question->>'type'='verbes_trous' then jsonb_build_object(
@@ -109,6 +109,67 @@ begin
  return jsonb_build_object('exam_id',v_exam_id,'version_id',v_version_id,'version_number',v_version_no,'raw_max',v_raw);
 end $written$;
 
+
+create or replace function public.publish_written_exam(p_exam_id uuid,p_version_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $written$
+declare v_raw numeric; v_count integer; v_bad integer; v_exam public.written_exams%rowtype; v_version public.written_exam_versions%rowtype;
+begin
+ if not public.written_exam_is_teacher() then raise exception 'Accès enseignant requis.'; end if;
+ select * into v_exam from public.written_exams where id=p_exam_id for update;
+ if not found then raise exception 'Examen introuvable.'; end if;
+ select * into v_version from public.written_exam_versions where id=p_version_id and exam_id=p_exam_id and status='draft' for update;
+ if not found then raise exception 'Cette version brouillon ne correspond pas à cet examen.'; end if;
+ if not exists(select 1 from public.written_exam_version_classes where version_id=p_version_id) then raise exception 'Associez au moins une classe à cette version.'; end if;
+ select coalesce(sum(q.points),0),count(*),count(*) filter(where q.prompt='' or q.public_data->>'type' not in ('qcm','text','reorder','verbes_trous'))
+ into v_raw,v_count,v_bad from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id where s.version_id=p_version_id;
+ if v_count=0 or v_bad>0 then raise exception 'L’examen contient des questions invalides ou est vide.'; end if;
+ if exists(select 1 from public.written_exam_sections s where s.version_id=p_version_id and s.max_points>0 and (select coalesce(sum(q.points),0) from public.written_exam_questions q where q.section_id=s.id)>s.max_points) then raise exception 'Le total des questions dépasse le plafond d’une section.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='qcm' and not q.manual_review and not exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'options')='array' then q.public_data->'options' else '[]'::jsonb end) o where o->>'id'=k.answer_key->>'correctOptionId')) then raise exception 'Un QCM possède une clé qui ne correspond à aucune option.'; end if;
+
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id where s.version_id=p_version_id and q.question_type='qcm' and (
+   (case when jsonb_typeof(q.public_data->'options')='array' then jsonb_array_length(q.public_data->'options') else 0 end)<2
+   or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'options')='array' then q.public_data->'options' else '[]'::jsonb end) o where nullif(btrim(o->>'id'),'') is null or nullif(btrim(o->>'label'),'') is null)
+   or (select count(distinct o->>'id') from jsonb_array_elements(case when jsonb_typeof(q.public_data->'options')='array' then q.public_data->'options' else '[]'::jsonb end) o)<>(case when jsonb_typeof(q.public_data->'options')='array' then jsonb_array_length(q.public_data->'options') else 0 end)
+ )) then raise exception 'Chaque option QCM doit avoir un identifiant et un libellé uniques.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id where s.version_id=p_version_id and q.question_type='reorder' and (
+   (case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end)<2
+   or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'items')='array' then q.public_data->'items' else '[]'::jsonb end) o where nullif(btrim(o->>'id'),'') is null or nullif(btrim(o->>'text'),'') is null)
+   or (select count(distinct o->>'id') from jsonb_array_elements(case when jsonb_typeof(q.public_data->'items')='array' then q.public_data->'items' else '[]'::jsonb end) o)<>(case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end)
+ )) then raise exception 'Chaque élément à réordonner doit avoir un identifiant et un texte uniques.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='reorder' and not q.manual_review and (case when jsonb_typeof(k.answer_key->'correctOrder')='array' then jsonb_array_length(k.answer_key->'correctOrder') else -1 end)<>(case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end)) then raise exception 'Une question de réordonnement possède un ordre incomplet.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='text' and not q.manual_review and not (
+   (case when jsonb_typeof(k.answer_key->'acceptedAnswers')='array' then jsonb_array_length(k.answer_key->'acceptedAnswers')>0 else false end) or
+   (case when jsonb_typeof(k.answer_key->'answers')='array' then jsonb_array_length(k.answer_key->'answers')>0 else false end)
+ )) then raise exception 'Une question texte ne possède aucune réponse acceptée.'; end if;
+if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='text' and not q.manual_review and (
+   (k.answer_key ? 'acceptedAnswers' and (
+     jsonb_typeof(k.answer_key->'acceptedAnswers')<>'array'
+     or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(k.answer_key->'acceptedAnswers')='array' then k.answer_key->'acceptedAnswers' else '[]'::jsonb end) a where jsonb_typeof(a)<>'string' or nullif(btrim(a#>>'{}'),'') is null)
+   ))
+   or (k.answer_key ? 'answers' and (
+     jsonb_typeof(k.answer_key->'answers')<>'array'
+     or (case when jsonb_typeof(k.answer_key->'answers')='array' then jsonb_array_length(k.answer_key->'answers') else 0 end)=0
+     or (case when jsonb_typeof(q.public_data->'blank_count')='number' then (q.public_data->>'blank_count')::integer else 1 end)<>(case when jsonb_typeof(k.answer_key->'answers')='array' then jsonb_array_length(k.answer_key->'answers') else 0 end)
+     or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(k.answer_key->'answers')='array' then k.answer_key->'answers' else '[]'::jsonb end) blank where jsonb_typeof(blank)<>'array' or (case when jsonb_typeof(blank)='array' then jsonb_array_length(blank)=0 else true end) or exists(select 1 from jsonb_array_elements(case when jsonb_typeof(blank)='array' then blank else '[]'::jsonb end) variant where jsonb_typeof(variant)<>'string' or nullif(btrim(variant#>>'{}'),'') is null))
+   ))
+ )) then raise exception 'Les réponses acceptées ou variantes de trous sont invalides.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='reorder' and not q.manual_review and (
+   (case when jsonb_typeof(k.answer_key->'correctOrder')='array' then jsonb_array_length(k.answer_key->'correctOrder') else -1 end)<>(case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end) or
+   exists(select 1 from jsonb_array_elements_text(case when jsonb_typeof(k.answer_key->'correctOrder')='array' then k.answer_key->'correctOrder' else '[]'::jsonb end) as correct_id(value) where not exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'items')='array' then q.public_data->'items' else '[]'::jsonb end) as item(value) where item.value->>'id'=correct_id.value)) or
+   exists(select 1 from jsonb_array_elements(case when jsonb_typeof(q.public_data->'items')='array' then q.public_data->'items' else '[]'::jsonb end) as item(value) where not exists(select 1 from jsonb_array_elements_text(case when jsonb_typeof(k.answer_key->'correctOrder')='array' then k.answer_key->'correctOrder' else '[]'::jsonb end) as correct_id(value) where correct_id.value=item.value->>'id'))
+ )) then raise exception 'Une question de réordonnement possède un ordre invalide.'; end if;
+ if exists(select 1 from public.written_exam_sections where version_id=p_version_id and support_url is not null and support_url !~* '^https?://') then raise exception 'Les documents supports doivent utiliser une URL HTTP ou HTTPS.'; end if;
+ if v_raw<=0 then raise exception 'Le barème doit être supérieur à zéro.'; end if;
+ if v_exam.opens_at is not null and v_exam.closes_at is not null and v_exam.closes_at<=v_exam.opens_at then raise exception 'La date de fermeture doit suivre la date d’ouverture.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='qcm' and (case when jsonb_typeof(q.public_data->'options')='array' then jsonb_array_length(q.public_data->'options') else 0 end)<2) then raise exception 'Un QCM doit proposer au moins deux options.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='text' and not q.manual_review and not (k.answer_key ? 'acceptedAnswers' or k.answer_key ? 'answers')) then raise exception 'Une question texte doit posséder une réponse attendue ou être corrigée manuellement.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and q.question_type='reorder' and (case when jsonb_typeof(q.public_data->'items')='array' then jsonb_array_length(q.public_data->'items') else 0 end)<2) then raise exception 'Une question de réordonnement doit contenir au moins deux éléments.'; end if;
+ if exists(select 1 from public.written_exam_questions q join public.written_exam_sections s on s.id=q.section_id left join public.written_exam_answer_keys k on k.question_id=q.id where s.version_id=p_version_id and k.question_id is null) then raise exception 'Clé de correction manquante.'; end if;
+ update public.written_exam_versions set status='published',published_at=now(),raw_max=v_raw where id=p_version_id and exam_id=p_exam_id and status='draft';
+ if not found then raise exception 'Version non modifiable ou introuvable.'; end if;
+ update public.written_exams set title=v_version.title,description=v_version.description,level=v_version.level,target_language=v_version.target_language,instruction_language=v_version.instruction_language,duration_minutes=v_version.duration_minutes,opens_at=v_version.opens_at,closes_at=v_version.closes_at,display_scale=v_version.display_scale,max_attempts=v_version.max_attempts,shuffle_sections=v_version.shuffle_sections,shuffle_questions=v_version.shuffle_questions,shuffle_options=v_version.shuffle_options,navigation_mode=v_version.navigation_mode,show_score_after_publish=v_version.show_score_after_publish,show_corrections_after_publish=v_version.show_corrections_after_publish,integrity_settings=v_version.integrity_settings,status=case when v_version.opens_at is not null and v_version.opens_at>now() then 'scheduled' else 'published' end,updated_at=now() where id=p_exam_id;
+ return jsonb_build_object('published',true,'raw_max',v_raw,'version_id',p_version_id);
+end $written$;
 
 create or replace function public.validate_verbes_trous_published_version()
 returns trigger
