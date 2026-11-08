@@ -14,7 +14,7 @@ $written$;
 
 drop trigger if exists written_exam_question_shuffle_required on public.written_exam_versions;
 create trigger written_exam_question_shuffle_required
-before insert or update of shuffle_questions on public.written_exam_versions
+before insert or update on public.written_exam_versions
 for each row execute function public.force_written_exam_question_shuffle();
 
 create or replace function public.force_written_exam_section_question_shuffle()
@@ -30,7 +30,7 @@ $written$;
 
 drop trigger if exists written_exam_section_question_shuffle_required on public.written_exam_sections;
 create trigger written_exam_section_question_shuffle_required
-before insert or update of shuffle on public.written_exam_sections
+before insert or update on public.written_exam_sections
 for each row execute function public.force_written_exam_section_question_shuffle();
 
 create or replace function public.save_written_exam_question_time_limits(
