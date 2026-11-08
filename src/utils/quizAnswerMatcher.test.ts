@@ -38,7 +38,6 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.deepEqual(parseStudentAnswers(serialized, 2), ['Io ', 'vado a scuola ']);
   });
 });
-\n
 describe('notation des questions verbes_trous', () => {
   it('attribue séparément le point du verbe et les deux points de conjugaison', () => {
     const question: any = {
