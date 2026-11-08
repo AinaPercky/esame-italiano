@@ -58,6 +58,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_ci_bootstrap.sql
       - name: Apply written exam migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261108000000_composite_written_exams.sql
+      - name: Apply verb-bank question migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261109000000_verbes_trous_written_exams.sql
       - name: Verify schema and RLS
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation
