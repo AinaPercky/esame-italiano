@@ -195,7 +195,7 @@ begin
   end if;
 
   for v_q in
-    select q.id, q.points, q.public_data, k.answer_key
+    select q.id, q.points, q.manual_review, q.public_data, k.answer_key
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
     left join public.written_exam_answer_keys k on k.question_id=q.id
@@ -205,6 +205,12 @@ begin
     v_key := v_q.answer_key;
     if jsonb_typeof(v_public) is distinct from 'object' or jsonb_typeof(v_key->'phrases') is distinct from 'array' then
       raise exception 'Question « verbes à trous » : configuration ou corrigé manquant.';
+    end if;
+    if v_q.manual_review then
+      raise exception 'Question « verbes à trous » : la correction est automatique; désactivez la correction manuelle.';
+    end if;
+    if coalesce((v_public->>'points_par_phrase')::integer,3)<>3 then
+      raise exception 'Question « verbes à trous » : points_par_phrase doit être égal à 3.';
     end if;
     v_bank := v_public->'banque';
     v_phrases := v_public->'phrases';
@@ -217,8 +223,8 @@ begin
     if v_count<1 or v_bank_count<v_count or jsonb_array_length(v_keys)<>v_count then
       raise exception 'Question « verbes à trous » : la banque doit contenir au moins autant de verbes que de phrases.';
     end if;
-    if exists(select 1 from jsonb_array_elements_text(v_bank) b where nullif(btrim(b),'') is null) then
-      raise exception 'Question « verbes à trous » : la banque contient un verbe vide.';
+    if exists(select 1 from jsonb_array_elements(v_bank) b where jsonb_typeof(b.value)<>'string' or nullif(btrim(b.value#>>'{}'),'') is null) then
+      raise exception 'Question « verbes à trous » : la banque doit contenir uniquement des verbes non vides.';
     end if;
     select count(distinct lower(btrim(value))) into v_unique_bank
     from jsonb_array_elements_text(v_bank);
@@ -232,8 +238,11 @@ begin
     end if;
     if (select count(distinct value->>'id') from jsonb_array_elements(v_phrases))<>v_count
       or exists(select 1 from jsonb_array_elements(v_phrases) p where nullif(btrim(p.value->>'id'),'') is null)
+      or (select count(distinct value->>'id') from jsonb_array_elements(v_keys))<>v_count
+      or exists(select 1 from jsonb_array_elements(v_keys) k where nullif(btrim(k.value->>'id'),'') is null)
+      or exists(select 1 from jsonb_array_elements(v_phrases) p where not exists(select 1 from jsonb_array_elements(v_keys) k where p.value->>'id'=k.value->>'id'))
       or exists(select 1 from jsonb_array_elements(v_keys) k where not exists(select 1 from jsonb_array_elements(v_phrases) p where p.value->>'id'=k.value->>'id')) then
-      raise exception 'Question « verbes à trous » : les identifiants des phrases doivent être présents et uniques.';
+      raise exception 'Question « verbes à trous » : les identifiants des phrases et des réponses doivent correspondre exactement et être uniques.';
     end if;
     if v_q.points<>v_count*3 then
       raise exception 'Question « verbes à trous » : le barème doit être de 3 points par phrase.';
@@ -292,7 +301,7 @@ begin
   end if;
 
   for v_q in
-    select q.id,q.section_id,q.points,k.answer_key
+    select q.id,q.section_id,q.points,q.public_data,k.answer_key
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
     join public.written_exam_answer_keys k on k.question_id=q.id
@@ -312,7 +321,12 @@ begin
       v_expected_verb:=lower(regexp_replace(btrim(coalesce(v_phrase->>'verbe','')),'\s+',' ','g'));
       v_typed:=lower(regexp_replace(btrim(coalesce(v_phrase_answer->>'texte_saisi','')),'\s+',' ','g'));
       v_phrase_points:=0;
-      if v_chosen_verb<>'' and not (v_chosen_verb=any(v_used_verbs)) then
+      if v_chosen_verb<>'' and not (v_chosen_verb=any(v_used_verbs))
+        and exists(
+          select 1
+          from jsonb_array_elements_text(coalesce(v_q.public_data->'verbes_trous'->'banque','[]'::jsonb)) bank(value)
+          where lower(regexp_replace(btrim(bank.value),'\\s+',' ','g'))=v_chosen_verb
+        ) then
         v_used_verbs:=array_append(v_used_verbs,v_chosen_verb);
         if v_chosen_verb=v_expected_verb then v_phrase_points:=v_phrase_points+1; end if;
         if v_typed<>'' and exists(
