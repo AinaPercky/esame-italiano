@@ -94,6 +94,10 @@ export const VerbesTrousQuestion: React.FC<Props> = ({
         @media(orientation:landscape) and (max-width:899px){.vt-bank{position:relative}}
         @media(prefers-reduced-motion:reduce){.verbes-trous *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
       `}</style>
+      {(definition.titre || definition.consigne) && <div className="rounded-xl p-3" style={{ background: 'var(--vt-chip)' }}>
+        {definition.titre && <h3 className="text-base font-bold">{definition.titre}</h3>}
+        {definition.consigne && <p className="mt-1 text-sm" style={{ color: 'var(--vt-muted)' }}>{definition.consigne}</p>}
+      </div>}
       <div className="vt-layout">
         <aside className="min-w-0">
           <div className="vt-bank">
