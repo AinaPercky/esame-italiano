@@ -119,7 +119,7 @@ begin
   v_started:=public.start_written_exam(v_exam_id);
   v_attempt_id:=(v_started->>'attempt_id')::uuid;
 
-  if v_started::text like '%answer_key%' or v_started::text like '%is_correct%' then
+  if v_started::text like '%answer_key%' or v_started::text like '%is_correct%' or v_started::text like '%"reponses"%' or v_started::text like '%"verbe"%' then
     raise exception 'Private answer-key fields leaked into the student exam payload.';
   end if;
 
