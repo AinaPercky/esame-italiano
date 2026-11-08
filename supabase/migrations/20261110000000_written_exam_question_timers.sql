@@ -8,6 +8,7 @@ set search_path = ''
 as $written$
 begin
   new.shuffle_questions := true;
+  new.navigation_mode := 'sequential';
   return new;
 end
 $written$;
@@ -32,6 +33,16 @@ drop trigger if exists written_exam_section_question_shuffle_required on public.
 create trigger written_exam_section_question_shuffle_required
 before insert or update on public.written_exam_sections
 for each row execute function public.force_written_exam_section_question_shuffle();
+
+-- Bring already-published templates into the mandatory anti-cheat order for future attempts.
+-- Existing attempts retain their immutable order_manifest.
+alter table public.written_exam_versions disable trigger written_exam_versions_immutable;
+update public.written_exam_versions
+set shuffle_questions=true, navigation_mode='sequential';
+alter table public.written_exam_versions enable trigger written_exam_versions_immutable;
+
+update public.written_exam_sections set shuffle=true;
+
 
 alter table public.written_exam_attempts
   add column if not exists question_timer_started_at timestamptz;
