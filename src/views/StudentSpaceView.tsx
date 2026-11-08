@@ -1622,11 +1622,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                         ) : currentQuestionIndex + 1 === totalQuestions ? (
                           <>
                             <Save className="w-4 h-4" />
-                            <span>{isPracticeMode ? 'Terminer le tutoriel' : 'Valider et Terminer le Quiz'}</span>
+                            <span>{isPracticeMode ? 'Terminer le tutoriel' : currentQ.type === 'verbes_trous' ? 'Corriger et terminer' : 'Valider et Terminer le Quiz'}</span>
                           </>
                         ) : (
                           <>
-                            <span>Valider et Question Suivante</span>
+                            <span>{currentQ.type === 'verbes_trous' ? 'Corriger et continuer' : 'Valider et Question Suivante'}</span>
                             <ChevronRight className="w-4 h-4" />
                           </>
                         )}
