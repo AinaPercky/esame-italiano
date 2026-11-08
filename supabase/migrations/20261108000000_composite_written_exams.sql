@@ -495,7 +495,7 @@ begin
  if v_has_attempt then
    select * into v_version from public.written_exam_versions where id=v_attempt.version_id;
  else
-   select * into v_version from public.written_exam_versions where exam_id=p_exam_id and status='published' order by version_number desc limit 1;
+   select * into v_version from public.written_exam_versions vv where vv.exam_id=p_exam_id and vv.status='published' and exists(select 1 from public.written_exam_version_classes ec where ec.version_id=vv.id and ec.class_id=v_student.class_id) order by vv.version_number desc limit 1;
  end if;
  if not found then raise exception 'Aucune version publiée.'; end if;
  if not exists(select 1 from public.written_exam_version_classes where version_id=v_version.id and class_id=v_student.class_id) then raise exception 'Cet examen n’est pas destiné à votre classe.'; end if;
