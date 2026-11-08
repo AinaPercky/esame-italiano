@@ -346,3 +346,10 @@ Le total réel reste calculé à partir des questions présentes. Si vous suppri
 8. Enregistrer le brouillon, puis utiliser l’action de publication lorsque le sujet est prêt.
 
 L’importateur analyse le contenu JSON/JSONC, mais ne remplace pas la validation pédagogique : relisez systématiquement les réponses attendues, les variantes, le nombre de trous, les identifiants et le barème avant de publier.
+
+
+## 11. Question « Verbes à trous avec banque »
+
+Le type `verbes_trous` est disponible dans l’éditeur. Il attend une banque sans doublon, au moins autant de verbes que de phrases, un verbe attendu différent par phrase et une ou plusieurs conjugaisons acceptées. Le barème est fixé à 3 points par phrase (1 point pour le verbe, 2 points pour la conjugaison). Les données visibles par l’élève sont séparées des clés de correction privées.
+
+Consultez [le guide Verbes à trous avec banque](verbes-trous.md) pour le format JSON complet, les règles de correction et le diagramme de séquence.
