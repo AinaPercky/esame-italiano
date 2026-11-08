@@ -40,6 +40,9 @@ declare
   v_normalized numeric;
   v_status text;
   v_section_count integer;
+  v_question_key text;
+  v_offset integer;
+  v_duration integer;
   v_error text;
 begin
   insert into public.classes(id,name) values(v_class_id,'CI test class');
@@ -119,6 +122,7 @@ begin
 
   v_started:=public.start_written_exam(v_exam_id);
   v_attempt_id:=(v_started->>'attempt_id')::uuid;
+  perform public.get_or_start_written_exam_question_timer(v_attempt_id);
 
   if v_started::text like '%answer_key%' or v_started::text like '%is_correct%' or v_started::text like '%"reponses"%' or v_started::text like '%"verbe"%' then
     raise exception 'Private answer-key fields leaked into the student exam payload.';
@@ -156,7 +160,33 @@ begin
     v_manual_id::text,'free response',
     v_verbes_id::text,jsonb_build_object('1',jsonb_build_object('verbe_choisi','addormentarsi','texte_saisi','mi addormento'),'2',jsonb_build_object('verbe_choisi','dire','texte_saisi','beviamo'),'3',jsonb_build_object('verbe_choisi','not_in_bank','texte_saisi','dico'))
   );
-  perform public.save_written_exam_answers(v_attempt_id,v_answers);
+  for v_question_key in select key from jsonb_each(v_answers) loop
+    with ordered_questions as (
+      select q.id::text as question_id,
+        coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,case when q.question_type in ('text','verbes_trous') then 32 else 17 end) as duration_seconds,
+        row_number() over(order by sec.section_ord,oq.question_ord) as question_order
+      from public.written_exam_attempts a
+      cross join lateral jsonb_array_elements_text(a.order_manifest->'sections')
+        with ordinality as sec(section_id,section_ord)
+      cross join lateral jsonb_array_elements_text(a.order_manifest->'questions'->(sec.section_id))
+        with ordinality as oq(question_id,question_ord)
+      join public.written_exam_questions q on q.id::text=oq.question_id
+      where a.id=v_attempt_id
+    )
+    select coalesce(sum(previous.duration_seconds),0)::integer,current_question.duration_seconds into v_offset,v_duration
+    from ordered_questions current_question
+    left join ordered_questions previous on previous.question_order<current_question.question_order
+    where current_question.question_id=v_question_key
+    group by current_question.question_order,current_question.duration_seconds;
+
+    update public.written_exam_attempts
+    set question_timer_started_at=now()-make_interval(secs=>v_offset+1)
+    where id=v_attempt_id;
+    perform public.save_written_exam_question_answer(v_attempt_id,v_question_key,v_answers->v_question_key);
+    update public.written_exam_attempts set question_timer_started_at=now()-make_interval(secs=>v_offset+v_duration+1) where id=v_attempt_id;
+    v_result:=public.save_written_exam_question_answer(v_attempt_id,v_question_key,'"late answer"'::jsonb);
+    if coalesce((v_result->>'saved')::boolean,false) then raise exception 'A response was accepted after its individual question deadline.'; end if;
+  end loop;
   v_result:=public.submit_written_exam(v_attempt_id);
   if coalesce((v_result->>'needs_review')::boolean,false) is not true then
     raise exception 'Manual-review question did not put the attempt into review.';
