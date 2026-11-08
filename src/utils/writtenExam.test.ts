@@ -42,8 +42,10 @@ test('question order restores the exact stored attempt order and option order',(
 test('quiz-imported questions preserve their individual time limit and use a safe default',()=>{
  assert.equal(getWrittenQuestionTimeLimit({time_limit_seconds:8}),8);
  assert.equal(getWrittenQuestionTimeLimit({public_data:{time_limit_seconds:45}}),45);
- assert.equal(getWrittenQuestionTimeLimit({}),30);
- assert.equal(getWrittenQuestionTimeLimit({time_limit_seconds:0}),30);
+ assert.equal(getWrittenQuestionTimeLimit({type:'qcm'}),17);
+ assert.equal(getWrittenQuestionTimeLimit({type:'text'}),32);
+ assert.equal(getWrittenQuestionTimeLimit({type:'verbes_trous'}),32);
+ assert.equal(getWrittenQuestionTimeLimit({type:'text',time_limit_seconds:0}),32);
 });
 test('per-question clock resumes at the correct randomized question from the server start time',()=>{
  const sections=[{questions:[{id:'q-b',time_limit_seconds:8},{id:'q-a',time_limit_seconds:15},{id:'q-c',time_limit_seconds:10}]}];
@@ -56,7 +58,8 @@ test('per-question clock resumes at the correct randomized question from the ser
 });
 
 test('new manually created questions receive the 30-second default and invalid timer values are rejected',()=>{
- assert.equal(createQuestion('qcm').time_limit_seconds,30);
+ assert.equal(createQuestion('qcm').time_limit_seconds,17);
+ assert.equal(createQuestion('text').time_limit_seconds,32);
  const section=createSection('Timed');
  section.questions=[{id:'bad-time',type:'text',prompt:'Ciao?',points:1,time_limit_seconds:3601,answer_key:{acceptedAnswers:['ciao']}}];
  const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
