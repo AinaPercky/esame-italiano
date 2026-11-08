@@ -13,7 +13,7 @@ import { CORRECTION_DISPLAY_SECONDS } from '../../utils/quizTiming';
 import { QuizReorderList } from '../../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../../components/QuizClozeInput';
 import { VerbesTrousQuestion } from '../../components/verbesTrous/VerbesTrousQuestion';
-import type { VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
+import { parseVerbesTrousAnswers, type VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
 
 interface PublicQuizQuestionScreenProps {
   question: QuizQuestion;
@@ -59,6 +59,14 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   onPrevious
 }) => {
   const [correctionCountdown, setCorrectionCountdown] = React.useState(CORRECTION_DISPLAY_SECONDS);
+  const [confirmIncomplete, setConfirmIncomplete] = React.useState(false);
+  const missingVerbPhrases = question.type === 'verbes_trous' && question.verbes_trous
+    ? question.verbes_trous.phrases.filter((phrase) => !parseVerbesTrousAnswers(answer)[String(phrase.id)]?.verbe_choisi).length
+    : 0;
+  const requestValidation = () => {
+    if (missingVerbPhrases > 0) setConfirmIncomplete(true);
+    else onValidate();
+  };
   const isLastQuestion = questionIndex === totalQuestions - 1;
   const totalTimeRatio = totalTimeDurationMs > 0 ? totalTimeLeftMs / totalTimeDurationMs : 1;
   const totalTimeRemainingPercent = Math.max(0, Math.min(100, totalTimeRatio * 100));
@@ -81,7 +89,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   };
 
   const primaryLabel = !isValidated
-    ? 'Valider'
+    ? question.type === 'verbes_trous' ? 'Corriger' : 'Valider'
     : isLastQuestion
       ? 'Terminer le quiz'
       : 'Question suivante';
@@ -265,7 +273,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 
           <button
             type="button"
-            onClick={isValidated ? onNext : onValidate}
+            onClick={isValidated ? onNext : requestValidation}
             className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 text-sm font-extrabold text-white shadow-md transition hover:bg-[#0b3c5d] active:scale-[.99] sm:h-14 sm:px-6 sm:text-base"
           >
             {!isValidated ? <CheckCircle2 className="h-5 w-5" /> : isLastQuestion ? <Send className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
@@ -273,6 +281,19 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           </button>
         </div>
       </div>
+
+      {confirmIncomplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4" role="presentation">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="vt-confirm-title" className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h2 id="vt-confirm-title" className="text-base font-extrabold text-slate-900">Il reste {missingVerbPhrases} phrase{missingVerbPhrases > 1 ? 's' : ''} sans réponse.</h2>
+            <p className="mt-2 text-sm text-slate-600">Corriger quand même ?</p>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => setConfirmIncomplete(false)} className="min-h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700">Continuer</button>
+              <button type="button" onClick={() => { setConfirmIncomplete(false); onValidate(); }} className="min-h-11 flex-1 rounded-xl bg-[#072a3f] px-3 text-sm font-bold text-white">Corriger</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {showCorrection && feedback && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm animate-fade-in">
