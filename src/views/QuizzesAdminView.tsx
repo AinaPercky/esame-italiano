@@ -2472,7 +2472,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Le modèle intègre les trois types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous ex: 4 verbes via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>) et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>. Les commentaires de documentation sont acceptés.
+                  Le modèle intègre les quatre types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>), <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">verbes_trous</code> (banque de verbes, un verbe par phrase et conjugaison). Les commentaires de documentation sont acceptés.
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
 {quizImportTemplate}
