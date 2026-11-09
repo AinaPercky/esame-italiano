@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {BookOpen,CheckCircle2,Clock,FileText,Lock,Play,Save,ShieldAlert,Send,ChevronRight,Keyboard,ShieldCheck} from 'lucide-react';
+import {BookOpen,CheckCircle2,Clock,FileText,Lock,Play,Save,ShieldAlert,Send,ChevronRight,ShieldCheck} from 'lucide-react';
 import {writtenExamService} from '../services/writtenExamService';
 import type {AuthUser} from '../services/authService';
 import {applyWrittenExamOrder,WrittenAttempt,getTimedQuestionIndex,getTimedQuestionRemainingSeconds,getWrittenQuestionTimeLimit} from '../utils/writtenExam';
