@@ -39,7 +39,7 @@ const l135ComprehensionQuestions:WrittenQuestion[]=[
  textQ('Confronta la cucina del nord e quella del sud usando le informazioni del testo. Indica almeno due ingredienti o prodotti caratteristici per ciascuna zona e rispondi con una frase completa.',3,["Al nord gli abitanti usano molto il burro, il riso e la polenta; al sud, invece, preferiscono l’olio d’oliva, i pomodori, il pesce e le verdure.","Al nord si usano molto burro, riso e polenta, mentre al sud si preferiscono olio d’oliva, pomodori, pesce e verdure.","La cucina del nord usa soprattutto burro, riso e polenta; quella del sud preferisce olio d’oliva, pomodori, pesce e verdure."],{manual_review:true,explanation:'Correggere manualmente. Accetta ogni frase completa che confronti correttamente gli ingredienti del nord e quelli del sud indicati nel testo.'})
 ];
 export const L135_TEMPLATE:WrittenExam={
- title:'L135 – Examen composite',description:'90 points · 1 h 30 · compréhension, grammaire, vocabulaire et réordonnement. Sans production écrite ni orale.',
+ title:'L135 – Examen composite',description:'90 points pour les questions · 1 h 30 · compréhension, grammaire, vocabulaire et réordonnement. Expression écrite corrigée séparément sur 10 points.',
  level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:10,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:true,warn_on_tab_switch:true,watermark:false},
@@ -59,7 +59,7 @@ const a1TF=[
  ['Marco vive a Roma.',2,0],['Marco ha venticinque anni.',2,1],['Marco studia italiano.',2,0],['Marco va a lezione in treno.',2,1],['Nel fine settimana gioca a calcio.',2,0]
 ] as const;
 export const A1_TEMPLATE:WrittenExam={
- title:'Esame bianco – Italiano A1',description:'80 points · 1 h 10 · compréhension, grammaire, vocabulaire et phrases à compléter. Sans production écrite ni orale.',
+ title:'Esame bianco – Italiano A1',description:'80 points pour les questions · 1 h 10 · compréhension, grammaire, vocabulaire et phrases à compléter. Expression écrite corrigée séparément sur 20 points.',
  level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:20,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
@@ -91,10 +91,10 @@ export const A1_TEMPLATE:WrittenExam={
   ]}
  ]
 };
-export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'>){
+export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'|'expression_writing_max_points'>){
  const raw=exam.sections.reduce((sum,s)=>sum+s.questions.reduce((n,q)=>n+Math.max(0,Number(q.points)||0),0),0);
  const planned=exam.sections.reduce((sum,s)=>sum+Math.max(0,Number(s.points)||0),0);
- return {raw,planned,normalizedMaximum:exam.display_scale,totalWithExpression:raw+Number((exam as any).expression_writing_max_points||0)};
+ return {raw,planned,normalizedMaximum:exam.display_scale,totalWithExpression:raw+Number(exam.expression_writing_max_points||0)};
 }
 export function validateWrittenExam(exam:WrittenExam):string[]{
  const errors:string[]=[];
