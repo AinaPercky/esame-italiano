@@ -299,7 +299,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
             </div>
           </div>
 
-          {/* Student & Animal Presentation Highlight Card */}
+          {/* Candidate, exam subject and speaking time */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Candidate Identity */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
