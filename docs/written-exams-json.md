@@ -424,3 +424,14 @@ Dans un examen composite, les données de présentation et la clé de correction
 Chaque phrase rapporte 3 points : **1 point** si le verbe attendu est correctement placé et **2 points** si la conjugaison correspond à l’une des réponses acceptées. Une phrase sans verbe placé rapporte zéro. Les verbes pièges non utilisés ne rapportent aucun point.
 
 Pour le format détaillé, le comportement de l’exercice et le diagramme de séquence, consultez [le guide Verbes à trous avec banque](verbes-trous.md).
+
+
+## Réaffecter une classe, actualiser un sujet ou réinitialiser ses tentatives
+
+Un sujet peut cibler une ou plusieurs classes. Dans l’éditeur, cochez les classes souhaitées puis enregistrez et publiez une nouvelle version. Les élèves des nouvelles classes accèdent à cette version; les anciennes tentatives restent associées à leur version et à leur classe d’origine. Pour reprendre le contenu mis à jour des sujets L135 ou A1 existants, ouvrez **Modifier / version**, choisissez **Modèle → Appliquer L135** ou **Appliquer A1**, vérifiez les classes et publiez la nouvelle version. Le titre, les dates et les classes de l’examen en cours sont conservés au chargement du modèle.
+
+La remise à zéro est séparée de la modification du sujet. Pour actualiser un sujet existant tout en effaçant ses anciens résultats, suivez cet ordre : **clôturez-le → ouvrez Résultats et choisissez Réinitialiser les tentatives → confirmez → modifiez/appliquez le modèle et les classes → publiez la nouvelle version**. La RPC n’autorise le reset que pour un sujet clôturé (`closed`) ou clôturé en attente de correction manuelle (`grading`); un examen encore ouvert ou planifié ne peut pas être effacé. Une confirmation explicite précède la suppression définitive de toutes les tentatives du sujet — y compris celles en cours — et de leurs réponses, notes, résultats par rubrique et journaux d’intégrité. Le sujet, ses versions et ses affectations de classes sont conservés. Cette action n’a pas été exécutée sur la base partagée depuis cet environnement. La RPC `reset_written_exam_attempts` est ajoutée par `supabase/migrations/20261112000000_reset_written_exam_attempts.sql`.
+
+### Erreur `save_written_exam_question_time_limits` / `PGRST202`
+
+Cette erreur indique que PostgREST ne trouve pas le RPC dans le schéma Supabase courant. Appliquez toutes les migrations en attente, notamment `supabase/migrations/20261110000000_written_exam_question_timers.sql`. Si la migration est déjà présente mais que le cache est obsolète, exécutez `NOTIFY pgrst, 'reload schema';` dans le SQL Editor. La sauvegarde du sujet peut déjà avoir créé un brouillon avant cette erreur, mais ses durées individuelles n’ont pas été écrites; après réparation du schéma, rouvrez et réenregistrez ce même sujet.

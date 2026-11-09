@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError } from './writtenExam';
 
 test('L135 model starts with a 90-point configurable allocation and 90-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
@@ -23,10 +23,31 @@ test('raw maximum follows actual question points, not a fixed template total',()
  assert.equal(getWrittenExamTotals({sections:[section],display_scale:100}).raw,2);
  assert.equal(getWrittenExamTotals({sections:[section],display_scale:100}).planned,10);
 });
-test('L135 remains an editable scaffold until its source text and comprehension prompts are supplied',()=>{
- const errors=validateWrittenExam({...L135_TEMPLATE,class_ids:['class-1']});
- assert.ok(errors.some(error=>error.includes('texte-support')));
- assert.ok(errors.some(error=>error.includes('canevas à compléter')));
+test('L135 comprehension contains the source text and ten questions with complete-sentence answer guidance',()=>{
+ const section=L135_TEMPLATE.sections[0];
+ assert.equal(section.questions.length,10);
+ assert.ok(section.support_text?.includes('La cucina italiana non è una sola'));
+ assert.ok(!section.support_text?.includes('{{'));
+ assert.equal(section.questions.reduce((n,q)=>n+q.points,0),20);
+ assert.deepEqual(validateWrittenExam({...L135_TEMPLATE,class_ids:['class-1']}),[]);
+ assert.ok(section.questions[7].answer_key.acceptedAnswers?.includes('Il tempo totale è di 100 minuti.'));
+ assert.equal(section.questions[9].manual_review,true);
+});
+test('A1 comprehension accepts full sentences and equivalent answers for Marco',()=>{
+ const questions=A1_TEMPLATE.sections[0].questions;
+ const residence=questions.find(q=>q.prompt==='Dove abita Marco?');
+ assert.ok(residence?.answer_key.acceptedAnswers?.includes('Marco abita a Roma.'));
+ assert.ok(residence?.answer_key.acceptedAnswers?.includes('Marco vive a Roma.'));
+ assert.ok(residence?.answer_key.acceptedAnswers?.includes('A Roma.'));
+ const age=questions.find(q=>q.prompt==='Quanti anni ha Marco?');
+ assert.ok(age?.answer_key.acceptedAnswers?.includes('Marco ha vent’anni.'));
+});
+test('missing per-question timer RPC error gives migration and safe re-save instructions',()=>{
+ const message=formatWrittenExamTimeSaveError({code:'PGRST202',message:'Could not find the function public.save_written_exam_question_time_limits(p_time_limits, p_version_id) in the schema cache'});
+ assert.match(message,/20261110000000_written_exam_question_timers\.sql/);
+ assert.match(message,/brouillon du sujet a déjà été enregistré/);
+ assert.match(message,/réenregistrez ce même sujet/);
+ assert.equal(formatWrittenExamTimeSaveError({message:'Erreur réseau'}),'Erreur réseau');
 });
 test('validation rejects missing class, missing questions and invalid answer keys',()=>{
  const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:[],sections:[createSection('Grammaire',5)]});
