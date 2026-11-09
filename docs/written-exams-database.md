@@ -27,7 +27,6 @@ erDiagram
 | `written_exam_classes` | Classes ciblées par la définition courante |
 | `written_exam_version_classes` | Instantané des classes autorisées par version publiée |
 | `written_exam_versions` | Instantané versionné et immuable après publication : durée, dates, échelle, mélange, total brut et paramètres d'intégrité |
-| `written_exam_version_classes` | Copie des classes ciblées au moment de la sauvegarde de chaque version |
 | `written_exam_sections` | Rubriques dynamiques, ordre, plafond, catégorie et groupe libres, consignes, texte-support partagé et lien vers document PDF/image (`support_url`) |
 | `written_exam_questions` | Questions figées, type, énoncé, barème, options/éléments publics, référence au quiz source et indicateur de correction manuelle |
 | `written_exam_answer_keys` | Clés privées et explications; jamais retournées par les RPC de passage |
@@ -57,14 +56,14 @@ erDiagram
 
 ## Installation Supabase
 
-1. Ouvrir le SQL Editor du projet Supabase utilisé par PerckyLingua.
-2. Exécuter dans l'ordre, une seule fois chacune, les deux migrations :
-   - `supabase/migrations/20261108000000_composite_written_exams.sql` (schéma des examens écrits composites).
-   - `supabase/migrations/20261109000000_verbes_trous_written_exams.sql` (type de question « verbes à trous avec banque » et notation serveur).
-3. Vérifier la création des tables `written_*`, les fonctions RPC et les politiques RLS.
-4. Tester avec un compte enseignant et deux comptes élèves appartenant à des classes différentes.
-5. Vérifier qu'un élève ne peut ni sélectionner directement `written_exam_answer_keys`, ni appeler une tentative pour une autre classe.
-6. Effectuer les tests de publication, reprise, expiration, double soumission, correction manuelle et publication des résultats avant de faire passer un examen réel.
+Dans le SQL Editor du projet Supabase utilisé par PerckyLingua, exécuter les migrations dans cet ordre, une seule fois chacune :
+
+1. `supabase/migrations/20261108000000_composite_written_exams.sql` — schéma des examens écrits composites.
+2. `supabase/migrations/20261109000000_verbes_trous_written_exams.sql` — type de question « verbes à trous avec banque » et notation serveur.
+3. `supabase/migrations/20261110000000_written_exam_question_timers.sql` — limites de temps par question et chronomètre serveur.
+4. `supabase/migrations/20261111000000_fix_written_exam_time_limit_count.sql` — correction de compatibilité PostgreSQL du RPC de sauvegarde des temps par question. **Indispensable si la migration précédente est déjà installée** : elle remplace l'appel invalide à `jsonb_object_length(jsonb)`.
+
+Après application, vérifier la création des tables `written_*`, les fonctions RPC et les politiques RLS. Tester avec un compte enseignant et deux comptes élèves appartenant à des classes différentes. Vérifier qu'un élève ne peut ni sélectionner directement `written_exam_answer_keys`, ni appeler une tentative pour une autre classe. Effectuer les tests de publication, reprise, expiration, double soumission, correction manuelle et publication des résultats avant de faire passer un examen réel.
 
 **Ne pas exécuter** le schéma d'initialisation historique `src/data/supabaseSqlSchema.ts` pour cette fonctionnalité : il contient des suppressions de tables existantes et des politiques permissives. La migration écrite est additive et isolée.
 

@@ -3,6 +3,7 @@
 do $written$
 declare
   v_table text;
+  v_function_definition text;
   v_required text[] := array[
     'written_exams','written_exam_classes','written_exam_versions','written_exam_version_classes',
     'written_exam_sections','written_exam_questions','written_exam_answer_keys','written_exam_attempts',
@@ -29,6 +30,11 @@ begin
   if to_regprocedure('public.reset_written_exam_attempts(uuid)') is null then raise exception 'Missing teacher-only destructive reset RPC'; end if;
   if to_regprocedure('public.get_or_start_written_exam_question_timer(uuid)') is null then raise exception 'Missing persisted question timer RPC'; end if;
   if to_regprocedure('public.save_written_exam_question_answer(uuid,text,jsonb)') is null then raise exception 'Missing server-timed per-question answer RPC'; end if;
+  select pg_get_functiondef(to_regprocedure('public.save_written_exam_question_time_limits(uuid,jsonb)'))
+    into v_function_definition;
+  if v_function_definition ilike '%jsonb_object_length%' then
+    raise exception 'Unsupported jsonb_object_length call remains in the time-limit RPC';
+  end if;
   if has_function_privilege('authenticated','public.save_written_exam_answers(uuid,jsonb)','EXECUTE') then raise exception 'Legacy bulk answer save remains executable by students'; end if;
   if has_function_privilege('anon','public.reset_written_exam_attempts(uuid)','EXECUTE') then raise exception 'Anonymous users can reset written-exam attempts'; end if;
   if not has_function_privilege('authenticated','public.reset_written_exam_attempts(uuid)','EXECUTE') then raise exception 'Teachers cannot call the written-exam reset RPC'; end if;
