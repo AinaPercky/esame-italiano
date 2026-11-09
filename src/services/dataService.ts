@@ -764,7 +764,6 @@ export const dataService = {
         created_at: now,
         updated_at: now,
         details,
-        presented_animal: animal,
         max_duration_seconds: maxDuration,
         duration_used_seconds: durationUsed,
         timer_status: timerStatus
