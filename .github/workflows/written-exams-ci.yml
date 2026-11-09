@@ -76,3 +76,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_flow.sql
+      - name: Test manual expression-writing score and publication guard
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_expression_score.sql
