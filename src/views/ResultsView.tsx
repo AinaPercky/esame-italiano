@@ -564,12 +564,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                     <span className="font-semibold text-slate-800">{selectedStudentExamEval.exam_title}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">Animal présenté</span>
-                    <span className="font-bold text-slate-900 flex items-center gap-1">
-                      <span>🐾 {selectedStudentExamEval.presented_animal || 'Non renseigné'}</span>
-                    </span>
-                  </div>
-                  <div>
                     <span className="text-slate-400 block">Rubriques validées</span>
                     <span className="font-mono font-semibold text-emerald-800">
                       {selectedStudentExamEval.validated_rubrics_count} / {selectedStudentExamEval.total_rubrics_count}
@@ -578,7 +572,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   <div>
                     <span className="text-slate-400 block">Temps de parole</span>
                     <span className="font-mono font-semibold text-slate-900">
-                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0')}s / 3m 00s
+                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0' )}s / durée prévue
                     </span>
                   </div>
                 </div>
