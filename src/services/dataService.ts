@@ -645,7 +645,7 @@ export const dataService = {
       question: rubric.question.trim(),
       example_sentence: rubric.example_sentence.trim(),
       points: Number(rubric.points) || 1,
-      position: idx + 1
+      position: Number(rubric.position) || idx + 1
     }));
 
     // La base est mise à jour avant l'état local : un échec cloud ne doit pas
