@@ -68,6 +68,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261112000000_reset_written_exam_attempts.sql
       - name: Clarify instructions in existing draft exams
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113000000_clarify_existing_draft_exam_prompts.sql
+      - name: Include manual-review state in student corrections
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261114000000_include_manual_review_in_student_corrections.sql
       - name: Verify schema and RLS
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation
