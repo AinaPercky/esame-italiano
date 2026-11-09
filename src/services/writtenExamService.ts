@@ -20,5 +20,6 @@ export const writtenExamService={
  async saveQuestionAnswer(attemptId:string,questionId:string,answer:unknown){const {data,error}=await client().rpc('save_written_exam_question_answer',{p_attempt_id:attemptId,p_question_id:questionId,p_answer:answer??null});return unwrap<any>(data,error);},
  async submit(attemptId:string){const {data,error}=await client().rpc('submit_written_exam',{p_attempt_id:attemptId});return unwrap<any>(data,error);},
  async getCorrections(examId:string){const {data,error}=await client().rpc('get_my_written_exam_corrections',{p_exam_id:examId});return unwrap<any[]>(data||[],error);},
- async logIntegrity(attemptId:string,eventType:string,details:Record<string,unknown>={}){const {error}=await client().rpc('log_written_exam_integrity_event',{p_attempt_id:attemptId,p_event_type:eventType,p_details:details});if(error)throw new Error(error.message);}
+ async logIntegrity(attemptId:string,eventType:string,details:Record<string,unknown>={}){const {error}=await client().rpc('log_written_exam_integrity_event',{p_attempt_id:attemptId,p_event_type:eventType,p_details:details});if(error)throw new Error(error.message);},
+ async flagIntegrityViolation(attemptId:string,eventType:'visibility_hidden'|'window_blur'|'screenshot_attempt',details:Record<string,unknown>={}){const {data,error}=await client().rpc('flag_written_exam_integrity_violation',{p_attempt_id:attemptId,p_event_type:eventType,p_details:details});return unwrap<any>(data,error);}
 };
