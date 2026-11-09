@@ -24,22 +24,6 @@ import { dataService } from '../services/dataService';
 import { SpeechTimer } from '../components/SpeechTimer';
 import { StudentQRCodeModal } from '../components/StudentQRCodeModal';
 
-const ANIMAL_SUGGESTIONS = [
-  'Il lupo',
-  'L\'aquila',
-  'Il delfino',
-  'Il leone',
-  'La tigre',
-  'Il cavallo',
-  'La volpe',
-  'Il panda',
-  'L\'elefante',
-  'Il gatto',
-  'Il cane',
-  'Il pinguino',
-  'L\'orso',
-  'Il cervo'
-];
 
 interface OralEvaluationViewProps {
   classes: ClassRoom[];
@@ -132,7 +116,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   // Animal présenté par cet élève
-  const [presentedAnimal, setPresentedAnimal] = useState<string>('Il lupo');
   const [isQRModalOpen, setIsQRModalOpen] = useState<boolean>(false);
 
   // Gestion du temps de parole (Section 5.3)
@@ -183,19 +166,20 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     }
   };
 
-  const handleCreateExamForClass = () => {
+  const handleCreateExamForClass = async () => {
     if (!selectedClassId) return;
-    const targetClass = classes.find(c => c.id === selectedClassId);
-    const className = targetClass ? targetClass.name : 'Classe';
-    const newExam = dataService.createExam(
-      `Présentation orale — Gli Animali (Sujet libre)`,
-      selectedClassId,
-      `Épreuve orale de description d'un animal au choix en italien (${className}).`,
-      new Date().toISOString().split('T')[0],
-      true
-    );
-    setSelectedExamId(newExam.id);
-    onEvaluationSaved();
+    try {
+      const newExam = await dataService.createExam(
+        'Nouvel examen oral',
+        selectedClassId,
+        'Épreuve orale à configurer par l’enseignant.',
+        new Date().toISOString().split('T')[0]
+      );
+      setSelectedExamId(newExam.id);
+      onEvaluationSaved();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
+    }
   };
 
   // Synchronisation de l'élève lors du changement de classe, examen ou ordre de passage
@@ -223,8 +207,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     const evals = dataService.getEvaluations(selectedExamId, undefined, selectedStudentId);
     const existing = evals[0];
 
-    const studentIndex = students.findIndex(s => s.id === selectedStudentId);
-    const fallbackSuggestedAnimal = ANIMAL_SUGGESTIONS[(studentIndex >= 0 ? studentIndex : 0) % ANIMAL_SUGGESTIONS.length];
 
     if (existing && existing.details) {
       const vMap: Record<string, boolean> = {};
@@ -237,7 +219,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       });
       setValidatedRubrics(vMap);
       setErrorNotes(eMap);
-      setPresentedAnimal(existing.presented_animal || fallbackSuggestedAnimal);
       setIsSaved(true);
       const usedSecs = existing.duration_used_seconds || 0;
       setInitialElapsedSeconds(usedSecs);
@@ -257,7 +238,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       });
       setValidatedRubrics(vMap);
       setErrorNotes(eMap);
-      setPresentedAnimal(fallbackSuggestedAnimal);
       setIsSaved(false);
       setInitialElapsedSeconds(0);
       setTimingData({
@@ -388,14 +368,13 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
         max_duration_seconds: timingData.maxDurationSeconds,
         timer_status: timingData.timerStatus
       },
-      errorNotes,
-      presentedAnimal
+      errorNotes
     );
     setIsSaved(true);
     const m = Math.floor(timingData.durationUsedSeconds / 60);
     const s = timingData.durationUsedSeconds % 60;
     const timeFormatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Animal : « ${presentedAnimal} » · Temps : ${timeFormatted}`);
+    setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Temps : ${timeFormatted}`);
     onEvaluationSaved();
 
     setTimeout(() => {
