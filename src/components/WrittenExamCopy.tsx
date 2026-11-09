@@ -78,7 +78,7 @@ export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
  const student=[attempt.students?.first_name,attempt.students?.last_name].filter(Boolean).join(' ')||'Élève';
  doc.setFontSize(16);doc.text('Feuille de copie – '+(version?.title||attempt.exam?.title||'Examen écrit'),14,18);
  doc.setFontSize(10);doc.text('Élève : '+student,14,26);doc.text('Date : '+(attempt.submitted_at?new Date(attempt.submitted_at).toLocaleString():'—'),14,32);
- doc.text('Résultat : '+(attempt.raw_score??'—')+' / '+(attempt.raw_max??'—')+(attempt.normalized_score!=null?' · '+attempt.normalized_score:''),14,38);
+ doc.text('Résultat : '+(attempt.raw_score??'—')+' / '+(attempt.raw_max??'—')+(attempt.expression_writing_max_points>0?' · Expression écrite : '+(attempt.expression_writing_score??'—')+'/'+attempt.expression_writing_max_points:'')+(attempt.normalized_score!=null?' · '+attempt.normalized_score:''),14,38);
  const sourceSections=[...(version?.written_exam_sections||[])];const byId=new Map(sourceSections.map((s:any)=>[s.id,s]));
  const sectionIds=Array.isArray(attempt.order_manifest?.sections)&&attempt.order_manifest.sections.length?attempt.order_manifest.sections:sourceSections.sort((a:any,b:any)=>a.position-b.position).map((s:any)=>s.id);
  const rows:any[]=[];
