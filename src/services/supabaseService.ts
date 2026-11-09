@@ -809,7 +809,7 @@ class SupabaseService {
     const client = this.getClient();
     if (!client || !isUUID(exam.id) || !isUUID(exam.class_id)) return;
     try {
-      await client.from('exams').upsert({
+      const { error } = await client.from('exams').upsert({
         id: exam.id,
         class_id: exam.class_id,
         title: exam.title,
@@ -818,12 +818,64 @@ class SupabaseService {
         status: exam.status || 'in_progress',
         created_at: exam.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
+      if (error) throw new Error(`Enregistrement de l'examen impossible : ${error.message}`);
 
       if (rubrics && rubrics.length > 0) {
         await this.saveRubrics(rubrics);
       }
     } catch (e) {
       console.error('Supabase saveExam error:', e);
+      throw e instanceof Error ? e : new Error('Enregistrement de l’examen impossible.');
+    }
+  }
+
+  public async deleteExam(id: string): Promise<void> {
+    const client = this.getClient();
+    if (!client || !isUUID(id)) return;
+    try {
+      await client.from('exams').delete().eq('id', id);
+    } catch (e) {
+      console.error('Supabase deleteExam error:', e);
+    }
+  }
+
+  public async saveRubrics(rubrics: ExamRubric[], targetExamId?: string): Promise<void> {
+    const client = this.getClient();
+    if (!client) return;
+
+    const examId = targetExamId || rubrics[0]?.exam_id;
+    if (!examId || !isUUID(examId)) throw new Error('Identifiant de l’examen invalide.');
+    if (rubrics.some(r => r.exam_id !== examId)) throw new Error('Les rubriques doivent appartenir au même examen.');
+
+    const validRubrics = rubrics.map((r, idx) => {
+      if (!isUUID(r.id)) throw new Error(`Identifiant invalide pour la rubrique ${idx + 1}.`);
+      return {
+        id: r.id,
+        exam_id: examId,
+        title: r.title,
+        question: r.question,
+        example_sentence: r.example_sentence,
+        points: Number(r.points) || 1,
+        position: idx + 1
+      };
+    });
+
+    if (validRubrics.length > 0) {
+      const { error: upsertError } = await client
+        .from('exam_rubrics')
+        .upsert(validRubrics, { onConflict: 'id' });
+      if (upsertError) throw new Error(`Enregistrement des rubriques impossible : ${upsertError.message}`);
+
+      const retainedIds = validRubrics.map(r => r.id);
+      const { error: deleteError } = await client
+        .from('exam_rubrics')
+        .delete()
+        .eq('exam_id', examId)
+        .not('id', 'in', `(${retainedIds.join(',')})`);
+      if (deleteError) throw new Error(`Nettoyage des anciennes rubriques impossible : ${deleteError.message}`);
+    } else {
+      const { error } = await client.from('exam_rubrics').delete().eq('exam_id', examId);
+      if (error) throw new Error(`Suppression des rubriques impossible : ${error.message}`);
     }
   }
 
