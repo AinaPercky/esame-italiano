@@ -3,7 +3,7 @@ export type WrittenQuestionType='qcm'|'text'|'reorder'|'verbes_trous';
 export type WrittenAnswerKey={correctOptionId?:string;acceptedAnswers?:string[];answers?:Array<string|string[]>;correctOrder?:string[];phrases?:VerbesTrousAnswerKeyPhrase[]};
 export type WrittenQuestion={id:string;type:WrittenQuestionType;prompt:string;points:number;blank_count?:number;options?:Array<{id:string;label:string}>;items?:Array<{id:string;text:string}>;verbes_trous?:VerbesTrousDefinition;answer_key:WrittenAnswerKey;explanation?:string;manual_review?:boolean;shuffle_options?:boolean;source_quiz_id?:string;source_question_id?:string;time_limit_seconds?:number};
 export type WrittenSection={id:string;title:string;instructions:string;category?:string;group_name?:string;points:number;shuffle:boolean;fixed_position?:boolean;support_text?:string;support_url?:string;questions:WrittenQuestion[]};
-export type WrittenExam={id?:string;title:string;description:string;level:string;target_language:string;instruction_language:string;duration_minutes:number;class_ids:string[];opens_at?:string|null;closes_at?:string|null;status:string;display_scale:number|null;max_attempts:number;shuffle_sections:boolean;shuffle_questions:boolean;shuffle_options:boolean;navigation_mode:'free'|'sequential';show_score_after_publish:boolean;show_corrections_after_publish:boolean;integrity_settings:{fullscreen:boolean;warn_on_tab_switch:boolean;watermark:boolean};sections:WrittenSection[]};
+export type WrittenExam={id?:string;title:string;description:string;level:string;target_language:string;instruction_language:string;duration_minutes:number;class_ids:string[];opens_at?:string|null;closes_at?:string|null;status:string;display_scale:number|null;expression_writing_max_points?:0|10|20;max_attempts:number;shuffle_sections:boolean;shuffle_questions:boolean;shuffle_options:boolean;navigation_mode:'free'|'sequential';show_score_after_publish:boolean;show_corrections_after_publish:boolean;integrity_settings:{fullscreen:boolean;warn_on_tab_switch:boolean;watermark:boolean};sections:WrittenSection[]};
 export type WrittenOrderManifest={sections:string[];questions:Record<string,string[]>;options:Record<string,string[]>;items:Record<string,string[]>};
 export type WrittenAttempt={attempt_id:string;status:string;deadline_at:string;started_at:string;question_timer_started_at?:string;answers:Record<string,unknown>;order_manifest:WrittenOrderManifest;exam:any;sections:Array<any>};
 export const DEFAULT_WRITTEN_QCM_TIME_LIMIT_SECONDS=17;
@@ -40,7 +40,7 @@ const l135ComprehensionQuestions:WrittenQuestion[]=[
 ];
 export const L135_TEMPLATE:WrittenExam={
  title:'L135 – Examen composite',description:'90 points · 1 h 30 · compréhension, grammaire, vocabulaire et réordonnement. Sans production écrite ni orale.',
- level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:null,max_attempts:1,
+ level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:10,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:true,warn_on_tab_switch:true,watermark:false},
  sections:[
@@ -60,7 +60,7 @@ const a1TF=[
 ] as const;
 export const A1_TEMPLATE:WrittenExam={
  title:'Esame bianco – Italiano A1',description:'80 points · 1 h 10 · compréhension, grammaire, vocabulaire et phrases à compléter. Sans production écrite ni orale.',
- level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:80,max_attempts:1,
+ level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:20,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
  sections:[
@@ -94,7 +94,7 @@ export const A1_TEMPLATE:WrittenExam={
 export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'>){
  const raw=exam.sections.reduce((sum,s)=>sum+s.questions.reduce((n,q)=>n+Math.max(0,Number(q.points)||0),0),0);
  const planned=exam.sections.reduce((sum,s)=>sum+Math.max(0,Number(s.points)||0),0);
- return {raw,planned,normalizedMaximum:exam.display_scale};
+ return {raw,planned,normalizedMaximum:exam.display_scale,totalWithExpression:raw+Number((exam as any).expression_writing_max_points||0)};
 }
 export function validateWrittenExam(exam:WrittenExam):string[]{
  const errors:string[]=[];
