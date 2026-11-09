@@ -67,7 +67,7 @@ export interface Evaluation {
   created_at: string;
   updated_at: string;
   details: EvaluationDetail[];
-  // Animal présenté par l'élève
+  // Champ historique conservé pour lire les anciennes évaluations ; non utilisé pour les nouveaux examens.
   presented_animal?: string;
   // Gestion du temps de parole (Section 5.3)
   max_duration_seconds?: number;
