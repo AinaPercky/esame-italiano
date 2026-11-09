@@ -20,8 +20,7 @@ import {
   SEED_EVALUATIONS, 
   SEED_PASS_ORDER,
   SEED_QUIZZES,
-  SEED_QUIZ_SUBMISSIONS,
-  ZEBU_DEFAULT_RUBRICS 
+  SEED_QUIZ_SUBMISSIONS
 } from '../data/seedData';
 import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
@@ -590,11 +589,10 @@ export const dataService = {
     };
   },
 
-  createExam(title: string, classId: string, description: string = '', examDate?: string, useZebuTemplate = true): Exam {
+  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false): Promise<Exam> {
     if (!title.trim() || !classId) throw new Error('Titre et classe obligatoires');
-    const newExamId = generateUUID();
     const newExam: Exam = {
-      id: newExamId,
+      id: generateUUID(),
       class_id: classId,
       title: title.trim(),
       description: description.trim(),
@@ -602,25 +600,15 @@ export const dataService = {
       status: 'in_progress',
       created_at: new Date().toISOString()
     };
+
+    // Un examen est volontairement créé sans grille implicite : les rubriques
+    // sont définies explicitement par l'enseignant pour chaque sujet.
+    await supabaseService.saveExam(newExam);
     state.exams.push(newExam);
-
-    let templateRubrics: ExamRubric[] = [];
-    if (useZebuTemplate) {
-      templateRubrics = ZEBU_DEFAULT_RUBRICS.map((r, idx) => ({
-        id: generateUUID(),
-        exam_id: newExamId,
-        ...r
-      }));
-      state.rubrics.push(...templateRubrics);
-    }
-
     persistState();
     notifySubscribers();
 
-    // Persistance Cloud Supabase
-    supabaseService.saveExam(newExam, templateRubrics).catch(err => console.error('Cloud createExam error:', err));
-
-    return this.getExamById(newExamId)!;
+    return this.getExamById(newExam.id)!;
   },
 
   updateExam(id: string, updates: Partial<Exam>): Exam {
@@ -647,20 +635,26 @@ export const dataService = {
     supabaseService.deleteExam(id).catch(err => console.error('Cloud deleteExam error:', err));
   },
 
-  updateExamRubrics(examId: string, rubrics: Array<Omit<ExamRubric, 'id' | 'exam_id'>>) {
-    state.rubrics = state.rubrics.filter(r => r.exam_id !== examId);
-    const newRubrics: ExamRubric[] = rubrics.map((r, idx) => ({
-      id: generateUUID(),
+  async updateExamRubrics(examId: string, rubrics: Array<Partial<ExamRubric> & Pick<ExamRubric, 'title' | 'question' | 'example_sentence' | 'points'>>): Promise<ExamRubric[]> {
+    if (!state.exams.some(exam => exam.id === examId)) throw new Error('Examen introuvable');
+
+    const newRubrics: ExamRubric[] = rubrics.map((rubric, idx) => ({
+      id: rubric.id && isUUID(rubric.id) ? rubric.id : generateUUID(),
       exam_id: examId,
-      ...r,
-      position: idx + 1
+      title: rubric.title.trim(),
+      question: rubric.question.trim(),
+      example_sentence: rubric.example_sentence.trim(),
+      points: Number(rubric.points) || 1,
+      position: Number(rubric.position) || idx + 1
     }));
+
+    // La base est mise à jour avant l'état local : un échec cloud ne doit pas
+    // être présenté comme une sauvegarde réussie.
+    await supabaseService.saveRubrics(newRubrics, examId);
+    state.rubrics = state.rubrics.filter(r => r.exam_id !== examId);
     state.rubrics.push(...newRubrics);
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase
-    supabaseService.saveRubrics(newRubrics).catch(err => console.error('Cloud updateExamRubrics error:', err));
     return newRubrics;
   },
 
@@ -711,8 +705,7 @@ export const dataService = {
     studentId: string, 
     validatedMap: Record<string, boolean>,
     timing?: { duration_used_seconds?: number; max_duration_seconds?: number; timer_status?: 'completed' | 'stopped_manually' | 'not_timed' },
-    errorNotesMap?: Record<string, string>,
-    presentedAnimal?: string
+    errorNotesMap?: Record<string, string>
   ): Evaluation {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
@@ -744,10 +737,6 @@ export const dataService = {
     const maxDuration = timing?.max_duration_seconds ?? 180;
     const durationUsed = timing?.duration_used_seconds ?? (existingIndex !== -1 ? state.evaluations[existingIndex].duration_used_seconds : 0);
     const timerStatus = timing?.timer_status ?? (existingIndex !== -1 ? state.evaluations[existingIndex].timer_status : 'stopped_manually');
-    const animal = presentedAnimal !== undefined 
-      ? presentedAnimal.trim() 
-      : (existingIndex !== -1 ? state.evaluations[existingIndex].presented_animal : undefined);
-
     let savedEval: Evaluation;
 
     if (existingIndex !== -1) {
@@ -758,7 +747,6 @@ export const dataService = {
         total_score: totalScore,
         status: 'completed',
         details,
-        presented_animal: animal,
         max_duration_seconds: maxDuration,
         duration_used_seconds: durationUsed,
         timer_status: timerStatus,
@@ -775,7 +763,6 @@ export const dataService = {
         created_at: now,
         updated_at: now,
         details,
-        presented_animal: animal,
         max_duration_seconds: maxDuration,
         duration_used_seconds: durationUsed,
         timer_status: timerStatus

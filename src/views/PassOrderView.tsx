@@ -124,19 +124,20 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
     }
   };
 
-  const handleCreateDefaultExam = () => {
+  const handleCreateDefaultExam = async () => {
     if (!selectedClassId) return;
-    const targetClass = classes.find(c => c.id === selectedClassId);
-    const className = targetClass ? targetClass.name : 'Classe';
-    const newExam = dataService.createExam(
-      `Présentation orale — Lo zébu`,
-      selectedClassId,
-      `Épreuve orale de description du zébu en italien (${className}).`,
-      new Date().toISOString().split('T')[0],
-      true
-    );
-    setExamId(newExam.id);
-    setPassOrder(dataService.getPassOrder(newExam.id));
+    try {
+      const newExam = await dataService.createExam(
+        'Nouvel examen oral',
+        selectedClassId,
+        'Épreuve orale à configurer par l’enseignant.',
+        new Date().toISOString().split('T')[0]
+      );
+      setExamId(newExam.id);
+      setPassOrder(dataService.getPassOrder(newExam.id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
+    }
   };
 
   const handleShuffle = () => {
@@ -272,7 +273,7 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
               Aucun examen créé pour {currentClass?.name || 'cette classe'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500">
-              Pour organiser l'ordre de passage et débuter les notations orales, créez l'épreuve de présentation avec les 10 critères officiels en un seul clic.
+              Pour organiser l'ordre de passage, créez un examen oral puis configurez ses rubriques.
             </p>
           </div>
           <button
@@ -281,7 +282,7 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Créer l'examen « Lo zébu » (10 critères)</span>
+            <span>Créer un examen oral</span>
           </button>
         </div>
       )}

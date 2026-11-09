@@ -24,22 +24,6 @@ import { dataService } from '../services/dataService';
 import { SpeechTimer } from '../components/SpeechTimer';
 import { StudentQRCodeModal } from '../components/StudentQRCodeModal';
 
-const ANIMAL_SUGGESTIONS = [
-  'Il lupo',
-  'L\'aquila',
-  'Il delfino',
-  'Il leone',
-  'La tigre',
-  'Il cavallo',
-  'La volpe',
-  'Il panda',
-  'L\'elefante',
-  'Il gatto',
-  'Il cane',
-  'Il pinguino',
-  'L\'orso',
-  'Il cervo'
-];
 
 interface OralEvaluationViewProps {
   classes: ClassRoom[];
@@ -131,8 +115,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   const [errorNotes, setErrorNotes] = useState<Record<string, string>>({});
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
-  // Animal présenté par cet élève
-  const [presentedAnimal, setPresentedAnimal] = useState<string>('Il lupo');
+  // 
   const [isQRModalOpen, setIsQRModalOpen] = useState<boolean>(false);
 
   // Gestion du temps de parole (Section 5.3)
@@ -183,19 +166,20 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     }
   };
 
-  const handleCreateExamForClass = () => {
+  const handleCreateExamForClass = async () => {
     if (!selectedClassId) return;
-    const targetClass = classes.find(c => c.id === selectedClassId);
-    const className = targetClass ? targetClass.name : 'Classe';
-    const newExam = dataService.createExam(
-      `Présentation orale — Gli Animali (Sujet libre)`,
-      selectedClassId,
-      `Épreuve orale de description d'un animal au choix en italien (${className}).`,
-      new Date().toISOString().split('T')[0],
-      true
-    );
-    setSelectedExamId(newExam.id);
-    onEvaluationSaved();
+    try {
+      const newExam = await dataService.createExam(
+        'Nouvel examen oral',
+        selectedClassId,
+        'Épreuve orale à configurer par l’enseignant.',
+        new Date().toISOString().split('T')[0]
+      );
+      setSelectedExamId(newExam.id);
+      onEvaluationSaved();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
+    }
   };
 
   // Synchronisation de l'élève lors du changement de classe, examen ou ordre de passage
@@ -223,8 +207,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     const evals = dataService.getEvaluations(selectedExamId, undefined, selectedStudentId);
     const existing = evals[0];
 
-    const studentIndex = students.findIndex(s => s.id === selectedStudentId);
-    const fallbackSuggestedAnimal = ANIMAL_SUGGESTIONS[(studentIndex >= 0 ? studentIndex : 0) % ANIMAL_SUGGESTIONS.length];
 
     if (existing && existing.details) {
       const vMap: Record<string, boolean> = {};
@@ -237,7 +219,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       });
       setValidatedRubrics(vMap);
       setErrorNotes(eMap);
-      setPresentedAnimal(existing.presented_animal || fallbackSuggestedAnimal);
       setIsSaved(true);
       const usedSecs = existing.duration_used_seconds || 0;
       setInitialElapsedSeconds(usedSecs);
@@ -257,7 +238,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       });
       setValidatedRubrics(vMap);
       setErrorNotes(eMap);
-      setPresentedAnimal(fallbackSuggestedAnimal);
       setIsSaved(false);
       setInitialElapsedSeconds(0);
       setTimingData({
@@ -388,14 +368,13 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
         max_duration_seconds: timingData.maxDurationSeconds,
         timer_status: timingData.timerStatus
       },
-      errorNotes,
-      presentedAnimal
+      errorNotes
     );
     setIsSaved(true);
     const m = Math.floor(timingData.durationUsedSeconds / 60);
     const s = timingData.durationUsedSeconds % 60;
     const timeFormatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Animal : « ${presentedAnimal} » · Temps : ${timeFormatted}`);
+    setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Temps : ${timeFormatted}`);
     onEvaluationSaved();
 
     setTimeout(() => {
@@ -571,7 +550,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
               Aucun examen d'évaluation pour cette classe
             </h3>
             <p className="text-xs sm:text-sm text-slate-500">
-              Pour évaluer les {classStudents.length} élève(s) de cette classe, générez l'épreuve orale « Lo zébu » avec la grille des 10 critères en 1 clic.
+              Pour évaluer les {classStudents.length} élève(s) de cette classe, créez une épreuve orale puis définissez son sujet et ses rubriques.
             </p>
           </div>
           <button
@@ -580,7 +559,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Créer l'examen oral « Lo zébu »</span>
+            <span>Créer un examen oral</span>
           </button>
         </div>
       )}
@@ -627,162 +606,25 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
       {/* 2. Candidate Spotlight & Subject Visual Card */}
       {currentStudent && currentExam && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-amber-50">
-              <img 
-                src="/src/assets/images/zebu_study_illustration_1790527533886.webp" 
-                alt="Illustration du sujet d'examen oral" 
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className="text-[10px] sm:text-xs font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                  Passage #{currentPassOrderItem?.position || (currentStudentIndex + 1)} sur {orderedStudents.length}
-                </span>
-                {isSaved ? (
-                  <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    <span>Évaluation enregistrée ({liveScore}/{maxScore} pts)</span>
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-amber-600" />
-                    <span>En attente de notation</span>
-                  </span>
-                )}
-              </div>
-              <h3 className="font-display text-xl sm:text-2xl font-bold text-slate-900">
-                {currentStudent.first_name} {currentStudent.last_name}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {currentExam.title} · {currentStudent.student_number ? `Matricule : ${currentStudent.student_number}` : 'Sans matricule'} · {currentExam.class_name}
-              </p>
-
-              {/* Navigation rapide entre candidats selon l'ordre de passage */}
-              <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={handlePreviousStudent}
-                  disabled={currentStudentIndex <= 0}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:pointer-events-none rounded-md transition-colors min-h-[34px]"
-                  title="Candidat précédent dans l'ordre de passage"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Précédent</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextStudent}
-                  disabled={currentStudentIndex >= orderedStudents.length - 1}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 disabled:opacity-40 disabled:pointer-events-none rounded-md transition-colors min-h-[34px]"
-                  title="Candidat suivant dans l'ordre de passage"
-                >
-                  <span>Suivant dans l'ordre</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Live Score Display Card (Section 5.1) */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:px-5 flex items-center gap-6 justify-between sm:justify-end">
-            <div className="text-left sm:text-right">
-              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block">
-                Note en temps réel
-              </span>
-              <div className="flex items-baseline gap-1 font-mono font-bold text-2xl sm:text-3xl text-amber-900">
-                <span>{liveScore}</span>
-                <span className="text-slate-400 font-normal text-base">/{maxScore}</span>
-              </div>
-            </div>
-
-            <div className="border-l border-slate-200 pl-4 space-y-0.5 text-xs">
-              <div className="text-slate-600">
-                Validées : <strong className="font-mono text-emerald-700">{validatedCount}</strong> / {totalRubricsCount}
-              </div>
-              <div className="text-slate-600">
-                Restantes : <strong className="font-mono text-slate-500">{remainingCount}</strong>
-              </div>
-              <div className="text-slate-600">
-                Réussite : <strong className="font-mono text-amber-800">{percentage}%</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Chronomètre de Parole (3 minutes / 180s - Section 5.3) */}
-      <SpeechTimer
-        key={`timer_${selectedExamId}_${selectedStudentId}`}
-        maxSeconds={180}
-        initialElapsedSeconds={initialElapsedSeconds}
-        onTimeChange={setTimingData}
-      />
-
-      {/* 2.1 Saisie de l'animal présenté & Code QR élève */}
-      {currentStudent && currentExam && (
-        <div className="bg-amber-50/75 border border-amber-200/90 rounded-xl p-4 sm:p-5 space-y-3 shadow-2xs">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 shadow-2xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-800 shrink-0" />
-                <h4 className="text-xs sm:text-sm font-bold text-amber-950 uppercase tracking-wide">
-                  Animal présenté par {currentStudent.first_name} :
-                </h4>
-              </div>
-              <p className="text-xs text-amber-800/85 mt-0.5">
-                Chaque élève présente un animal différent en italien. Ce titre figurera sur sa fiche et son Code QR.
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Épreuve : {currentExam.title}
+              </h4>
+              <p className="text-xs text-slate-600 mt-1">
+                {currentExam.description || 'Consignes définies par l’enseignant.'}
               </p>
             </div>
-
-            <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-              <input
-                type="text"
-                value={presentedAnimal}
-                onChange={(e) => {
-                  setPresentedAnimal(e.target.value);
-                  setIsSaved(false);
-                }}
-                placeholder="ex: Il lupo, L'aquila, Il leone..."
-                className="w-full min-w-0 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:outline-none focus:ring-2 focus:ring-amber-800/30 sm:w-60 sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setIsQRModalOpen(true)}
-                className="inline-flex min-h-11 w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-amber-800 px-3 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-amber-900 sm:w-auto"
-                title="Afficher et imprimer le Code QR de cet élève"
-              >
-                <QrCode className="w-3.5 h-3.5 text-amber-200" />
-                <span>Code QR</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Suggestions de choix rapides */}
-          <div className="pt-2 border-t border-amber-200/60 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold text-amber-900/70 uppercase mr-1">
-              Choix rapides :
-            </span>
-            {ANIMAL_SUGGESTIONS.map(animal => (
-              <button
-                key={animal}
-                type="button"
-                onClick={() => {
-                  setPresentedAnimal(animal);
-                  setIsSaved(false);
-                }}
-                className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
-                  presentedAnimal === animal
-                    ? 'bg-amber-800 text-white font-semibold shadow-2xs'
-                    : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200'
-                }`}
-              >
-                {animal}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() => setIsQRModalOpen(true)}
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#072a3f] px-3 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0b3c5d]"
+              title="Afficher et imprimer le Code QR de cet élève"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Code QR</span>
+            </button>
           </div>
         </div>
       )}

@@ -119,7 +119,7 @@ export const ClassQRCodesModal: React.FC<ClassQRCodesModalProps> = ({
         {/* Modal Body / Printable Grid */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
           <p className="text-xs text-slate-500 no-print">
-            Chaque élève peut scanner son Code QR personnel avec son smartphone pour consulter sa fiche d'examen oral (note, animal présenté, grille détaillée et remarques).
+            Chaque élève peut scanner son Code QR personnel pour consulter sa fiche d'examen, ses résultats, la grille détaillée et les remarques.
           </p>
 
           {loading ? (
@@ -161,11 +161,6 @@ export const ClassQRCodesModal: React.FC<ClassQRCodesModalProps> = ({
                       <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
                         Épreuve à venir
                       </span>
-                    )}
-                    {evaluation?.presented_animal && (
-                      <p className="text-[11px] font-medium text-amber-900 truncate">
-                        🐾 {evaluation.presented_animal}
-                      </p>
                     )}
                   </div>
                 </div>

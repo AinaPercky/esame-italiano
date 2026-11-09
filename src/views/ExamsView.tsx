@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Exam, ClassRoom, ExamRubric } from '../types';
 import { dataService } from '../services/dataService';
-import { ZEBU_DEFAULT_RUBRICS } from '../data/seedData';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface ExamsViewProps {
@@ -40,7 +39,6 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const [newClassId, setNewClassId] = useState(classes[0]?.id || '');
   const [newDescription, setNewDescription] = useState('');
   const [newExamDate, setNewExamDate] = useState(new Date().toISOString().split('T')[0]);
-  const [useZebuTemplate, setUseZebuTemplate] = useState(true);
 
   // Rubric Editing inside Details Modal
   const [rubricsDraft, setRubricsDraft] = useState<ExamRubric[]>([]);
@@ -69,22 +67,19 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     }
   };
 
-  const handleCreateExam = (e: React.FormEvent) => {
+  const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newClassId) return;
 
-    dataService.createExam(
-      newTitle.trim(),
-      newClassId,
-      newDescription.trim(),
-      newExamDate,
-      useZebuTemplate
-    );
-
-    setIsCreateModalOpen(false);
-    setNewTitle('');
-    setNewDescription('');
-    onRefresh();
+    try {
+      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate);
+      setIsCreateModalOpen(false);
+      setNewTitle('');
+      setNewDescription('');
+      onRefresh();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
+    }
   };
 
   const handleDeleteExam = (id: string) => {
@@ -102,15 +97,19 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     });
   };
 
-  const handleSaveRubrics = () => {
+  const handleSaveRubrics = async () => {
     if (!selectedExamForDetails) return;
-    dataService.updateExamRubrics(selectedExamForDetails.id, rubricsDraft);
-    onRefresh();
-    handleOpenDetails(selectedExamForDetails);
+    try {
+      await dataService.updateExamRubrics(selectedExamForDetails.id, rubricsDraft);
+      onRefresh();
+      handleOpenDetails(selectedExamForDetails);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "L'enregistrement des rubriques a échoué.");
+    }
   };
 
   const handleAddRubricToDraft = () => {
-    const nextPos = rubricsDraft.length + 1;
+    const nextPos = Math.max(0, ...rubricsDraft.map(r => Number(r.position) || 0)) + 1;
     const newR: ExamRubric = {
       id: 'temp_' + Date.now(),
       exam_id: selectedExamForDetails?.id || '',
@@ -124,7 +123,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   };
 
   const handleRemoveRubricFromDraft = (index: number) => {
-    const updated = rubricsDraft.filter((_, i) => i !== index).map((r, i) => ({ ...r, position: i + 1 }));
+    const updated = rubricsDraft.filter((_, i) => i !== index);
     setRubricsDraft(updated);
   };
 
@@ -143,9 +142,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
         <button
           type="button"
           onClick={() => {
-            setNewTitle('Présentation orale — Lo zébu');
-            setNewDescription('Évaluation de la description du zébu en 10 rubriques prédéfinies.');
-            setUseZebuTemplate(true);
+            setNewTitle('');
+            setNewDescription('');
             setIsCreateModalOpen(true);
           }}
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-2xs transition-colors self-stretch sm:self-auto min-h-[44px]"
@@ -161,7 +159,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e6f0f7] text-[#0b3c5d]"><BookOpen className="h-7 w-7" /></div>
           <h3 className="text-lg font-bold text-[#072a3f]">Aucun examen créé</h3>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">Créez une épreuve orale pour configurer ses rubriques et commencer les évaluations.</p>
-          <button type="button" onClick={() => { setNewTitle('Présentation orale — Lo zébu'); setNewDescription('Évaluation de la description du zébu en 10 rubriques prédéfinies.'); setUseZebuTemplate(true); setIsCreateModalOpen(true); }} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" />Créer un examen</button>
+          <button type="button" onClick={() => { setNewTitle(''); setNewDescription(''); setIsCreateModalOpen(true); }} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" />Créer un examen</button>
         </div>
       ) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {exams.map((exam) => (
@@ -198,13 +196,13 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 <div>
                   <span className="text-slate-400 block text-[10px] sm:text-[11px]">Rubriques</span>
                   <span className="font-semibold text-slate-800 font-mono text-[11px] sm:text-xs">
-                    {exam.rubric_count || 10} rubr.
+                    {exam.rubric_count ?? 0} rubr.
                   </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[10px] sm:text-[11px]">Barème max</span>
                   <span className="font-semibold text-[#0b3c5d] font-mono text-[11px] sm:text-xs">
-                    {exam.max_score || 10} pts
+                    {exam.max_score ?? 0} pts
                   </span>
                 </div>
               </div>
@@ -216,7 +214,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 onClick={() => handleOpenDetails(exam)}
                 className="py-2.5 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors text-center min-h-[44px] flex items-center justify-center"
               >
-                Rubriques ({exam.rubric_count || 10})
+                Rubriques ({exam.rubric_count ?? 0})
               </button>
               {onSelectExamForPassOrder && (
                 <button
@@ -249,7 +247,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               Créer un nouvel examen oral
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Définissez le sujet d'évaluation et choisissez d'appliquer le modèle des 10 rubriques.
+              Définissez librement le sujet et les consignes. Vous pourrez ensuite créer les rubriques adaptées à cet examen.
             </p>
 
             <form onSubmit={handleCreateExam} className="space-y-4">
@@ -262,7 +260,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                   required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ex: Présentation orale — Lo zébu"
+                  placeholder="Ex. : Presentarsi, Ricette e cucina, La mia città…"
                   className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3c5d]/20 focus:border-[#0b3c5d] min-h-[44px]"
                 />
               </div>
@@ -306,26 +304,6 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                   placeholder="Ex: Présentation orale fluide de 3 minutes sans notes..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
                 />
-              </div>
-
-              {/* Template Choice */}
-              <div className="p-3 bg-[#e6f0f7] border border-[#b7d3e4] rounded-2xl space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useZebuTemplate}
-                    onChange={(e) => setUseZebuTemplate(e.target.checked)}
-                    className="mt-0.5 rounded text-amber-800 focus:ring-amber-800 w-4 h-4"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold text-[#072a3f] block">
-                      Appliquer le modèle officiel « Lo zébu » (10 rubriques)
-                    </span>
-                    <span className="text-[11px] text-[#315267] block leading-tight">
-                      Charge automatiquement les 10 critères standardisés (Identificazione, Nome scientifico, Aspetto fisico, Habitat, ecc.) notés 1 point chacun (Note max : 10).
-                    </span>
-                  </div>
-                </label>
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3">

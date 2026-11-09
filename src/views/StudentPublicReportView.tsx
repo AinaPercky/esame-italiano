@@ -299,7 +299,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
             </div>
           </div>
 
-          {/* Student & Animal Presentation Highlight Card */}
+          {/* Candidate, exam subject and speaking time */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Candidate Identity */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -315,17 +315,17 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
               </p>
             </div>
 
-            {/* Animal Presented - Custom per student */}
+            {/* Exam subject and instructions */}
             <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200/90">
               <div className="text-[10px] uppercase font-bold text-amber-800 mb-1 flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-                <span>Animal présenté</span>
+                <span>Sujet de l'épreuve</span>
               </div>
-              <h3 className="text-lg font-bold text-amber-950 truncate">
-                {evaluation?.presented_animal || 'Animal choisi par l\'élève'}
+              <h3 className="text-lg font-bold text-amber-950">
+                {currentExam?.title || evaluation?.exam_title || 'Examen oral'}
               </h3>
               <p className="text-xs text-amber-800/80 font-medium mt-0.5">
-                Sujet de description orale en italien
+                {currentExam?.description || 'Consignes de l’épreuve définies par l’enseignant.'}
               </p>
             </div>
 
@@ -338,10 +338,10 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
               <div className="text-lg font-bold text-slate-900 font-mono">
                 {evaluation?.duration_used_seconds 
                   ? `${Math.floor(evaluation.duration_used_seconds / 60)}m ${evaluation.duration_used_seconds % 60}s`
-                  : '3m 00s (Réglementaire)'}
+                  : 'Non renseignée'}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Sur 3 minutes allouées
+                Durée prévue : {evaluation?.max_duration_seconds ? `${Math.floor(evaluation.max_duration_seconds / 60)}m ${evaluation.max_duration_seconds % 60}s` : 'non renseignée'}
               </p>
             </div>
           </div>
@@ -353,7 +353,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
                 Résultat Global de l'Épreuve Orale
               </div>
               <div className="text-sm text-slate-300">
-                Grille officielle sur les 10 compétences de communication
+                Grille d'évaluation personnalisée de l'épreuve
               </div>
               <div className="pt-2">
                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${appreciation.color}`}>
@@ -379,7 +379,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
           <div className="space-y-3">
             <h3 className="font-display font-bold text-slate-900 text-base flex items-center gap-2 border-b border-slate-200 pb-2">
               <FileCheck2 className="w-4 h-4 text-amber-800" />
-              <span>Détail des 10 critères d'évaluation & Remarques</span>
+              <span>Détail des rubriques d'évaluation & Remarques</span>
             </h3>
 
             {rubrics.length > 0 ? (

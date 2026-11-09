@@ -361,11 +361,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         <span className="font-mono text-xs text-slate-400">
                           {ev.student_number || 'Sans matricule'}
                         </span>
-                        {ev.presented_animal && (
-                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-1.5 py-0.2 rounded">
-                            <span>🐾 {ev.presented_animal}</span>
-                          </div>
-                        )}
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-xs font-medium text-slate-800">
@@ -407,7 +402,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                             ? 'bg-slate-100 text-slate-700'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {ev.timer_status === 'completed' ? '3 min atteintes' : 'Arrêté manuellement'}
+                          {ev.timer_status === 'completed' ? 'Durée maximale atteinte' : 'Arrêté manuellement'}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-xs text-slate-600">
@@ -569,12 +564,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                     <span className="font-semibold text-slate-800">{selectedStudentExamEval.exam_title}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">Animal présenté</span>
-                    <span className="font-bold text-slate-900 flex items-center gap-1">
-                      <span>🐾 {selectedStudentExamEval.presented_animal || 'Non renseigné'}</span>
-                    </span>
-                  </div>
-                  <div>
                     <span className="text-slate-400 block">Rubriques validées</span>
                     <span className="font-mono font-semibold text-emerald-800">
                       {selectedStudentExamEval.validated_rubrics_count} / {selectedStudentExamEval.total_rubrics_count}
@@ -583,7 +572,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   <div>
                     <span className="text-slate-400 block">Temps de parole</span>
                     <span className="font-mono font-semibold text-slate-900">
-                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0')}s / 3m 00s
+                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0'  )}s / {Math.floor((selectedStudentExamEval.max_duration_seconds || 180) / 60)}m {((selectedStudentExamEval.max_duration_seconds || 180) % 60).toString().padStart(2, '0')}s
                     </span>
                   </div>
                 </div>
