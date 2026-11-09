@@ -6,6 +6,9 @@ test('L135 model starts with a 90-point configurable allocation and 90-minute du
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
  assert.equal(getWrittenExamTotals(L135_TEMPLATE).raw,90);
  assert.equal(L135_TEMPLATE.duration_minutes,90);
+ assert.equal(L135_TEMPLATE.display_scale,100);
+ assert.equal(L135_TEMPLATE.expression_writing_max_points,10);
+ assert.equal(getWrittenExamTotals(L135_TEMPLATE).totalWithExpression,100);
  assert.deepEqual(L135_TEMPLATE.sections.map(s=>s.points),[20,10,10,10,10,10,10,10]);
 });
 test('A1 model preserves its 60 questions with an 80-point scale and 70-minute duration',()=>{
