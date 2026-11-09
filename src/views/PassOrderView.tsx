@@ -124,19 +124,20 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
     }
   };
 
-  const handleCreateDefaultExam = () => {
+  const handleCreateDefaultExam = async () => {
     if (!selectedClassId) return;
-    const targetClass = classes.find(c => c.id === selectedClassId);
-    const className = targetClass ? targetClass.name : 'Classe';
-    const newExam = dataService.createExam(
-      `Présentation orale — Lo zébu`,
-      selectedClassId,
-      `Épreuve orale de description du zébu en italien (${className}).`,
-      new Date().toISOString().split('T')[0],
-      true
-    );
-    setExamId(newExam.id);
-    setPassOrder(dataService.getPassOrder(newExam.id));
+    try {
+      const newExam = await dataService.createExam(
+        'Nouvel examen oral',
+        selectedClassId,
+        'Épreuve orale à configurer par l’enseignant.',
+        new Date().toISOString().split('T')[0]
+      );
+      setExamId(newExam.id);
+      setPassOrder(dataService.getPassOrder(newExam.id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
+    }
   };
 
   const handleShuffle = () => {
