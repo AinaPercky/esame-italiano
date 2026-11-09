@@ -1,18 +1,18 @@
-# PerckyLingua (Gestionnaire d'examens oraux d'italien)
+# PerckyLingua (Gestionnaire d'examens d'italien)
 
-Application web professionnelle complète pour enseignants d'italien permettant d'organiser, évaluer et analyser les examens oraux en temps réel selon des grilles de rubriques prédéfinies ou personnalisées.
+Application web pour enseignants d'italien permettant de créer, organiser, évaluer et analyser des examens oraux et écrits. Chaque examen oral est défini librement par son titre, ses consignes et sa propre grille de rubriques personnalisées.
 
 ---
 
 ## 1. Présentation du Projet
 
-Lors d'un examen oral (par exemple la description de l'animal « Lo zébu »), l'élève doit aborder 10 rubriques prédéfinies en italien. L'enseignant écoute et valide d'un simple clic les critères maîtrisés. L'application calcule immédiatement la note sur 10, enregistre le résultat dans la base de données PostgreSQL / Supabase, met à jour les statistiques de la classe et organise l'ordre de passage des candidats.
+Pour chaque examen oral, l'enseignant définit le sujet (par exemple « Presentarsi », « Ricette e cucina » ou tout autre thème), les consignes et les rubriques attendues. L'enseignant valide les critères maîtrisés, ajoute des remarques et suit le temps de parole. L'application calcule la note selon le barème réellement configuré, enregistre le résultat dans Supabase, met à jour les statistiques et organise l'ordre de passage.
 
 ### Fonctionnalités Clés :
 
 - **Gestion des classes & élèves** : l’adresse e-mail est obligatoire et constitue l’unique identifiant élève ; elle est unique sans distinction de casse dans toutes les classes. Les doublons de nom, prénom, téléphone ou matricule sont autorisés.
 - **Suppression d'une classe** : supprime de Supabase ses élèves, photos de profil, évaluations, quiz et résultats, ainsi que les examens et données associés. Les comptes étudiants conservés localement sont supprimés du navigateur qui effectue l'opération.
-- **Grilles de rubriques en italien** : modèle officiel « Lo zébu » (10 rubriques) et création libre.
+- **Grilles de rubriques en italien** : rubriques entièrement personnalisables pour chaque examen, sans sujet ni modèle animal imposé.
 - **Évaluation en direct en 1 clic** : calcul instantané de la note, des points, du % de réussite.
 - **Tirage au sort de l'ordre de passage** : algorithme Fisher-Yates avec suivi des statuts (_En attente, Évalué, Absent_).
 - **Quiz en ligne** : création et lancement des quiz, enregistrement des réponses et des notes, suivi des résultats et classement journalier.
