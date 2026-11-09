@@ -706,7 +706,7 @@ export const dataService = {
     validatedMap: Record<string, boolean>,
     timing?: { duration_used_seconds?: number; max_duration_seconds?: number; timer_status?: 'completed' | 'stopped_manually' | 'not_timed' },
     errorNotesMap?: Record<string, string>,
-    presentedAnimal?: string
+    _legacyPresentedAnimal?: string
   ): Evaluation {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
@@ -738,10 +738,6 @@ export const dataService = {
     const maxDuration = timing?.max_duration_seconds ?? 180;
     const durationUsed = timing?.duration_used_seconds ?? (existingIndex !== -1 ? state.evaluations[existingIndex].duration_used_seconds : 0);
     const timerStatus = timing?.timer_status ?? (existingIndex !== -1 ? state.evaluations[existingIndex].timer_status : 'stopped_manually');
-    const animal = presentedAnimal !== undefined 
-      ? presentedAnimal.trim() 
-      : (existingIndex !== -1 ? state.evaluations[existingIndex].presented_animal : undefined);
-
     let savedEval: Evaluation;
 
     if (existingIndex !== -1) {
@@ -752,7 +748,6 @@ export const dataService = {
         total_score: totalScore,
         status: 'completed',
         details,
-        presented_animal: animal,
         max_duration_seconds: maxDuration,
         duration_used_seconds: durationUsed,
         timer_status: timerStatus,
