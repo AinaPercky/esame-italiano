@@ -705,8 +705,7 @@ export const dataService = {
     studentId: string, 
     validatedMap: Record<string, boolean>,
     timing?: { duration_used_seconds?: number; max_duration_seconds?: number; timer_status?: 'completed' | 'stopped_manually' | 'not_timed' },
-    errorNotesMap?: Record<string, string>,
-    _legacyPresentedAnimal?: string
+    errorNotesMap?: Record<string, string>
   ): Evaluation {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
