@@ -69,16 +69,15 @@ set search_path = ''
 as $written$
 begin
   if new.integrity_failed then
+    if new.expression_writing_max_points>0 then
+      new.expression_writing_score:=0;
+    end if;
     if new.status<>'in_progress' then
       new.status:='graded';
       new.needs_manual_review:=false;
       new.auto_score:=0;
       new.raw_score:=0;
       new.normalized_score:=0;
-      new.manual_scores:='{}'::jsonb;
-      if new.expression_writing_max_points>0 then
-        new.expression_writing_score:=0;
-      end if;
     end if;
   end if;
   return new;
