@@ -856,7 +856,7 @@ class SupabaseService {
         question: r.question,
         example_sentence: r.example_sentence,
         points: Number(r.points) || 1,
-        position: idx + 1
+        position: Number(r.position) || idx + 1
       };
     });
 
