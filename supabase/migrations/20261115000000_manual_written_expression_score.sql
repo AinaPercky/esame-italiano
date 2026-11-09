@@ -38,8 +38,8 @@ begin
   if not found or v_version.status<>'draft' then
     raise exception 'Seule une version brouillon peut être configurée.';
   end if;
-  if p_max_points>0 and v_version.raw_max+p_max_points<>100 then
-    raise exception 'Pour obtenir une note sur 100, les questions ( % points) et l’expression écrite ( / % ) doivent totaliser exactement 100 points.',
+  if p_max_points>0 and (v_version.raw_max+p_max_points<>100 or v_version.display_scale is distinct from 100) then
+    raise exception 'Pour obtenir une note sur 100, les questions ( % points) et l’expression écrite ( / % ) doivent totaliser 100 points et l’échelle normalisée doit être 100.',
       v_version.raw_max,p_max_points;
   end if;
 
