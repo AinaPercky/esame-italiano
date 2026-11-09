@@ -63,7 +63,9 @@ begin
   select q.id into v_question
   from public.written_exam_questions q
   join public.written_exam_sections s on s.id=q.section_id
-  where s.version_id=v_version and q.question_type='qcm'\n  limit 1;\n  if v_question is null then raise exception 'CI fixture did not create a QCM question.'; end if;
+  where s.version_id=v_version and q.question_type='qcm'
+  limit 1;
+  if v_question is null then raise exception 'CI fixture did not create a QCM question.'; end if;
 
   perform public.save_written_exam_answers(v_attempt,jsonb_build_object(v_question::text,'correct'));
   perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',jsonb_build_object('source','ci-test'));
