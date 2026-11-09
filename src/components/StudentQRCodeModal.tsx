@@ -112,11 +112,6 @@ export const StudentQRCodeModal: React.FC<StudentQRCodeModalProps> = ({
             <p className="text-xs text-slate-500">
               {exam.title} • {exam.class_name || 'Classe'}
             </p>
-            {evaluation?.presented_animal && (
-              <p className="text-xs font-semibold text-amber-800 mt-1">
-                🐾 Animal présenté : « {evaluation.presented_animal} »
-              </p>
-            )}
           </div>
 
           {/* QR Code Image Card */}
