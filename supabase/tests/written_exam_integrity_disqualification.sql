@@ -1,4 +1,4 @@
--- End-to-end test: a tab switch forces a written-exam attempt to zero, even after teacher grading.
+-- End-to-end test: a tab switch forces a written-exam attempt to zero, including manual-review and expression-writing components.
 begin;
 
 do $written$
@@ -63,7 +63,7 @@ begin
   select q.id into v_question
   from public.written_exam_questions q
   join public.written_exam_sections s on s.id=q.section_id
-  where s.version_id=v_version and q.question_key='qcm-90';
+  where s.version_id=v_version and q.question_key='qcm-80';
 
   perform public.save_written_exam_answers(v_attempt,jsonb_build_object(v_question::text,'correct'));
   perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',jsonb_build_object('source','ci-test'));
