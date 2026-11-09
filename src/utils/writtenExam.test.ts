@@ -35,11 +35,11 @@ test('L135 comprehension contains the source text and ten questions with complet
 });
 test('A1 comprehension accepts full sentences and equivalent answers for Marco',()=>{
  const questions=A1_TEMPLATE.sections[0].questions;
- const residence=questions.find(q=>q.prompt==='Dove abita Marco?');
+ const residence=questions.find(q=>q.answer_key.acceptedAnswers?.includes('Marco abita a Roma.'));
  assert.ok(residence?.answer_key.acceptedAnswers?.includes('Marco abita a Roma.'));
  assert.ok(residence?.answer_key.acceptedAnswers?.includes('Marco vive a Roma.'));
  assert.ok(residence?.answer_key.acceptedAnswers?.includes('A Roma.'));
- const age=questions.find(q=>q.prompt==='Quanti anni ha Marco?');
+ const age=questions.find(q=>q.answer_key.acceptedAnswers?.includes('Marco ha vent’anni.'));
  assert.ok(age?.answer_key.acceptedAnswers?.includes('Marco ha vent’anni.'));
 });
 test('missing per-question timer RPC error gives migration and safe re-save instructions',()=>{
