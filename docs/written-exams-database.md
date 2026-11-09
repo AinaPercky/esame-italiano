@@ -30,7 +30,7 @@ erDiagram
 | `written_exam_sections` | Rubriques dynamiques, ordre, plafond, catégorie et groupe libres, consignes, texte-support partagé et lien vers document PDF/image (`support_url`) |
 | `written_exam_questions` | Questions figées, type, énoncé, barème, options/éléments publics, référence au quiz source et indicateur de correction manuelle |
 | `written_exam_answer_keys` | Clés privées et explications; jamais retournées par les RPC de passage |
-| `written_exam_attempts` | Une ligne par tentative composite : élève, version, échéance serveur, permutation, réponses, score automatique et manuel, état de publication |
+| `written_exam_attempts` | Une ligne par tentative composite : élève, version, échéance serveur, permutation, réponses, score automatique et manuel, note d’expression écrite, état de publication |
 | `written_exam_section_results` | Détail des points par section; ces lignes ne deviennent pas des évaluations/quiz séparés |
 | `written_exam_integrity_events` | Événements de visibilité/focus/plein écran horodatés, à interpréter comme signaux |
 
@@ -61,7 +61,7 @@ Dans le SQL Editor du projet Supabase utilisé par PerckyLingua, exécuter les m
 1. `supabase/migrations/20261108000000_composite_written_exams.sql` — schéma des examens écrits composites.
 2. `supabase/migrations/20261109000000_verbes_trous_written_exams.sql` — type de question « verbes à trous avec banque » et notation serveur.
 3. `supabase/migrations/20261110000000_written_exam_question_timers.sql` — limites de temps par question et chronomètre serveur.
-4. `supabase/migrations/20261111000000_fix_written_exam_time_limit_count.sql` — correction de compatibilité PostgreSQL du RPC de sauvegarde des temps par question. **Indispensable si la migration précédente est déjà installée** : elle remplace l'appel invalide à `jsonb_object_length(jsonb)`.
+4. `supabase/migrations/20261111000000_fix_written_exam_time_limit_count.sql` — correction de compatibilité PostgreSQL du RPC de sauvegarde des temps par question. **Indispensable si la migration précédente est déjà installée** : elle remplace l'appel invalide à `jsonb_object_length(jsonb)`.\n5. `supabase/migrations/20261112000000_reset_written_exam_attempts.sql` — réinitialisation sécurisée des tentatives d'un examen clôturé.\n6. `supabase/migrations/20261113000000_clarify_existing_draft_exam_prompts.sql` — consignes détaillées des sujets en brouillon.\n7. `supabase/migrations/20261114000000_include_manual_review_in_student_corrections.sql` — champ de correction manuelle dans la copie détaillée.\n8. `supabase/migrations/20261115000000_manual_written_expression_score.sql` — note d'expression écrite sur 10 ou 20 intégrée au total sur 100.
 
 Après application, vérifier la création des tables `written_*`, les fonctions RPC et les politiques RLS. Tester avec un compte enseignant et deux comptes élèves appartenant à des classes différentes. Vérifier qu'un élève ne peut ni sélectionner directement `written_exam_answer_keys`, ni appeler une tentative pour une autre classe. Effectuer les tests de publication, reprise, expiration, double soumission, correction manuelle et publication des résultats avant de faire passer un examen réel.
 
@@ -72,3 +72,4 @@ Après application, vérifier la création des tables `written_*`, les fonctions
 - Le navigateur ne peut pas bloquer ou détecter de manière fiable une capture d'écran système ou une photo prise avec un autre appareil.
 - Les réponses courtes automatiques reposent sur des variantes exactes normalisées; les réponses ambiguës doivent être revues par le professeur.
 - Les règles RLS et RPC doivent être validées dans le projet Supabase cible avant production. Aucun accès au projet Supabase de production ni exécution de migration distante n'est effectué par cette PR.
+\n## Note manuelle d’expression écrite\n\n- Dans l’éditeur, choisir aucune note, une note sur 10 ou une note sur 20. Les modèles A1 et L135 sont préconfigurés respectivement sur 20 et 10 points afin que les autres questions complètent le total à 100.\n- La configuration est enregistrée sur la version brouillon et figée dans chaque tentative. Elle ne modifie pas les versions publiées ni les tentatives existantes.\n- Après correction de la copie, le professeur saisit la note d’expression écrite. La base valide le plafond, ajoute la note au score automatique et aux éventuelles corrections manuelles, puis recalcule le résultat sur 100.\n- La publication des résultats est refusée tant que la note d’expression écrite requise n’a pas été saisie.\n
