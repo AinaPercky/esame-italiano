@@ -109,7 +109,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   };
 
   const handleAddRubricToDraft = () => {
-    const nextPos = rubricsDraft.length + 1;
+    const nextPos = Math.max(0, ...rubricsDraft.map(r => Number(r.position) || 0)) + 1;
     const newR: ExamRubric = {
       id: 'temp_' + Date.now(),
       exam_id: selectedExamForDetails?.id || '',
@@ -123,7 +123,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   };
 
   const handleRemoveRubricFromDraft = (index: number) => {
-    const updated = rubricsDraft.filter((_, i) => i !== index).map((r, i) => ({ ...r, position: i + 1 }));
+    const updated = rubricsDraft.filter((_, i) => i !== index);
     setRubricsDraft(updated);
   };
 
