@@ -105,6 +105,30 @@ Ces options ne remplacent pas une surveillance physique et ne garantissent pas �
 
 Un même texte de compréhension peut être placé dans `support_text` plutôt que répété dans chaque énoncé. Le lien `support_url` est facultatif ; les fichiers locaux et les téléversements directs de PDF ne sont pas pris en charge par ce champ.
 
+## Règles de rédaction des consignes pédagogiques
+
+Un titre de rubrique ou un nom de notion ne constitue pas une consigne suffisante. Éviter les énoncés vagues comme « Grammaire », « Prépositions », « Conjugaison » ou « Vocabulaire » lorsqu'ils sont présentés seuls à l'élève.
+
+Chaque section doit préciser l'opération attendue et chaque question doit, autant que possible, préciser :
+
+1. **L'action** : compléter, conjuguer, remplacer, traduire, choisir, justifier, comparer, réordonner, etc.
+2. **L'objet** : mot, verbe, pronom, préposition, phrase ou information du texte concerné.
+3. **La règle ou le contexte** : présent de l'indicatif, COD/COI, préposition de lieu, accord en genre/nombre, sens du texte, etc.
+4. **Le format de réponse** : un mot, une forme verbale, une option unique, une phrase complète ou une justification.
+5. **Les contraintes utiles** : utiliser tous les éléments une seule fois, conserver le pronom réfléchi, ajouter l'article si nécessaire, répondre en italien, etc.
+
+Exemples :
+
+| Consigne trop vague | Consigne attendue |
+|---|---|
+| Prépositions | « Complète avec la préposition simple ou articulée qui indique la destination. » |
+| Conjugaison | « Conjugue le verbe entre parenthèses au présent de l'indicatif et accorde-le avec le sujet. » |
+| COD/COI | « Remplace le complément indiqué par le pronom direct (COD) ou indirect (COI) approprié. » |
+| Vocabulaire | « Traduis en italien l'expression française complète. » |
+| Réordonnement | « Réorganise tous les éléments, sans en oublier ni en répéter, pour former une phrase correcte. » |
+
+Les consignes doivent rester adaptées au niveau CECRL : vocabulaire simple et direct en A1, formulation plus précise et nuancée à partir de B1. Ne pas donner la réponse dans l'énoncé, ni modifier le barème, le nombre de questions ou la difficulté uniquement pour reformuler une consigne.
+
 ## 4. Les trois types de questions
 
 Chaque question possède au minimum :
