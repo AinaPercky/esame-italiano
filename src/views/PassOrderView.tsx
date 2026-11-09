@@ -273,7 +273,7 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
               Aucun examen créé pour {currentClass?.name || 'cette classe'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500">
-              Pour organiser l'ordre de passage et débuter les notations orales, créez l'épreuve de présentation avec les 10 critères officiels en un seul clic.
+              Pour organiser l'ordre de passage, créez un examen oral puis configurez ses rubriques.
             </p>
           </div>
           <button
@@ -282,7 +282,7 @@ export const PassOrderView: React.FC<PassOrderViewProps> = ({
             className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Créer l'examen « Lo zébu » (10 critères)</span>
+            <span>Créer un examen oral</span>
           </button>
         </div>
       )}
