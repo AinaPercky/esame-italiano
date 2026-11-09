@@ -402,7 +402,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                             ? 'bg-slate-100 text-slate-700'
                             : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {ev.timer_status === 'completed' ? '3 min atteintes' : 'Arrêté manuellement'}
+                          {ev.timer_status === 'completed' ? 'Durée maximale atteinte' : 'Arrêté manuellement'}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-xs text-slate-600">
@@ -572,7 +572,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                   <div>
                     <span className="text-slate-400 block">Temps de parole</span>
                     <span className="font-mono font-semibold text-slate-900">
-                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0' )}s / durée prévue
+                      {Math.floor((selectedStudentExamEval.duration_used_seconds || 0) / 60)}m {((selectedStudentExamEval.duration_used_seconds || 0) % 60).toString().padStart(2, '0'  )}s / {Math.floor((selectedStudentExamEval.max_duration_seconds || 180) / 60)}m {((selectedStudentExamEval.max_duration_seconds || 180) % 60).toString().padStart(2, '0')}s
                     </span>
                   </div>
                 </div>
