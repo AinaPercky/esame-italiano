@@ -818,7 +818,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             Réinitialiser les données d'exemple
           </h3>
           <p className="text-xs text-slate-500">
-            Recharge les classes A1/B1, l'examen officiel « Lo zébu », et les 3 évaluations de référence.
+            Recharge les classes de démonstration, un examen oral d'exemple et les évaluations de référence.
           </p>
         </div>
         <button
@@ -827,7 +827,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             setConfirmDialog({
               isOpen: true,
               title: 'Réinitialiser les données',
-              message: 'Voulez-vous réinitialiser toutes les données aux valeurs de démonstration ?\nCette action recharge les classes de test A1/B1 et l\'examen officiel.',
+              message: 'Voulez-vous réinitialiser toutes les données aux valeurs de démonstration ?\nCette action recharge les données de démonstration, y compris un examen oral exemple.',
               confirmLabel: 'Réinitialiser',
               variant: 'danger',
               action: () => {
