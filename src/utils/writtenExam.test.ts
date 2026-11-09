@@ -12,7 +12,9 @@ test('A1 model preserves its 60 questions with an 80-point scale and 70-minute d
  assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),80);
  assert.equal(getWrittenExamTotals(A1_TEMPLATE).raw,80);
  assert.equal(A1_TEMPLATE.duration_minutes,70);
- assert.equal(A1_TEMPLATE.display_scale,80);
+ assert.equal(A1_TEMPLATE.display_scale,100);
+ assert.equal(A1_TEMPLATE.expression_writing_max_points,20);
+ assert.equal(getWrittenExamTotals(A1_TEMPLATE).totalWithExpression,100);
  assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.questions.length,0),60);
  assert.deepEqual(A1_TEMPLATE.sections.map(s=>s.points),[20,5,5,5,5,5,5,5,5,20]);
  assert.deepEqual(validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1']}),[]);
