@@ -56,7 +56,7 @@ begin
   perform set_config('request.jwt.claim.sub',v_student::text,true);
   v_started:=public.start_written_exam(v_exam);
   v_attempt:=(v_started->>'attempt_id')::uuid;
-  select id into v_question
+  select q.id into v_question
   from public.written_exam_questions q
   join public.written_exam_sections s on s.id=q.section_id
   where s.version_id=v_version and q.question_key='qcm-90';
