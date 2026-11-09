@@ -361,11 +361,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                         <span className="font-mono text-xs text-slate-400">
                           {ev.student_number || 'Sans matricule'}
                         </span>
-                        {ev.presented_animal && (
-                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-900 bg-slate-100 border border-slate-200/70 px-1.5 py-0.2 rounded">
-                            <span>🐾 {ev.presented_animal}</span>
-                          </div>
-                        )}
                       </td>
                       <td className="py-3 px-4">
                         <div className="text-xs font-medium text-slate-800">
