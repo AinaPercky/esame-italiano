@@ -36,13 +36,17 @@ begin
     'sections',jsonb_build_array(jsonb_build_object(
       'id','section','title','Automatic assessment','points',90,
       'shuffle',false,'questions',jsonb_build_array(jsonb_build_object(
-        'id','qcm-90','type','qcm','prompt','Automatic question worth 90 points',
-        'points',90,'shuffle_options',false,
+        'id','qcm-80','type','qcm','prompt','Automatic question worth 80 points',
+        'points',80,'shuffle_options',false,
         'options',jsonb_build_array(
           jsonb_build_object('id','correct','label','Correct answer'),
           jsonb_build_object('id','wrong','label','Wrong answer')
         ),
         'answer_key',jsonb_build_object('correctOptionId','correct')
+      ),jsonb_build_object(
+        'id','manual-10','type','text','prompt','Short written response for manual review',
+        'points',10,'manual_review',true,
+        'answer_key',jsonb_build_object('acceptedAnswers',jsonb_build_array('accepted'))
       ))
     ))
   ));
@@ -67,7 +71,6 @@ begin
 
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_admin::text,true);
-  perform public.grade_written_exam_expression_writing(v_attempt,8);
   perform public.publish_written_exam_results(v_exam);
 
   select raw_score,raw_max,normalized_score,expression_writing_score,integrity_failed,status
