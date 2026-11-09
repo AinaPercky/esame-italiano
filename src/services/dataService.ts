@@ -639,7 +639,7 @@ export const dataService = {
     if (!state.exams.some(exam => exam.id === examId)) throw new Error('Examen introuvable');
 
     const newRubrics: ExamRubric[] = rubrics.map((rubric, idx) => ({
-      id: generateUUID(),
+      id: rubric.id && isUUID(rubric.id) ? rubric.id : generateUUID(),
       exam_id: examId,
       title: rubric.title.trim(),
       question: rubric.question.trim(),
