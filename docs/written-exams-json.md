@@ -105,6 +105,10 @@ Ces options ne remplacent pas une surveillance physique et ne garantissent pas �
 
 Un même texte de compréhension peut être placé dans `support_text` plutôt que répété dans chaque énoncé. Le lien `support_url` est facultatif ; les fichiers locaux et les téléversements directs de PDF ne sont pas pris en charge par ce champ.
 
+## Note d’expression écrite corrigée par le professeur
+
+Une version d’examen peut inclure une composante d’expression écrite corrigée séparément. Dans l’éditeur, choisir `expression_writing_max_points: 10` ou `20` (ou `0` pour la désactiver). Le total des points des questions et de cette composante doit être exactement égal à 100. Les modèles fournis sont préconfigurés : A1 = 80 points de questions + expression écrite /20 ; L135 = 90 points de questions + expression écrite /10. Après lecture de la production de l’élève, le professeur saisit la note dans le panneau de correction. La publication des résultats reste bloquée tant que cette note n’a pas été saisie pour chaque tentative concernée.
+
 ## Règles de rédaction des consignes pédagogiques
 
 Un titre de rubrique ou un nom de notion ne constitue pas une consigne suffisante. Éviter les énoncés vagues comme « Grammaire », « Prépositions », « Conjugaison » ou « Vocabulaire » lorsqu'ils sont présentés seuls à l'élève.
