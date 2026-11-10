@@ -82,7 +82,7 @@ Après application, vérifier la création des tables `written_*`, les fonctions
 ## Note manuelle d’expression écrite
 
 - Dans l’éditeur, choisir aucune note, une note sur 10 ou une note sur 20. Les modèles A1 et L135 sont préconfigurés respectivement sur 20 et 10 points afin que les autres questions complètent le total à 100.
-- La configuration est enregistrée sur l’examen brouillon et figée dès la première tentative. Elle ne modifie pas les versions publiées ni les tentatives existantes.
+- La configuration est enregistrée sur l’examen brouillon et figée dès la première tentative. Elle ne modifie pas les examens publiés ni les tentatives existantes.
 - Après correction de la copie, le professeur saisit la note d’expression écrite. La base valide le plafond, ajoute la note au score automatique et aux éventuelles corrections manuelles, puis recalcule le résultat sur 100.
 - La publication des résultats est refusée tant que la note d’expression écrite requise n’a pas été saisie.
 
