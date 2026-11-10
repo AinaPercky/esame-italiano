@@ -231,20 +231,23 @@ begin
 end
 $written$;
 
--- Publish a second immutable version for the same class. Students should see one card
--- and new attempts should use this class's latest published version.
+-- A second exam is a separate exam record, not another version of the first.
+-- Re-saving a draft updates its single definition row; a started exam is locked.
 do $written$
 declare
   v_admin_id uuid:=gen_random_uuid();
   v_class_two uuid:=gen_random_uuid();
   v_student_two uuid:=gen_random_uuid();
   v_ctx record;
+  v_definition jsonb;
   v_saved jsonb;
+  v_saved_again jsonb;
   v_started jsonb;
-  v_started_again jsonb;
-  v_version_id uuid;
+  v_exam_two uuid;
+  v_definition_id uuid;
   v_attempt_id uuid;
   v_list jsonb;
+  v_error text;
 begin
   select * into v_ctx from written_exam_ci_context limit 1;
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin_id::text)::text,true);
@@ -253,46 +256,70 @@ begin
   insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
   values(v_student_two,v_class_two,'Second','Student','student-written-exam-ci-two@example.test','CI-002','approved');
 
-  v_saved:=public.save_written_exam_definition(v_ctx.exam_id,jsonb_build_object(
-    'title','DB flow v2','description','Second immutable version for another class','level','A1',
+  v_definition:=jsonb_build_object(
+    'title','DB flow second exam','description','A distinct exam using the same JSON template structure','level','A1',
     'target_language','it','instruction_language','fr','duration_minutes',30,
     'class_ids',jsonb_build_array(v_class_two::text),'opens_at',null,'closes_at',null,
     'display_scale',100,'max_attempts',2,'shuffle_sections',false,'shuffle_questions',false,
     'shuffle_options',false,'navigation_mode','free','show_score_after_publish',true,
     'show_corrections_after_publish',true,
     'integrity_settings',jsonb_build_object('fullscreen',false,'warn_on_tab_switch',true,'watermark',false),
-    'sections',jsonb_build_array(jsonb_build_object('id','v2-section','title','Version two section','points',0,'shuffle',false,
-      'questions',jsonb_build_array(jsonb_build_object('id','v2-qcm','type','qcm','prompt','Version two QCM','points',1,'shuffle_options',false,
+    'sections',jsonb_build_array(jsonb_build_object('id','second-section','title','Second exam section','points',0,'shuffle',false,
+      'questions',jsonb_build_array(jsonb_build_object('id','second-qcm','type','qcm','prompt','Second exam QCM','points',1,'shuffle_options',false,
         'options',jsonb_build_array(jsonb_build_object('id','a','label','A'),jsonb_build_object('id','b','label','B')),
         'answer_key',jsonb_build_object('correctOptionId','a')
       ))
     ))
-  ));
-  v_version_id:=(v_saved->>'version_id')::uuid;
-  perform public.publish_written_exam(v_ctx.exam_id,v_version_id);
+  );
 
-  -- The first student must still receive the older version assigned to class one.
+  v_saved:=public.save_written_exam_definition(null,v_definition);
+  v_exam_two:=(v_saved->>'exam_id')::uuid;
+  v_definition_id:=(v_saved->>'version_id')::uuid;
+  v_saved_again:=public.save_written_exam_definition(v_exam_two,v_definition);
+  if (v_saved_again->>'version_id')::uuid<>v_definition_id then
+    raise exception 'Saving the same exam draft created a second definition record.';
+  end if;
+  if (select count(*) from public.written_exam_versions where exam_id=v_exam_two and status in ('draft','published'))<>1 then
+    raise exception 'An exam must have exactly one current definition.';
+  end if;
+  perform public.publish_written_exam(v_exam_two,v_definition_id);
+
+  -- Once an attempt exists, editing the exam must be refused rather than creating a version.
+  begin
+    perform public.save_written_exam_definition(v_ctx.exam_id,v_definition);
+  exception when others then
+    v_error:=sqlerrm;
+  end;
+  if coalesce(v_error,'') not like '%tentatives%' then
+    raise exception 'An exam with existing attempts was not protected from edits: %',coalesce(v_error,'no error');
+  end if;
+  if (select count(*) from public.written_exam_versions where exam_id=v_ctx.exam_id)<>1 then
+    raise exception 'A blocked edit created an additional definition row.';
+  end if;
+
+  -- The first student still sees only the first exam assigned to class one.
   perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci@example.test','sub',v_ctx.student_id::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_ctx.student_id::text,true);
   v_list:=public.list_available_written_exams();
   if jsonb_array_length(v_list)<>1 or v_list->0->>'title'<>'DB flow v1' then
-    raise exception 'Student in class one did not retain the version assigned to class one.';
+    raise exception 'The first student received an exam assigned to another class.';
   end if;
-  v_started:=public.start_written_exam(v_ctx.exam_id);
-  v_attempt_id:=(v_started->>'attempt_id')::uuid;
-  if v_started->'exam'->>'title'<>'DB flow v1' then raise exception 'Student in class one started a version assigned to another class.'; end if;
-  v_started_again:=public.start_written_exam(v_ctx.exam_id);
-  if (v_started_again->>'attempt_id')::uuid<>v_attempt_id then raise exception 'Resume created a second attempt instead of reusing the active attempt.'; end if;
 
-  -- The second student must receive and start the newer version assigned to class two.
+  -- The second student sees a separate exam created from the same template structure.
   perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci-two@example.test','sub',v_student_two::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_student_two::text,true);
   v_list:=public.list_available_written_exams();
-  if jsonb_array_length(v_list)<>1 or v_list->0->>'title'<>'DB flow v2' then
-    raise exception 'Student in class two did not receive the latest version assigned to class two.';
+  if jsonb_array_length(v_list)<>1 or v_list->0->>'title'<>'DB flow second exam' then
+    raise exception 'The second student did not receive the separate exam assigned to class two.';
   end if;
-  v_started:=public.start_written_exam(v_ctx.exam_id);
-  if v_started->'exam'->>'title'<>'DB flow v2' then raise exception 'Student in class two did not start the class-specific latest version.'; end if;
+  v_started:=public.start_written_exam(v_exam_two);
+  v_attempt_id:=(v_started->>'attempt_id')::uuid;
+  if v_started->'exam'->>'title'<>'DB flow second exam' then
+    raise exception 'The second student started the wrong exam.';
+  end if;
+  if (select count(*) from public.written_exam_versions where exam_id=v_exam_two)<>1 then
+    raise exception 'The second exam contains more than one definition row.';
+  end if;
 end
 $written$;
 
@@ -306,7 +333,7 @@ declare
   v_corrections jsonb;
 begin
   select * into v_ctx from written_exam_ci_context limit 1;
-  -- Restore the first student's JWT after the multi-class scenario switched to student two.
+  -- Restore the first student's JWT after the separate-exam scenario switched to student two.
   perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci@example.test','sub',v_ctx.student_id::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_ctx.student_id::text,true);
   if exists(select 1 from public.written_exam_answer_keys) then raise exception 'Student can read private answer keys directly.'; end if;
