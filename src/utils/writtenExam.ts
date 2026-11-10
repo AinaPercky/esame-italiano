@@ -54,16 +54,6 @@ export const L135_TEMPLATE:WrittenExam={
   {...createSection('Réordonnement',10),instructions:'Rimetti ogni frase nell’ordine corretto. Ricostruisci una frase completa e grammaticalmente corretta usando tutti gli elementi una sola volta; controlla la posizione del soggetto, del verbo e dei complementi.',questions:[reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Domani','vado','al mercato']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['A Maria','piacciono','i romanzi']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Non','ho','capito','la domanda']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Ci','vediamo','dopo','la lezione']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Ieri','abbiamo','visitato','il museo'])]}
  ]
 };
- 
-// Reading comprehension includes time to read the source text before answering.
-// Open responses receive 90 seconds; QCM receive 50 seconds.
-const applyComprehensionTiming=(template:WrittenExam,durationMinutes:number)=>{
- template.duration_minutes=durationMinutes;
- const section=template.sections.find(item=>item.title.toLocaleLowerCase('fr').includes('compréhension écrite'));
- if(section)section.questions=section.questions.map(question=>({...question,time_limit_seconds:question.type==='qcm'?50:90}));
-};
-applyComprehensionTiming(A1_TEMPLATE,80);
-applyComprehensionTiming(L135_TEMPLATE,105);
 
 const a1Text='Marco vive a Roma. Ha vent’anni e studia italiano all’università. Ogni mattina prende l’autobus per andare a lezione. Nel fine settimana gioca a calcio con i suoi amici. La sera legge un libro o guarda un film.';
 const a1TF=[
@@ -101,7 +91,17 @@ export const A1_TEMPLATE:WrittenExam={
    textQ('Completa con la forma corretta del verbo «essere» al presente indicativo: Io ___ studente.',2,['sono']),textQ('Completa con la forma corretta del verbo «avere» al presente indicativo: Tu ___ un libro.',2,['hai']),textQ('Completa con la forma corretta del verbo «andare» al presente indicativo: Noi ___ a scuola.',2,['andiamo']),textQ('Completa con la forma corretta del verbo «vivere» al presente indicativo: Lei ___ a Roma.',2,['vive']),textQ('Completa con la forma corretta del verbo «parlare» al presente indicativo: Loro ___ italiano.',2,['parlano']),textQ('Completa con la forma corretta del verbo «essere» al presente indicativo: Voi ___ amici.',2,['siete']),textQ('Completa con la forma corretta dell’espressione «fare colazione» al presente indicativo: Lui ___ colazione.',2,['fa']),textQ('Completa con la forma corretta del verbo «prendere» al presente indicativo: Io ___ il treno.',2,['prendo']),textQ('Completa con la forma corretta del verbo «avere» al presente indicativo: Noi ___ una casa.',2,['abbiamo']),textQ('Completa con la forma corretta del verbo «studiare» al presente indicativo: Tu ___ italiano.',2,['studi'])
   ]}
  ]
+}; 
+// Reading comprehension includes time to read the source text before answering.
+// Open responses receive 90 seconds; QCM receive 50 seconds.
+const applyComprehensionTiming=(template:WrittenExam,durationMinutes:number)=>{
+ template.duration_minutes=durationMinutes;
+ const section=template.sections.find(item=>item.title.toLocaleLowerCase('fr').includes('compréhension écrite'));
+ if(section)section.questions=section.questions.map(question=>({...question,time_limit_seconds:question.type==='qcm'?50:90}));
 };
+applyComprehensionTiming(A1_TEMPLATE,80);
+applyComprehensionTiming(L135_TEMPLATE,105);
+
 export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'|'expression_writing_max_points'>){
  const raw=exam.sections.reduce((sum,s)=>sum+s.questions.reduce((n,q)=>n+Math.max(0,Number(q.points)||0),0),0);
  const planned=exam.sections.reduce((sum,s)=>sum+Math.max(0,Number(s.points)||0),0);
