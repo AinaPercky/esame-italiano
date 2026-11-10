@@ -137,6 +137,10 @@ $written$;
 
 revoke all on function public.written_exam_auto_question_score(uuid,jsonb) from public;
 
+-- The new scorer includes verb-bank questions, so disable the older after-submit scorer
+-- to avoid counting those answers twice.
+drop trigger if exists written_exam_verbes_trous_score on public.written_exam_attempts;
+
 -- Re-run the automatic correction for every supported question. manual_review now
 -- means "automatic proposal + teacher verification", not "skip automatic correction".
 create or replace function public.submit_written_exam(p_attempt_id uuid)
