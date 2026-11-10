@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {BookOpen,CheckCircle2,Clock,FileText,Lock,Play,Save,ShieldAlert,Send,ChevronRight} from 'lucide-react';
 import {writtenExamService} from '../services/writtenExamService';
 import type {AuthUser} from '../services/authService';
-import {applyWrittenExamOrder,WrittenAttempt,getTimedQuestionIndex,getTimedQuestionRemainingSeconds,getWrittenQuestionTimeLimit} from '../utils/writtenExam';
+import {applyWrittenExamOrder,WrittenAttempt,getTimedQuestionIndex,getTimedQuestionRemainingSeconds,getWrittenQuestionTimeLimit,shouldDisqualifyWrittenExamVisibilityChange} from '../utils/writtenExam';
 import {QuizClozeInput} from '../components/QuizClozeInput';
 import {QuizReorderList} from '../components/QuizReorderList';
 import {VerbesTrousQuestion} from '../components/verbesTrous/VerbesTrousQuestion';
@@ -32,7 +32,7 @@ export const StudentWrittenExamsView:React.FC<{currentUser:AuthUser;onFullscreen
  useEffect(()=>{if(!attempt||submitted)return;const gracePeriodMs=2000;const debounceMs=1500;const startedAt=Date.now();const isMobileDevice=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);let violationTimer:number|null=null;
   const clearViolationTimer=()=>{if(violationTimer!==null){window.clearTimeout(violationTimer);violationTimer=null;}};
   const scheduleViolationCheck=(reason:'visibility_hidden'|'window_blur')=>{clearViolationTimer();const graceRemainingMs=Math.max(0,gracePeriodMs-(Date.now()-startedAt));violationTimer=window.setTimeout(()=>{violationTimer=null;const actuallyAway=document.hidden||(!isMobileDevice&&!document.hasFocus());if(actuallyAway&&!violationPendingRef.current){violationPendingRef.current=true;setIntegrityWarning('Changement d’onglet ou sortie de la fenêtre détecté. Votre examen est remis avec la note de 0/100.');void finish(reason);}},graceRemainingMs+debounceMs);};
-  const hidden=()=>{if(document.hidden&&attempt.exam.integrity_settings?.warn_on_tab_switch!==false){if(isMobileDevice){void writtenExamService.logIntegrity(attempt.attempt_id,'visibility_hidden',{page:'written-exam',platform:'mobile',policy:'non_disqualifying'}).catch(()=>{});}else{scheduleViolationCheck('visibility_hidden');}}else if(!document.hidden)clearViolationTimer();};
+  const hidden=()=>{if(document.hidden&&attempt.exam.integrity_settings?.warn_on_tab_switch!==false){if(!shouldDisqualifyWrittenExamVisibilityChange(isMobileDevice)){void writtenExamService.logIntegrity(attempt.attempt_id,'visibility_hidden',{page:'written-exam',platform:'mobile',policy:'non_disqualifying'}).catch(()=>{});}else{scheduleViolationCheck('visibility_hidden');}}else if(!document.hidden)clearViolationTimer();};
   const blur=()=>{if(!isMobileDevice&&attempt.exam.integrity_settings?.warn_on_tab_switch!==false)scheduleViolationCheck('window_blur');};
   const focus=()=>clearViolationTimer();
   const log=(type:string)=>{void writtenExamService.logIntegrity(attempt.attempt_id,type,{page:'written-exam'}).catch(()=>{});};
