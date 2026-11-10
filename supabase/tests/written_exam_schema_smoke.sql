@@ -48,7 +48,7 @@ begin
     raise exception 'Mandatory section question shuffle trigger is missing';
   end if;
   if not exists(select 1 from pg_trigger where tgname='written_exam_versions_immutable' and not tgisinternal) then
-    raise exception 'Published-version immutability trigger is missing';
+    raise exception 'Exam definition lock trigger is missing';
   end if;
   if not exists(select 1 from pg_trigger where tgname='written_answer_keys_immutable' and not tgisinternal) then
     raise exception 'Answer-key immutability trigger is missing';
