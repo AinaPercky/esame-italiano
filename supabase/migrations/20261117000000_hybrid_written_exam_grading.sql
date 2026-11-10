@@ -137,9 +137,18 @@ $written$;
 
 revoke all on function public.written_exam_auto_question_score(uuid,jsonb) from public;
 
--- The new scorer includes verb-bank questions, so disable the older after-submit scorer
--- to avoid counting those answers twice.
-drop trigger if exists written_exam_verbes_trous_score on public.written_exam_attempts;
+-- The new scorer includes verb-bank questions. Keep the established trigger
+-- for schema compatibility, but make it a no-op to avoid scoring the same answer twice.
+create or replace function public.apply_verbes_trous_attempt_score()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $score$
+begin
+  return new;
+end
+$score$;
 
 -- Re-run the automatic correction for every supported question. manual_review now
 -- means "automatic proposal + teacher verification", not "skip automatic correction".
