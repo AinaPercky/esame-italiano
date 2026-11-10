@@ -1,21 +1,21 @@
 # Base de données – Examens écrits composites
 
-Cette fonctionnalité possède son propre modèle PostgreSQL. Elle ne réutilise ni ne modifie `exams`, `exam_rubrics`, `evaluations`, `exam_pass_order`, `quizzes` ou `quiz_submissions`.
+Cette fonctionnalité possède son propre modèle PostgreSQL. Elle ne réutilise ni ne modifie `exams`, `exam_rubrics`, `evaluations`, `exam_pass_order`, `quizzes` ou `quiz_submissions`. Les deux canevas JSON A1 et L135 sont des modèles statiques fournis par l’application : ils ne sont pas des examens et ne créent aucune ligne en base. Un professeur peut créer directement un examen conforme à l’un de ces formats, ou démarrer depuis un canevas.
 
 ## Modèle relationnel
 
 ```mermaid
 erDiagram
-  written_exams ||--o{ written_exam_versions : versions
+  written_exams ||--|| written_exam_versions : current_definition
   written_exams ||--o{ written_exam_classes : targets
   classes ||--o{ written_exam_classes : assigned
-  written_exam_versions ||--o{ written_exam_version_classes : snapshots
+  written_exam_versions ||--o{ written_exam_version_classes : class_snapshot
   classes ||--o{ written_exam_version_classes : assigned
   written_exam_versions ||--o{ written_exam_sections : contains
   written_exam_sections ||--o{ written_exam_questions : contains
   written_exam_questions ||--|| written_exam_answer_keys : private_key
   written_exams ||--o{ written_exam_attempts : attempts
-  written_exam_versions ||--o{ written_exam_attempts : based_on
+  written_exam_versions ||--o{ written_exam_attempts : internal_definition_ref
   students ||--o{ written_exam_attempts : writes
   written_exam_attempts ||--o{ written_exam_section_results : scores
   written_exam_attempts ||--o{ written_exam_integrity_events : events
@@ -25,19 +25,19 @@ erDiagram
 |---|---|
 | `written_exams` | Identité, titre, langues, classe(s) courantes, état, dates, politique de tentatives et paramètres de publication |
 | `written_exam_classes` | Classes ciblées par la définition courante |
-| `written_exam_version_classes` | Instantané des classes autorisées par version publiée |
-| `written_exam_versions` | Instantané versionné et immuable après publication : durée, dates, échelle, mélange, total brut et paramètres d'intégrité |
+| `written_exam_version_classes` | Instantané des classes autorisées pour la définition courante, conservé pour compatibilité des RPC et des tentatives historiques |
+| `written_exam_versions` | Ligne technique de définition courante (une seule ligne active par examen). Le nom historique de la table est conservé pour compatibilité SQL, mais l’application ne propose ni ne crée de versions métier. Les anciennes lignes sont archivées uniquement si des tentatives historiques les référencent. |
 | `written_exam_sections` | Rubriques dynamiques, ordre, plafond, catégorie et groupe libres, consignes, texte-support partagé et lien vers document PDF/image (`support_url`) |
 | `written_exam_questions` | Questions figées, type, énoncé, barème, options/éléments publics, référence au quiz source et indicateur de correction manuelle |
 | `written_exam_answer_keys` | Clés privées et explications; jamais retournées par les RPC de passage |
-| `written_exam_attempts` | Une ligne par tentative composite : élève, version, échéance serveur, permutation, réponses, scores, note d’expression écrite, état de publication et indicateur de disqualification anti-triche |
+| `written_exam_attempts` | Une ligne par tentative : élève, référence technique vers la définition utilisée, échéance serveur, permutation, réponses, scores, note d’expression écrite, état de publication et indicateur de disqualification anti-triche |
 | `written_exam_section_results` | Détail des points par section; ces lignes ne deviennent pas des évaluations/quiz séparés |
 | `written_exam_integrity_events` | Événements de visibilité/focus/plein écran horodatés, dont les violations entraînant une note nulle |
 
 ## Cycle de vie
 
-1. Le professeur enregistre un brouillon via `save_written_exam_definition`. La fonction écrit la définition et ses clés dans des tables séparées, calcule le maximum brut et copie les classes dans `written_exam_version_classes`.
-2. `publish_written_exam` valide les sections, plafonds, types et clés, puis publie la version. Les triggers interdisent ensuite la modification des questions, sections, clés, classes et paramètres de cette version. Une édition crée une nouvelle version.
+1. Le professeur crée un examen directement ou depuis l’un des deux canevas JSON. `save_written_exam_definition` crée une seule ligne de définition pour cet examen. Les sauvegardes suivantes réutilisent cette même ligne, recalculent le maximum brut et remplacent le contenu tant qu’aucune tentative n’existe.
+2. `publish_written_exam` valide les sections, plafonds, types et clés, puis publie l’examen. Dès qu’une tentative est créée, le contenu et les classes de l’examen sont verrouillés afin de préserver les copies et les corrections. Pour proposer un autre sujet après le début des tentatives, le professeur crée un nouvel examen ; il n’existe pas de commande « nouvelle version ».
 3. `list_available_written_exams` n'expose que les métadonnées et examens destinés à la classe de l'élève connecté.
 4. `start_written_exam` retrouve l'élève à partir de l'e-mail de la session Supabase, contrôle sa classe et la période, crée une tentative unique et calcule l'échéance avec l'heure PostgreSQL. Il génère et stocke une permutation par tentative; les sections d'un même `group_name` restent ensemble et l'ordre est conservé à la reprise.
 5. `save_written_exam_answers` n'accepte que des identifiants de questions appartenant à la version de la tentative. La sauvegarde n'accepte ni score ni identité du navigateur.
@@ -52,7 +52,7 @@ erDiagram
 - Les clés de réponse et explications sont conservées dans `written_exam_answer_keys`. Les RPC de démarrage et de liste ne les sélectionnent pas.
 - Les notes et le statut de la tentative sont calculés par le serveur. Une soumission répétée, une tentative expirée, une classe non autorisée, un examen fermé ou un identifiant de question étranger sont refusés.
 - Le RPC `flag_written_exam_integrity_violation` enregistre côté serveur les changements d’onglet/fenêtre et les tentatives de capture clavier détectables. Un trigger impose alors un score final nul, y compris après une correction manuelle ou la saisie de l’expression écrite. Le navigateur ne fournit pas de signal fiable pour les captures natives iOS.
-- Les versions publiées sont immuables. Une modification de sujet doit créer une nouvelle version.
+- Un examen qui possède au moins une tentative est verrouillé au niveau SQL : sections, questions, corrigés, paramètres et classes ne peuvent plus être modifiés. Cela protège les réponses et résultats historiques. Un nouveau sujet doit être créé comme un nouvel examen.
 
 ## Installation Supabase
 
@@ -67,7 +67,7 @@ Dans le SQL Editor du projet Supabase utilisé par PerckyLingua, exécuter les m
 7. `supabase/migrations/20261114000000_include_manual_review_in_student_corrections.sql` — champ de correction manuelle dans la copie détaillée.
 8. `supabase/migrations/20261115000000_manual_written_expression_score.sql` — note d'expression écrite sur 10 ou 20 intégrée au total sur 100.
 9. `supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql` — disqualification serveur et note nulle après violation d’intégrité.
-10. `supabase/migrations/20261117000000_hybrid_written_exam_grading.sql` — correction automatique préalable, validation/surcharge manuelle et conservation de la note d’expression écrite même si la tentative est disqualifiée.
+10. `supabase/migrations/20261117000000_hybrid_written_exam_grading.sql` — correction automatique préalable, validation/surcharge manuelle et conservation de la note d’expression écrite même si la tentative est disqualifiée.\n11. `supabase/migrations/20261110120000_single_definition_written_exams.sql` — impose une seule définition active par examen, réutilise la même ligne lors des sauvegardes et verrouille les examens dès qu’une tentative existe.
 
 Après application, vérifier la création des tables `written_*`, les fonctions RPC et les politiques RLS. Tester avec un compte enseignant et deux comptes élèves appartenant à des classes différentes. Vérifier qu'un élève ne peut ni sélectionner directement `written_exam_answer_keys`, ni appeler une tentative pour une autre classe. Effectuer les tests de publication, reprise, expiration, double soumission, correction manuelle et publication des résultats avant de faire passer un examen réel.
 
@@ -82,7 +82,7 @@ Après application, vérifier la création des tables `written_*`, les fonctions
 ## Note manuelle d’expression écrite
 
 - Dans l’éditeur, choisir aucune note, une note sur 10 ou une note sur 20. Les modèles A1 et L135 sont préconfigurés respectivement sur 20 et 10 points afin que les autres questions complètent le total à 100.
-- La configuration est enregistrée sur la version brouillon et figée dans chaque tentative. Elle ne modifie pas les versions publiées ni les tentatives existantes.
+- La configuration est enregistrée sur l’examen brouillon et figée dès la première tentative. Elle ne modifie pas les versions publiées ni les tentatives existantes.
 - Après correction de la copie, le professeur saisit la note d’expression écrite. La base valide le plafond, ajoute la note au score automatique et aux éventuelles corrections manuelles, puis recalcule le résultat sur 100.
 - La publication des résultats est refusée tant que la note d’expression écrite requise n’a pas été saisie.
 
