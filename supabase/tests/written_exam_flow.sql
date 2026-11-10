@@ -226,6 +226,28 @@ begin
   if not (v_corrections->0->'questions'->0 ? 'answer_key') then raise exception 'Published corrections do not include the answer key. '; end if;
   if not (v_corrections->0->'questions'->0 ? 'manual_review') then raise exception 'Student corrections do not expose manual-review state.'; end if;
 
+  -- Simulate a legacy archived definition while preserving the student's original copy.
+  perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin_id::text)::text,true);
+  perform set_config('request.jwt.claim.sub',v_admin_id::text,true);
+  execute 'alter table public.written_exam_versions disable trigger written_exam_versions_immutable';
+  update public.written_exam_versions set status='archived' where id=v_version_id;
+  execute 'alter table public.written_exam_versions enable trigger written_exam_versions_immutable';
+  insert into public.written_exam_versions(exam_id,version_number,status,title,description,raw_max)
+  values(v_exam_id,2,'published','Legacy newer definition','Used to verify historical copy selection',17);
+  insert into public.written_exam_version_classes(version_id,class_id)
+  select id,v_class_id from public.written_exam_versions where exam_id=v_exam_id and version_number=2;
+
+  perform set_config('request.jwt.claims',jsonb_build_object('email','student-written-exam-ci@example.test','sub',v_student_id::text)::text,true);
+  perform set_config('request.jwt.claim.sub',v_student_id::text,true);
+  v_list:=public.list_available_written_exams();
+  if jsonb_array_length(v_list)<>1
+     or v_list->0->>'title'<>'DB flow v1'
+     or v_list->0->>'version_id'<>v_version_id::text then
+    raise exception 'The student did not retain access to the exact definition used by their archived attempt.';
+  end if;
+
+  perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin_id::text)::text,true);
+  perform set_config('request.jwt.claim.sub',v_admin_id::text,true);
   insert into written_exam_ci_context(exam_id,version_id,student_id,class_id,attempt_id)
   values(v_exam_id,v_version_id,v_student_id,v_class_id,v_attempt_id);
 end
@@ -293,8 +315,8 @@ begin
   if coalesce(v_error,'') not like '%tentatives%' then
     raise exception 'An exam with existing attempts was not protected from edits: %',coalesce(v_error,'no error');
   end if;
-  if (select count(*) from public.written_exam_versions where exam_id=v_ctx.exam_id)<>1 then
-    raise exception 'A blocked edit created an additional definition row.';
+  if (select count(*) from public.written_exam_versions where exam_id=v_ctx.exam_id and status in ('draft','published'))<>1 then
+    raise exception 'A blocked edit created an additional active definition row.';
   end if;
 
   -- The first student still sees only the first exam assigned to class one.
