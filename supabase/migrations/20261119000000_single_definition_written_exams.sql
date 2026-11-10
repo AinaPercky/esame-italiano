@@ -324,7 +324,8 @@ begin
  select id,version_number into v_version_id,v_version_no
  from public.written_exam_versions
  where exam_id=v_exam_id
- order by version_number desc
+ order by case when status='draft' then 0 when status='published' then 1 else 2 end,
+          version_number desc
  limit 1 for update;
  if v_version_id is null then
    v_version_no:=1;
