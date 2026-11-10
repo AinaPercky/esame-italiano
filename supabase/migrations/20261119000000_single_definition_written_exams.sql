@@ -25,7 +25,7 @@ begin
   end if;
 
   if exists(select 1 from public.written_exam_attempts a where a.version_id=old.id)
-     and (to_jsonb(new)-'locked_at') is distinct from (to_jsonb(old)-'locked_at') then
+     and (to_jsonb(new)-array['locked_at','shuffle_questions','navigation_mode']) is distinct from (to_jsonb(old)-array['locked_at','shuffle_questions','navigation_mode']) then
     raise exception 'Le contenu d’un examen ayant des tentatives est verrouillé pour préserver les copies.';
   end if;
   return new;
