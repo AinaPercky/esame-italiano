@@ -146,7 +146,12 @@ with ranked as (
   select id,
          row_number() over (
            partition by exam_id
-           order by case status when 'draft' then 0 when 'published' then 1 else 2 end,
+           order by case
+                      when exists(select 1 from public.written_exam_attempts a where a.version_id=written_exam_versions.id) then 0
+                      when status='draft' then 1
+                      when status='published' then 2
+                      else 3
+                    end,
                     version_number desc, created_at desc
          ) as position
   from public.written_exam_versions
