@@ -5,7 +5,7 @@ Ce guide décrit le format accepté par l’importateur **Importer JSONC** de l�
 - **JSON** : format standard, sans commentaires ni virgule finale.
 - **JSONC** : même structure, avec commentaires `//` ou `/* ... */` et virgules finales autorisés par l’importateur.
 - Le fichier doit être encodé en UTF-8 et porter l’extension `.json` ou `.jsonc`.
-- L’import crée un **nouveau brouillon**. Il ne publie pas le sujet et ne remplace pas une version déjà publiée.
+- L’import crée un **nouveau brouillon**. Il ne publie pas le sujet et ne remplace pas un examen déjà enregistré.
 
 Les PDF peuvent servir de référence pédagogique, mais l’import PDF automatique n’est pas pris en charge. Il faut recopier le contenu dans le JSON ou le saisir dans l’éditeur. Un document support peut être fourni sous forme de texte ou de lien HTTP/HTTPS.
 
@@ -107,7 +107,7 @@ Un même texte de compréhension peut être placé dans `support_text` plutôt q
 
 ## Note d’expression écrite corrigée par le professeur
 
-Une version d’examen peut inclure une composante d’expression écrite corrigée séparément. Dans l’éditeur, choisir `expression_writing_max_points: 10` ou `20` (ou `0` pour la désactiver). Le total des points des questions et de cette composante doit être exactement égal à 100. Les modèles fournis sont préconfigurés : A1 = 80 points de questions + expression écrite /20 ; L135 = 90 points de questions + expression écrite /10. Après lecture de la production de l’élève, le professeur saisit la note dans le panneau de correction. La publication des résultats reste bloquée tant que cette note n’a pas été saisie pour chaque tentative concernée.
+Un examen peut inclure une composante d’expression écrite corrigée séparément. Dans l’éditeur, choisir `expression_writing_max_points: 10` ou `20` (ou `0` pour la désactiver). Le total des points des questions et de cette composante doit être exactement égal à 100. Les modèles fournis sont préconfigurés : A1 = 80 points de questions + expression écrite /20 ; L135 = 90 points de questions + expression écrite /10. Après lecture de la production de l’élève, le professeur saisit la note dans le panneau de correction. La publication des résultats reste bloquée tant que cette note n’a pas été saisie pour chaque tentative concernée.
 
 ## Règles de rédaction des consignes pédagogiques
 
@@ -288,7 +288,7 @@ Avec `manual_review: true`, la question est envoyée à la correction de l’ens
 
 ## 6. Réutiliser une question d’un quiz
 
-L’interface enseignant permet de copier les questions d’un quiz existant dans une section. Le sujet conserve une copie du contenu, des options/éléments, du barème et des réponses attendues. Les champs facultatifs `source_quiz_id` et `source_question_id` peuvent servir de références ; ils ne sont pas nécessaires pour créer un sujet JSON. Une modification ultérieure du quiz source ne modifie pas la version déjà copiée dans le sujet.
+L’interface enseignant permet de copier les questions d’un quiz existant dans une section. Le sujet conserve une copie du contenu, des options/éléments, du barème et des réponses attendues. Les champs facultatifs `source_quiz_id` et `source_question_id` peuvent servir de références ; ils ne sont pas nécessaires pour créer un sujet JSON. Une modification ultérieure du quiz source ne modifie pas les questions déjà copiées dans l’examen.
 
 ## 7. Exemple complet minimal
 
@@ -382,10 +382,10 @@ Cet exemple peut être enregistré sous `examen-a1.json`. Remplacer `UUID_REEL_D
 - La note normalisée est facultative. Exemple : pour un total brut de 65 points et `display_scale: 100`, le résultat est ramené sur 100.
 - Les questions corrigées manuellement sont évaluées par l’enseignant ; prévoir le temps nécessaire à cette correction.
 
-## 9. Modèles fournis dans l’application
+## 9. Canevas JSON fournis dans l’application
 
 - **L135** : 90 points et 90 minutes. Le canevas comporte 20 points de compréhension écrite, 50 points de grammaire, 10 points de vocabulaire et 10 points de réordonnement. Le texte source et les questions de compréhension sont à compléter avant publication. La production écrite et la production orale ne font pas partie de ce module.
-- **A1** : 65 points et 120 minutes, avec une échelle /100 facultative. Le modèle contient compréhension, grammaire, vocabulaire et phrases à compléter. Il n’inclut pas de production écrite longue ni d’expression orale.
+- **A1** : 65 points et 120 minutes, avec une échelle /100 facultative. Le canevas contient compréhension, grammaire, vocabulaire et phrases à compléter. Il n’inclut pas de production écrite longue ni d’expression orale.
 
 Le total réel reste calculé à partir des questions présentes. Si vous supprimez ou ajoutez des questions, vérifiez à nouveau le barème et la durée.
 
@@ -456,9 +456,9 @@ Pour le format détaillé, le comportement de l’exercice et le diagramme de s�
 
 ## Réaffecter une classe, actualiser un sujet ou réinitialiser ses tentatives
 
-Un sujet peut cibler une ou plusieurs classes. Dans l’éditeur, cochez les classes souhaitées puis enregistrez et publiez une nouvelle version. Les élèves des nouvelles classes accèdent à cette version; les anciennes tentatives restent associées à leur version et à leur classe d’origine. Pour reprendre le contenu mis à jour des sujets L135 ou A1 existants, ouvrez **Modifier / version**, choisissez **Modèle → Appliquer L135** ou **Appliquer A1**, vérifiez les classes et publiez la nouvelle version. Le titre, les dates et les classes de l’examen en cours sont conservés au chargement du modèle.
+Un sujet peut cibler une ou plusieurs classes. Dans l’éditeur, cochez les classes souhaitées puis enregistrez et publiez l’examen. Tant qu’aucune tentative n’a commencé, vous pouvez modifier le même examen et réutiliser l’un des deux canevas JSON. Pour appliquer un canevas à un examen existant, ouvrez **Modifier l’examen**, choisissez **Canevas → Utiliser le canevas L135** ou **Utiliser le canevas A1**, vérifiez les classes puis enregistrez et publiez. Le titre, les dates et les classes de l’examen sont conservés. Dès qu’une tentative existe, le sujet est verrouillé pour protéger les copies : créez alors un nouvel examen pour proposer un autre sujet.
 
-La remise à zéro est séparée de la modification du sujet. Pour actualiser un sujet existant tout en effaçant ses anciens résultats, suivez cet ordre : **clôturez-le → ouvrez Résultats et choisissez Réinitialiser les tentatives → confirmez → modifiez/appliquez le modèle et les classes → publiez la nouvelle version**. La RPC n’autorise le reset que pour un sujet clôturé (`closed`) ou clôturé en attente de correction manuelle (`grading`); un examen encore ouvert ou planifié ne peut pas être effacé. Une confirmation explicite précède la suppression définitive de toutes les tentatives du sujet — y compris celles en cours — et de leurs réponses, notes, résultats par rubrique et journaux d’intégrité. Le sujet, ses versions et ses affectations de classes sont conservés. Cette action n’a pas été exécutée sur la base partagée depuis cet environnement. La RPC `reset_written_exam_attempts` est ajoutée par `supabase/migrations/20261112000000_reset_written_exam_attempts.sql`.
+La remise à zéro est séparée de la modification du sujet. Pour actualiser un sujet existant après le début des tentatives, clôturez-le, ouvrez **Résultats**, choisissez **Réinitialiser les tentatives** et confirmez. Cette opération supprime définitivement toutes les tentatives du sujet — y compris celles en cours — ainsi que leurs réponses, notes, résultats par rubrique et journaux d’intégrité. Une fois les tentatives supprimées, vous pouvez modifier le même examen, réappliquer un canevas et le publier à nouveau. La RPC n’autorise le reset que pour un sujet clôturé (`closed`) ou clôturé en attente de correction manuelle (`grading`); un examen encore ouvert ou planifié ne peut pas être effacé. Le sujet et ses affectations de classes sont conservés. La RPC `reset_written_exam_attempts` est ajoutée par `supabase/migrations/20261112000000_reset_written_exam_attempts.sql`.
 
 ### Erreur `save_written_exam_question_time_limits` / `PGRST202`
 
