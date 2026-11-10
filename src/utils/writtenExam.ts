@@ -109,7 +109,7 @@ const compactExamInstructions=(template:WrittenExam)=>{
    return {...section,instructions:'Lis le texte, puis réponds aux questions. Pour les QCM, sélectionne une seule réponse ; pour les réponses saisies, écris en italien.'};
   }
   const instruction=String(section.instructions||'').trim();
-  const end=instruction.search(/[.!?](?:\\s|$)/);
+  const end=instruction.search(/[.!?](?:\s|$)/);
   return {...section,instructions:instruction&&instruction.length>150&&end>=0?instruction.slice(0,end+1):instruction};
  });
 };
