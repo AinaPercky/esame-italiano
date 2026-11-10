@@ -92,10 +92,17 @@ DROP POLICY IF EXISTS "Quiz attempt read authenticated" ON public.quiz_attempts;
 CREATE POLICY "Quiz attempt read authenticated" ON public.quiz_attempts FOR SELECT TO authenticated USING (true);
 
 CREATE OR REPLACE FUNCTION public.quiz_is_teacher()
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $
+  -- L'application identifie le seul compte professeur via ADMIN_EMAIL.
+  -- Ne pas se fier à user_metadata, modifiable par l'utilisateur.
   SELECT auth.role() = 'authenticated'
-    AND COALESCE((auth.jwt() -> 'app_metadata' ->> 'role') IN ('teacher', 'admin', 'professor'), false);
-$$;
+    AND lower(coalesce(auth.jwt() ->> 'email', '')) = 'ainapercky@gmail.com';
+$;
 
 CREATE OR REPLACE FUNCTION public.quiz_current_student_id()
 RETURNS TEXT LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
