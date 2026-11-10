@@ -41,7 +41,7 @@ const l135ComprehensionQuestions:WrittenQuestion[]=[
 export const L135_TEMPLATE:WrittenExam={
  title:'L135 – Examen composite',description:'90 points pour les questions · 1 h 45 · compréhension, grammaire, vocabulaire et réordonnement. Expression écrite corrigée séparément sur 10 points.',
  level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:10,max_attempts:1,
- shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
+ shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:true,
  integrity_settings:{fullscreen:true,warn_on_tab_switch:true,watermark:false},
  sections:[
   {...createSection('Compréhension écrite',20),instructions:'Leggi il testo con attenzione. Per ogni domanda, seleziona Vero/Falso oppure scrivi la risposta richiesta. Quando la domanda chiede una giustificazione, cita un’informazione precisa del testo e formula una frase completa.',support_text:l135Text,questions:l135ComprehensionQuestions},
@@ -62,7 +62,7 @@ const a1TF=[
 export const A1_TEMPLATE:WrittenExam={
  title:'Esame bianco – Italiano A1',description:'80 points pour les questions · 1 h 20 · compréhension, grammaire, vocabulaire et phrases à compléter. Expression écrite corrigée séparément sur 20 points.',
  level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:20,max_attempts:1,
- shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
+ shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:true,
  integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
  sections:[
   {...createSection('Compréhension écrite',20),instructions:'Leggi il testo e rispondi alle domande nell’ordine proposto. Per le domande Vero/Falso seleziona una sola opzione. Per le risposte aperte, fornisci l’informazione richiesta in italiano; puoi usare una formulazione equivalente corretta.',support_text:a1Text,questions:[
