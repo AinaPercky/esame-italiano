@@ -74,11 +74,15 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261115000000_manual_written_expression_score.sql
       - name: Enforce written-exam anti-cheat disqualification
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql
+      - name: Enable hybrid automatic and manual grading
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117000000_hybrid_written_exam_grading.sql
       - name: Verify schema and RLS
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_flow.sql
       - name: Test manual expression-writing score and publication guard
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_expression_score.sql
-      - name: Test written-exam anti-cheat disqualification and zero score
+      - name: Test written-exam anti-cheat disqualification and teacher expression mark
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_integrity_disqualification.sql
+      - name: Test hybrid automatic and manual question grading
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_hybrid_grading.sql
