@@ -143,19 +143,19 @@ for each row execute function public.guard_written_exam_section_attempts();
 -- Keep the newest draft when one exists; otherwise keep the newest published
 -- definition. Older rows are archived, never deleted, so attempts remain readable.
 with ranked as (
-  select id,
+  select v.id,
          row_number() over (
-           partition by exam_id
+           partition by v.exam_id
            order by case
-                      when exists(select 1 from public.written_exam_attempts a where a.version_id=written_exam_versions.id) then 0
-                      when status='draft' then 1
-                      when status='published' then 2
+                      when exists(select 1 from public.written_exam_attempts a where a.version_id=v.id) then 0
+                      when v.status='draft' then 1
+                      when v.status='published' then 2
                       else 3
                     end,
-                    version_number desc, created_at desc
+                    v.version_number desc, v.created_at desc
          ) as position
-  from public.written_exam_versions
-  where status in ('draft','published')
+  from public.written_exam_versions v
+  where v.status in ('draft','published')
 )
 update public.written_exam_versions v
 set status='archived'
