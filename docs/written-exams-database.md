@@ -37,7 +37,7 @@ erDiagram
 ## Cycle de vie
 
 1. Le professeur crée un examen directement ou depuis l’un des deux canevas JSON. `save_written_exam_definition` crée une seule ligne de définition pour cet examen. Les sauvegardes suivantes réutilisent cette même ligne, recalculent le maximum brut et remplacent le contenu tant qu’aucune tentative n’existe.
-2. `publish_written_exam` valide les sections, plafonds, types et clés, puis publie l’examen. Dès qu’une tentative est créée, le contenu et les classes de l’examen sont verrouillés afin de préserver les copies et les corrections. Pour proposer un autre sujet après le début des tentatives, le professeur crée un nouvel examen ; il n’existe pas de commande « nouvelle version ».
+2. `publish_written_exam` valide les sections, plafonds, types et clés, puis publie l’examen. Dès qu’une tentative est créée, le contenu et les classes de l’examen sont verrouillés afin de préserver les copies et les corrections. Pour proposer un autre sujet après le début des tentatives, le professeur crée un nouvel examen ; le sujet commencé n’est plus éditable.
 3. `list_available_written_exams` n'expose que les métadonnées et examens destinés à la classe de l'élève connecté.
 4. `start_written_exam` retrouve l'élève à partir de l'e-mail de la session Supabase, contrôle sa classe et la période, crée une tentative unique et calcule l'échéance avec l'heure PostgreSQL. Il génère et stocke une permutation par tentative; les sections d'un même `group_name` restent ensemble et l'ordre est conservé à la reprise.
 5. `save_written_exam_answers` n'accepte que des identifiants de questions appartenant à la définition de l’examen utilisée par la tentative. La sauvegarde n'accepte ni score ni identité du navigateur.
