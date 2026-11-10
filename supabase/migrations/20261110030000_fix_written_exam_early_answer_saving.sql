@@ -129,12 +129,17 @@ begin
 
   -- Normal autosave is accepted only for the active question. A validation may also
   -- arrive just after the question timer expired, when the next timer window has begun.
-  if v_active_question_index is distinct from v_question_index then
-    if not p_advance
-       or v_active_question_index is distinct from (v_question_index+1)
-       and not (v_question_index=v_question_count-1 and v_active_question_index is null) then
-      return jsonb_build_object('saved',false,'expired',true,'reason','question_not_active');
-    end if;
+  if v_active_question_index is distinct from v_question_index
+     and not (
+       (p_advance and v_active_question_index=(v_question_index+1))
+       or (
+         v_question_index=v_question_count-1
+         and v_active_question_index is null
+         and v_attempt.answers ? p_question_id
+         and v_attempt.answers->p_question_id=coalesce(p_answer,'null'::jsonb)
+       )
+     ) then
+    return jsonb_build_object('saved',false,'expired',true,'reason','question_not_active');
   end if;
 
   update public.written_exam_attempts
