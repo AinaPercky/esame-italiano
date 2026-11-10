@@ -61,7 +61,7 @@ test('A1 and L135 template prompts use short instructions without answer hints',
   assert.ok(prepositions!.instructions.length<80);
   for(const question of prepositions!.questions){
    assert.match(question.prompt,/^Completa con la preposizione corretta:/);
-   assert.doesNotMatch(question.prompt,/destinazione|Paese|posizione|provenienza|durata|da quanto tempo/i);
+   assert.doesNotMatch(question.prompt,/\b(?:destinazione|Paese|posizione|provenienza|durata|da quanto tempo)\b/i);
    assert.ok(question.prompt.length<100);
   }
  }
