@@ -116,6 +116,10 @@ const compactExamInstructions=(template:WrittenExam)=>{
 compactExamInstructions(A1_TEMPLATE);
 compactExamInstructions(L135_TEMPLATE);
 
+// Mobile browsers may hide the page for OS-level actions (including screenshots and app switching).
+// Such visibility changes must never disqualify a written-exam attempt.
+export const shouldDisqualifyWrittenExamVisibilityChange=(isMobileDevice:boolean)=>!isMobileDevice;
+
 export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'|'expression_writing_max_points'>){
  const raw=exam.sections.reduce((sum,s)=>sum+s.questions.reduce((n,q)=>n+Math.max(0,Number(q.points)||0),0),0);
  const planned=exam.sections.reduce((sum,s)=>sum+Math.max(0,Number(s.points)||0),0);
