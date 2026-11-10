@@ -17,10 +17,10 @@ export const WrittenExamStudentCopy:React.FC<Props>=({sections,rawScore,rawMax,n
   doc.setFontSize(16);doc.text('Feuille de copie corrigée – '+title,14,18);
   doc.setFontSize(10);doc.text('Élève : '+studentName,14,26);
   doc.text('Résultat : '+(rawScore??'—')+' / '+(rawMax??'—')+(normalizedScore!=null?' · Note : '+normalizedScore+(displayScale?'/'+displayScale:''):'') ,14,33);
-  const rows=[];
-  sections.forEach((section,si)=>{
+  const rows:any[]=[];
+  sections.forEach((section:any,si:number)=>{
    rows.push([{content:section.section_title||('Section '+(si+1)),colSpan:4,styles:{fontStyle:'bold',fillColor:[230,240,247],textColor:[7,42,63]}}]);
-   (section.questions||[]).forEach((q,qi)=>{
+   (section.questions||[]).forEach((q:any,qi:number)=>{
     const score=scoreOf(q);const status=statusOf(q);
     rows.push([String(qi+1)+'. '+q.prompt,'Réponse : '+answerText(q),'Attendu : '+expectedText(q),(score===null?'À corriger':score+' / '+q.points)+' · '+(status==='correct'?'Correct':status==='missing'?'Absent':status==='pending'?'En attente':'Incorrect')]);
    });
