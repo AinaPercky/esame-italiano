@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL } from '../data/quizPresenceMigration';
+import { QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL, QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL } from '../data/quizPresenceMigration';
 import { getPresenceInitializationRemainingSeconds } from './quizPresence';
+
+
+test('the presence migration upgrades legacy tables instead of relying on CREATE TABLE IF NOT EXISTS', () => {
+  const migration = QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL;
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS launch_id UUID/i);
+  assert.match(migration, /uq_quiz_participants_launch_student/i);
+  assert.match(migration, /quiz_participants_presence_status_check/i);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS launched_by UUID/i);
+});
 
 test('presence initialization counts down from the student-specific server deadline', () => {
   const now = Date.parse('2026-11-03T18:00:00.000Z');
