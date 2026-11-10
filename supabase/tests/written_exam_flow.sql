@@ -157,20 +157,20 @@ begin
 
   -- Regression: a student may validate a question before its allotted timer expires.
   -- The server timer must move forward atomically with the saved answer.
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,'\"a\"'::jsonb,false);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),false);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
     raise exception 'Initial autosave of the first question failed: %',v_early_result;
   end if;
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,'\"a\"'::jsonb,true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
     raise exception 'Early validation of the first question failed: %',v_early_result;
   end if;
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,'\"early second answer\"'::jsonb,true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
     raise exception 'Immediate save of the second question after early validation failed: %',v_early_result;
   end if;
   -- Retrying the same advance after a lost HTTP response must be harmless.
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,'\"early second answer\"'::jsonb,true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
     raise exception 'Idempotent retry of question validation failed: %',v_early_result;
   end if;
