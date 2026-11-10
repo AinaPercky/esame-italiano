@@ -19,6 +19,7 @@ declare
   v_expression numeric;
   v_failed boolean;
   v_status text;
+  v_event_result jsonb;
 begin
   insert into public.classes(id,name) values(v_class,'Integrity zero CI class');
   insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
@@ -75,7 +76,25 @@ begin
   if v_manual_question is null then raise exception 'CI fixture did not create a manual-review question.'; end if;
 
   perform public.save_written_exam_answers(v_attempt,jsonb_build_object(v_question::text,'correct'));
-  perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',jsonb_build_object('source','ci-test'));
+
+  -- iOS app switching / screenshots are audit events, never automatic cheating flags.
+  v_event_result:=public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',
+    jsonb_build_object('source','ci-test','platform','mobile','userAgent','iPhone Safari'));
+  if coalesce((v_event_result->>'disqualified')::boolean,true) then
+    raise exception 'Mobile visibility change incorrectly disqualified the attempt.';
+  end if;
+  v_event_result:=public.flag_written_exam_integrity_violation(v_attempt,'screenshot_attempt',
+    jsonb_build_object('source','ci-test','platform','mobile','userAgent','iPhone Safari'));
+  if coalesce((v_event_result->>'disqualified')::boolean,true) then
+    raise exception 'Screenshot event incorrectly disqualified the attempt.';
+  end if;
+  if (select integrity_failed from public.written_exam_attempts where id=v_attempt) then
+    raise exception 'Mobile audit-only events changed the integrity flag.';
+  end if;
+
+  -- Desktop tab/window loss remains a disqualifying signal.
+  perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',
+    jsonb_build_object('source','ci-test','platform','desktop','userAgent','Desktop browser'));
   perform public.submit_written_exam(v_attempt);
 
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin::text)::text,true);
