@@ -140,8 +140,8 @@ create trigger written_exam_sections_attempts_guard
 before insert or update or delete on public.written_exam_sections
 for each row execute function public.guard_written_exam_section_attempts();
 
--- Keep the newest draft when one exists; otherwise keep the newest published
--- definition. Older rows are archived, never deleted, so attempts remain readable.
+-- Prefer a definition already referenced by attempts; otherwise keep the newest draft,
+-- then the newest published definition. Older rows are archived, never deleted.
 with ranked as (
   select v.id,
          row_number() over (
