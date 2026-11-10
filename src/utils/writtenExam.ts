@@ -102,6 +102,20 @@ const applyComprehensionTiming=(template:WrittenExam,durationMinutes:number)=>{
 applyComprehensionTiming(A1_TEMPLATE,80);
 applyComprehensionTiming(L135_TEMPLATE,105);
 
+const compactExamInstructions=(template:WrittenExam)=>{
+ template.sections=template.sections.map(section=>{
+  const title=String(section.title||'').toLocaleLowerCase('fr');
+  if(title.includes('compréhension écrite')){
+   return {...section,instructions:'Lis le texte, puis réponds aux questions. Pour les QCM, sélectionne une seule réponse ; pour les réponses saisies, écris en italien.'};
+  }
+  const instruction=String(section.instructions||'').trim();
+  const end=instruction.search(/[.!?](?:\\s|$)/);
+  return {...section,instructions:instruction&&instruction.length>150&&end>=0?instruction.slice(0,end+1):instruction};
+ });
+};
+compactExamInstructions(A1_TEMPLATE);
+compactExamInstructions(L135_TEMPLATE);
+
 export function getWrittenExamTotals(exam:Pick<WrittenExam,'sections'|'display_scale'|'expression_writing_max_points'>){
  const raw=exam.sections.reduce((sum,s)=>sum+s.questions.reduce((n,q)=>n+Math.max(0,Number(q.points)||0),0),0);
  const planned=exam.sections.reduce((sum,s)=>sum+Math.max(0,Number(s.points)||0),0);
