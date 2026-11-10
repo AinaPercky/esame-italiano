@@ -295,14 +295,21 @@ begin
   end if;
 
   for v_question in
-    select q.id,q.section_id
+    select distinct q.section_id
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
     where s.version_id=v_attempt.version_id and q.manual_review
   loop
-    v_auto:=public.written_exam_auto_question_score(v_question.id,v_attempt.answers->v_question.id::text);
-    v_awarded:=coalesce((p_manual_scores->>v_question.id::text)::numeric,v_auto);
-    v_section_delta:=v_awarded-v_auto;
+    select coalesce(sum(
+      (p_manual_scores->>q.id::text)::numeric
+      - public.written_exam_auto_question_score(q.id,v_attempt.answers->q.id::text)
+    ),0)
+    into v_section_delta
+    from public.written_exam_questions q
+    join public.written_exam_sections s on s.id=q.section_id
+    where s.version_id=v_attempt.version_id
+      and q.manual_review and q.section_id=v_question.section_id;
+
     update public.written_exam_section_results sr
     set raw_score=sr.raw_score-sr.manual_score+v_section_delta,
         manual_score=v_section_delta
