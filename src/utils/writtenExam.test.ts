@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createWrittenExamFromTemplate, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange } from './writtenExam';
+
+test('the two built-in JSON templates create independent new exams, not persisted exam records',()=>{
+ const a1=createWrittenExamFromTemplate(A1_TEMPLATE);
+ const l135=createWrittenExamFromTemplate(L135_TEMPLATE);
+ assert.equal(A1_TEMPLATE.id,undefined);
+ assert.equal(L135_TEMPLATE.id,undefined);
+ assert.equal(a1.id,undefined);
+ assert.equal(l135.id,undefined);
+ assert.equal(a1.status,'draft');
+ assert.equal(l135.status,'draft');
+ assert.deepEqual(a1.class_ids,[]);
+ assert.deepEqual(l135.class_ids,[]);
+ a1.sections[0].title='Edited copy';
+ assert.notEqual(A1_TEMPLATE.sections[0].title,'Edited copy');
+ assert.notEqual(a1.sections[0],A1_TEMPLATE.sections[0]);
+});
 
 test('L135 model starts with a 90-point configurable allocation and 105-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);

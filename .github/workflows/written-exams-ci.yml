@@ -78,6 +78,10 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql
       - name: Enable hybrid automatic and manual grading
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117000000_hybrid_written_exam_grading.sql
+      - name: Enable published student exam copies
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000000_enable_published_student_exam_copies.sql
+      - name: Enforce one current definition per written exam
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000000_single_definition_written_exams.sql
       - name: Verify schema and RLS
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation

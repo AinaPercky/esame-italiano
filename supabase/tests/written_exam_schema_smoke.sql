@@ -48,10 +48,23 @@ begin
     raise exception 'Mandatory section question shuffle trigger is missing';
   end if;
   if not exists(select 1 from pg_trigger where tgname='written_exam_versions_immutable' and not tgisinternal) then
-    raise exception 'Published-version immutability trigger is missing';
+    raise exception 'Exam definition lock trigger is missing';
   end if;
   if not exists(select 1 from pg_trigger where tgname='written_answer_keys_immutable' and not tgisinternal) then
     raise exception 'Answer-key immutability trigger is missing';
+  end if;
+  if not exists(select 1 from pg_trigger where tgname='written_exam_sections_attempts_guard' and not tgisinternal) then
+    raise exception 'Exam section attempt-lock trigger is missing';
+  end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='written_exam_one_current_definition') then
+    raise exception 'Single current definition unique index is missing';
+  end if;
+  if exists(
+    select exam_id from public.written_exam_versions
+    where status in ('draft','published')
+    group by exam_id having count(*)>1
+  ) then
+    raise exception 'An exam has more than one current definition';
   end if;
   if not exists(select 1 from pg_constraint where conrelid='public.written_exam_questions'::regclass and pg_get_constraintdef(oid) like '%verbes_trous%') then
     raise exception 'Verb-bank question type constraint is missing';
