@@ -44,6 +44,8 @@ declare
   v_offset integer;
   v_duration integer;
   v_error text;
+  v_early_result jsonb;
+  v_persisted_answers jsonb;
 begin
   insert into public.classes(id,name) values(v_class_id,'CI test class');
   insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
@@ -151,6 +153,30 @@ begin
 
   if v_qcm_id is null or v_text_id is null or v_reorder_id is null or v_manual_id is null or v_verbes_id is null then
     raise exception 'A question was missing from the student payload.';
+  end if;
+
+  -- Regression: a student may validate a question before its allotted timer expires.
+  -- The server timer must move forward atomically with the saved answer.
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),false);
+  if coalesce((v_early_result->>'saved')::boolean,false) is not true then
+    raise exception 'Initial autosave of the first question failed: %',v_early_result;
+  end if;
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),true);
+  if coalesce((v_early_result->>'saved')::boolean,false) is not true then
+    raise exception 'Early validation of the first question failed: %',v_early_result;
+  end if;
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
+  if coalesce((v_early_result->>'saved')::boolean,false) is not true then
+    raise exception 'Immediate save of the second question after early validation failed: %',v_early_result;
+  end if;
+  -- Retrying the same advance after a lost HTTP response must be harmless.
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
+  if coalesce((v_early_result->>'saved')::boolean,false) is not true then
+    raise exception 'Idempotent retry of question validation failed: %',v_early_result;
+  end if;
+  select answers into v_persisted_answers from public.written_exam_attempts where id=v_attempt_id;
+  if v_persisted_answers->>v_qcm_id::text<>'a' or v_persisted_answers->>v_text_id::text<>'early second answer' then
+    raise exception 'Early validated answers were not persisted in PostgreSQL: %',v_persisted_answers;
   end if;
 
   v_answers:=jsonb_build_object(
