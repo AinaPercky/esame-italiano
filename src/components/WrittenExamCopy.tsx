@@ -74,7 +74,7 @@ const autoScore=(q:any,value:any)=>{
 
 export const getWrittenQuestionAutoScore=autoScore;
 
-export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
+export const createWrittenExamCopyPdf=(attempt:any,version:any)=>{
  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
  const student=[attempt.students?.first_name,attempt.students?.last_name].filter(Boolean).join(' ')||'Élève';
  doc.setFontSize(16);doc.text('Feuille de copie – '+(version?.title||attempt.exam?.title||'Examen écrit'),14,18);
@@ -85,7 +85,12 @@ export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
  const rows:any[]=[];
  sectionIds.forEach((sid:string)=>{const section:any=byId.get(sid);if(!section)return;rows.push([{content:section.title,colSpan:4,styles:{fontStyle:'bold',fillColor:[230,240,247],textColor:[7,42,63]}}]);const all=[...(section.written_exam_questions||[])];const map=new Map(all.map((q:any)=>[q.id,q]));const ids=attempt.order_manifest?.questions?.[sid]||all.sort((a:any,b:any)=>a.position-b.position).map((q:any)=>q.id);ids.forEach((id:string,idx:number)=>{const q:any=map.get(id);if(!q)return;const answer=answerOf(attempt,q);const score=autoScore(q,answer);const awarded=attempt.manual_scores?.[q.id]!=null?Number(attempt.manual_scores[q.id]):Number(score??0);rows.push([String(idx+1)+'. '+q.prompt,'Élève : '+studentText(q,answer),'Attendu : '+correctText(q),awarded+' / '+q.points]);});});
  autoTable(doc,{startY:44,head:[['Question','Réponse de l’élève','Réponse correcte / attendue','Points']],body:rows,styles:{fontSize:8,cellPadding:2.5,overflow:'linebreak',valign:'top'},headStyles:{fillColor:[11,60,93]},columnStyles:{0:{cellWidth:45},1:{cellWidth:49},2:{cellWidth:62},3:{cellWidth:22}},margin:{left:14,right:14}});
- doc.save('feuille-copie-'+student.toLocaleLowerCase().replace(/[^a-z0-9]+/g,'-')+'.pdf');
+ return doc;
+};
+
+export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
+ const student=[attempt.students?.first_name,attempt.students?.last_name].filter(Boolean).join(' ')||'eleve';
+ createWrittenExamCopyPdf(attempt,version).save('feuille-copie-'+student.toLocaleLowerCase().replace(/[^a-z0-9]+/g,'-')+'.pdf');
 };
 
 export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onManualScore})=>{
