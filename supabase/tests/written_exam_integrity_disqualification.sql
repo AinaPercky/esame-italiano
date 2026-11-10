@@ -10,6 +10,7 @@ declare
   v_version uuid;
   v_attempt uuid;
   v_question uuid;
+  v_manual_question uuid;
   v_saved jsonb;
   v_started jsonb;
   v_score numeric;
@@ -66,6 +67,12 @@ begin
   where s.version_id=v_version and q.question_type='qcm'
   limit 1;
   if v_question is null then raise exception 'CI fixture did not create a QCM question.'; end if;
+  select q.id into v_manual_question
+  from public.written_exam_questions q
+  join public.written_exam_sections s on s.id=q.section_id
+  where s.version_id=v_version and q.manual_review
+  limit 1;
+  if v_manual_question is null then raise exception 'CI fixture did not create a manual-review question.'; end if;
 
   perform public.save_written_exam_answers(v_attempt,jsonb_build_object(v_question::text,'correct'));
   perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',jsonb_build_object('source','ci-test'));
@@ -73,15 +80,19 @@ begin
 
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_admin::text,true);
+  -- The teacher must still be able to record both the manual question review and
+  -- the separate expression-writing mark after a confirmed integrity violation.
+  perform public.grade_written_exam_attempt(v_attempt,jsonb_build_object(v_manual_question::text,0));
+  perform public.grade_written_exam_expression_writing(v_attempt,7);
   perform public.publish_written_exam_results(v_exam);
 
   select raw_score,raw_max,normalized_score,expression_writing_score,integrity_failed,status
   into v_score,v_max,v_normalized,v_expression,v_failed,v_status
   from public.written_exam_attempts where id=v_attempt;
 
-  if v_score<>0 or v_max<>100 or v_normalized<>0 or v_expression<>0
+  if v_score<>0 or v_max<>100 or v_normalized<>0 or v_expression<>7
      or not v_failed or v_status<>'graded' then
-    raise exception 'Integrity penalty was not enforced: raw %, max %, normalized %, expression %, failed %, status %',
+    raise exception 'Integrity penalty or teacher grading was not enforced: raw %, max %, normalized %, expression %, failed %, status %',
       v_score,v_max,v_normalized,v_expression,v_failed,v_status;
   end if;
 end
