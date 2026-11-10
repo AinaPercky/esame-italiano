@@ -6,7 +6,7 @@ Cette fonctionnalité possède son propre modèle PostgreSQL. Elle ne réutilise
 
 ```mermaid
 erDiagram
-  written_exams ||--|| written_exam_versions : current_definition
+  written_exams ||--o{ written_exam_versions : internal_definition_snapshots
   written_exams ||--o{ written_exam_classes : targets
   classes ||--o{ written_exam_classes : assigned
   written_exam_versions ||--o{ written_exam_version_classes : class_snapshot
@@ -26,7 +26,7 @@ erDiagram
 | `written_exams` | Identité, titre, langues, classe(s) courantes, état, dates, politique de tentatives et paramètres de publication |
 | `written_exam_classes` | Classes ciblées par la définition courante |
 | `written_exam_version_classes` | Instantané des classes autorisées pour la définition courante, conservé pour compatibilité des RPC et des tentatives historiques |
-| `written_exam_versions` | Ligne technique de définition courante (une seule ligne active par examen). Le nom historique de la table est conservé pour compatibilité SQL, mais l’application ne propose ni ne crée de versions métier. Les anciennes lignes sont archivées uniquement si des tentatives historiques les référencent. |
+| `written_exam_versions` | Ligne technique de définition courante (une seule ligne active par examen). Le nom historique de la table est conservé pour compatibilité SQL, mais l’application ne propose ni ne crée de versions métier. Une seule ligne est active (brouillon ou publiée) à la fois ; les anciennes lignes sont archivées pour conserver les tentatives historiques déjà liées à elles. |
 | `written_exam_sections` | Rubriques dynamiques, ordre, plafond, catégorie et groupe libres, consignes, texte-support partagé et lien vers document PDF/image (`support_url`) |
 | `written_exam_questions` | Questions figées, type, énoncé, barème, options/éléments publics, référence au quiz source et indicateur de correction manuelle |
 | `written_exam_answer_keys` | Clés privées et explications; jamais retournées par les RPC de passage |
