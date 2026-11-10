@@ -19,6 +19,10 @@ declare
   v_raw numeric;
   v_section_raw numeric;
   v_status text;
+  v_answers jsonb;
+  v_question_key text;
+  v_offset integer;
+  v_duration integer;
 begin
   insert into public.classes(id,name) values(v_class,'Hybrid grading CI class');
   insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
@@ -63,8 +67,39 @@ begin
   join public.written_exam_sections s on s.id=q.section_id
   where s.version_id=v_version and q.question_key='auto-wrong-text';
 
-  perform public.save_written_exam_question_answer(v_attempt,v_correct_question,'"correct phrase"'::jsonb);
-  perform public.save_written_exam_question_answer(v_attempt,v_wrong_question,'"student wording"'::jsonb);
+  v_answers:=jsonb_build_object(
+    v_correct_question::text,'correct phrase',
+    v_wrong_question::text,'student wording'
+  );
+  -- The question timer is sequential: position the server timer at each question
+  -- before saving its answer, regardless of the per-attempt random order.
+  for v_question_key in select key from jsonb_each(v_answers)
+  loop
+    with ordered_questions as (
+      select q.id::text as question_id,
+        coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,
+          case when q.question_type in ('text','verbes_trous') then 32 else 17 end) as duration_seconds,
+        row_number() over(order by sec.section_ord,oq.question_ord) as question_order
+      from public.written_exam_attempts a
+      cross join lateral jsonb_array_elements_text(a.order_manifest->'sections')
+        with ordinality as sec(section_id,section_ord)
+      cross join lateral jsonb_array_elements_text(a.order_manifest->'questions'->(sec.section_id))
+        with ordinality as oq(question_id,question_ord)
+      join public.written_exam_questions q on q.id::text=oq.question_id
+      where a.id=v_attempt
+    )
+    select coalesce(sum(previous.duration_seconds),0)::integer,current_question.duration_seconds
+    into v_offset,v_duration
+    from ordered_questions current_question
+    left join ordered_questions previous on previous.question_order<current_question.question_order
+    where current_question.question_id=v_question_key
+    group by current_question.question_order,current_question.duration_seconds;
+
+    update public.written_exam_attempts
+    set question_timer_started_at=now()-make_interval(secs=>v_offset+1)
+    where id=v_attempt;
+    perform public.save_written_exam_question_answer(v_attempt,v_question_key,v_answers->v_question_key);
+  end loop;
   v_result:=public.submit_written_exam(v_attempt);
 
   select auto_score,raw_score,status into v_auto,v_raw,v_status
