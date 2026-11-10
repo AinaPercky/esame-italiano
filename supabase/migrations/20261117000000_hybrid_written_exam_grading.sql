@@ -338,7 +338,7 @@ begin
     'graded',true,
     'automatic_score',v_attempt.auto_score,
     'manual_adjustment',v_delta,
-    'raw_score',v_attempt.auto_score+v_delta,
+    'raw_score',case when v_attempt.integrity_failed then 0 else v_attempt.auto_score+v_delta end,
     'raw_max',v_attempt.raw_max
   );
 end
@@ -390,7 +390,7 @@ begin
   end if;
 
   select * into v_version from public.written_exam_versions where id=v_attempt.version_id;
-  v_final:=coalesce(v_attempt.raw_score,v_attempt.auto_score,0)+p_score;
+  v_final:=case when v_attempt.integrity_failed then 0 else coalesce(v_attempt.raw_score,v_attempt.auto_score,0)+p_score end;
 
   update public.written_exam_attempts
   set expression_writing_score=p_score,
