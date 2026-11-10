@@ -49,7 +49,6 @@ const studentText=(q:any,value:any)=>{
  return parsed.map((x:any)=>String(x??'')).join(' | ')||'Aucune réponse';
 };
 const autoScore=(q:any,value:any)=>{
- if(q.manual_review)return null;
  const points=Number(q.points)||0;const key=keyOf(q);const pub=publicOf(q);
  if(q.question_type==='qcm')return String(value??'')===String(key.correctOptionId??'')?points:0;
  if(q.question_type==='text'){
@@ -73,6 +72,8 @@ const autoScore=(q:any,value:any)=>{
  return 0;
 };
 
+export const getWrittenQuestionAutoScore=autoScore;
+
 export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
  const student=[attempt.students?.first_name,attempt.students?.last_name].filter(Boolean).join(' ')||'Élève';
@@ -82,7 +83,7 @@ export const downloadWrittenExamCopyPdf=(attempt:any,version:any)=>{
  const sourceSections=[...(version?.written_exam_sections||[])];const byId=new Map(sourceSections.map((s:any)=>[s.id,s]));
  const sectionIds=Array.isArray(attempt.order_manifest?.sections)&&attempt.order_manifest.sections.length?attempt.order_manifest.sections:sourceSections.sort((a:any,b:any)=>a.position-b.position).map((s:any)=>s.id);
  const rows:any[]=[];
- sectionIds.forEach((sid:string)=>{const section:any=byId.get(sid);if(!section)return;rows.push([{content:section.title,colSpan:4,styles:{fontStyle:'bold',fillColor:[230,240,247],textColor:[7,42,63]}}]);const all=[...(section.written_exam_questions||[])];const map=new Map(all.map((q:any)=>[q.id,q]));const ids=attempt.order_manifest?.questions?.[sid]||all.sort((a:any,b:any)=>a.position-b.position).map((q:any)=>q.id);ids.forEach((id:string,idx:number)=>{const q:any=map.get(id);if(!q)return;const answer=answerOf(attempt,q);const score=autoScore(q,answer);const awarded=q.manual_review?Number(attempt.manual_scores?.[q.id]??0):Number(score??0);rows.push([String(idx+1)+'. '+q.prompt,'Élève : '+studentText(q,answer),'Attendu : '+(q.manual_review?'Correction manuelle':correctText(q)),awarded+' / '+q.points]);});});
+ sectionIds.forEach((sid:string)=>{const section:any=byId.get(sid);if(!section)return;rows.push([{content:section.title,colSpan:4,styles:{fontStyle:'bold',fillColor:[230,240,247],textColor:[7,42,63]}}]);const all=[...(section.written_exam_questions||[])];const map=new Map(all.map((q:any)=>[q.id,q]));const ids=attempt.order_manifest?.questions?.[sid]||all.sort((a:any,b:any)=>a.position-b.position).map((q:any)=>q.id);ids.forEach((id:string,idx:number)=>{const q:any=map.get(id);if(!q)return;const answer=answerOf(attempt,q);const score=autoScore(q,answer);const awarded=q.manual_review?Number(attempt.manual_scores?.[q.id]??score??0):Number(score??0);rows.push([String(idx+1)+'. '+q.prompt,'Élève : '+studentText(q,answer),'Attendu : '+correctText(q),awarded+' / '+q.points]);});});
  autoTable(doc,{startY:44,head:[['Question','Réponse de l’élève','Réponse correcte / attendue','Points']],body:rows,styles:{fontSize:8,cellPadding:2.5,overflow:'linebreak',valign:'top'},headStyles:{fillColor:[11,60,93]},columnStyles:{0:{cellWidth:45},1:{cellWidth:49},2:{cellWidth:62},3:{cellWidth:22}},margin:{left:14,right:14}});
  doc.save('feuille-copie-'+student.toLocaleLowerCase().replace(/[^a-z0-9]+/g,'-')+'.pdf');
 };
@@ -98,16 +99,16 @@ export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onMa
    return <section key={section.id} className="overflow-hidden rounded-xl border border-[#d8e6ee]">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f3f8fb] px-3 py-3"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#2fa36b]">Partie {si+1}</p><h5 className="font-bold text-[#072a3f]">{section.title}</h5></div><strong className="text-sm">{sectionResult?.raw_score??'—'} / {sectionResult?.raw_max??questions.reduce((n:number,q:any)=>n+Number(q.points||0),0)} pts</strong></div>
     <div className="divide-y divide-slate-100">{questions.map((q:any,qi:number)=>{
-     const answer=answerOf(attempt,q);const score=autoScore(q,answer);const manual=Number(attempt.manual_scores?.[q.id]??manualScores[q.id]??0);const awarded=q.manual_review?manual:score;
+     const answer=answerOf(attempt,q);const score=autoScore(q,answer);const manual=Number(manualScores[q.id]??attempt.manual_scores?.[q.id]??score??0);const awarded=q.manual_review?manual:score;
      const publicData=publicOf(q);
      return <article key={q.id} className="space-y-3 p-3 sm:p-4">
       <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question {qi+1} · {q.question_type==='qcm'?'QCM':q.question_type==='text'?'Réponse texte':q.question_type==='reorder'?'Réordonnement':'Verbes à trous'} · {publicData.time_limit_seconds||getDefaultWrittenQuestionTimeLimit({type:q.question_type})} s</p><p className="mt-1 text-sm font-semibold text-[#072a3f]">{q.prompt}</p></div><span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold">{q.points} pt{Number(q.points)===1?'':'s'}</span></div>
       {publicData.verbes_trous?.titre&&<p className="text-xs text-slate-500">{publicData.verbes_trous.titre}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
        <div className={'rounded-lg border p-3 '+(q.manual_review?'border-amber-200 bg-amber-50':Number(score)===Number(q.points)?'border-emerald-200 bg-emerald-50':'border-rose-200 bg-rose-50')}><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Réponse de l’élève</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{studentText(q,answer)}</p></div>
-       <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Réponse correcte / attendue</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{q.manual_review?'Aucune réponse modèle définie : appréciation du professeur.':correctText(q)}</p></div>
+       <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Réponse correcte / attendue</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{correctText(q)}</p></div>
       </div>
-      {q.manual_review?<div className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-[1fr_120px] sm:items-center"><div><p className="text-xs font-bold text-amber-900">Correction manuelle requise</p><p className="text-[11px] text-amber-800">Attribuez les points après lecture de la réponse.</p></div><label className="text-xs font-semibold">Points obtenus<input type="number" min="0" max={q.points} step=".25" className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2" value={manualScores[q.id]??attempt.manual_scores?.[q.id]??0} onChange={e=>onManualScore(q.id,Math.max(0,Math.min(Number(q.points),Number(e.target.value))))}/></label></div>:<div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="text-slate-500">Points automatiques</span><strong className={Number(awarded)===Number(q.points)?'text-emerald-700':'text-[#072a3f]'}>{awarded} / {q.points}</strong></div>}
+      {q.manual_review?<div className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-[1fr_120px] sm:items-center"><div><p className="text-xs font-bold text-amber-900">Vérification manuelle après correction automatique</p><p className="text-[11px] text-amber-800">Score automatique proposé : {score??0} / {q.points}. Confirmez-le ou ajustez-le après lecture.</p></div><label className="text-xs font-semibold">Points obtenus<input type="number" min="0" max={q.points} step=".25" className="mt-1 w-full rounded-lg border border-amber-300 bg-white p-2" value={manualScores[q.id]??attempt.manual_scores?.[q.id]??score??0} onChange={e=>onManualScore(q.id,Math.max(0,Math.min(Number(q.points),Number(e.target.value))))}/></label></div>:<div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="text-slate-500">Points automatiques</span><strong className={Number(awarded)===Number(q.points)?'text-emerald-700':'text-[#072a3f]'}>{awarded} / {q.points}</strong></div>}
      </article>;
     })}</div>
    </section>;
