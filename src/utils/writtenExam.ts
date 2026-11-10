@@ -105,12 +105,33 @@ applyComprehensionTiming(L135_TEMPLATE,105);
 const compactExamInstructions=(template:WrittenExam)=>{
  template.sections=template.sections.map(section=>{
   const title=String(section.title||'').toLocaleLowerCase('fr');
-  if(title.includes('compréhension écrite')){
-   return {...section,instructions:'Lis le texte, puis réponds aux questions. Pour les QCM, sélectionne une seule réponse ; pour les réponses saisies, écris en italien.'};
-  }
+  const concisePrompt=(prompt:string)=>{
+   const value=String(prompt||'').trim();
+   const content=value.includes(':')?value.slice(value.lastIndexOf(':')+1).trim():value;
+   if(title.includes('préposition'))return 'Completa con la preposizione corretta: '+content;
+   if(title.includes('article'))return 'Completa con l’articolo corretto: '+content;
+   if(title.includes('conjugaison')||title.includes('présent')||title.includes('essere')||title.includes('compléter les phrases'))return 'Completa con la forma corretta: '+content;
+   if(title.includes('cod/coi'))return 'Completa con il pronome corretto: '+content;
+   if(title.includes('possessif'))return 'Completa con il possessivo corretto: '+content;
+   if(title.includes('réordonnement'))return 'Riordina gli elementi: '+content;
+   return value;
+  };
+  const questions=section.questions.map(question=>({...question,prompt:concisePrompt(question.prompt)}));
+  if(title.includes('compréhension écrite'))return {...section,questions,instructions:'Leggi il testo e rispondi alle domande.'};
+  const conciseInstructions=[
+   {match:'préposition',value:'Completa con la preposizione corretta.'},
+   {match:'article',value:'Completa con l’articolo corretto.'},
+   {match:'conjugaison',value:'Completa con la forma verbale corretta.'},
+   {match:'présent',value:'Completa con la forma verbale corretta.'},
+   {match:'essere',value:'Completa con la forma verbale corretta.'},
+   {match:'cod/coi',value:'Completa con il pronome corretto.'},
+   {match:'possessif',value:'Completa con il possessivo corretto.'},
+   {match:'réordonnement',value:'Riordina gli elementi.'},
+   {match:'compléter les phrases',value:'Completa con la forma verbale corretta.'}
+  ].find(item=>title.includes(item.match))?.value;
   const instruction=String(section.instructions||'').trim();
-  const end=instruction.search(/[.!?](?:\s|$)/);
-  return {...section,instructions:instruction&&instruction.length>150&&end>=0?instruction.slice(0,end+1):instruction};
+  const end=instruction.search(/[.!?](?:\\s|$)/);
+  return {...section,questions,instructions:conciseInstructions||(instruction&&instruction.length>150&&end>=0?instruction.slice(0,end+1):instruction)};
  });
 };
 compactExamInstructions(A1_TEMPLATE);
