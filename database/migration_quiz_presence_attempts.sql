@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS public.quiz_launches (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- CREATE TABLE IF NOT EXISTS ne complète pas une table préexistante.
+-- Cette colonne est requise par launch_quiz_with_presence().
+ALTER TABLE public.quiz_launches
+  ADD COLUMN IF NOT EXISTS launched_by UUID;
+
 CREATE TABLE IF NOT EXISTS public.quiz_participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   launch_id UUID NOT NULL,
