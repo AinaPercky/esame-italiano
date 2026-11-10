@@ -6,7 +6,7 @@ La migration est additive. Elle crée `quiz_launches`, `quiz_participants`, `qui
 
 Avant l’exécution, vérifier que le schéma de production correspond au schéma versionné et effectuer une sauvegarde. Ne pas exécuter `database/schema.sql` sur une base existante : ce fichier contient des instructions destructives. Ne pas exécuter non plus l’ancien script `migration_atomic_quiz_close.sql` pour ce nouveau parcours, car son RPC de relance supprime les anciennes lignes `missed`.
 
-Après exécution, vérifier dans Supabase que le cache PostgREST a été rechargé et tester avec un quiz privé de préproduction. Les quiz historiques et les quiz publics restent en mode `legacy`; les nouveaux quiz privés sauvegardés par l’application utilisent `strict_presence`.
+Si la migration de présence avait déjà été exécutée avant l'ajout de `launched_by`, exécuter aussi `supabase/migrations/20261110010000_add_quiz_launches_launched_by.sql` dans le SQL Editor. Cette migration ajoute la colonne manquante sans modifier les lancements existants. Après exécution, vérifier dans Supabase que le cache PostgREST a été rechargé et tester avec un quiz privé de préproduction. Les quiz historiques et les quiz publics restent en mode `legacy`; les nouveaux quiz privés sauvegardés par l’application utilisent `strict_presence`.
 
 ## Vérification rapide
 
