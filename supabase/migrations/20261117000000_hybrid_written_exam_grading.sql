@@ -262,8 +262,6 @@ declare
   v_awarded numeric;
   v_delta numeric:=0;
   v_section_delta numeric;
-  v_required integer;
-  v_provided integer;
 begin
   if not public.written_exam_is_teacher() then
     raise exception 'Accès enseignant requis.';
@@ -277,15 +275,20 @@ begin
     raise exception 'Les notes manuelles doivent être un objet JSON.';
   end if;
 
+  -- A teacher may adjust any automatically graded text answer, including cloze
+  -- and long comprehension answers. Required manual_review questions must all
+  -- be confirmed; optional text overrides are only included when changed.
   for v_entry in select key,value from jsonb_each(coalesce(p_manual_scores,'{}'::jsonb))
   loop
     select q.id,q.section_id,q.points
     into v_question
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
-    where q.id::text=v_entry.key and q.manual_review and s.version_id=v_attempt.version_id;
+    where q.id::text=v_entry.key
+      and (q.manual_review or q.question_type='text')
+      and s.version_id=v_attempt.version_id;
     if not found then
-      raise exception 'Question de correction manuelle inconnue pour cette tentative.';
+      raise exception 'Question non modifiable ou inconnue pour cette tentative.';
     end if;
     if jsonb_typeof(v_entry.value) not in ('number','string')
       or (v_entry.value#>>'{}')::numeric<0
@@ -297,31 +300,35 @@ begin
     v_delta:=v_delta+(v_awarded-v_auto);
   end loop;
 
-  select count(*) into v_required
-  from public.written_exam_questions q
-  join public.written_exam_sections s on s.id=q.section_id
-  where s.version_id=v_attempt.version_id and q.manual_review;
-  select count(*) into v_provided
-  from jsonb_each(coalesce(p_manual_scores,'{}'::jsonb));
-  if v_provided<>v_required then
-    raise exception 'Attribuez une note à chaque question nécessitant une vérification manuelle.';
+  if exists(
+    select 1
+    from public.written_exam_questions q
+    join public.written_exam_sections s on s.id=q.section_id
+    where s.version_id=v_attempt.version_id
+      and q.manual_review
+      and not (coalesce(p_manual_scores,'{}'::jsonb) ? q.id::text)
+  ) then
+    raise exception 'Confirmez la note de chaque question nécessitant une vérification manuelle.';
   end if;
 
   for v_question in
     select distinct q.section_id
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
-    where s.version_id=v_attempt.version_id and q.manual_review
+    where s.version_id=v_attempt.version_id
+      and (q.manual_review or coalesce(p_manual_scores,'{}'::jsonb) ? q.id::text)
   loop
     select coalesce(sum(
-      (p_manual_scores->>q.id::text)::numeric
+      coalesce((p_manual_scores->>q.id::text)::numeric,
+        public.written_exam_auto_question_score(q.id,v_attempt.answers->q.id::text))
       - public.written_exam_auto_question_score(q.id,v_attempt.answers->q.id::text)
     ),0)
     into v_section_delta
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
     where s.version_id=v_attempt.version_id
-      and q.manual_review and q.section_id=v_question.section_id;
+      and q.section_id=v_question.section_id
+      and (q.manual_review or coalesce(p_manual_scores,'{}'::jsonb) ? q.id::text);
 
     update public.written_exam_section_results sr
     set raw_score=sr.raw_score-sr.manual_score+v_section_delta,
