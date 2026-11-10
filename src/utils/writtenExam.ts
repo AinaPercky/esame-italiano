@@ -97,7 +97,7 @@ export const A1_TEMPLATE:WrittenExam={
 const applyComprehensionTiming=(template:WrittenExam,durationMinutes:number)=>{
  template.duration_minutes=durationMinutes;
  const section=template.sections.find(item=>item.title.toLocaleLowerCase('fr').includes('compréhension écrite'));
- if(section)section.questions=section.questions.map(question=>({...question,time_limit_seconds:question.type==='qcm'?50:90}));
+ if(section)section.questions=section.questions.map((question,index)=>({...question,time_limit_seconds:(question.type==='qcm'?50:90)+(index===0?(template.level==='A1'?60:90):0)}));
 };
 applyComprehensionTiming(A1_TEMPLATE,80);
 applyComprehensionTiming(L135_TEMPLATE,105);
