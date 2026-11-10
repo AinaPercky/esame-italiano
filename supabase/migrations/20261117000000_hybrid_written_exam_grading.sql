@@ -358,6 +358,72 @@ begin
 end
 $written$;
 
+-- Mobile visibility changes and screenshot signals are audit-only. Browser APIs
+-- cannot reliably distinguish iOS screenshots, app switching, notification shade,
+-- control center, or other operating-system interruptions.
+create or replace function public.flag_written_exam_integrity_violation(
+  p_attempt_id uuid,
+  p_event_type text,
+  p_details jsonb default '{}'::jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $written$
+declare
+  v_student_id uuid;
+  v_mobile boolean;
+  v_disqualified boolean:=false;
+begin
+  if p_event_type not in ('visibility_hidden','window_blur','screenshot_attempt') then
+    raise exception 'Type de violation anti-triche non autorisé.';
+  end if;
+
+  select id into v_student_id
+  from public.students
+  where lower(email)=lower(auth.jwt()->>'email')
+    and coalesce(validation_status,'approved')='approved'
+  limit 1;
+
+  if v_student_id is null or not exists (
+    select 1 from public.written_exam_attempts
+    where id=p_attempt_id and student_id=v_student_id and status='in_progress'
+  ) then
+    raise exception 'Tentative active introuvable.';
+  end if;
+
+  v_mobile:=coalesce(p_details->>'platform','')='mobile'
+    or coalesce(p_details->>'userAgent','') ~* '(iPhone|iPad|iPod|Android)';
+
+  insert into public.written_exam_integrity_events(attempt_id,event_type,details)
+  values (
+    p_attempt_id,
+    p_event_type,
+    left(coalesce(p_details,'{}'::jsonb)::text,2000)::jsonb
+  );
+
+  -- Only desktop tab/window loss is actionable. Screenshot events are never
+  -- treated as proof of cheating because the browser cannot reliably detect them.
+  if not v_mobile and p_event_type in ('visibility_hidden','window_blur') then
+    update public.written_exam_attempts
+    set integrity_failed=true,
+        integrity_failed_at=coalesce(integrity_failed_at,now()),
+        integrity_failure_reason=coalesce(integrity_failure_reason,p_event_type),
+        updated_at=now()
+    where id=p_attempt_id;
+    v_disqualified:=true;
+  end if;
+
+  return jsonb_build_object(
+    'logged',true,
+    'flagged',v_disqualified,
+    'disqualified',v_disqualified,
+    'reason',p_event_type
+  );
+end
+$written$;
+
 -- Expression-writing marks remain recordable after an integrity violation.
 -- The attempt-level integrity trigger still forces the final exam mark to zero.
 create or replace function public.grade_written_exam_expression_writing(
