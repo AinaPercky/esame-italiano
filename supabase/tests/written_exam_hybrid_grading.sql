@@ -52,6 +52,7 @@ begin
   perform set_config('request.jwt.claim.sub',v_student::text,true);
   v_started:=public.start_written_exam(v_exam);
   v_attempt:=(v_started->>'attempt_id')::uuid;
+  perform public.get_or_start_written_exam_question_timer(v_attempt);
 
   select q.id into v_correct_question
   from public.written_exam_questions q
