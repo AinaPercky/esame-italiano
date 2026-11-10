@@ -841,7 +841,7 @@ class SupabaseService {
 
   public async saveRubrics(rubrics: ExamRubric[], targetExamId?: string): Promise<void> {
     const client = this.getClient();
-    if (!client) return;
+    if (!client || (rubrics.length === 0 && !targetExamId)) return;
 
     const examId = targetExamId || rubrics[0]?.exam_id;
     if (!examId || !isUUID(examId)) throw new Error('Identifiant de l’examen invalide.');
@@ -876,40 +876,6 @@ class SupabaseService {
     } else {
       const { error } = await client.from('exam_rubrics').delete().eq('exam_id', examId);
       if (error) throw new Error(`Suppression des rubriques impossible : ${error.message}`);
-    }
-  }
-
-  public async deleteExam(id: string): Promise<void> {
-    const client = this.getClient();
-    if (!client || !isUUID(id)) return;
-    try {
-      await client.from('exams').delete().eq('id', id);
-    } catch (e) {
-      console.error('Supabase deleteExam error:', e);
-    }
-  }
-
-  public async saveRubrics(rubrics: ExamRubric[]): Promise<void> {
-    const client = this.getClient();
-    if (!client || rubrics.length === 0) return;
-    try {
-      const validRubrics = rubrics
-        .filter(r => isUUID(r.id) && isUUID(r.exam_id))
-        .map(r => ({
-          id: r.id,
-          exam_id: r.exam_id,
-          title: r.title,
-          question: r.question,
-          example_sentence: r.example_sentence,
-          points: Number(r.points) || 1,
-          position: r.position
-        }));
-
-      if (validRubrics.length > 0) {
-        await client.from('exam_rubrics').upsert(validRubrics, { onConflict: 'id' });
-      }
-    } catch (e) {
-      console.error('Supabase saveRubrics error:', e);
     }
   }
 

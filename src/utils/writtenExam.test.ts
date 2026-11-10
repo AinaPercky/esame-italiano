@@ -1,26 +1,42 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange } from './writtenExam';
 
-test('L135 model starts with a 90-point configurable allocation and 90-minute duration',()=>{
+test('L135 model starts with a 90-point configurable allocation and 105-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
  assert.equal(getWrittenExamTotals(L135_TEMPLATE).raw,90);
- assert.equal(L135_TEMPLATE.duration_minutes,90);
+ assert.equal(L135_TEMPLATE.duration_minutes,105);
  assert.equal(L135_TEMPLATE.display_scale,100);
  assert.equal(L135_TEMPLATE.expression_writing_max_points,10);
  assert.equal(getWrittenExamTotals(L135_TEMPLATE).totalWithExpression,100);
  assert.deepEqual(L135_TEMPLATE.sections.map(s=>s.points),[20,10,10,10,10,10,10,10]);
 });
-test('A1 model preserves its 60 questions with an 80-point scale and 70-minute duration',()=>{
+test('A1 model preserves its 60 questions with an 80-point scale and 80-minute duration',()=>{
  assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),80);
  assert.equal(getWrittenExamTotals(A1_TEMPLATE).raw,80);
- assert.equal(A1_TEMPLATE.duration_minutes,70);
+ assert.equal(A1_TEMPLATE.duration_minutes,80);
  assert.equal(A1_TEMPLATE.display_scale,100);
  assert.equal(A1_TEMPLATE.expression_writing_max_points,20);
  assert.equal(getWrittenExamTotals(A1_TEMPLATE).totalWithExpression,100);
  assert.equal(A1_TEMPLATE.sections.reduce((n,s)=>n+s.questions.length,0),60);
  assert.deepEqual(A1_TEMPLATE.sections.map(s=>s.points),[20,5,5,5,5,5,5,5,5,20]);
  assert.deepEqual(validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1']}),[]);
+});
+test('reading comprehension timers include a separate first-question reading allowance',()=>{
+ const a1=A1_TEMPLATE.sections[0].questions;
+ const l135=L135_TEMPLATE.sections[0].questions;
+ assert.equal(a1[0].time_limit_seconds,(a1[0].type==='qcm'?50:90)+60);
+ assert.equal(l135[0].time_limit_seconds,(l135[0].type==='qcm'?50:90)+90);
+ for(const question of [...a1.slice(1),...l135.slice(1)]){
+  assert.equal(question.time_limit_seconds,question.type==='qcm'?50:90);
+ }
+});
+test('exam template instructions stay concise and corrections are enabled by default',()=>{
+ for(const template of [A1_TEMPLATE,L135_TEMPLATE]){
+  assert.equal(template.show_corrections_after_publish,true);
+  assert.ok(template.sections[0].instructions.length<180);
+  assert.ok(template.sections.every(section=>section.instructions.length<300));
+ }
 });
 test('raw maximum follows actual question points, not a fixed template total',()=>{
  const section=createSection('Compréhension',10);
@@ -90,4 +106,8 @@ test('new manually created questions receive quiz-compatible defaults and invali
  section.questions=[{id:'bad-time',type:'text',prompt:'Ciao?',points:1,time_limit_seconds:3601,answer_key:{acceptedAnswers:['ciao']}}];
  const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
  assert.ok(errors.some(error=>error.includes('temps doit être compris entre 1 et 3600')));
+});
+test('iOS and other mobile visibility changes never disqualify a written exam',()=>{
+ assert.equal(shouldDisqualifyWrittenExamVisibilityChange(true),false);
+ assert.equal(shouldDisqualifyWrittenExamVisibilityChange(false),true);
 });

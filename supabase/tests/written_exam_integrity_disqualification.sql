@@ -10,6 +10,7 @@ declare
   v_version uuid;
   v_attempt uuid;
   v_question uuid;
+  v_manual_question uuid;
   v_saved jsonb;
   v_started jsonb;
   v_score numeric;
@@ -18,6 +19,7 @@ declare
   v_expression numeric;
   v_failed boolean;
   v_status text;
+  v_event_result jsonb;
 begin
   insert into public.classes(id,name) values(v_class,'Integrity zero CI class');
   insert into public.students(id,class_id,first_name,last_name,email,student_number,validation_status)
@@ -66,22 +68,50 @@ begin
   where s.version_id=v_version and q.question_type='qcm'
   limit 1;
   if v_question is null then raise exception 'CI fixture did not create a QCM question.'; end if;
+  select q.id into v_manual_question
+  from public.written_exam_questions q
+  join public.written_exam_sections s on s.id=q.section_id
+  where s.version_id=v_version and q.manual_review
+  limit 1;
+  if v_manual_question is null then raise exception 'CI fixture did not create a manual-review question.'; end if;
 
   perform public.save_written_exam_answers(v_attempt,jsonb_build_object(v_question::text,'correct'));
-  perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',jsonb_build_object('source','ci-test'));
+
+  -- iOS app switching / screenshots are audit events, never automatic cheating flags.
+  v_event_result:=public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',
+    jsonb_build_object('source','ci-test','platform','mobile','userAgent','iPhone Safari'));
+  if coalesce((v_event_result->>'disqualified')::boolean,true) then
+    raise exception 'Mobile visibility change incorrectly disqualified the attempt.';
+  end if;
+  v_event_result:=public.flag_written_exam_integrity_violation(v_attempt,'screenshot_attempt',
+    jsonb_build_object('source','ci-test','platform','mobile','userAgent','iPhone Safari'));
+  if coalesce((v_event_result->>'disqualified')::boolean,true) then
+    raise exception 'Screenshot event incorrectly disqualified the attempt.';
+  end if;
+  if (select integrity_failed from public.written_exam_attempts where id=v_attempt) then
+    raise exception 'Mobile audit-only events changed the integrity flag.';
+  end if;
+
+  -- Desktop tab/window loss remains a disqualifying signal.
+  perform public.flag_written_exam_integrity_violation(v_attempt,'visibility_hidden',
+    jsonb_build_object('source','ci-test','platform','desktop','userAgent','Desktop browser'));
   perform public.submit_written_exam(v_attempt);
 
   perform set_config('request.jwt.claims',jsonb_build_object('email','ainapercky@gmail.com','sub',v_admin::text)::text,true);
   perform set_config('request.jwt.claim.sub',v_admin::text,true);
+  -- The teacher must still be able to record both the manual question review and
+  -- the separate expression-writing mark after a confirmed integrity violation.
+  perform public.grade_written_exam_attempt(v_attempt,jsonb_build_object(v_manual_question::text,0));
+  perform public.grade_written_exam_expression_writing(v_attempt,7);
   perform public.publish_written_exam_results(v_exam);
 
   select raw_score,raw_max,normalized_score,expression_writing_score,integrity_failed,status
   into v_score,v_max,v_normalized,v_expression,v_failed,v_status
   from public.written_exam_attempts where id=v_attempt;
 
-  if v_score<>0 or v_max<>100 or v_normalized<>0 or v_expression<>0
+  if v_score<>0 or v_max<>100 or v_normalized<>0 or v_expression<>7
      or not v_failed or v_status<>'graded' then
-    raise exception 'Integrity penalty was not enforced: raw %, max %, normalized %, expression %, failed %, status %',
+    raise exception 'Integrity penalty or teacher grading was not enforced: raw %, max %, normalized %, expression %, failed %, status %',
       v_score,v_max,v_normalized,v_expression,v_failed,v_status;
   end if;
 end
