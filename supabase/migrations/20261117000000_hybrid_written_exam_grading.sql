@@ -275,9 +275,8 @@ begin
     raise exception 'Les notes manuelles doivent être un objet JSON.';
   end if;
 
-  -- A teacher may adjust any automatically graded text answer, including cloze
-  -- and long comprehension answers. Required manual_review questions must all
-  -- be confirmed; optional text overrides are only included when changed.
+  -- A teacher may adjust the awarded score for any question, without editing the
+  -- student's answer. Required manual_review questions must all be confirmed.
   for v_entry in select key,value from jsonb_each(coalesce(p_manual_scores,'{}'::jsonb))
   loop
     select q.id,q.section_id,q.points
@@ -285,7 +284,6 @@ begin
     from public.written_exam_questions q
     join public.written_exam_sections s on s.id=q.section_id
     where q.id::text=v_entry.key
-      and (q.manual_review or q.question_type='text')
       and s.version_id=v_attempt.version_id;
     if not found then
       raise exception 'Question non modifiable ou inconnue pour cette tentative.';
