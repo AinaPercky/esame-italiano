@@ -20,6 +20,7 @@ declare
   v_section_raw numeric;
   v_status text;
   v_answers jsonb;
+  v_saved_answers jsonb;
   v_question_key text;
   v_offset integer;
   v_duration integer;
@@ -43,7 +44,7 @@ begin
       'shuffle',false,'questions',jsonb_build_array(
         jsonb_build_object('id','auto-correct-text','type','text','prompt','Question with an automatic match','points',2,'manual_review',true,
           'answer_key',jsonb_build_object('acceptedAnswers',jsonb_build_array('correct phrase'))),
-        jsonb_build_object('id','auto-wrong-text','type','text','prompt','Question requiring teacher override','points',2,'manual_review',true,
+        jsonb_build_object('id','auto-wrong-text','type','text','prompt','Question requiring teacher override','points',2,
           'answer_key',jsonb_build_object('acceptedAnswers',jsonb_build_array('expected answer')))
       )
     ))
@@ -116,8 +117,11 @@ begin
     v_wrong_question::text,2
   ));
 
-  select raw_score,auto_score,status into v_raw,v_auto,v_status
+  select raw_score,auto_score,status,answers into v_raw,v_auto,v_status,v_saved_answers
   from public.written_exam_attempts where id=v_attempt;
+  if v_saved_answers is distinct from v_answers then
+    raise exception 'Teacher grading modified the original student answers.';
+  end if;
   select raw_score into v_section_raw
   from public.written_exam_section_results where attempt_id=v_attempt limit 1;
   if v_auto<>2 or v_raw<>3 or v_section_raw<>3 or v_status<>'graded' then
