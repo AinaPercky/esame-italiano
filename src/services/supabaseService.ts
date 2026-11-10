@@ -841,7 +841,7 @@ class SupabaseService {
 
   public async saveRubrics(rubrics: ExamRubric[], targetExamId?: string): Promise<void> {
     const client = this.getClient();
-    if (!client) return;
+    if (!client || (rubrics.length === 0 && !targetExamId)) return;
 
     const examId = targetExamId || rubrics[0]?.exam_id;
     if (!examId || !isUUID(examId)) throw new Error('Identifiant de l’examen invalide.');
