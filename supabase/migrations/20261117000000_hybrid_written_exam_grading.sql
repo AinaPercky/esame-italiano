@@ -459,13 +459,14 @@ begin
       v_attempt.expression_writing_max_points;
   end if;
 
-  select count(*) into v_required
-  from public.written_exam_questions q
-  join public.written_exam_sections s on s.id=q.section_id
-  where s.version_id=v_attempt.version_id and q.manual_review;
-  select count(*) into v_provided
-  from jsonb_each(coalesce(v_attempt.manual_scores,'{}'::jsonb));
-  if v_required<>v_provided then
+  if exists(
+    select 1
+    from public.written_exam_questions q
+    join public.written_exam_sections s on s.id=q.section_id
+    where s.version_id=v_attempt.version_id
+      and q.manual_review
+      and not (coalesce(v_attempt.manual_scores,'{}'::jsonb) ? q.id::text)
+  ) then
     raise exception 'Corrigez d’abord toutes les questions nécessitant une vérification manuelle.';
   end if;
 
