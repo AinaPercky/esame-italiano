@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange } from './writtenExam';
 
 test('L135 model starts with a 90-point configurable allocation and 105-minute duration',()=>{
  assert.equal(L135_TEMPLATE.sections.reduce((n,s)=>n+s.points,0),90);
@@ -106,4 +106,8 @@ test('new manually created questions receive quiz-compatible defaults and invali
  section.questions=[{id:'bad-time',type:'text',prompt:'Ciao?',points:1,time_limit_seconds:3601,answer_key:{acceptedAnswers:['ciao']}}];
  const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
  assert.ok(errors.some(error=>error.includes('temps doit être compris entre 1 et 3600')));
+});
+test('iOS and other mobile visibility changes never disqualify a written exam',()=>{
+ assert.equal(shouldDisqualifyWrittenExamVisibilityChange(true),false);
+ assert.equal(shouldDisqualifyWrittenExamVisibilityChange(false),true);
 });
