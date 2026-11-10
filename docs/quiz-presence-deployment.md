@@ -22,4 +22,4 @@ select to_regclass('public.quiz_launches'),
        to_regclass('public.quiz_attempts');
 ```
 
-Les RPC sensibles exigent une session authentifiée. Le rôle professeur est lu depuis `auth.jwt() -> app_metadata -> role` (`teacher`, `professor` ou `admin`).
+Les RPC sensibles exigent une session Supabase Auth authentifiée. Le droit professeur est vérifié côté SQL par comparaison de l’adresse e-mail du JWT avec l’adresse administrateur configurée dans l’application (`ainapercky@gmail.com`). Le contrôle ne dépend pas de `user_metadata` ni d’un `app_metadata.role` absent du flux de connexion actuel.
