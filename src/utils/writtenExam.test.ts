@@ -38,6 +38,18 @@ test('exam template instructions stay concise and corrections are enabled by def
   assert.ok(template.sections.every(section=>section.instructions.length<300));
  }
 });
+test('A1 and L135 template prompts use short instructions without answer hints',()=>{
+ for(const template of [A1_TEMPLATE,L135_TEMPLATE]){
+  const prepositions=template.sections.find(section=>section.title.includes('Prépositions'));
+  assert.ok(prepositions);
+  assert.ok(prepositions!.instructions.length<80);
+  for(const question of prepositions!.questions){
+   assert.match(question.prompt,/^Completa con la preposizione corretta:/);
+   assert.doesNotMatch(question.prompt,/destinazione|Paese|posizione|provenienza|durata|da quanto tempo/i);
+   assert.ok(question.prompt.length<100);
+  }
+ }
+});
 test('raw maximum follows actual question points, not a fixed template total',()=>{
  const section=createSection('Compréhension',10);
  section.questions=[{id:'q1',type:'text',prompt:'Ciao?',points:2,answer_key:{acceptedAnswers:['ciao']}}];
