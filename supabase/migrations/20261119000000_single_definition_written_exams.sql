@@ -166,6 +166,137 @@ create unique index if not exists written_exam_one_current_definition
 on public.written_exam_versions(exam_id)
 where status in ('draft','published');
 
+-- Keep the parent lifecycle state consistent with the single active definition.
+-- A published definition referenced by attempts remains the student's copy source.
+update public.written_exams e
+set status='published'
+where e.status='draft'
+  and exists (
+    select 1 from public.written_exam_versions v
+    where v.exam_id=e.id and v.status='published'
+      and exists(select 1 from public.written_exam_attempts a where a.version_id=v.id)
+  );
+
+-- If only a draft definition remains, the exam must not appear as publishable.
+update public.written_exams e
+set status='draft'
+where e.status in ('published','scheduled','open')
+  and exists(select 1 from public.written_exam_versions v where v.exam_id=e.id and v.status='draft')
+  and not exists(select 1 from public.written_exam_versions v where v.exam_id=e.id and v.status='published');
+
+create or replace function public.list_available_written_exams()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $written$
+declare
+  v_student public.students%rowtype;
+  v_result jsonb;
+begin
+  select * into v_student
+  from public.students
+  where lower(email)=lower(auth.jwt()->>'email')
+    and coalesce(validation_status,'approved')='approved'
+  limit 1;
+
+  if not found then
+    raise exception 'Fiche élève active introuvable.';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',e.id,
+    'title',v.title,
+    'description',v.description,
+    'level',v.level,
+    'target_language',v.target_language,
+    'instruction_language',v.instruction_language,
+    'duration_minutes',v.duration_minutes,
+    'display_scale',v.display_scale,
+    'status',e.status,
+    'opens_at',v.opens_at,
+    'closes_at',v.closes_at,
+    'raw_max',v.raw_max,
+    'version_id',v.id,
+    'class_eligible',exists(
+      select 1 from public.written_exam_version_classes ec
+      where ec.version_id=v.id and ec.class_id=v_student.class_id
+    ),
+    'integrity_settings',v.integrity_settings,
+    'max_attempts',v.max_attempts,
+    'navigation_mode',v.navigation_mode,
+    'sections',(
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'title',s.title,
+        'group_name',s.group_name,
+        'instructions',s.instructions,
+        'max_points',s.max_points,
+        'support_text',s.support_text,
+        'support_url',s.support_url
+      ) order by s.position),'[]'::jsonb)
+      from public.written_exam_sections s where s.version_id=v.id
+    ),
+    'attempts_used',(
+      select count(*) from public.written_exam_attempts x
+      where x.exam_id=e.id and x.student_id=v_student.id
+    ),
+    'attempt_status',a.status,
+    'attempt_version_id',a.version_id,
+    'attempt_raw_max',a.raw_max,
+    'attempt_display_scale',av.display_scale,
+    'results_published',coalesce(a.results_published,false),
+    'raw_score',case
+      when a.results_published and coalesce(av.show_score_after_publish,v.show_score_after_publish)
+      then a.raw_score else null end,
+    'normalized_score',case
+      when a.results_published and coalesce(av.show_score_after_publish,v.show_score_after_publish)
+      then a.normalized_score else null end,
+    'show_score_after_publish',coalesce(av.show_score_after_publish,v.show_score_after_publish),
+    'show_corrections_after_publish',case
+      when a.results_published then coalesce(e.show_corrections_after_publish,true)
+      else coalesce(av.show_corrections_after_publish,v.show_corrections_after_publish)
+    end
+  ) order by v.opens_at nulls first,e.created_at desc),'[]'::jsonb)
+  into v_result
+  from public.written_exams e
+  left join lateral (
+    select *
+    from public.written_exam_attempts aa
+    where aa.exam_id=e.id and aa.student_id=v_student.id
+    order by aa.attempt_number desc
+    limit 1
+  ) a on true
+  join lateral (
+    select vv.*
+    from public.written_exam_versions vv
+    where vv.id=coalesce(a.version_id,(
+      select current_definition.id
+      from public.written_exam_versions current_definition
+      where current_definition.exam_id=e.id
+        and current_definition.status='published'
+        and exists(
+          select 1 from public.written_exam_version_classes ec
+          where ec.version_id=current_definition.id and ec.class_id=v_student.class_id
+        )
+      order by current_definition.version_number desc
+      limit 1
+    ))
+  ) v on true
+  left join public.written_exam_versions av on av.id=a.version_id
+  where (
+    (a.status='in_progress' and e.status in ('published','scheduled','open'))
+    or (e.status in ('published','scheduled','open')
+      and (v.opens_at is null or v.opens_at<=now())
+      and (v.closes_at is null or v.closes_at>now()))
+    or (a.id is not null and e.status in ('published','scheduled','open','closed','grading','results_published','draft'))
+  );
+
+  return v_result;
+end
+$written$;
+
+
+
 create or replace function public.save_written_exam_definition(p_exam_id uuid,p_definition jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $written$
 declare
@@ -276,4 +407,6 @@ end $written$;
 
 
 
+revoke all on function public.list_available_written_exams() from public;
+grant execute on function public.list_available_written_exams() to authenticated;
 notify pgrst,'reload schema';
