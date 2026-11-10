@@ -39,7 +39,7 @@ const l135ComprehensionQuestions:WrittenQuestion[]=[
  textQ('Confronta la cucina del nord e quella del sud usando le informazioni del testo. Indica almeno due ingredienti o prodotti caratteristici per ciascuna zona e rispondi con una frase completa.',3,["Al nord gli abitanti usano molto il burro, il riso e la polenta; al sud, invece, preferiscono l’olio d’oliva, i pomodori, il pesce e le verdure.","Al nord si usano molto burro, riso e polenta, mentre al sud si preferiscono olio d’oliva, pomodori, pesce e verdure.","La cucina del nord usa soprattutto burro, riso e polenta; quella del sud preferisce olio d’oliva, pomodori, pesce e verdure."],{manual_review:true,explanation:'Correggere manualmente. Accetta ogni frase completa che confronti correttamente gli ingredienti del nord e quelli del sud indicati nel testo.'})
 ];
 export const L135_TEMPLATE:WrittenExam={
- title:'L135 – Examen composite',description:'90 points pour les questions · 1 h 30 · compréhension, grammaire, vocabulaire et réordonnement. Expression écrite corrigée séparément sur 10 points.',
+ title:'L135 – Examen composite',description:'90 points pour les questions · 1 h 45 · compréhension, grammaire, vocabulaire et réordonnement. Expression écrite corrigée séparément sur 10 points.',
  level:'B1',target_language:'it',instruction_language:'fr',duration_minutes:90,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:10,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:true,warn_on_tab_switch:true,watermark:false},
@@ -54,12 +54,23 @@ export const L135_TEMPLATE:WrittenExam={
   {...createSection('Réordonnement',10),instructions:'Rimetti ogni frase nell’ordine corretto. Ricostruisci una frase completa e grammaticalmente corretta usando tutti gli elementi una sola volta; controlla la posizione del soggetto, del verbo e dei complementi.',questions:[reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Domani','vado','al mercato']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['A Maria','piacciono','i romanzi']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Non','ho','capito','la domanda']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Ci','vediamo','dopo','la lezione']),reorderQ('Riordina tutti gli elementi proposti per formare una frase italiana completa e grammaticalmente corretta. Usa ogni elemento una sola volta.',2,['Ieri','abbiamo','visitato','il museo'])]}
  ]
 };
+ 
+// Reading comprehension includes time to read the source text before answering.
+// Open responses receive 90 seconds; QCM receive 50 seconds.
+const applyComprehensionTiming=(template:WrittenExam,durationMinutes:number)=>{
+ template.duration_minutes=durationMinutes;
+ const section=template.sections.find(item=>item.title.toLocaleLowerCase('fr').includes('compréhension écrite'));
+ if(section)section.questions=section.questions.map(question=>({...question,time_limit_seconds:question.type==='qcm'?50:90}));
+};
+applyComprehensionTiming(A1_TEMPLATE,80);
+applyComprehensionTiming(L135_TEMPLATE,105);
+
 const a1Text='Marco vive a Roma. Ha vent’anni e studia italiano all’università. Ogni mattina prende l’autobus per andare a lezione. Nel fine settimana gioca a calcio con i suoi amici. La sera legge un libro o guarda un film.';
 const a1TF=[
  ['Marco vive a Roma.',2,0],['Marco ha venticinque anni.',2,1],['Marco studia italiano.',2,0],['Marco va a lezione in treno.',2,1],['Nel fine settimana gioca a calcio.',2,0]
 ] as const;
 export const A1_TEMPLATE:WrittenExam={
- title:'Esame bianco – Italiano A1',description:'80 points pour les questions · 1 h 10 · compréhension, grammaire, vocabulaire et phrases à compléter. Expression écrite corrigée séparément sur 20 points.',
+ title:'Esame bianco – Italiano A1',description:'80 points pour les questions · 1 h 20 · compréhension, grammaire, vocabulaire et phrases à compléter. Expression écrite corrigée séparément sur 20 points.',
  level:'A1',target_language:'it',instruction_language:'fr',duration_minutes:70,class_ids:[],status:'draft',display_scale:100,expression_writing_max_points:20,max_attempts:1,
  shuffle_sections:true,shuffle_questions:true,shuffle_options:true,navigation_mode:'free',show_score_after_publish:true,show_corrections_after_publish:false,
  integrity_settings:{fullscreen:false,warn_on_tab_switch:true,watermark:false},
