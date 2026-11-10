@@ -71,23 +71,13 @@ class SupabaseService {
   private quizWriteQueues = new Map<string, Promise<void>>();
 
   public loadConfig(): SupabaseConfig {
-    let localUrl = '';
-    let localKey = '';
-    try {
-      localUrl = localStorage.getItem('percky_supabase_url') || '';
-      localKey = localStorage.getItem('percky_supabase_anon_key') || '';
-    } catch {
-      // ignore
-    }
+    // Supabase est obligatoire : aucun fallback vers une configuration locale.
+    // Les identifiants du projet sont fournis au build par l'hébergeur.
     const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
     const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
-
-    // En production, la configuration du build est canonique. Le localStorage
-    // reste uniquement un fallback pour le panneau Paramètres et ne doit pas
-    // permettre à un ancien navigateur de pointer vers un autre projet.
     return {
-      url: cleanSupabaseUrl(envUrl || localUrl),
-      anonKey: (envKey || localKey).trim()
+      url: cleanSupabaseUrl(envUrl),
+      anonKey: envKey.trim()
     };
   }
 
@@ -98,20 +88,9 @@ class SupabaseService {
       url: cleanedUrl,
       anonKey: cleanedKey
     };
-    try {
-      if (cleanedUrl) {
-        localStorage.setItem('percky_supabase_url', cleanedUrl);
-      } else {
-        localStorage.removeItem('percky_supabase_url');
-      }
-      if (cleanedKey) {
-        localStorage.setItem('percky_supabase_anon_key', cleanedKey);
-      } else {
-        localStorage.removeItem('percky_supabase_anon_key');
-      }
-    } catch {
-      // ignore
-    }
+    // Configuration temporaire pour le panneau de test uniquement.
+    // Elle n'est jamais persistée dans le navigateur : le build reste la source
+    // de configuration durable (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).
     this.client = null; // Réinitialise l'instance client
   }
 

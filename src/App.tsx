@@ -36,6 +36,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [initialDataReady, setInitialDataReady] = useState<boolean>(false);
+  const [initialDataError, setInitialDataError] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isPublicMode, setIsPublicMode] = useState<boolean>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -81,20 +82,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Chargement des données (nécessaire aussi pour la vue publique étudiante)
-    reloadData();
-
+    // L'interface ne doit jamais démarrer sur des seeds ou un cache local.
     const unsubscribe = dataService.subscribe(() => {
       reloadData();
     });
 
     if (!initialCloudSyncPromise) initialCloudSyncPromise = dataService.initFromCloud();
     initialCloudSyncPromise.then(synced => {
-      if (synced) {
-        reloadData();
-      }
+      if (!synced) throw new Error('Les données Supabase n’ont pas été chargées.');
+      reloadData();
     }).catch(err => {
-      console.warn('Initial cloud sync notice:', err);
+      console.error('Initial Supabase sync failed:', err);
+      setInitialDataError(err instanceof Error ? err.message : 'Connexion Supabase impossible.');
     }).finally(() => setInitialDataReady(true));
 
     return () => {
@@ -188,6 +187,32 @@ export default function App() {
   const studentViewExamId = urlParams.get('exam') || '';
   const studentViewStudentId = urlParams.get('student') || '';
   const publicQuizViewId = urlParams.get('id') || '';
+
+  if (!initialDataReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="text-center text-slate-600">
+          <p className="font-semibold">Connexion à Supabase…</p>
+          <p className="mt-2 text-sm">Chargement des données de l’application.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (initialDataError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-xl rounded-2xl bg-white p-6 text-center shadow-sm">
+          <h1 className="text-lg font-bold text-slate-900">Connexion Supabase requise</h1>
+          <p className="mt-3 text-sm text-slate-600">{initialDataError}</p>
+          <p className="mt-2 text-sm text-slate-600">Aucune donnée locale ou de démonstration ne sera affichée à la place de la base de données.</p>
+          <button className="mt-5 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white" onClick={() => window.location.reload()}>
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isPublicMode) {
     // Public quiz view (with or without a specific quiz id)

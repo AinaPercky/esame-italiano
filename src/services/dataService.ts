@@ -12,16 +12,6 @@ import {
   QuizSubmission,
   DailyGrade
 } from '../types';
-import { 
-  SEED_CLASSES, 
-  SEED_STUDENTS, 
-  SEED_EXAMS, 
-  SEED_RUBRICS, 
-  SEED_EVALUATIONS, 
-  SEED_PASS_ORDER,
-  SEED_QUIZZES,
-  SEED_QUIZ_SUBMISSIONS
-} from '../data/seedData';
 import { supabaseService, generateUUID, isUUID } from './supabaseService';
 import { authService } from './authService';
 import { isValidEmail, normalizeEmail } from '../utils/email';
@@ -115,16 +105,18 @@ function sanitizeState(appState: AppState): AppState {
 }
 
 function loadInitialState(): AppState {
-  return sanitizeState({
-    classes: [...SEED_CLASSES],
-    students: [...SEED_STUDENTS],
-    exams: [...SEED_EXAMS],
-    rubrics: [...SEED_RUBRICS],
-    evaluations: [...SEED_EVALUATIONS],
-    passOrder: [...SEED_PASS_ORDER],
-    quizzes: [...SEED_QUIZZES],
-    quizSubmissions: [...SEED_QUIZ_SUBMISSIONS]
-  });
+  // Aucun jeu de données de démonstration n'est utilisé comme solution de repli.
+  // L'état est rempli exclusivement après un chargement réussi depuis Supabase.
+  return {
+    classes: [],
+    students: [],
+    exams: [],
+    rubrics: [],
+    evaluations: [],
+    passOrder: [],
+    quizzes: [],
+    quizSubmissions: []
+  };
 }
 
 let state: AppState = loadInitialState();
@@ -181,46 +173,25 @@ export const dataService = {
    * Synchronisation initiale avec Supabase Cloud au démarrage
    */
   async initFromCloud(): Promise<boolean> {
-    if (!supabaseService.isConfigured()) return false;
-    try {
-      const res = await supabaseService.importFromSupabase();
-      if (!res.success) {
-        console.warn('Initial cloud import failed:', res.message);
-        return false;
-      }
-      if (res.success && res.state) {
-        // Supabase est la source de vérité. Ne fusionnez jamais les seeds locaux
-        // avec le cloud : un seed invalide (ex. public_id non-UUID) pouvait faire
-        // échouer l'import entier et laisser l'interface sur un état incohérent.
-        this.setImportedState(res.state);
-        authService.synchronizeStudentAccountsWithRoster(res.state.students, res.state.classes);
-        return true;
-      }
-    } catch (e) {
-      console.warn('Initial cloud sync error:', e);
+    if (!supabaseService.isConfigured()) {
+      throw new Error('Supabase est obligatoire. Configurez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans les variables d’environnement de déploiement.');
     }
-    return false;
+    const res = await supabaseService.importFromSupabase();
+    if (!res.success || !res.state) {
+      throw new Error(res.message || 'Le chargement des données depuis Supabase a échoué.');
+    }
+    this.setImportedState(res.state);
+    authService.synchronizeStudentAccountsWithRoster(res.state.students, res.state.classes);
+    return true;
   },
 
-  // Reset demo
-  resetToDefault() {
-    state = {
-      classes: [...SEED_CLASSES],
-      students: [...SEED_STUDENTS],
-      exams: [...SEED_EXAMS],
-      rubrics: [...SEED_RUBRICS],
-      evaluations: [...SEED_EVALUATIONS],
-      passOrder: [...SEED_PASS_ORDER],
-      quizzes: [...SEED_QUIZZES],
-      quizSubmissions: [...SEED_QUIZ_SUBMISSIONS]
-    };
-    persistState();
-    notifySubscribers();
-
-    // Synchroniser la réinitialisation sur Supabase si connecté
-    if (supabaseService.isConfigured()) {
-      supabaseService.syncLocalToSupabase(this.getRawState()).catch(console.error);
+  // Recharger les données cloud; aucune réinitialisation locale de démonstration.
+  async resetToDefault() {
+    const res = await supabaseService.importFromSupabase();
+    if (!res.success || !res.state) {
+      throw new Error(res.message || 'Impossible de recharger les données Supabase.');
     }
+    this.setImportedState(res.state);
     return state;
   },
 
