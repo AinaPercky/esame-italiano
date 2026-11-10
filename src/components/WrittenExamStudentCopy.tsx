@@ -1,6 +1,6 @@
 import React from 'react';
 import {CheckCircle2, XCircle, MinusCircle, Download} from 'lucide-react';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {noterPhrase, parseVerbesTrousAnswers} from '../utils/verbesTrous';
 
@@ -11,9 +11,9 @@ const answerText=(q:any)=>{const a=q.student_answer,p=q.public_data||{};if(a==nu
 const expectedText=(q:any)=>{const k=q.answer_key||{},p=q.public_data||{};if(q.type==='qcm')return p.options?.find((x:any)=>x.id===k.correctOptionId)?.label||'Corrigé indisponible';if(q.type==='text')return Array.isArray(k.answers)?k.answers.map((x:any)=>Array.isArray(x)?x.join(' / '):String(x)).join(' · '):(k.acceptedAnswers||[]).join(' / ')||'Correction manuelle';if(q.type==='reorder')return (k.correctOrder||[]).map((id:string)=>(p.items||[]).find((x:any)=>x.id===id)?.text||id).join(' → ');if(q.type==='verbes_trous')return (k.phrases||[]).map((x:any)=>x.verbe+' → '+(x.reponses||[]).join(' / ')).join(' · ');return '—';};
 const scoreOf=(q:any)=>{const a=q.student_answer,k=q.answer_key||{},p=q.public_data||{},max=Number(q.points)||0;if(q.manual_score!=null)return Number(q.manual_score);if(q.type==='qcm')return String(a??'')===String(k.correctOptionId??'')?max:0;if(q.type==='text'){if(Array.isArray(k.answers)){const actual=arr(a);let hits=0;k.answers.forEach((variants:any,i:number)=>{if((Array.isArray(variants)?variants:[variants]).some((x:any)=>norm(x)===norm(actual[i])))hits++;});return k.answers.length?Math.round(max*hits/k.answers.length*100)/100:0;}return (k.acceptedAnswers||[]).some((x:any)=>norm(x)===norm(a))?max:0;}if(q.type==='reorder'){const actual=arr(a),expected=k.correctOrder||[];const hits=expected.filter((id:string,i:number)=>String(actual[i]??'')===id).length;return expected.length?Math.round(max*hits/expected.length*100)/100:0;}if(q.type==='verbes_trous'){const actual=parseVerbesTrousAnswers(a);let points=0;(k.phrases||[]).forEach((phrase:any)=>{const result=noterPhrase(phrase,actual[String(phrase.id)],3);points+=result.total;});return Math.min(max,points);}return 0;};
 const statusOf=(q:any)=>{const score=scoreOf(q);if(q.manual_review&&q.manual_score==null)return 'pending';if(score===Number(q.points))return 'correct';if(!q.student_answer||q.student_answer==='')return 'missing';return 'wrong';};
-export const WrittenExamStudentCopy:React.FC<Props>=({sections,rawScore,rawMax,normalizedScore,displayScale,title='Examen écrit',studentName='Élève'})=>{
- const downloadPdf=()=>{
-  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+export const createWrittenExamStudentCopyPdf=(props:Props)=>{
+ const {sections,rawScore,rawMax,normalizedScore,displayScale,title='Examen écrit',studentName='Élève'}=props;
+ const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   doc.setFontSize(16);doc.text('Feuille de copie corrigée – '+title,14,18);
   doc.setFontSize(10);doc.text('Élève : '+studentName,14,26);
   doc.text('Résultat : '+(rawScore??'—')+' / '+(rawMax??'—')+(normalizedScore!=null?' · Note : '+normalizedScore+(displayScale?'/'+displayScale:''):'') ,14,33);
@@ -26,8 +26,12 @@ export const WrittenExamStudentCopy:React.FC<Props>=({sections,rawScore,rawMax,n
    });
   });
   autoTable(doc,{startY:40,head:[['Question','Réponse de l’élève','Réponse attendue','Résultat']],body:rows,styles:{fontSize:8,cellPadding:2.5,overflow:'linebreak',valign:'top'},headStyles:{fillColor:[11,60,93]},columnStyles:{0:{cellWidth:48},1:{cellWidth:49},2:{cellWidth:58},3:{cellWidth:23}},margin:{left:14,right:14}});
-  doc.save('feuille-copie-corrigee.pdf');
- };
+  return doc;
+};
+
+export const WrittenExamStudentCopy:React.FC<Props>=(props)=>{
+ const {sections,rawScore,rawMax,normalizedScore,displayScale,title='Examen écrit',studentName='Élève'}=props;
+ const downloadPdf=()=>createWrittenExamStudentCopyPdf(props).save('feuille-copie-corrigee.pdf');
  return <div className="mt-4 space-y-4">
  <header className="rounded-xl bg-[#f3f8fb] p-4"><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Ma feuille de copie</p><div className="mt-1 flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-lg font-black text-[#072a3f]">Résultats et corrigés détaillés</h3><p className="text-xs text-slate-500">Vos réponses, les réponses attendues et les points obtenus.</p></div><button type="button" onClick={downloadPdf} className="inline-flex items-center gap-2 rounded-lg bg-[#072a3f] px-3 py-2 text-xs font-bold text-white"><Download className="h-4 w-4"/>Télécharger le PDF</button><div className="text-right"><p className="text-2xl font-black text-[#072a3f]">{rawScore??'—'} <span className="text-sm font-semibold text-slate-500">/ {rawMax??'—'}</span></p>{normalizedScore!=null&&displayScale!=null&&<p className="text-xs text-slate-600">Note : {normalizedScore} / {displayScale}</p>}</div></div></header>
  {sections.map((section:any,i:number)=><section key={section.section_title||i} className="overflow-hidden rounded-xl border border-[#d8e6ee]"><div className="bg-[#f3f8fb] px-3 py-3 font-bold text-[#072a3f]">{section.section_title}</div><div className="divide-y divide-slate-100">{(section.questions||[]).map((q:any,j:number)=>{const status=statusOf(q),score=scoreOf(q);const good=status==='correct',pending=status==='pending',missing=status==='missing';const tone=good?'border-emerald-200 bg-emerald-50':pending?'border-amber-200 bg-amber-50':'border-rose-200 bg-rose-50';const label=good?'Réponse correcte':pending?'En attente de correction':missing?'Absence de réponse':'Réponse incorrecte';return <article key={q.question_id||j} className="space-y-2 p-3"><div className="flex items-start justify-between gap-2"><p className="text-sm font-semibold text-[#072a3f]">{j+1}. {q.prompt}</p><span className="shrink-0 text-xs font-bold">{score===null?'À corriger':score+' / '+q.points}</span></div><div className={'rounded-lg border p-3 '+tone}><p className="flex items-center gap-1 text-xs font-bold">{good?<CheckCircle2 className="h-4 w-4"/>:pending?<MinusCircle className="h-4 w-4"/>:<XCircle className="h-4 w-4"/>}{label}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{answerText(q)}</p></div><div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Réponse vraie / attendue</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{expectedText(q)}</p></div>{q.explanation&&<p className="text-xs italic text-slate-500">Explication : {q.explanation}</p>}</article>;})}</div></section>)}
