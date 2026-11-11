@@ -51,6 +51,7 @@ import { createQuizReorderItem } from '../utils/quizReorder';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 import { VerbesTrousEditor } from '../components/verbesTrous/VerbesTrousEditor';
+import { downloadQuizWorkbookPdf } from '../utils/quizWorkbookPdf';
 
 interface QuizzesAdminViewProps {
   classes: ClassRoom[];
@@ -1428,6 +1429,16 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                             </>
                           )}
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => downloadQuizWorkbookPdf(quiz)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                          title="Télécharger une version imprimable du quiz, sans les réponses"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Cahier PDF</span>
+                        </button>
 
                         <button
                           type="button"
