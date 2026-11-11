@@ -20,6 +20,7 @@ import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizRe
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay, calculateQuestionPointsEarned, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
+import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1485,7 +1486,7 @@ export const dataService = {
       return s.quiz_id === quizId && Boolean(studentId) && s.student_id === studentId;
     });
 
-    if (existingIdx !== -1 && !retryGrantId && !allowAuthorizedRetry) {
+    if (!canSubmitQuizAttempt(existingIdx !== -1, Boolean(retryGrantId), allowAuthorizedRetry)) {
       throw new Error("Vous avez déjà soumis ce quiz et il est définitivement verrouillé.");
     }
 
