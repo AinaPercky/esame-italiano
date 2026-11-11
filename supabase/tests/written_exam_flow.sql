@@ -24,6 +24,8 @@ declare
   v_reorder_id uuid;
   v_manual_id uuid;
   v_verbes_id uuid;
+  v_first_question_id text;
+  v_second_question_id text;
   v_saved jsonb;
   v_started jsonb;
   v_started_again jsonb;
@@ -155,27 +157,53 @@ begin
     raise exception 'A question was missing from the student payload.';
   end if;
 
+  -- The migration enforces random question order, even if the submitted definition
+  -- requested shuffle_questions=false. Derive the active first and second question
+  -- from the attempt manifest instead of assuming the QCM is first.
+  select q.question_id into v_first_question_id
+  from jsonb_array_elements_text(v_started->'order_manifest'->'sections')
+    with ordinality as sec(section_id,section_ord)
+  cross join lateral jsonb_array_elements_text(
+    v_started->'order_manifest'->'questions'->(sec.section_id)
+  ) with ordinality as q(question_id,question_ord)
+  order by sec.section_ord,q.question_ord
+  limit 1;
+
+  select q.question_id into v_second_question_id
+  from jsonb_array_elements_text(v_started->'order_manifest'->'sections')
+    with ordinality as sec(section_id,section_ord)
+  cross join lateral jsonb_array_elements_text(
+    v_started->'order_manifest'->'questions'->(sec.section_id)
+  ) with ordinality as q(question_id,question_ord)
+  order by sec.section_ord,q.question_ord
+  offset 1 limit 1;
+
+  if v_first_question_id is null or v_second_question_id is null then
+    raise exception 'The randomized attempt manifest must contain at least two questions.';
+  end if;
+
   -- Regression: a student may validate a question before its allotted timer expires.
   -- The server timer must move forward atomically with the saved answer.
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),false);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_first_question_id,to_jsonb('early first answer'::text),false);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
-    raise exception 'Initial autosave of the first question failed: %',v_early_result;
+    raise exception 'Initial autosave of the active first question failed: %',v_early_result;
   end if;
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_qcm_id::text,to_jsonb('a'::text),true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_first_question_id,to_jsonb('early first answer'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
-    raise exception 'Early validation of the first question failed: %',v_early_result;
+    raise exception 'Early validation of the active first question failed: %',v_early_result;
   end if;
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_second_question_id,to_jsonb('early second answer'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
-    raise exception 'Immediate save of the second question after early validation failed: %',v_early_result;
+    raise exception 'Immediate save of the second active question after early validation failed: %',v_early_result;
   end if;
   -- Retrying the same advance after a lost HTTP response must be harmless.
-  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_text_id::text,to_jsonb('early second answer'::text),true);
+  v_early_result:=public.save_written_exam_question_answer(v_attempt_id,v_second_question_id,to_jsonb('early second answer'::text),true);
   if coalesce((v_early_result->>'saved')::boolean,false) is not true then
-    raise exception 'Idempotent retry of question validation failed: %',v_early_result;
+    raise exception 'Idempotent retry of the second question validation failed: %',v_early_result;
   end if;
   select answers into v_persisted_answers from public.written_exam_attempts where id=v_attempt_id;
-  if v_persisted_answers->>v_qcm_id::text<>'a' or v_persisted_answers->>v_text_id::text<>'early second answer' then
+  if v_persisted_answers->>v_first_question_id<>'early first answer'
+     or v_persisted_answers->>v_second_question_id<>'early second answer' then
     raise exception 'Early validated answers were not persisted in PostgreSQL: %',v_persisted_answers;
   end if;
 
