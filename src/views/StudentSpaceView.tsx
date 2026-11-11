@@ -252,7 +252,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Inclure aussi les quiz déjà soumis : une seconde chance peut rouvrir un quiz clôturé.
   const strictPresenceQuizIdsKey = quizzes
-    .filter(quiz => quiz.attendance_mode === 'strict_presence' && !quiz.is_public)
+    .filter(quiz => !quiz.is_public)
     .map(quiz => quiz.id)
     .sort()
     .join('|');
@@ -558,9 +558,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const freshSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
     const alreadySubmitted = mySubmissions.some(s => s.quiz_id === quiz.id) || freshSubs.some(s => s.quiz_id === quiz.id);
     const strictPresence = quiz.attendance_mode === 'strict_presence' && !quiz.is_public && supabaseService.isConfigured();
+    // Les quiz historiques peuvent aussi recevoir une autorisation individuelle
+    // liée à un lancement de présence. Ne vérifier cette voie que si l'élève a
+    // déjà une soumission : les autres quiz legacy gardent leur parcours inchangé.
+    let authorizedLegacyRetry = false;
+    if (!strictPresence && alreadySubmitted && !quiz.is_public && supabaseService.isConfigured()) {
+      try {
+        const active = await supabaseService.getStudentActiveLaunch(quiz.id);
+        authorizedLegacyRetry = active?.participant.presence_status === 'retry_authorized';
+      } catch (error) {
+        console.warn('Vérification de seconde chance legacy indisponible:', error);
+      }
+    }
+    const usePresenceRetryFlow = strictPresence || authorizedLegacyRetry;
     setPresenceStartError(null);
 
-    if (strictPresence) {
+    if (usePresenceRetryFlow) {
       primeTimerAudio();
       setPresenceInitSecondsRemaining(QUIZ_PRESENCE_INITIALIZATION_SECONDS);
       setPresenceInitialization({ quiz, phase: 'confirming' });
