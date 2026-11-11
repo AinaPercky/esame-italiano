@@ -38,6 +38,7 @@ import {
   QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL
 } from '../data/quizPresenceMigration';
 import { QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL } from '../data/quizAttemptSubmissionMigration';
+import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
 
 interface SettingsViewProps {
   onResetData: () => void;
@@ -54,6 +55,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedAtomicQuizMigration, setCopiedAtomicQuizMigration] = useState(false);
   const [copiedPresenceMigration, setCopiedPresenceMigration] = useState(false);
   const [copiedPresenceInitializationMigration, setCopiedPresenceInitializationMigration] = useState(false);
+  const [copiedIndividualRetryMigration, setCopiedIndividualRetryMigration] = useState(false);
   const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
@@ -158,6 +160,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration initialisation présence:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration corrective de présence.' });
+    }
+  };
+
+  const handleCopyIndividualRetryMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL);
+      setCopiedIndividualRetryMigration(true);
+      setTimeout(() => setCopiedIndividualRetryMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration seconde chance individuelle:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier le correctif de seconde chance individuelle.' });
     }
   };
 
@@ -544,6 +557,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedPresenceInitializationMigration ? '✓ Correctif présence copié !' : 'Copier l’ajustement « délai par élève »'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyIndividualRetryMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-fuchsia-700 hover:bg-fuchsia-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedIndividualRetryMigration ? '✓ Correctif seconde chance copié !' : 'Corriger la seconde chance individuelle'}</span>
             </button>
             <button
               type="button"

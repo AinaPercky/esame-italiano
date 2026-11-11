@@ -55,3 +55,18 @@ test('the follow-up migration stores the deadline per participant at confirmatio
   assert.match(closeFunction, /SET launch_id = NULL[\s\S]*?used_at IS NULL/i);
   assert.doesNotMatch(submissionFunction, /UPDATE public\.quiz_retry_grants/i);
 });
+
+
+test('individual retry migration unlocks a completed participant without deleting the previous result', async () => {
+  const { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } = await import('../data/quizRetryMigration');
+  const retryFunction = QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL.match(
+    /CREATE OR REPLACE FUNCTION public\.grant_quiz_retry[\s\S]*?\$\$;/
+  )?.[0] || '';
+
+  assert.match(retryFunction, /presence_status = 'retry_authorized'/i);
+  assert.match(retryFunction, /ON CONFLICT \(launch_id, student_id\)\s+DO UPDATE/i);
+  assert.match(retryFunction, /p_launch_id/);
+  assert.match(retryFunction, /v_class_id/);
+  assert.doesNotMatch(retryFunction, /DELETE FROM public\.(quiz_submissions|quiz_attempts)/i);
+  assert.match(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL, /NOTIFY pgrst, 'reload schema'/i);
+});
