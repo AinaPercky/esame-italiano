@@ -1,0 +1,35 @@
+name: Selenium - examens écrits
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, test/selenium-written-exams]
+    paths: ['src/**','scripts/selenium-written-exams.mjs','package.json','.github/workflows/selenium-written-exams.yml']
+jobs:
+  selenium:
+    if: ${{ vars.E2E_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: browser-actions/setup-chrome@v1
+      - run: npm install
+      - name: Parcours Selenium professeur et élève
+        run: npm run test:e2e:selenium
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_TEACHER_EMAIL: ${{ secrets.E2E_TEACHER_EMAIL }}
+          E2E_TEACHER_PASSWORD: ${{ secrets.E2E_TEACHER_PASSWORD }}
+          E2E_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
+          E2E_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          E2E_CLASS_ID: ${{ secrets.E2E_CLASS_ID }}
+          E2E_WRITTEN_EXAM_TITLE: ${{ secrets.E2E_WRITTEN_EXAM_TITLE }}
+      - name: Capture en cas d’échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-failure
+          path: selenium-failure.png
+          if-no-files-found: ignore
