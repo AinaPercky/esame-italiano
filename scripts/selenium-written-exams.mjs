@@ -161,6 +161,9 @@ async function takeExamAsStudent() {
     await radios[0].click();
     if (index === 1) {
       await clickButton('Valider et continuer');
+      await driver.wait(until.elementLocated(By.xpath("//*[contains(normalize-space(.),'2') and contains(normalize-space(.),'/ 2')]")), timeout);
+      assert.equal(await driver.findElements(By.xpath("//button[contains(.,'Précédent') or contains(.,'Retour')] ")).then(x => x.length), 0,
+        'Aucun bouton de retour ne doit permettre de revenir à la question précédente.');
     } else {
       await clickButton('Valider et remettre');
       await driver.wait(until.elementLocated(By.xpath("//h2[normalize-space(.)='Copie remise']")), timeout);
@@ -181,6 +184,7 @@ async function correctPublishAndDownloadAsTeacher() {
   await driver.wait(until.elementLocated(By.xpath("//h2[normalize-space(.)='Résultats, corrections et intégrité']")), timeout);
   await clickButton('Détails');
   await driver.wait(until.elementLocated(By.xpath("//button[normalize-space(.)='Télécharger la feuille PDF']")), timeout);
+  assert.ok(await pageContains('2 / 2'), 'Les deux réponses QCM doivent être automatiquement notées.');
   await clickButton('Télécharger la feuille PDF');
   const teacherPdf = await waitForDownload('feuille-copie-');
   await clickButton('Publier les résultats');
@@ -195,6 +199,7 @@ async function verifyStudentCorrectionsAndPdf() {
   await clickButton('Consulter ma feuille de copie détaillée', card);
   await driver.wait(until.elementLocated(By.xpath("//h3[normalize-space(.)='Résultats et corrigés détaillés']")), timeout);
   assert.ok(await pageContains('Réponse vraie / attendue'), 'Le corrigé détaillé doit être affiché.');
+  assert.ok(await pageContains('casa') && await pageContains('acqua'), 'Les réponses attendues doivent apparaître dans le corrigé élève.');
   await clickButton('Télécharger le PDF', card);
   const studentPdf = await waitForDownload('feuille-copie-corrigee');
   console.log(`OK — élève : résultats publiés, corrigé détaillé et PDF (${studentPdf}).`);
