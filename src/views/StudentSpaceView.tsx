@@ -45,6 +45,7 @@ import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION_SECONDS } from '../utils/quizPresence';
+import { canStudentStartQuiz } from '../utils/quizRetryAvailability';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
@@ -247,8 +248,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     };
   }, [currentUser]);
 
+  // Inclure aussi les quiz déjà soumis : une seconde chance peut rouvrir un quiz clôturé.
   const strictPresenceQuizIdsKey = quizzes
-    .filter(quiz => quiz.status === 'launched' && quiz.attendance_mode === 'strict_presence' && !quiz.is_public)
+    .filter(quiz => quiz.attendance_mode === 'strict_presence' && !quiz.is_public)
     .map(quiz => quiz.id)
     .sort()
     .join('|');
@@ -1244,7 +1246,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isTimedOut = sub?.status === 'timeout';
                     const isMissed = sub?.status === 'missed';
                     const hasRetryAuthorization = retryAuthorizedQuizIds.has(quiz.id);
-                    const isLive = quiz.status === 'launched' && (!hasSubmission || hasRetryAuthorization);
+                    const isLive = canStudentStartQuiz(quiz.status, hasSubmission, hasRetryAuthorization);
 
                     return (
                       <div

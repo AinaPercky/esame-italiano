@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL, QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL } from '../data/quizPresenceMigration';
 import { getPresenceInitializationRemainingSeconds } from './quizPresence';
+import { canStudentStartQuiz } from './quizRetryAvailability';
 
 
 test('the presence migration upgrades legacy tables instead of relying on CREATE TABLE IF NOT EXISTS', () => {
@@ -69,4 +70,24 @@ test('individual retry migration unlocks a completed participant without deletin
   assert.match(retryFunction, /v_class_id/);
   assert.doesNotMatch(retryFunction, /DELETE FROM public\.(quiz_submissions|quiz_attempts)/i);
   assert.match(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL, /NOTIFY pgrst, 'reload schema'/i);
+});
+
+
+
+test('a retry authorization makes a previously completed closed quiz available again', async () => {
+  assert.equal(canStudentStartQuiz('closed', true, true), true);
+  assert.equal(canStudentStartQuiz('closed', true, false), false);
+  assert.equal(canStudentStartQuiz('launched', false, false), true);
+  assert.equal(canStudentStartQuiz('launched', true, false), false);
+
+  const { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } = await import('../data/quizRetryMigration');
+  const retryFunction = QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL.match(
+    /CREATE OR REPLACE FUNCTION public\.grant_quiz_retry[\s\S]*?\$\$;/
+  )?.[0] || '';
+
+  assert.match(retryFunction, /PERFORM public\.launch_quiz_with_presence\(p_quiz_id\)/i);
+  assert.match(retryFunction, /SET status = 'launched'/i);
+  assert.match(retryFunction, /SET launch_id = v_launch\.id/i);
+  assert.match(retryFunction, /presence_status = 'retry_authorized'/i);
+  assert.doesNotMatch(retryFunction, /DELETE FROM public\.(quiz_submissions|quiz_attempts)/i);
 });
