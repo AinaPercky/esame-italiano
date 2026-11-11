@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/utils/quizAnswerMatcher.test.ts src/utils/tutorialQuiz.test.ts src/utils/quizSubmissionAnalysis.test.ts src/utils/quizCategories.test.ts src/utils/lessonPersistence.test.ts src/utils/lessonSpeech.test.ts src/utils/lessonQuiz.test.ts src/utils/lessonProgress.test.ts src/utils/lessonScreens.test.ts src/utils/quizPresence.test.ts src/utils/lessonPdf.test.ts src/components/lessons/LessonPlayer.test.tsx src/utils/writtenExam.test.ts src/services/writtenExamService.integration.test.ts src/components/WrittenExamCopy.test.ts src/components/WrittenExamStudentCopy.test.ts src/utils/verbesTrous.test.ts"
+    "test": "tsx --test src/utils/quizAnswerMatcher.test.ts src/utils/tutorialQuiz.test.ts src/utils/quizSubmissionAnalysis.test.ts src/utils/quizCategories.test.ts src/utils/lessonPersistence.test.ts src/utils/lessonSpeech.test.ts src/utils/lessonQuiz.test.ts src/utils/lessonProgress.test.ts src/utils/lessonScreens.test.ts src/utils/quizPresence.test.ts src/utils/lessonPdf.test.ts src/components/lessons/LessonPlayer.test.tsx src/utils/writtenExam.test.ts src/services/writtenExamService.integration.test.ts src/components/WrittenExamCopy.test.ts src/components/WrittenExamStudentCopy.test.ts src/utils/verbesTrous.test.ts",
+    "test:e2e:selenium": "node scripts/selenium-written-exams.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -38,6 +39,7 @@
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "@types/express": "^4.17.21",
+    "selenium-webdriver": "^4.38.0"
   }
 }
