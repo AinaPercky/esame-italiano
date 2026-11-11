@@ -1150,28 +1150,49 @@ class SupabaseService {
     return (data || []) as QuizParticipant[];
   }
 
-  public async grantQuizRetry(quizId: string, studentId: string, reason: string, _launchId?: string): Promise<number> {
+  public async grantQuizRetry(quizId: string, studentId: string, reason: string, launchId?: string): Promise<number> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour accorder une seconde chance.');
-    const result = await client.rpc('grant_quiz_retry', {
-      p_quiz_id: quizId,
-      p_student_ids: [studentId],
-      p_reason: reason,
-      p_max_attempts: 1
-    });
-    if (!result.error) return Number(result.data?.granted ?? 0);
+    if (!quizId.trim() || !studentId.trim() || !reason.trim()) {
+      throw new Error('Quiz, élève et motif sont obligatoires pour accorder une seconde chance.');
+    }
 
-    // Compatibilité avec la migration de présence précédente (RPC à p_student_id).
-    const isMissingNewRpc = result.error.code === 'PGRST202' || /function .*grant_quiz_retry.*not found/i.test(result.error.message);
-    if (!isMissingNewRpc) throw new Error(`Seconde chance : ${result.error.message}`);
-    const legacy = await client.rpc('grant_quiz_retry', {
+    // La RPC individuelle est prioritaire : elle lie l'autorisation au lancement
+    // courant et met immédiatement le participant en retry_authorized.
+    // L'ancienne RPC JSONB ne met à jour que la table des autorisations et peut
+    // donc annoncer un succès sans débloquer l'élève dans un quiz strict.
+    const individual = await client.rpc('grant_quiz_retry', {
       p_quiz_id: quizId,
       p_student_id: studentId,
-      p_reason: reason,
-      p_launch_id: _launchId || null
+      p_reason: reason.trim(),
+      p_launch_id: launchId || null
     });
-    if (legacy.error) throw new Error(`Seconde chance : ${legacy.error.message}`);
-    return legacy.data?.id || legacy.data?.granted ? 1 : 0;
+
+    if (!individual.error) {
+      const data = individual.data as { id?: string; granted?: number; count?: number } | null;
+      return data?.id ? 1 : Number(data?.granted ?? data?.count ?? 0);
+    }
+
+    const isMissingIndividualRpc =
+      individual.error.code === 'PGRST202' ||
+      individual.error.code === '42883' ||
+      /function .*grant_quiz_retry.*not found|could not find the function/i.test(individual.error.message);
+
+    if (!isMissingIndividualRpc) {
+      throw new Error(`Seconde chance individuelle : ${individual.error.message}`);
+    }
+
+    // Compatibilité avec les bases qui n'ont que l'ancienne signature JSONB.
+    const legacy = await client.rpc('grant_quiz_retry', {
+      p_quiz_id: quizId,
+      p_student_ids: [studentId],
+      p_reason: reason.trim(),
+      p_max_attempts: 1
+    });
+    if (legacy.error) throw new Error(`Seconde chance (compatibilité) : ${legacy.error.message}`);
+
+    const data = legacy.data as { granted?: number; count?: number } | null;
+    return Number(data?.granted ?? data?.count ?? 0);
   }
 
   public async grantQuizRetryForClass(quizId: string, classId: string, reason: string, maxAttempts = 1): Promise<number> {
