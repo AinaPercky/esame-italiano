@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { QUIZ_PRESENCE_ATTEMPTS_MIGRATION_SQL, QUIZ_PRESENCE_STUDENT_INITIALIZATION_MIGRATION_SQL } from '../data/quizPresenceMigration';
 import { getPresenceInitializationRemainingSeconds } from './quizPresence';
-import { canStudentStartQuiz } from './quizRetryAvailability';
+import { canStudentStartQuiz, canSubmitQuizAttempt } from './quizRetryAvailability';
 
 
 test('the presence migration upgrades legacy tables instead of relying on CREATE TABLE IF NOT EXISTS', () => {
@@ -90,4 +90,12 @@ test('a retry authorization makes a previously completed closed quiz available a
   assert.match(retryFunction, /SET launch_id = v_launch\.id/i);
   assert.match(retryFunction, /presence_status = 'retry_authorized'/i);
   assert.doesNotMatch(retryFunction, /DELETE FROM public\.(quiz_submissions|quiz_attempts)/i);
+});
+
+
+test('an existing quiz submission blocks duplicates unless a retry is explicitly authorized', () => {
+  assert.equal(canSubmitQuizAttempt(false, false, false), true);
+  assert.equal(canSubmitQuizAttempt(true, false, false), false);
+  assert.equal(canSubmitQuizAttempt(true, true, false), true);
+  assert.equal(canSubmitQuizAttempt(true, false, true), true);
 });
