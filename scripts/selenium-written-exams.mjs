@@ -142,7 +142,10 @@ async function createAndPublishExam() {
   const json = await driver.findElement(By.css('textarea[aria-label="Contenu JSON ou JSONC du sujet"]'));
   await json.sendKeys(JSON.stringify(definition));
   await clickButton('Charger le sujet');
-  await driver.wait(until.elementLocated(By.xpath(`//*[contains(normalize-space(.), ${JSON.stringify(examTitle)})]`)), timeout);
+  await driver.wait(async () => {
+    const titleInput = await driver.findElements(By.xpath("//label[contains(normalize-space(.),'Titre')]/input"));
+    return titleInput.length > 0 && (await titleInput[0].getAttribute('value')) === examTitle;
+  }, timeout);
   await clickButton('Publier');
   await driver.wait(until.elementLocated(By.xpath(`//p[normalize-space(.)=${JSON.stringify(examTitle)}]`)), timeout);
   console.log('OK — professeur : création du sujet depuis JSON et publication.');
