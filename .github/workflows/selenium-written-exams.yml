@@ -6,7 +6,7 @@ on:
     paths: ['src/**','scripts/selenium-written-exams.mjs','package.json','.github/workflows/selenium-written-exams.yml']
 jobs:
   selenium:
-    if: ${{ secrets.E2E_BASE_URL != '' && secrets.E2E_TEACHER_EMAIL != '' && secrets.E2E_TEACHER_PASSWORD != '' && secrets.E2E_STUDENT_EMAIL != '' && secrets.E2E_STUDENT_PASSWORD != '' }}
+    if: ${{ vars.E2E_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -16,7 +16,7 @@ jobs:
           node-version: 22
           cache: npm
       - uses: browser-actions/setup-chrome@v1
-      - run: npm ci
+      - run: npm install
       - name: Parcours Selenium professeur et élève
         run: npm run test:e2e:selenium
         env:
