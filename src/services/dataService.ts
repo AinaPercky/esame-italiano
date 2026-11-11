@@ -1459,7 +1459,8 @@ export const dataService = {
     classId: string,
     answers: Record<string, string>,
     isTimeout = false,
-    retryGrantId?: string
+    retryGrantId?: string,
+    allowAuthorizedRetry = false
   ): Promise<QuizSubmission> {
     const quiz = this.getQuizById(quizId);
     if (!quiz) throw new Error('Quiz introuvable');
@@ -1484,7 +1485,7 @@ export const dataService = {
       return s.quiz_id === quizId && Boolean(studentId) && s.student_id === studentId;
     });
 
-    if (existingIdx !== -1 && !retryGrantId) {
+    if (existingIdx !== -1 && !retryGrantId && !allowAuthorizedRetry) {
       throw new Error("Vous avez déjà soumis ce quiz et il est définitivement verrouillé.");
     }
 
@@ -1557,7 +1558,7 @@ export const dataService = {
       : await supabaseService.submitQuizSubmissionAtomically(submission);
     if (!savedAtomically) await supabaseService.saveQuizSubmission(submission);
 
-    if (existingIdx !== -1 && retryGrantId) {
+    if (existingIdx !== -1 && (retryGrantId || allowAuthorizedRetry)) {
       state.quizSubmissions.unshift(submission);
     } else if (existingIdx !== -1) {
       state.quizSubmissions[existingIdx] = submission;
