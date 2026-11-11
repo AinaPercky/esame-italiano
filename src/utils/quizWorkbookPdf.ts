@@ -8,7 +8,7 @@ const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const BOTTOM = PAGE_HEIGHT - 18;
 
 const slugify = (value: string) =>
-  value.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase()
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'quiz';
 
 const shuffle = <T,>(items: T[]): T[] => {
