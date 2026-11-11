@@ -2,7 +2,7 @@ name: Selenium - examens écrits
 on:
   workflow_dispatch:
   push:
-    branches: [main, test/written-exams-end-to-end-v2]
+    branches: [main, test/selenium-written-exams]
     paths: ['src/**','scripts/selenium-written-exams.mjs','package.json','.github/workflows/selenium-written-exams.yml']
 jobs:
   selenium:
@@ -14,7 +14,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: browser-actions/setup-chrome@v1
       - run: npm install
       - name: Parcours Selenium professeur et élève
