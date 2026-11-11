@@ -1182,7 +1182,16 @@ class SupabaseService {
       throw new Error(`Seconde chance individuelle : ${individual.error.message}`);
     }
 
-    // Compatibilité avec les bases qui n'ont que l'ancienne signature JSONB.
+    // En suivi live, ne jamais retomber silencieusement sur l'ancienne RPC :
+    // elle ne reçoit pas launch_id et ne peut pas débloquer le participant courant.
+    if (launchId) {
+      throw new Error(
+        'La RPC individuelle de seconde chance est absente de Supabase. ' +
+        'Le quiz en direct n’a pas été modifié; vérifiez que la migration de présence individuelle est installée.'
+      );
+    }
+
+    // Compatibilité uniquement pour les anciens quiz hors lancement live.
     const legacy = await client.rpc('grant_quiz_retry', {
       p_quiz_id: quizId,
       p_student_ids: [studentId],
