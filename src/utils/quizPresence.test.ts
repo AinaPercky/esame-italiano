@@ -73,6 +73,7 @@ test('individual retry migration unlocks a completed participant without deletin
 });
 
 
+
 test('a retry authorization makes a previously completed closed quiz available again', async () => {
   assert.equal(canStudentStartQuiz('closed', true, true), true);
   assert.equal(canStudentStartQuiz('closed', true, false), false);
@@ -81,12 +82,12 @@ test('a retry authorization makes a previously completed closed quiz available a
 
   const { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } = await import('../data/quizRetryMigration');
   const retryFunction = QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL.match(
-    /CREATE OR REPLACE FUNCTION public\\.grant_quiz_retry[\\s\\S]*?\\$\\$;/
+    /CREATE OR REPLACE FUNCTION public\.grant_quiz_retry[\s\S]*?\$\$;/
   )?.[0] || '';
 
-  assert.match(retryFunction, /PERFORM public\\.launch_quiz_with_presence\\(p_quiz_id\\)/i);
+  assert.match(retryFunction, /PERFORM public\.launch_quiz_with_presence\(p_quiz_id\)/i);
   assert.match(retryFunction, /SET status = 'launched'/i);
-  assert.match(retryFunction, /SET launch_id = v_launch\\.id/i);
+  assert.match(retryFunction, /SET launch_id = v_launch\.id/i);
   assert.match(retryFunction, /presence_status = 'retry_authorized'/i);
-  assert.doesNotMatch(retryFunction, /DELETE FROM public\\.(quiz_submissions|quiz_attempts)/i);
+  assert.doesNotMatch(retryFunction, /DELETE FROM public\.(quiz_submissions|quiz_attempts)/i);
 });
