@@ -24,6 +24,7 @@ jobs:
           E2E_TEACHER_PASSWORD: ${{ secrets.E2E_TEACHER_PASSWORD }}
           E2E_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
           E2E_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          E2E_CLASS_ID: ${{ secrets.E2E_CLASS_ID }}
           E2E_WRITTEN_EXAM_TITLE: ${{ secrets.E2E_WRITTEN_EXAM_TITLE }}
       - name: Capture en cas d’échec
         if: failure()
