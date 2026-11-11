@@ -20,7 +20,7 @@ const baseUrl = process.env.E2E_BASE_URL.replace(/\/$/, '');
 const timeout = Number(process.env.E2E_TIMEOUT_MS || 30000);
 const runId = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
 const examTitle = `[E2E Selenium] Cycle écrit ${runId}`;
-const downloadDir = path.resolve(process.env.E2E_DOWNLOAD_DIR || 'e2e-downloads');
+const downloadDir = path.resolve(process.env.E2E_DOWNLOAD_DIR || 'e2e-downloads', runId);
 await fs.mkdir(downloadDir, { recursive: true });
 
 const options = new chrome.Options();
@@ -35,9 +35,12 @@ const driver = await new Builder().forBrowser('chrome').setChromeOptions(options
 
 const exactButton = label => By.xpath(`//button[normalize-space(.)=${JSON.stringify(label)}]`);
 async function clickButton(label, root = driver) {
-  const element = await root.wait(until.elementLocated(exactButton(label)), timeout);
-  await root.wait(until.elementIsVisible(element), timeout);
-  await root.wait(until.elementIsEnabled(element), timeout);
+  const locator = exactButton(label);
+  const element = root === driver
+    ? await driver.wait(until.elementLocated(locator), timeout)
+    : await driver.wait(async () => (await root.findElements(locator))[0] || false, timeout);
+  await driver.wait(until.elementIsVisible(element), timeout);
+  await driver.wait(until.elementIsEnabled(element), timeout);
   await element.click();
   return element;
 }
