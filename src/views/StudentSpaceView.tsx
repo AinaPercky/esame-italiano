@@ -72,6 +72,7 @@ interface PresenceInitializationState {
   phase: 'confirming' | 'initializing' | 'validating';
   launchId?: string;
   deadlineAt?: string;
+  retryAuthorized?: boolean;
 }
 
 export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
@@ -106,6 +107,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [presenceInitSecondsRemaining, setPresenceInitSecondsRemaining] = useState(QUIZ_PRESENCE_INITIALIZATION_SECONDS);
   const [presenceStartError, setPresenceStartError] = useState<string | null>(null);
   const [retryAuthorizedQuizIds, setRetryAuthorizedQuizIds] = useState<Set<string>>(() => new Set());
+  const [isRetryAttempt, setIsRetryAttempt] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [questionSecondsRemaining, setQuestionSecondsRemaining] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
@@ -476,8 +478,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(fbTimer);
   }, [incorrectFeedback?.isOpen]);
 
-  const startQuizSession = (quiz: Quiz, practiceMode: boolean) => {
+  const startQuizSession = (quiz: Quiz, practiceMode: boolean, retryAttempt = false) => {
     primeTimerAudio();
+    setIsRetryAttempt(retryAttempt);
     quizSubmissionLockRef.current = false;
     setIsSubmitting(false);
     setIsPracticeMode(practiceMode);
@@ -525,7 +528,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         }
         setPresenceStartError(null);
         setPresenceInitialization(null);
-        startQuizSession(quiz, false);
+        startQuizSession(quiz, false, presenceInitialization.retryAuthorized === true);
       } catch (error) {
         setPresenceInitialization(null);
         setPresenceStartError(error instanceof Error ? error.message : 'Impossible de démarrer ce quiz.');
@@ -586,7 +589,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           quiz,
           phase: 'initializing',
           launchId: activeLaunch.launch.id,
-          deadlineAt: participant.presence_deadline_at
+          deadlineAt: participant.presence_deadline_at,
+          retryAuthorized
         });
       } catch (error) {
         setPresenceInitialization(null);
@@ -781,13 +785,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         stNum,
         clId,
         answersToSubmit,
-        isAutoTimeout
+        isAutoTimeout,
+        undefined,
+        isRetryAttempt
       );
 
       try { localStorage.removeItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id); } catch { /* stockage local indisponible */ }
       setActiveQuiz(null);
       setCurrentQuestionIndex(0);
       setLastSubmissionResult(result);
+      setIsRetryAttempt(false);
       loadData();
 
       if (isAutoTimeout) {
