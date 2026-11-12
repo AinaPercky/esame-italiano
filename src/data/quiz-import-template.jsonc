@@ -1,7 +1,7 @@
 // Modèle de quiz PerckyLingua, basé sur le quiz fourni « La cucina e il cibo ».
 // L’import accepte les commentaires JSONC commençant par // ou entourés par /* ... */.
 //
-// Champs du quiz : title (obligatoire), category (facultative; Autre par défaut), description (facultative), questions (obligatoire).
+// Champs du quiz : title (obligatoire), level (facultatif : A1, A2, B1, B2, C1, C2), category (facultative; Autre par défaut), description (facultative), questions (obligatoire).
 // duration_minutes est conservé pour compatibilité; le temps réel est la somme des time_limit_seconds.
 //
 // Types de question :
@@ -54,6 +54,7 @@
 
 {
   "title": "La cucina e il cibo",
+  "level": "A1",
   "description": "Test sul vocabolario, il presente indicativo, l'accento tonico e la comprensione della ricetta del ragù alla bolognese",
   "category": "Vocabulaire",
   // Valeur indicative historique; le temps total est recalculé à partir des questions.
