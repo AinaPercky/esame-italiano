@@ -561,13 +561,14 @@ export const dataService = {
     };
   },
 
-  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false): Promise<Exam> {
+  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false, level?: Exam['level']): Promise<Exam> {
     if (!title.trim() || !classId) throw new Error('Titre et classe obligatoires');
     const newExam: Exam = {
       id: generateUUID(),
       class_id: classId,
       title: title.trim(),
       description: description.trim(),
+      level: level || null,
       exam_date: examDate || new Date().toISOString().split('T')[0],
       status: 'in_progress',
       created_at: new Date().toISOString()
@@ -1202,6 +1203,7 @@ export const dataService = {
     title: string;
     description?: string;
     category?: QuizCategory;
+    level?: Quiz['level'];
     class_id: string;
     class_ids?: string[];
     duration_minutes: number;
@@ -1232,6 +1234,7 @@ export const dataService = {
       public_id: data.is_public ? generateUUID() : undefined,
       is_public: data.is_public ?? false,
       category: data.category || 'Autre',
+      level: data.level || null,
       title: data.title.trim(),
       description: data.description?.trim(),
       class_id: data.class_id, // Keep for backward compatibility (first class)
