@@ -2,6 +2,9 @@
  * Modèles de données pour PerckyLingua
  */
 
+export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
+export type CEFRLevel = typeof CEFR_LEVELS[number];
+
 export interface ClassRoom {
   id: string;
   name: string;
@@ -41,6 +44,7 @@ export interface Exam {
   class_id: string;
   title: string;
   description?: string;
+  level?: CEFRLevel | null;
   exam_date: string;
   status: 'draft' | 'in_progress' | 'completed';
   created_at: string;
@@ -188,6 +192,7 @@ export interface Quiz {
   attendance_mode?: 'legacy' | 'strict_presence';
   presence_window_seconds?: number;
   category?: QuizCategory;
+  level?: CEFRLevel | null;
   title: string;
   description?: string;
   class_id: string; // Primary class (backward compatibility)
