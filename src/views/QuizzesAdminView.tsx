@@ -1235,6 +1235,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
                             {quiz.category || 'Autre'}
                           </span>
+                          {quiz.level && <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">{quiz.level}</span>}
                           {quiz.class_ids && quiz.class_ids.length > 1 ? (
                             quiz.class_ids.map(cid => {
                               const c = classes.find(item => item.id === cid);
