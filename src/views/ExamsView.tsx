@@ -12,7 +12,7 @@ import {
   ArrowRight,
   Shuffle
 } from 'lucide-react';
-import { Exam, ClassRoom, ExamRubric } from '../types';
+import { Exam, ClassRoom, ExamRubric, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
@@ -39,6 +39,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const [newClassId, setNewClassId] = useState(classes[0]?.id || '');
   const [newDescription, setNewDescription] = useState('');
   const [newExamDate, setNewExamDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newExamLevel, setNewExamLevel] = useState<CEFRLevel | ''>('');
 
   // Rubric Editing inside Details Modal
   const [rubricsDraft, setRubricsDraft] = useState<ExamRubric[]>([]);
@@ -72,10 +73,11 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     if (!newTitle.trim() || !newClassId) return;
 
     try {
-      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate);
+      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate, false, newExamLevel || null);
       setIsCreateModalOpen(false);
       setNewTitle('');
       setNewDescription('');
+      setNewExamLevel('');
       onRefresh();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
@@ -144,6 +146,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           onClick={() => {
             setNewTitle('');
             setNewDescription('');
+            setNewExamLevel('');
             setIsCreateModalOpen(true);
           }}
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-2xs transition-colors self-stretch sm:self-auto min-h-[44px]"
@@ -184,6 +187,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <h3 className="font-semibold text-slate-900 text-lg mb-1">
                 {exam.title}
               </h3>
+              {exam.level && <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-800">{exam.level}</span>}
               <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
                 {exam.description || 'Aucune description spécifique.'}
               </p>
@@ -294,6 +298,18 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Niveau (CECRL)</label>
+                <select
+                  value={newExamLevel}
+                  onChange={(e) => setNewExamLevel(e.target.value as CEFRLevel | '')}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white min-h-[44px]"
+                >
+                  <option value="">Non défini</option>
+                  {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Description / Consignes générales (facultatif)
                 </label>
@@ -341,6 +357,22 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 <p className="text-xs text-slate-500">
                   Total : {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
                 </p>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  Niveau (CECRL)
+                  <select
+                    value={selectedExamForDetails.level || ''}
+                    onChange={(e) => {
+                      const level = e.target.value as CEFRLevel | '';
+                      dataService.updateExam(selectedExamForDetails.id, { level: level || null });
+                      setSelectedExamForDetails(previous => previous ? { ...previous, level: level || null } : previous);
+                      onRefresh();
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                  >
+                    <option value="">Non défini</option>
+                    {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
+                  </select>
+                </label>
               </div>
               <button
                 type="button"

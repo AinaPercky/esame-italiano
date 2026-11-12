@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {AlertCircle,ArrowDown,ArrowUp,Download,FilePlus2,Layers3,Plus,Save,ShieldAlert,Trash2,Upload} from 'lucide-react';
 import {dataService} from '../services/dataService';
+import {CEFR_LEVELS} from '../types';
 import {writtenExamService} from '../services/writtenExamService';
 import {A1_TEMPLATE,L135_TEMPLATE,WrittenExam,WrittenQuestion,WrittenSection,createQuestion,createSection,createWrittenExamFromTemplate,getWrittenExamTotals,getDefaultWrittenQuestionTimeLimit,makeId,validateWrittenExam} from '../utils/writtenExam';
 import {getQuestionExpectedAnswers} from '../utils/quizAnswerMatcher';
@@ -76,7 +77,7 @@ export const WrittenExamsView:React.FC<{classes:Array<{id:string;name:string}>}>
    <fieldset disabled={examLocked} className="min-w-0 space-y-5 border-0 p-0 disabled:opacity-75">
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
     <label className="text-xs font-semibold">Titre<input className="mt-1 w-full rounded-lg border p-2 text-sm" value={exam.title} onChange={e=>setExam({...exam,title:e.target.value})}/></label>
-    <label className="text-xs font-semibold">Niveau CECRL<input className="mt-1 w-full rounded-lg border p-2 text-sm" placeholder="A1, A2, B1…" value={exam.level} onChange={e=>setExam({...exam,level:e.target.value})}/></label>
+    <label className="text-xs font-semibold">Niveau CECRL<select className="mt-1 w-full rounded-lg border p-2 text-sm" value={exam.level} onChange={e=>setExam({...exam,level:e.target.value})}><option value="">Non défini</option>{CEFR_LEVELS.map(level=><option key={level} value={level}>{level}</option>)}</select></label>
     <label className="text-xs font-semibold">Durée globale (minutes)<input type="number" min="1" className="mt-1 w-full rounded-lg border p-2 text-sm" value={exam.duration_minutes} onChange={e=>setExam({...exam,duration_minutes:Number(e.target.value)})}/></label>
     <label className="text-xs font-semibold">Langue cible<input className="mt-1 w-full rounded-lg border p-2 text-sm" value={exam.target_language} onChange={e=>setExam({...exam,target_language:e.target.value})}/></label>
     <label className="text-xs font-semibold">Langue des consignes<input className="mt-1 w-full rounded-lg border p-2 text-sm" value={exam.instruction_language} onChange={e=>setExam({...exam,instruction_language:e.target.value})}/></label>

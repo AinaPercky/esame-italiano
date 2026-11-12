@@ -40,7 +40,7 @@ import {
   Search,
   SlidersHorizontal
 } from 'lucide-react';
-import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QuizParticipant, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory } from '../types';
+import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QuizParticipant, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -113,6 +113,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [quizTitle, setQuizTitle] = useState('');
   const [quizDescription, setQuizDescription] = useState('');
   const [quizCategory, setQuizCategory] = useState<QuizCategory | ''>('');
+  const [quizLevel, setQuizLevel] = useState<CEFRLevel | ''>('');
   const [selectedQuizClassIds, setSelectedQuizClassIds] = useState<string[]>(classes[0] ? [classes[0].id] : []);
   const [quizDuration, setQuizDuration] = useState(10);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -203,6 +204,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       title: quizTitle || 'Sans titre',
       description: quizDescription || '',
       category: quizCategory || 'Autre',
+      level: quizLevel || null,
       duration_minutes: quizDuration || 10,
       questions: questions.map((q) => {
         const item: any = {
@@ -326,6 +328,9 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       }
       if (typeof parsed.category === 'string') {
         setQuizCategory(normalizeQuizCategory(parsed.category));
+      }
+      if (typeof parsed.level === 'string' && CEFR_LEVELS.includes(parsed.level as CEFRLevel)) {
+        setQuizLevel(parsed.level as CEFRLevel);
       }
       if (parsed.duration_minutes) {
         setQuizDuration(Number(parsed.duration_minutes) || 10);
@@ -498,6 +503,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setQuizTitle('');
     setQuizDescription('');
     setQuizCategory('');
+    setQuizLevel('');
     setSelectedQuizClassIds(selectedClassId ? [selectedClassId] : (classes[0] ? [classes[0].id] : []));
     setQuizDuration(1);
     setQuestions([
@@ -520,6 +526,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setQuizTitle(quiz.title);
     setQuizDescription(quiz.description || '');
     setQuizCategory(normalizeQuizCategory(quiz.category));
+    setQuizLevel(quiz.level || '');
     const initialClassIds = quiz.class_ids && quiz.class_ids.length > 0 ? quiz.class_ids : (quiz.class_id ? [quiz.class_id] : []);
     setSelectedQuizClassIds(initialClassIds.length > 0 ? initialClassIds : (selectedClassId ? [selectedClassId] : []));
     const normalizedQuestions: QuizQuestion[] = quiz.questions
@@ -651,6 +658,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         title: quizTitle,
         description: quizDescription,
         category: quizCategory,
+        level: quizLevel || null,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -662,6 +670,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         title: quizTitle,
         description: quizDescription,
         category: quizCategory,
+        level: quizLevel || null,
         class_id: primaryClassId,
         class_ids: selectedQuizClassIds,
         duration_minutes: Math.max(1, Math.ceil(getQuizTotalTimeSeconds({ duration_minutes: quizDuration, questions: normalizedQuestions }) / 60)),
@@ -1226,6 +1235,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
                             {quiz.category || 'Autre'}
                           </span>
+                          {quiz.level && <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">{quiz.level}</span>}
                           {quiz.class_ids && quiz.class_ids.length > 1 ? (
                             quiz.class_ids.map(cid => {
                               const c = classes.find(item => item.id === cid);
@@ -1947,6 +1957,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   >
                     <option value="" disabled>Sélectionner une catégorie</option>
                     {QUIZ_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Niveau (CECRL)</label>
+                  <select
+                    value={quizLevel}
+                    onChange={(e) => setQuizLevel(e.target.value as CEFRLevel | '')}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">Non défini</option>
+                    {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
                   </select>
                 </div>
 
