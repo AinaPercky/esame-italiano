@@ -353,23 +353,20 @@ class SupabaseService {
       const { count: studentsCount } = await testClient.from('students').select('*', { count: 'exact', head: true });
       const { count: examsCount } = await testClient.from('exams').select('*', { count: 'exact', head: true });
       const { count: evalsCount } = await testClient.from('evaluations').select('*', { count: 'exact', head: true });
-      const { count: quizzesCount, error: quizzesError } = await testClient
-        .from('quizzes')
-        .select('*', { count: 'exact', head: true });
-      const { count: quizSubmissionsCount, error: submissionsError } = await testClient
-        .from('quiz_submissions')
-        .select('*', { count: 'exact', head: true });
-
-      if (quizzesError || submissionsError) {
+      // Les tables quiz ne sont volontairement plus lisibles directement avec la clé anon.
+      // Vérifier le catalogue public via la RPC sécurisée plutôt que contourner les nouvelles RLS.
+      const { data: publicQuizzes, error: quizzesError } = await testClient.rpc('get_public_quiz_catalog');
+      const quizzesCount = Array.isArray(publicQuizzes) ? publicQuizzes.length : 0;
+      if (quizzesError) {
         return {
           success: false,
-          message: "La connexion Supabase fonctionne, mais les tables des quiz sont absentes ou inaccessibles. Copiez et exécutez la migration « Ajouter les tables Quiz » depuis ce panneau Paramètres."
+          message: "La connexion Supabase fonctionne, mais la RPC sécurisée des quiz est absente ou inaccessible. Appliquez la migration de sécurité des quiz."
         };
       }
 
       return {
         success: true,
-        message: `Connexion Supabase réussie. Tables des quiz et résultats vérifiées.`,
+        message: `Connexion Supabase réussie. Catalogue public des quiz vérifié.`,
         details: {
           tablesCreated: true,
           classesCount: classesCount || 0,
@@ -377,7 +374,6 @@ class SupabaseService {
           examsCount: examsCount || 0,
           evaluationsCount: evalsCount || 0,
           quizzesCount: quizzesCount || 0,
-          quizSubmissionsCount: quizSubmissionsCount || 0
         }
       };
     } catch (err: any) {
@@ -913,18 +909,21 @@ class SupabaseService {
   public async fetchPublicQuiz(publicIdOrId: string): Promise<Quiz | null> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase n'est pas encore configuré.");
-
     const clean = (publicIdOrId || '').trim();
     if (!clean) return null;
-
-    const mapRowToQuiz = (q: any): Quiz => ({
+    const { data, error } = await client.rpc('get_public_quiz', { p_public_id: clean });
+    if (error) throw new Error(`Chargement sécurisé du quiz public : ${error.message}`);
+    if (!data || typeof data !== 'object') return null;
+    const q: any = data;
+    return {
       id: q.id,
       public_id: q.public_id || undefined,
-      is_public: true, // Force public for external access
+      is_public: true,
       attendance_mode: q.attendance_mode || 'legacy',
       class_id: q.class_id,
       class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
       category: normalizeQuizCategory(q.category),
+      level: q.level ?? null,
       title: q.title,
       description: q.description || undefined,
       created_at: q.created_at,
@@ -934,37 +933,7 @@ class SupabaseService {
       expires_at: q.expires_at || undefined,
       questions: Array.isArray(q.questions) ? q.questions : [],
       total_points: Number(q.total_points) || 20
-    });
-
-    // Évite une comparaison UUID = slug qui provoque une 400 côté PostgREST.
-    if (isUUID(clean)) {
-      const { data: byPublicId } = await client
-        .from('quizzes')
-        .select('*')
-        .eq('public_id', clean)
-        .maybeSingle();
-
-      if (byPublicId) return mapRowToQuiz(byPublicId);
-    }
-
-    const { data: byId } = await client
-      .from('quizzes')
-      .select('*')
-      .eq('id', clean)
-      .maybeSingle();
-
-    if (byId) return mapRowToQuiz(byId);
-
-    // Fallback: fetch any quiz if exact match fails
-    const { data: anyQuiz } = await client
-      .from('quizzes')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-
-    if (anyQuiz) return mapRowToQuiz(anyQuiz);
-
-    return null;
+    };
   }
 
   public async deleteQuiz(id: string): Promise<void> {
@@ -1167,52 +1136,89 @@ class SupabaseService {
     }));
   }
 
-  public async submitQuizSubmissionAtomically(submission: QuizSubmission): Promise<boolean> {
+  public async submitQuizSubmissionAtomically(submission: QuizSubmission): Promise<QuizSubmission | null> {
     const client = this.getClient();
     if (!client) {
       if (this.isConfigured()) throw new Error('Le client Supabase est indisponible; le résultat n’a pas été enregistré.');
-      return false;
+      return null;
     }
 
     const { error } = await client.rpc('submit_quiz_submission', {
       p_submission: {
-        id: submission.id,
-        quiz_id: submission.quiz_id,
-        quiz_title: submission.quiz_title,
-        student_id: submission.student_id,
-        student_name: submission.student_name,
-        student_number: submission.student_number || null,
-        class_id: submission.class_id,
-        class_name: submission.class_name || null,
-        started_at: submission.started_at,
-        submitted_at: submission.submitted_at || null,
-        answers: submission.answers || {},
-        score: submission.score,
-        max_score: submission.max_score,
-        score_20: submission.score_20,
-        status: submission.status,
-        feedback: submission.feedback || {},
-        date: submission.date
+        id: submission.id, quiz_id: submission.quiz_id, quiz_title: submission.quiz_title,
+        student_id: submission.student_id, student_name: submission.student_name,
+        student_number: submission.student_number || null, class_id: submission.class_id,
+        class_name: submission.class_name || null, started_at: submission.started_at,
+        submitted_at: submission.submitted_at || null, answers: submission.answers || {},
+        status: submission.status, date: submission.date
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
-    return true;
+
+    const { data, error: readError } = await client.from('quiz_submissions').select('*')
+      .eq('quiz_id', submission.quiz_id).eq('student_id', submission.student_id)
+      .order('attempt_number', { ascending: false }).limit(1).maybeSingle();
+    if (readError) throw new Error(`Lecture du résultat corrigé par le serveur : ${readError.message}`);
+    if (!data) throw new Error('Le serveur a enregistré le quiz sans retourner son résultat.');
+    return {
+      ...submission,
+      id: data.id,
+      score: Number(data.score) || 0,
+      max_score: Number(data.max_score) || 20,
+      score_20: Number(data.score_20) || 0,
+      status: data.status,
+      feedback: data.feedback || {},
+      submitted_at: data.submitted_at || submission.submitted_at,
+      attempt_number: Number(data.attempt_number) || submission.attempt_number
+    };
   }
 
-  public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<boolean> {
+  public async evaluateQuizQuestion(quizId: string, questionId: string, answer: string): Promise<{
+    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string;
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour corriger une réponse.');
+    const { data, error } = await client.rpc('evaluate_quiz_question', {
+      p_quiz_id: quizId, p_question_id: questionId, p_answer: answer
+    });
+    if (error) throw new Error(`Correction serveur du quiz : ${error.message}`);
+    return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
+  }
+
+  public async evaluatePublicQuizQuestion(publicId: string, questionId: string, answer: string): Promise<{
+    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string;
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour corriger une réponse.');
+    const { data, error } = await client.rpc('evaluate_public_quiz_question', {
+      p_public_id: publicId, p_question_id: questionId, p_answer: answer
+    });
+    if (error) throw new Error(`Correction serveur du quiz public : ${error.message}`);
+    return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
+  }
+
+  public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<QuizSubmission> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour soumettre ce quiz.');
-    const { error } = await client.rpc('submit_quiz_presence_submission', {
+    const { data, error } = await client.rpc('submit_quiz_presence_submission', {
       p_submission: {
         id: submission.id, quiz_id: submission.quiz_id, student_name: submission.student_name,
         student_number: submission.student_number || null, class_id: submission.class_id,
         class_name: submission.class_name || null, started_at: submission.started_at,
-        answers: submission.answers || {}, score: submission.score, max_score: submission.max_score,
-        score_20: submission.score_20, status: submission.status, feedback: submission.feedback || {}
+        answers: submission.answers || {}, status: submission.status
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
-    return true;
+    return {
+      ...submission,
+      score: Number(data?.score) || 0,
+      max_score: Number(data?.max_score) || submission.max_score,
+      score_20: Number(data?.score_20) || 0,
+      status: data?.status || submission.status,
+      feedback: data?.feedback || {},
+      submitted_at: data?.submitted_at || submission.submitted_at,
+      attempt_number: Number(data?.attempt_number) || submission.attempt_number
+    };
   }
 
   public async syncQuizData(quizzes: Quiz[] = [], submissions: QuizSubmission[] = []): Promise<void> {
@@ -1434,6 +1440,22 @@ class SupabaseService {
     }
 
     try {
+      const { data: authData } = await client.auth.getUser();
+      const isAuthenticated = Boolean(authData.user);
+      let isTeacher = false;
+      if (isAuthenticated) {
+        const { data, error } = await client.rpc('quiz_is_teacher');
+        if (error) throw new Error(`Vérification du rôle quiz : ${error.message}`);
+        isTeacher = Boolean(data);
+      }
+      const quizzesRequest = isTeacher
+        ? client.from('quizzes').select('*')
+        : isAuthenticated
+          ? client.rpc('get_student_quiz_catalog')
+          : client.rpc('get_public_quiz_catalog');
+      const quizSubmissionsRequest = isAuthenticated
+        ? client.from('quiz_submissions').select('*')
+        : Promise.resolve({ data: [], error: null });
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1453,8 +1475,8 @@ class SupabaseService {
         client.from('evaluations').select('*'),
         client.from('evaluation_details').select('*'),
         client.from('exam_pass_order').select('*'),
-        client.from('quizzes').select('*'),
-        client.from('quiz_submissions').select('*'),
+        quizzesRequest,
+        quizSubmissionsRequest,
         client.from('class_enrollments').select('student_id,class_id,status')
       ]);
 
@@ -1550,7 +1572,7 @@ class SupabaseService {
         created_at: po.created_at
       }));
 
-      const quizzes: Quiz[] = (quizzesData || []).map(q => ({
+      const quizzes: Quiz[] = (quizzesData || []).map((q: any) => ({
         id: q.id,
         public_id: q.public_id || undefined,
         is_public: Boolean(q.is_public),

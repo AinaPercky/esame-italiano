@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { Quiz } from '../types';
 import {
@@ -17,7 +16,6 @@ import { PublicQuizQuestionScreen } from './publicQuiz/PublicQuizQuestionScreen'
 import { PublicQuizResultScreen } from './publicQuiz/PublicQuizResultScreen';
 
 import {
-  evaluateQuizAnswers,
   getQuizTimeTone,
   QuizFeedbackEntry,
   QuizEvaluationResult,
@@ -142,7 +140,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   // Submit the entire quiz (all answers collected so far)
   // ─────────────────────────────────────────────────────────────────────────
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (hasSubmittedRef.current) return;
     const q = quizRef.current;
     const qId = activeQuizIdRef.current;
@@ -153,34 +151,61 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-
     if (correctionAdvanceTimeoutRef.current) {
       clearTimeout(correctionAdvanceTimeoutRef.current);
       correctionAdvanceTimeoutRef.current = null;
     }
-    const evaluation = evaluateQuizAnswers(q, answersRef.current);
-    setResult(evaluation);
-    if (qId) clearStorage(qId);
-    setScreen('result');
+
+    try {
+      const publicId = qId || q.public_id || q.id;
+      const feedback: Record<string, QuizFeedbackEntry> = {};
+      let rawScore = 0;
+      for (const question of q.questions || []) {
+        const entry = await supabaseService.evaluatePublicQuizQuestion(
+          publicId,
+          question.id,
+          answersRef.current[question.id] || ''
+        );
+        feedback[question.id] = entry;
+        rawScore += Number(entry.points) || 0;
+      }
+      const maxScore = Number(q.total_points) || 20;
+      setResult({
+        rawScore,
+        maxScore,
+        score20: maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0,
+        feedback
+      });
+      if (qId) clearStorage(qId);
+      setScreen('result');
+    } catch (error: any) {
+      hasSubmittedRef.current = false;
+      setLoadError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
+      setScreen('start');
+    }
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Validate current question and compute feedback
   // ─────────────────────────────────────────────────────────────────────────
-  const doValidate = useCallback((questionId: string) => {
+  const doValidate = useCallback(async (questionId: string) => {
     const q = quizRef.current;
     if (!q) return;
-
-    const currentAnswers = answersRef.current;
-    const evalResult = evaluateQuizAnswers(q, currentAnswers);
-    const entry = evalResult.feedback[questionId];
-
-    if (entry) {
+    const publicId = activeQuizIdRef.current || q.public_id || q.id;
+    try {
+      const entry = await supabaseService.evaluatePublicQuizQuestion(
+        publicId,
+        questionId,
+        answersRef.current[questionId] || ''
+      );
       setPerQuestionFeedback((prev) => ({ ...prev, [questionId]: entry }));
       perQuestionFeedbackRef.current = { ...perQuestionFeedbackRef.current, [questionId]: entry };
+      setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
+      validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
+    } catch (error: any) {
+      setLoadError(error?.message || 'La correction sécurisée est indisponible. Rechargez le quiz.');
+      setScreen('start');
     }
-    setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
-    validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -229,14 +254,13 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setScreen('loading');
       setLoadError(null);
 
-      let q: Quiz | null = dataService.getPublicQuiz(activeQuizId);
-
-      if (!q) {
-        try {
-          q = await supabaseService.fetchPublicQuiz(activeQuizId);
-        } catch (err) {
-          console.error('Erreur chargement quiz distant:', err);
-        }
+      let q: Quiz | null = null;
+      try {
+        // Toujours charger une version nettoyée par le serveur, même si l'état local
+        // du navigateur contient une copie professeur avec les réponses attendues.
+        q = await supabaseService.fetchPublicQuiz(activeQuizId);
+      } catch (err) {
+        console.error('Erreur chargement sécurisé du quiz public:', err);
       }
 
       if (cancelled) return;
@@ -410,16 +434,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const question = q.questions[currentIndex];
     if (!question) return;
 
-    // Auto‑validate (creates feedback, records zero if answer empty)
+    // Auto-validate through the server. Never inspect an answer key in the browser.
     if (!validatedSetRef.current[question.id]) {
-      doValidate(question.id);
-    }
-
-    // A visible correction uses its own thirteen-second pause; retain the existing
-    // fallback delay only when no per-question correction is shown.
-    const correction = perQuestionFeedbackRef.current[question.id]
-      || evaluateQuizAnswers(q, answersRef.current).feedback[question.id];
-    if (showCorrectionAtEnd || !correction) {
+      void doValidate(question.id);
+    } else {
       scheduleAdvanceAfterCorrection(currentIndex, q.questions.length);
     }
   }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, scheduleAdvanceAfterCorrection, showCorrectionAtEnd]);

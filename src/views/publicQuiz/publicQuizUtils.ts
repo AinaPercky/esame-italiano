@@ -10,6 +10,7 @@ export interface QuizFeedbackEntry {
   points: number;
   expected: string;
   studentAnswer: string;
+  explanation?: string;
 }
 
 export interface QuizEvaluationResult {
