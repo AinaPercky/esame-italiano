@@ -14,7 +14,6 @@ import {
   Sparkles, 
   Calendar, 
   HelpCircle, 
-  ArrowRight, 
   ShieldCheck, 
   FileText,
   RotateCcw,
@@ -36,10 +35,16 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
-import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
+import {
+  isTimerBeepEnabled,
+  playTimerBeep,
+  primeTimerAudio,
+  setTimerBeepEnabled,
+  useAssessmentTimerBeeper
+} from '../utils/timerAudio';
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
-import { formatCorrectReorderAnswer, formatReorderAnswer, getReorderAnswerIds, isReorderAnswerCorrect } from '../utils/quizReorder';
+import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
 import { isQuestionAnswerCorrect, calculateQuestionPointsEarned, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
@@ -49,9 +54,23 @@ import { canStudentStartQuiz } from '../utils/quizRetryAvailability';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
+import {
+  AssessmentCorrectionModal,
+  AssessmentQcmOptions,
+  AssessmentQuestionHeader,
+  AssessmentShell
+} from '../components/AssessmentRunner';
 import { LessonsStudentView } from './LessonsStudentView';
 import { StudentWrittenExamsView } from './StudentWrittenExamsView';
 import { ExercisesStudentView } from './ExercisesStudentView';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  LearningModuleHeader,
+  StatusBadge
+} from '../components/LearningCard';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
@@ -118,8 +137,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const quizAnswersRef = useRef<Record<string, string>>({});
   quizAnswersRef.current = quizAnswers;
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
-  const questionTimerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
-  const finalQuizBeepSecondRef = useRef<number>(-1);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isTimerBeepEnabled());
   const quizSubmissionLockRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
@@ -127,6 +145,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
   const [incompletePhraseConfirmation, setIncompletePhraseConfirmation] = useState<number | null>(null);
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    setTimerBeepEnabled(next);
+    if (next) {
+      primeTimerAudio();
+      playTimerBeep(true);
+    }
+  };
 
   // Correction & Explication si la réponse est fausse (affichée 13 secondes, suspend les chronomètres)
   const [incorrectFeedback, setIncorrectFeedback] = useState<{
@@ -419,28 +447,19 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(timer);
   }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen, isPracticeMode]);
 
-  // Bip global répété chaque seconde durant les cinq dernières secondes (quiz officiels et tutoriel).
-  useEffect(() => {
-    if (!activeQuiz || incorrectFeedback?.isOpen || quizSecondsRemaining <= 0 || quizSecondsRemaining > 5) return;
-    if (finalQuizBeepSecondRef.current === quizSecondsRemaining) return;
-    finalQuizBeepSecondRef.current = quizSecondsRemaining;
-    playTimerBeep();
-  }, [activeQuiz, quizSecondsRemaining, incorrectFeedback?.isOpen]);
+  const activeQuestionMaxSeconds = activeQuiz
+    ? getQuestionTimeSeconds(activeQuiz.questions[currentQuestionIndex])
+    : 30;
 
-  // Alerte sonore du temps de chaque question : moitié, cinq secondes puis les trois dernières secondes.
-  useEffect(() => {
-    if (!activeQuiz || questionSecondsRemaining <= 0) return;
-    if (quizSecondsRemaining <= 5) return;
-    const questionKey = `${activeQuiz.id}:${currentQuestionIndex}`;
-    if (questionTimerCueRef.current.questionKey !== questionKey) {
-      questionTimerCueRef.current = { questionKey, played: new Set() };
-    }
-    const questionSeconds = getQuestionTimeSeconds(activeQuiz.questions[currentQuestionIndex]);
-    const cueSeconds = new Set([Math.ceil(questionSeconds / 2), 5, 3, 2, 1]);
-    if (!cueSeconds.has(questionSecondsRemaining) || questionTimerCueRef.current.played.has(questionSecondsRemaining)) return;
-    questionTimerCueRef.current.played.add(questionSecondsRemaining);
-    playTimerBeep();
-  }, [activeQuiz, currentQuestionIndex, questionSecondsRemaining, quizSecondsRemaining]);
+  useAssessmentTimerBeeper({
+    active: Boolean(activeQuiz),
+    paused: Boolean(incorrectFeedback?.isOpen),
+    questionKey: activeQuiz ? `${activeQuiz.id}:${currentQuestionIndex}` : '',
+    questionTotalSeconds: activeQuestionMaxSeconds,
+    questionSecondsRemaining: activeQuiz ? questionSecondsRemaining : null,
+    totalSecondsRemaining: activeQuiz ? quizSecondsRemaining : null,
+    soundEnabled
+  });
 
   // 2. Chronomètre dédié par Question (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -491,8 +510,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setTutorialResult(null);
     setTimeoutNotice(false);
     setAntiCheatNotice(false);
-    questionTimerCueRef.current = { questionKey: `${quiz.id}:0`, played: new Set() };
-    finalQuizBeepSecondRef.current = -1;
     let restoredAnswers: Record<string, string> = {};
     if (!practiceMode) { try { const saved = localStorage.getItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + quiz.id); if (saved) { const parsed = JSON.parse(saved); if (parsed && typeof parsed === 'object') restoredAnswers = parsed; } } catch { /* ignorer un brouillon illisible */ } }
     quizAnswersRef.current = restoredAnswers;
@@ -913,13 +930,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     image.src = imageUrl;
   };
 
-  // Formatage chronomètre mm:ss
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   const cumulativeSubmissions = dailyGrades
     .flatMap(grade => grade.submissions)
     .filter(submission =>
@@ -1235,36 +1245,60 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
             )}
 
-            <section className="flex flex-col gap-4 rounded-2xl border border-[#C7DCEB] bg-gradient-to-br from-[#F4F8FB] to-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center rounded-full border border-[#C7DCEB] bg-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#0B3C5D]">Entraînement · essais illimités</span>
-                  <span className="text-[10px] font-semibold text-slate-500">5 questions · environ 2 min 15</span>
+            <LearningModuleHeader
+              kicker="Évaluations & entraînement"
+              title="Quiz du professeur"
+              description="Passez les quiz pendant leur disponibilité en direct ou testez le format complet avec le tutoriel."
+            />
+
+            <LearningCard>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1.5">
+                  <LearningCardHeader
+                    kicker="Entraînement · Essais illimités"
+                    status={<StatusBadge tone="info" icon={<Clock className="h-3 w-3" />}>5 questions · ~2 min 15</StatusBadge>}
+                  />
+                  <h2 className="font-display text-base font-extrabold text-[#072a3f] sm:text-lg">
+                    Découvrir comment passer un quiz
+                  </h2>
+                  <p className="max-w-3xl text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
+                    Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Le résultat reste local et n’affecte pas vos notes.
+                  </p>
                 </div>
-                <h2 className="font-display text-base font-bold text-[#072A3F]">Découvrir comment passer un quiz</h2>
-                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-600">Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Un changement d’onglet clôt l’essai, mais son résultat reste local : il n’est pas envoyé à la base ni pris en compte dans vos notes et classements.</p>
+                <button
+                  type="button"
+                  onClick={handleStartTutorial}
+                  className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0b3c5d] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#072a3f] whitespace-nowrap sm:text-[13px]"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  <span>Démarrer le tutoriel</span>
+                </button>
               </div>
-              <button type="button" onClick={handleStartTutorial} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#072A3F]">
-                <Play className="h-4 w-4 fill-current" /> Démarrer le tutoriel
-              </button>
-            </section>
+            </LearningCard>
 
             {/* Quizzes List */}
             <div className="space-y-4">
-              <h2 className="student-section-title">
-                <BookOpen className="w-4 h-4 text-amber-800" />
-                <span>Quiz assignés à votre classe</span>
-              </h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="student-section-title">
+                  <BookOpen className="h-5 w-5 text-[#0b3c5d]" />
+                  <span>Quiz assignés à votre classe</span>
+                </h2>
+                {quizzes.length > 0 && (
+                  <span className="text-xs font-bold tabular-nums text-[#607f93]">
+                    {quizzes.length} quiz
+                  </span>
+                )}
+              </div>
 
               {quizzes.length === 0 ? (
-                <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-slate-500 text-xs">
+                <div className="rounded-[22px] border border-dashed border-[#b9cfdd] bg-white/90 p-8 text-center text-xs text-[#607f93] sm:text-sm">
                   Aucun quiz n'a encore été créé pour votre classe par le professeur.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {quizzes.map(quiz => {
                     const done = hasCompletedQuiz(quiz.id);
-                    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+                    const { stId, stName, stNum } = getStudentQueryInfo();
                     const sub = mySubmissions.find(s => s.quiz_id === quiz.id)
                       || dataService.getStudentSubmissions(stId, stName, stNum).find(s => s.quiz_id === quiz.id);
                     const hasSubmission = done || Boolean(sub);
@@ -1273,117 +1307,132 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                     const isMissed = sub?.status === 'missed';
                     const hasRetryAuthorization = retryAuthorizedQuizIds.has(quiz.id);
                     const isLive = canStudentStartQuiz(quiz.status, hasSubmission, hasRetryAuthorization);
+                    const durationText = formatQuizDuration(getQuizTotalTimeSeconds(quiz));
+
+                    const statusBadge = isLive ? (
+                      <StatusBadge
+                        tone="live"
+                        icon={<Play className="h-3 w-3 fill-current" />}
+                        title="Le quiz reste accessible jusqu’à sa clôture manuelle."
+                      >
+                        {hasRetryAuthorization ? 'Seconde chance' : 'En direct'}
+                      </StatusBadge>
+                    ) : isCompleted ? (
+                      <StatusBadge tone="success" icon={<Check className="h-3 w-3" />}>
+                        Quiz soumis
+                      </StatusBadge>
+                    ) : isTimedOut ? (
+                      <StatusBadge tone="warning" icon={<AlertCircle className="h-3 w-3" />}>
+                        Clôturé auto
+                      </StatusBadge>
+                    ) : isMissed ? (
+                      <StatusBadge tone="danger" icon={<Clock className="h-3 w-3" />}>
+                        Non rendu
+                      </StatusBadge>
+                    ) : hasSubmission ? (
+                      <StatusBadge tone="success" icon={<Check className="h-3 w-3" />}>
+                        Enregistré
+                      </StatusBadge>
+                    ) : (
+                      <StatusBadge tone="neutral" icon={<Clock className="h-3 w-3" />}>
+                        En attente
+                      </StatusBadge>
+                    );
+
+                    const metrics = [
+                      {
+                        label: 'Questions',
+                        value: `${quiz.questions?.length || 0}`
+                      },
+                      {
+                        label: 'Durée totale',
+                        value: durationText
+                      },
+                      hasSubmission && sub
+                        ? {
+                            label: hasRetryAuthorization ? 'Précédent' : 'Note',
+                            value: `${sub.score_20} / 20`,
+                            tone: (sub.score_20 > 0 ? 'success' : 'danger') as 'success' | 'danger'
+                          }
+                        : {
+                            label: 'Barème',
+                            value: `${quiz.total_points || 20} pts`
+                          }
+                    ];
 
                     return (
-                      <div
-                        key={quiz.id}
-                        className={`student-quiz-card ${isLive ? 'is-live' : ''}`}
-                      >
-                        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
-                                {quiz.category || 'Autre'}
-                              </span>
-                              {isLive && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                                  <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">{hasRetryAuthorization ? 'SECONDE CHANCE • jusqu’à clôture' : 'EN DIRECT • jusqu’à clôture'}</span>
-                                </span>
-                              )}
+                      <LearningCard key={quiz.id} active={isLive}>
+                        <LearningCardHeader
+                          kicker={
+                            <>
+                              {quiz.category || 'Autre'}
+                              {quiz.level ? ` · ${quiz.level}` : ''}
+                            </>
+                          }
+                          status={statusBadge}
+                        />
 
-                              {isCompleted && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-[11px] font-bold text-slate-700">
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>Quiz soumis</span>
-                                </span>
-                              )}
-
-                              {isTimedOut && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-[11px] font-bold text-amber-900">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>Évaluation clôturée automatiquement</span>
-                                </span>
-                              )}
-
-                              {isMissed && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>Non rendu • délai dépassé</span>
-                                </span>
-                              )}
-
-                              {hasSubmission && !sub && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-[11px] font-bold text-slate-700">
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>Résultat enregistré</span>
-                                </span>
-                              )}
-
-                              {quiz.status === 'draft' && !hasSubmission && (
-                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600">
-                                  En attente de lancement par le professeur
-                                </span>
-                              )}
-                            </div>
-
-                            <h3 className="student-quiz-title">{quiz.title}</h3>
-                            {quiz.description && (
-                              <p className="student-quiz-description">{quiz.description}</p>
-                            )}
-                          </div>
-
-                          <div className="student-quiz-meta">
-                            <div>{quiz.questions?.length || 0} questions</div>
-                            <div>{formatQuizDuration(getQuizTotalTimeSeconds(quiz))} au total</div>
-                          </div>
+                        <div className="min-w-0 space-y-1.5">
+                          <h3 className="break-words text-base font-extrabold leading-snug text-[#072a3f] sm:text-lg">
+                            {quiz.title}
+                          </h3>
+                          {quiz.description && (
+                            <p className="line-clamp-2 break-words text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
+                              {quiz.description}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Card Action footer */}
-                        <div className="student-quiz-footer">
-                          <div className="student-quiz-points">
-                            Barème : <strong>{quiz.total_points || 20} pts</strong>
-                          </div>
+                        <LearningCardMetrics items={metrics} columns={3} />
 
-                          {isLive && (
-                            <button
-                              type="button"
-                              onClick={() => handleStartQuiz(quiz)}
-                              className="student-quiz-start"
-                            >
-                              <Play className="w-3.5 h-3.5 fill-current" />
-                              <span>{hasRetryAuthorization ? 'Commencer la seconde chance' : 'Commencer le Quiz'} ({formatQuizDuration(getQuizTotalTimeSeconds(quiz))})</span>
-                            </button>
-                          )}
-
-                          {hasSubmission && sub && (
-                            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                              <span className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-mono font-bold shadow-2xs ${
-                                sub.score_20 > 0
-                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                                  : 'border-rose-300 bg-rose-50 text-rose-800'
-                              }`}>
-                                {sub.score_20 > 0
-                                  ? <Check className="h-3.5 w-3.5 text-emerald-600" />
-                                  : <XCircle className="h-3.5 w-3.5 text-rose-600" />}
-                                <span>{hasRetryAuthorization ? 'Résultat précédent' : 'Note définitive'} : {sub.score_20} / 20</span>
-                              </span>
-                              {hasRetryAuthorization ? (
-                                <span className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-800">
-                                  <RotateCcw className="h-3 w-3" />
-                                  <span>Seconde chance accordée</span>
-                                </span>
-                              ) : sub.status !== 'missed' && (
-                                <span className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500" title="Le quiz ne peut pas être repassé">
-                                  <Lock className="h-3 w-3 text-slate-400" />
-                                  <span>Tentative verrouillée</span>
-                                </span>
+                        <LearningCardFooter>
+                          {isLive ? (
+                            <>
+                              {hasRetryAuthorization && sub && (
+                                <p className="flex items-center gap-1.5 text-[11px] font-bold text-[#0b3c5d]">
+                                  <RotateCcw className="h-3.5 w-3.5 shrink-0 text-[#2fa36b]" />
+                                  <span>Seconde chance accordée · barème {quiz.total_points || 20} pts</span>
+                                </p>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => handleStartQuiz(quiz)}
+                                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] active:scale-[.99] sm:text-[13px]"
+                              >
+                                <Play className="h-4 w-4 fill-current" />
+                                <span>
+                                  {hasRetryAuthorization ? 'Commencer la seconde chance' : 'Commencer le Quiz'} ({durationText})
+                                </span>
+                              </button>
+                            </>
+                          ) : hasSubmission && sub ? (
+                            <div className="flex min-h-[40px] items-center justify-between gap-2 rounded-xl bg-[#f5f9fc] px-3 py-2 text-xs font-semibold text-[#46657a]">
+                              <span className="flex items-center gap-1.5">
+                                {sub.status === 'missed' ? (
+                                  <Clock className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                                ) : (
+                                  <Lock className="h-3.5 w-3.5 shrink-0 text-[#607f93]" />
+                                )}
+                                <span>
+                                  {sub.status === 'missed'
+                                    ? 'Délai dépassé · non rendu'
+                                    : 'Tentative verrouillée · note définitive'}
+                                </span>
+                              </span>
+                              <span className="shrink-0 font-bold tabular-nums text-[#072a3f]">
+                                {quiz.total_points || 20} pts
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex min-h-[40px] items-center justify-between gap-2 rounded-xl bg-[#f5f9fc] px-3 py-2 text-xs font-semibold text-[#607f93]">
+                              <span className="flex items-center gap-1.5">
+                                <Clock className="h-3.5 w-3.5 shrink-0" />
+                                <span>En attente de lancement par le professeur</span>
+                              </span>
                             </div>
                           )}
-
-                        </div>
-                      </div>
+                        </LearningCardFooter>
+                      </LearningCard>
                     );
                   })}
                 </div>
@@ -1393,7 +1442,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
         )}
 
-        {/* ACTIVE TEST MODE (L'élève passe le quiz question par question) */}
+        {/* ACTIVE TEST MODE (Interface unifiée PerckyLingua) */}
         {activeQuiz && (() => {
           const questions = activeQuiz.questions || [];
           const totalQuestions = questions.length;
@@ -1401,398 +1450,180 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           const currentQ = questions[safeIndex];
           const currentAnswer = currentQ ? (quizAnswers[currentQ.id] || '') : '';
           const maxQSecs = currentQ ? getQuestionTimeSeconds(currentQ) : 1;
-          const qProgressPercent = Math.max(0, Math.min(100, (questionSecondsRemaining / maxQSecs) * 100));
-          const totalProgressPercent = Math.round((safeIndex / Math.max(1, totalQuestions)) * 100);
+          const clozeInfo = currentQ?.type === 'text' ? parseQuestionClozePrompt(currentQ.question) : null;
+          const isLastQuestion = safeIndex + 1 === totalQuestions;
 
           return (
-            <div className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-slate-950 animate-fade-in select-none">
-
-              {quizSubmissionError && (
-                <div role="alert" className="mx-3 mt-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900 sm:mx-6">
-                  <span>{quizSubmissionError} Cliquez sur le bouton de validation pour réessayer.</span>
-                </div>
-              )}
-              
-              {/* Anti-Screenshot Watermark Banner */}
-              <div className={`flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1 text-[9px] leading-tight shadow-inner sm:gap-3 sm:px-6 sm:py-2.5 sm:text-xs ${isPracticeMode ? 'bg-[#0B3C5D] text-sky-100' : 'bg-rose-950 text-rose-100'}`}>
-                <span className="flex min-w-0 items-center gap-1.5 truncate font-bold sm:gap-2">
-                  <ShieldCheck className={`h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 ${isPracticeMode ? 'text-sky-300' : 'text-rose-300'}`} />
-                  <span className="sm:hidden">{isPracticeMode ? 'MODE ENTRAÎNEMENT' : 'MODE SÉCURISÉ ANTI-TRICHE'}</span>
-                  <span className="hidden sm:inline">{isPracticeMode ? 'MODE ENTRAÎNEMENT • Résultat non enregistré' : 'MODE SÉCURISÉ ANTI-TRICHE • Capture d’écran strictement interdite'}</span>
-                </span>
-                {!isPracticeMode && (
-                  <span className="hidden shrink-0 truncate opacity-90 sm:block">
-                    {currentUser.name} • {currentUser.student_number || 'N°1'} • Session officielle
-                  </span>
-                )}
-                {isPracticeMode && (
-                  <button type="button" onClick={handleExitTutorial} className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 font-bold text-white hover:bg-white/20" aria-label="Quitter le tutoriel">
-                    <LogOut className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Quitter</span>
-                  </button>
-                )}
-              </div>
-              
-              {/* Quiz Header Bar with Global & Question Timers */}
-              <div className="shrink-0 border-b border-slate-800 bg-slate-900 px-2.5 py-1.5 text-white shadow-lg sm:px-6 sm:py-4">
-                <div className="mx-auto max-w-7xl space-y-1.5 sm:space-y-4">
-                <div className="flex flex-row items-center justify-between gap-1.5 sm:gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-amber-300 sm:text-[11px]">
-                        {isPracticeMode ? 'Mode entraînement • sans note officielle' : `Évaluation en cours • ${activeQuiz.class_name || 'Classe'}`}
+            <AssessmentShell
+              modeTone={isPracticeMode ? 'training' : 'official'}
+              bannerLabel={
+                isPracticeMode
+                  ? 'MODE ENTRAÎNEMENT • Résultat non enregistré'
+                  : 'MODE SÉCURISÉ ANTI-TRICHE • Capture d’écran strictement interdite'
+              }
+              bannerMobileLabel={isPracticeMode ? 'MODE ENTRAÎNEMENT' : 'MODE SÉCURISÉ ANTI-TRICHE'}
+              bannerRight={
+                !isPracticeMode
+                  ? `${currentUser.name} • ${currentUser.student_number || 'N°1'} • Session officielle`
+                  : undefined
+              }
+              onExit={isPracticeMode ? handleExitTutorial : undefined}
+              exitLabel="Quitter"
+              kicker={isPracticeMode ? 'Tutoriel interactif' : `Quiz · ${activeQuiz.class_name || 'Classe'}`}
+              title={activeQuiz.title}
+              questionIndex={safeIndex}
+              totalQuestions={totalQuestions}
+              completedMap={questions.map((q) => Boolean(quizAnswers[q.id]))}
+              questionSecondsRemaining={questionSecondsRemaining}
+              questionTotalSeconds={maxQSecs}
+              totalSecondsRemaining={quizSecondsRemaining}
+              soundEnabled={soundEnabled}
+              onToggleSound={toggleSound}
+              zIndexClass="z-[110]"
+              alerts={
+                quizSubmissionError ? (
+                  <div role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-900 sm:text-sm">
+                    {quizSubmissionError} Cliquez sur le bouton de validation pour réessayer.
+                  </div>
+                ) : null
+              }
+              footerAction={
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={
+                    quizSubmissionError
+                      ? () => void handleSubmitQuiz(quizSecondsRemaining <= 0)
+                      : handleAnswerAndNext
+                  }
+                  className={`inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-extrabold text-white shadow-sm transition-colors active:scale-[.99] disabled:opacity-50 sm:w-auto ${
+                    isLastQuestion ? 'bg-[#2fa36b] hover:bg-[#248556]' : 'bg-[#072a3f] hover:bg-[#0b3c5d]'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{isPracticeMode ? 'Calcul du résultat local…' : 'Enregistrement du résultat…'}</span>
+                    </>
+                  ) : quizSubmissionError ? (
+                    <span>Réessayer la validation</span>
+                  ) : isLastQuestion ? (
+                    <>
+                      <Save className="h-4 w-4" />
+                      <span>
+                        {isPracticeMode
+                          ? 'Terminer le tutoriel'
+                          : currentQ?.type === 'verbes_trous'
+                            ? 'Corriger et terminer'
+                            : 'Valider et terminer le quiz'}
                       </span>
-                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-200 sm:px-2 sm:text-[10px]">
-                        {safeIndex + 1}/{totalQuestions}
-                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{currentQ?.type === 'verbes_trous' ? 'Corriger et continuer' : 'Valider et continuer'}</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              }
+              modals={
+                <>
+                  {incompletePhraseConfirmation !== null && (
+                    <div className="fixed inset-0 z-[125] flex items-center justify-center bg-[#051e2e]/70 p-4 backdrop-blur-xs">
+                      <section role="alertdialog" aria-modal="true" aria-labelledby="student-vt-confirm" className="w-full max-w-sm rounded-2xl border border-[#d8e6ee] bg-white p-5 shadow-2xl">
+                        <h2 id="student-vt-confirm" className="text-base font-extrabold text-[#072a3f]">
+                          Il reste {incompletePhraseConfirmation} phrase{incompletePhraseConfirmation > 1 ? 's' : ''} sans réponse.
+                        </h2>
+                        <p className="mt-2 text-sm text-[#46657a]">Corriger quand même ?</p>
+                        <div className="mt-5 flex gap-2">
+                          <button type="button" onClick={() => setIncompletePhraseConfirmation(null)} className="min-h-11 flex-1 rounded-xl border border-[#d8e6ee] px-3 text-sm font-bold text-[#072a3f] hover:bg-[#f3f8fb]">
+                            Continuer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIncompletePhraseConfirmation(null);
+                              processQuestionProgression(quizAnswersRef.current, false);
+                            }}
+                            className="min-h-11 flex-1 rounded-xl bg-[#072a3f] px-3 text-sm font-bold text-white hover:bg-[#0b3c5d]"
+                          >
+                            Corriger
+                          </button>
+                        </div>
+                      </section>
                     </div>
-                    <h2 className="truncate font-display text-sm font-extrabold leading-tight text-white sm:text-xl">
-                      {activeQuiz.title}
-                    </h2>
-                  </div>
+                  )}
 
-                  {/* Dual Timers Badge */}
-                  <div className="flex shrink-0 items-center gap-1 self-center sm:gap-3">
-                    {/* Per-Question Countdown Timer */}
-                    <div className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-extrabold shadow-xs transition-colors sm:gap-2 sm:rounded-xl sm:border-2 sm:px-3.5 sm:py-1.5 sm:text-sm ${
-                      questionSecondsRemaining <= 10 
-                        ? 'bg-rose-50 border-rose-400 text-rose-700 animate-pulse' 
-                        : 'bg-amber-50 border-amber-300 text-amber-950'
-                    }`}>
-                      <Clock className={`h-3 w-3 sm:h-4 sm:w-4 ${questionSecondsRemaining <= 10 ? 'text-rose-600 motion-safe:animate-pulse' : 'text-amber-800'}`} />
-                      <div className="flex flex-col text-left">
-                        <span className="text-[6px] uppercase font-bold text-slate-500 font-sans leading-none sm:text-[9px]">Question</span>
-                        <span className={`leading-tight ${questionSecondsRemaining <= 5 ? 'motion-safe:animate-pulse text-rose-700' : ''}`}>{formatTime(questionSecondsRemaining)}</span>
-                      </div>
-                    </div>
-
-                    {/* Global Quiz Countdown Timer */}
-                    <div className="flex items-center gap-1 rounded-md border border-slate-600 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-white sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-1.5 sm:text-xs">
-                      <div className="flex flex-col text-right">
-                        <span className="text-[6px] uppercase font-bold text-slate-400 font-sans leading-none sm:text-[9px]">Total</span>
-                        <span className="font-bold leading-tight">{formatTime(quizSecondsRemaining)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress bar per question (Chrono de la question en cours) */}
-                <div className="space-y-0.5 sm:space-y-1">
-                  <div className="flex items-center justify-between text-[8px] font-semibold text-slate-300 sm:text-[11px]">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3 w-3 text-amber-400 sm:h-3.5 sm:w-3.5" />
-                      <span>Question {currentQuestionIndex + 1} · temps restant</span>
-                    </span>
-                    <span className={`font-mono font-bold ${qProgressPercent <= 25 ? 'text-rose-300 motion-safe:animate-pulse' : 'text-amber-300'}`}>
-                      {questionSecondsRemaining}s restantes
-                    </span>
-                  </div>
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-slate-700 sm:h-2.5">
-                    <div 
-                      className={`h-full transition-all duration-1000 ${
-                        qProgressPercent <= 25 
-                          ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,.7)] motion-safe:animate-pulse'
-                          : qProgressPercent <= 50 
-                            ? 'bg-orange-500' 
-                            : 'bg-emerald-600'
-                      }`}
-                      style={{ width: `${qProgressPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Stepper Dots (Questions progress) */}
-                <div className="hidden items-center gap-1 overflow-x-auto pt-0.5 sm:flex sm:gap-1.5 sm:pt-1">
-                  {questions.map((q, idx) => {
-                    const isPassed = idx < currentQuestionIndex;
-                    const isCurrent = idx === currentQuestionIndex;
-                    const isAnswered = Boolean(quizAnswers[q.id]);
-
-                    return (
-                      <div
-                        key={q.id}
-                        className={`h-1.5 rounded-full transition-all flex-1 min-w-[14px] sm:h-2 sm:min-w-[20px] ${
-                          isCurrent
-                            ? 'bg-amber-800 ring-2 ring-amber-400 scale-105'
-                            : isPassed
-                              ? isAnswered
-                                ? 'bg-emerald-500'
-                                : 'bg-slate-300'
-                              : 'bg-slate-200'
-                        }`}
-                        title={`Question #${idx + 1}`}
-                      />
-                    );
-                  })}
-                </div>
-                </div>
-              </div>
-
-              {/* Single Active Question Card */}
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
-              <div className="mx-auto max-w-4xl">
+                  <AssessmentCorrectionModal
+                    isOpen={Boolean(incorrectFeedback && incorrectFeedback.isOpen)}
+                    isCorrect={false}
+                    isTimeout={Boolean(incorrectFeedback?.isTimeout)}
+                    questionNumber={incorrectFeedback?.questionNumber ?? safeIndex + 1}
+                    questionText={incorrectFeedback?.questionText ?? ''}
+                    studentAnswer={incorrectFeedback?.studentAnswer ?? ''}
+                    expectedAnswer={incorrectFeedback?.correctAnswer ?? ''}
+                    explanation={incorrectFeedback?.explanation}
+                    points={incorrectFeedback?.points ?? 0}
+                    maxPoints={incorrectFeedback?.maxPoints ?? 0}
+                    countdownSeconds={incorrectFeedback?.countdown ?? CORRECTION_DISPLAY_SECONDS}
+                    totalCountdownSeconds={CORRECTION_DISPLAY_SECONDS}
+                    isLastQuestion={isLastQuestion}
+                    onContinue={handleCloseCorrection}
+                  />
+                </>
+              }
+            >
               {currentQ ? (
-                <div className="space-y-5 animate-fade-in sm:space-y-6">
-                  <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl sm:space-y-5 sm:p-8">
-                    {(() => {
-                      const clozeInfo = currentQ.type === 'text' ? parseQuestionClozePrompt(currentQ.question) : null;
-                      return (
-                        <>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3.5">
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-800 font-mono text-sm font-extrabold text-white shadow-xs sm:h-12 sm:w-12 sm:text-base">
-                                {currentQuestionIndex + 1}
-                              </span>
-                              <div>
-                                <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 sm:text-[11px]">
-                                  Question #{currentQuestionIndex + 1} • {currentQ.points} points
-                                </span>
-                                <h3 className="mt-1 font-display text-lg font-bold leading-snug text-slate-900 sm:text-2xl">
-                                  {clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
-                                </h3>
-                              </div>
-                            </div>
-                          </div>
+                <div key={`${activeQuiz.id}-${safeIndex}-${currentQ.id}`} className="space-y-5">
+                  <AssessmentQuestionHeader
+                    questionNumber={safeIndex + 1}
+                    type={currentQ.type}
+                    points={currentQ.points}
+                    prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
+                  />
 
-                          <div className="pl-0 pt-3 text-xs italic text-slate-500 sm:pl-16">
-                            {currentQ.type === 'qcm' 
-                              ? '👉 Sélectionnez la bonne réponse parmi les choix proposés ci-dessous :' 
-                               : currentQ.type === 'reorder'
-                                ? '👉 Glissez-déposez les éléments dans l’ordre correct :'
-                                : currentQ.type === 'verbes_trous'
-                                  ? '👉 Choisissez un verbe dans la banque, puis conjuguez-le :'
-                                  : '👉 Complétez directement les cases vides dans la phrase ci-dessous :'}
-                          </div>
+                  <div>
+                    {currentQ.type === 'qcm' && (
+                      <AssessmentQcmOptions
+                        options={(currentQ.options || []).map((opt) => ({ value: opt, label: opt }))}
+                        selectedValue={currentAnswer}
+                        onSelect={(opt) => updateQuizAnswer(currentQ.id, opt)}
+                      />
+                    )}
 
-                          {/* QCM Options */}
-                          {currentQ.type === 'qcm' && (
-                            <div className="grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 sm:pl-16">
-                              {(currentQ.options || []).map((opt, optIdx) => {
-                                const isSelected = currentAnswer === opt;
-                                return (
-                                  <button
-                                    key={optIdx}
-                                    type="button"
-                                    onClick={() => updateQuizAnswer(currentQ.id, opt)}
-                                    className={`flex min-h-[60px] items-center justify-between rounded-2xl border-2 p-4 text-left text-sm font-semibold transition-all cursor-pointer shadow-xs sm:min-h-[72px] ${
-                                      isSelected
-                                        ? 'bg-amber-800 text-white border-amber-900 shadow-md ring-2 ring-amber-400 scale-[1.01]'
-                                        : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400 hover:bg-amber-50/50'
-                                    }`}
-                                  >
-                                    <span className="pr-3 leading-snug">{opt}</span>
-                                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                      isSelected ? 'border-white bg-white text-amber-900' : 'border-slate-300'
-                                    }`}>
-                                      {isSelected && <span className="w-2.5 h-2.5 rounded-full bg-amber-900" />}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                    {currentQ.type === 'reorder' && (
+                      <QuizReorderList
+                        question={currentQ}
+                        answer={currentAnswer}
+                        onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
+                        theme="navy"
+                      />
+                    )}
 
-                          {currentQ.type === 'reorder' && (
-                            <div className="pt-4 sm:pl-16">
-                              <QuizReorderList
-                                question={currentQ}
-                                answer={currentAnswer}
-                                onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
-                                theme="amber"
-                              />
-                            </div>
-                          )}
+                    {currentQ.type === 'verbes_trous' && currentQ.verbes_trous && (
+                      <VerbesTrousQuestion
+                        definition={currentQ.verbes_trous}
+                        answer={currentAnswer}
+                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
+                        onEnterPress={handleAnswerAndNext}
+                        showCorrection={false}
+                      />
+                    )}
 
-                          {currentQ.type === 'verbes_trous' && currentQ.verbes_trous && (
-                            <div className="pt-4 sm:pl-16">
-                              <VerbesTrousQuestion
-                                definition={currentQ.verbes_trous}
-                                answer={currentAnswer}
-                                onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                                onEnterPress={handleAnswerAndNext}
-                                showCorrection={false}
-                              />
-                            </div>
-                          )}
-
-                          {/* Text input / Duolingo-style cloze text */}
-                          {currentQ.type === 'text' && (
-                            <div className="pt-4 sm:pl-16">
-                              <QuizClozeInput
-                                question={currentQ}
-                                customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
-                                answer={currentAnswer}
-                                onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                                theme="amber"
-                                onEnterPress={handleAnswerAndNext}
-                              />
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Navigation and Actions Footer */}
-                  <div className="sticky bottom-0 -mx-3 flex flex-col gap-2 border-t border-slate-200 bg-slate-100/95 px-2.5 py-2 backdrop-blur sm:-mx-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-0 sm:py-3">
-                    {/* Next / Submit Button */}
-                    <div className="flex items-center justify-between gap-2 sm:gap-3 sm:justify-end">
-                      <button
-                        type="button"
-                        disabled={isSubmitting}
-                        onClick={quizSubmissionError
-                          ? () => void handleSubmitQuiz(quizSecondsRemaining <= 0)
-                          : handleAnswerAndNext}
-                        className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-amber-800 px-3 py-2 text-[11px] font-extrabold text-white shadow-md transition-transform hover:bg-amber-900 active:scale-95 sm:flex-none sm:px-6 sm:py-3.5 sm:text-sm"
-                      >
-                        {isSubmitting ? (
-                          <span>{isPracticeMode ? 'Calcul du résultat local…' : 'Enregistrement du résultat…'}</span>
-                        ) : quizSubmissionError ? (
-                          <span>Réessayer la validation</span>
-                        ) : currentQuestionIndex + 1 === totalQuestions ? (
-                          <>
-                            <Save className="w-4 h-4" />
-                            <span>{isPracticeMode ? 'Terminer le tutoriel' : currentQ.type === 'verbes_trous' ? 'Corriger et terminer' : 'Valider et Terminer le Quiz'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>{currentQ.type === 'verbes_trous' ? 'Corriger et continuer' : 'Valider et Question Suivante'}</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    {currentQ.type === 'text' && (
+                      <QuizClozeInput
+                        question={currentQ}
+                        customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
+                        answer={currentAnswer}
+                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
+                        theme="navy"
+                        onEnterPress={handleAnswerAndNext}
+                      />
+                    )}
                   </div>
                 </div>
               ) : null}
-
-              {incompletePhraseConfirmation !== null && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
-                  <section role="alertdialog" aria-modal="true" aria-labelledby="student-vt-confirm" className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
-                    <h2 id="student-vt-confirm" className="text-base font-extrabold text-slate-900">Il reste {incompletePhraseConfirmation} phrase{incompletePhraseConfirmation > 1 ? 's' : ''} sans réponse.</h2>
-                    <p className="mt-2 text-sm text-slate-600">Corriger quand même ?</p>
-                    <div className="mt-5 flex gap-2">
-                      <button type="button" onClick={() => setIncompletePhraseConfirmation(null)} className="min-h-11 flex-1 rounded-xl border border-slate-300 px-3 text-sm font-bold text-slate-700">Continuer</button>
-                      <button type="button" onClick={() => { setIncompletePhraseConfirmation(null); processQuestionProgression(quizAnswersRef.current, false); }} className="min-h-11 flex-1 rounded-xl bg-[#072a3f] px-3 text-sm font-bold text-white">Corriger</button>
-                    </div>
-                  </section>
-                </div>
-              )}
-
-              {/* MODAL CORRECTION & EXPLICATION EN CAS DE MAUVAISE RÉPONSE (13 SECONDES) */}
-              {incorrectFeedback && incorrectFeedback.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in">
-                  <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border-2 border-rose-300 overflow-hidden transform animate-scale-in flex flex-col">
-                    
-                    {/* Header with Red Warning & Countdown Badge */}
-                    <div className="bg-gradient-to-r from-rose-700 via-rose-800 to-rose-900 text-white p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
-                          <XCircle className="w-6 h-6 text-rose-200" />
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-200 block">
-                            Correction Pédagogique
-                          </span>
-                          <h3 className="font-display font-extrabold text-base text-white">
-                            {incorrectFeedback.isTimeout ? 'Temps écoulé' : (incorrectFeedback.points || 0) > 0 ? 'Réponse partiellement correcte' : 'Réponse incorrecte !'}
-                          </h3>
-                        </div>
-                      </div>
-
-                      {/* Countdown de 13 s (temps non décompté du quiz) */}
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 rounded-xl border border-white/20 text-white font-mono font-black text-sm">
-                        <Clock className="w-4 h-4 text-amber-300 animate-spin" />
-                        <span>{incorrectFeedback.countdown}s</span>
-                      </div>
-                    </div>
-
-                    {/* Barre de progression des 13 secondes */}
-                    <div className="w-full bg-rose-100 h-2 overflow-hidden">
-                      <div 
-                        className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
-                        style={{ width: `${(incorrectFeedback.countdown / CORRECTION_DISPLAY_SECONDS) * 100}%` }}
-                      />
-                    </div>
-
-                    {/* Body: Question, Wrong Answer, Expected Answer & Explanation */}
-                    <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                      {/* Question Recall */}
-                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Question #{incorrectFeedback.questionNumber}
-                        </span>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800">
-                          {incorrectFeedback.questionText}
-                        </p>
-                      </div>
-
-                      {/* Answers Comparison */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        {/* Student Answer */}
-                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
-                          <div className="text-[10px] uppercase font-bold text-rose-700 flex items-center gap-1 mb-1">
-                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Votre réponse</span>
-                          </div>
-                          <div className="font-semibold text-rose-950 whitespace-pre-line leading-relaxed text-xs break-words">
-                            {incorrectFeedback.studentAnswer ? `« ${incorrectFeedback.studentAnswer} »` : '(Aucune réponse saisie)'}
-                          </div>
-                          <span className="text-[10px] text-rose-600 font-bold block mt-1">
-                            {incorrectFeedback.points ?? 0} / {incorrectFeedback.maxPoints ?? 0} point{(incorrectFeedback.maxPoints ?? 0) > 1 ? 's' : ''}
-                          </span>
-                        </div>
-
-                        {/* Expected Correct Answer */}
-                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300">
-                          <div className="text-[10px] uppercase font-bold text-emerald-700 flex items-center gap-1 mb-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Bonne réponse</span>
-                          </div>
-                          <div className="font-bold text-emerald-950 whitespace-pre-line leading-relaxed text-xs break-words">
-                            « {incorrectFeedback.correctAnswer} »
-                          </div>
-                          <span className="text-[10px] text-emerald-700 font-bold block mt-1">
-                            Réponse attendue
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Pedagogical Explanation Box */}
-                      {incorrectFeedback.explanation && (
-                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300/80 space-y-1.5 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
-                            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span>Explication & Règle :</span>
-                          </div>
-                          <p className="text-xs text-amber-950 leading-relaxed font-medium">
-                            {incorrectFeedback.explanation}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="text-[11px] text-slate-400 text-center italic">
-                        Ce temps de pause pédagogique n'est pas décompté de votre temps de quiz.
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center justify-between gap-3 sm:flex-row">
-                      <span className="text-xs text-slate-500 font-mono">
-                        Passage automatique dans {incorrectFeedback.countdown}s...
-                      </span>
-                      <button type="button" onClick={handleCloseCorrection} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#0B3C5D] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072A3F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2FA36B]">
-                        {currentQuestionIndex + 1 === totalQuestions ? 'Fermer la correction et terminer' : 'Fermer la correction et continuer'}
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-
-              </div>
-              </div>
-            </div>
+            </AssessmentShell>
           );
         })()}
 

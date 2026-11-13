@@ -3,6 +3,13 @@ import { Download, Upload, Plus, Save, FileText, BarChart3, ArrowLeftRight, Refr
 import type { ClassRoom, ExerciseDefinition, Quiz } from '../types';
 import { dataService } from '../services/dataService';
 import { exerciseService, convertQuizToExercise, parseExerciseJson } from '../services/exerciseService';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../components/LearningCard';
 
 interface Props { classes: ClassRoom[]; }
 
@@ -307,11 +314,51 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         </section>
       ) : (
         <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 flex items-center gap-2 font-bold text-[#072a3f]"><FileText size={17}/> Exercices enregistrés</h2>
-            {loading && <p className="text-sm text-slate-500">Chargement…</p>}
-            {!loading && items.length === 0 && <p className="text-sm text-slate-500">Aucun exercice pour le moment.</p>}
-            <div className="grid gap-2 md:grid-cols-2">{items.map(item => <article key={item.id} className="rounded-xl border border-slate-200 p-3"><div className="flex items-start justify-between gap-2"><div><h3 className="font-bold text-[#072a3f]">{item.title}</h3><p className="mt-1 text-xs text-slate-500">{item.questions.length} questions · {item.class_ids.length} classe(s) · v{item.current_version_number}</p></div><span className={'rounded-full px-2 py-1 text-[10px] font-bold ' + (item.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{item.status === 'published' ? 'Publié' : item.status === 'archived' ? 'Archivé' : 'Brouillon'}</span></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => loadExercise(item)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold">Modifier</button><button type="button" onClick={() => void showResults(item)} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold"><BarChart3 size={13}/> Tentatives</button><button type="button" onClick={() => { loadExercise(item); setStatus('archived'); }} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold">Archiver</button></div></article>)}</div>
+          <section className="rounded-[22px] border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.04)] sm:p-5">
+            <h2 className="mb-4 flex items-center gap-2 text-base font-extrabold text-[#072a3f]"><FileText size={18} className="text-[#0b3c5d]"/> Exercices enregistrés</h2>
+            {loading && <p className="text-sm text-[#607f93]">Chargement…</p>}
+            {!loading && items.length === 0 && <p className="text-sm text-[#607f93]">Aucun exercice pour le moment.</p>}
+            <div className="grid gap-4 md:grid-cols-2">
+              {items.map(item => {
+                const isPublished = item.status === 'published';
+                const statusBadge = isPublished ? (
+                  <StatusBadge tone="success">Publié</StatusBadge>
+                ) : item.status === 'archived' ? (
+                  <StatusBadge tone="neutral">Archivé</StatusBadge>
+                ) : (
+                  <StatusBadge tone="warning">Brouillon</StatusBadge>
+                );
+
+                return (
+                  <LearningCard key={item.id} active={isPublished}>
+                    <LearningCardHeader
+                      kicker={`${item.category || 'Exercice'}${item.level ? ` · ${item.level}` : ''} · v${item.current_version_number}`}
+                      status={statusBadge}
+                    />
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="break-words text-base font-extrabold text-[#072a3f]">{item.title}</h3>
+                      {item.description && (
+                        <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a]">{item.description}</p>
+                      )}
+                    </div>
+                    <LearningCardMetrics
+                      columns={2}
+                      items={[
+                        { label: 'Questions', value: `${item.questions.length}` },
+                        { label: 'Classes', value: `${item.class_ids.length}` }
+                      ]}
+                    />
+                    <LearningCardFooter>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => loadExercise(item)} className="inline-flex min-h-9 items-center justify-center rounded-xl bg-[#072a3f] px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#0b3c5d]">Modifier</button>
+                        <button type="button" onClick={() => void showResults(item)} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#e6f0f7]"><BarChart3 size={13}/> Tentatives</button>
+                        <button type="button" onClick={() => { loadExercise(item); setStatus('archived'); }} className="inline-flex min-h-9 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#46657a] transition-colors hover:bg-[#f5f9fc]">Archiver</button>
+                      </div>
+                    </LearningCardFooter>
+                  </LearningCard>
+                );
+              })}
+            </div>
           </section>
 
           <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

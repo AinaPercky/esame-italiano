@@ -15,6 +15,13 @@ import {
 import { Exam, ClassRoom, ExamRubric, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../components/LearningCard';
 
 interface ExamsViewProps {
   exams: Exam[];
@@ -164,82 +171,71 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">Créez une épreuve orale pour configurer ses rubriques et commencer les évaluations.</p>
           <button type="button" onClick={() => { setNewTitle(''); setNewDescription(''); setIsCreateModalOpen(true); }} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" />Créer un examen</button>
         </div>
-      ) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+      ) : <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
         {exams.map((exam) => (
-          <div
-            key={exam.id}
-            className="p-5 sm:p-6 bg-white border border-slate-200 rounded-[22px] shadow-sm hover:border-[#b7d3e4] hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-xs font-semibold text-[#0b3c5d] bg-[#e6f0f7] px-2.5 py-0.5 rounded">
+          <LearningCard key={exam.id} active={exam.status !== 'completed'}>
+            <LearningCardHeader
+              kicker={
+                <>
                   {exam.class_name}
-                </span>
-                <span className={`text-[11px] font-medium px-2 py-0.5 rounded font-mono ${
-                  exam.status === 'completed'
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-emerald-50 text-emerald-800'
-                }`}>
+                  {exam.level ? ` · ${exam.level}` : ''}
+                </>
+              }
+              status={
+                <StatusBadge tone={exam.status === 'completed' ? 'neutral' : 'live'}>
                   {exam.status === 'completed' ? 'Terminé' : 'En cours'}
-                </span>
-              </div>
+                </StatusBadge>
+              }
+            />
 
-              <h3 className="font-semibold text-slate-900 text-lg mb-1">
+            <div className="min-w-0 space-y-1.5">
+              <h3 className="break-words text-base font-extrabold leading-snug text-[#072a3f] sm:text-lg">
                 {exam.title}
               </h3>
-              {exam.level && <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-800">{exam.level}</span>}
-              <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+              <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
                 {exam.description || 'Aucune description spécifique.'}
               </p>
-
-              <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 text-xs text-slate-600 mb-4 text-center sm:text-left">
-                <div>
-                  <span className="text-slate-400 block text-[10px] sm:text-[11px]">Date</span>
-                  <span className="font-medium text-slate-800 text-[11px] sm:text-xs">{exam.exam_date}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] sm:text-[11px]">Rubriques</span>
-                  <span className="font-semibold text-slate-800 font-mono text-[11px] sm:text-xs">
-                    {exam.rubric_count ?? 0} rubr.
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] sm:text-[11px]">Barème max</span>
-                  <span className="font-semibold text-[#0b3c5d] font-mono text-[11px] sm:text-xs">
-                    {exam.max_score ?? 0} pts
-                  </span>
-                </div>
-              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => handleOpenDetails(exam)}
-                className="py-2.5 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors text-center min-h-[44px] flex items-center justify-center"
-              >
-                Rubriques ({exam.rubric_count ?? 0})
-              </button>
-              {onSelectExamForPassOrder && (
+            <LearningCardMetrics
+              columns={3}
+              items={[
+                { label: 'Date', value: exam.exam_date },
+                { label: 'Rubriques', value: `${exam.rubric_count ?? 0} rubr.` },
+                { label: 'Barème max', value: `${exam.max_score ?? 0} pts`, tone: 'accent' }
+              ]}
+            />
+
+            <LearningCardFooter>
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                 <button
                   type="button"
-                  onClick={() => onSelectExamForPassOrder(exam.id)}
-                  className="flex-1 py-2.5 px-3 text-xs font-semibold text-[#072a3f] bg-[#e6f0f7] hover:bg-[#d7e8f3] active:bg-[#b7d3e4] border border-[#b7d3e4] rounded-lg transition-colors text-center min-h-[44px] flex items-center justify-center gap-1.5"
+                  onClick={() => handleOpenDetails(exam)}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#d8e6ee] bg-white px-3.5 py-2 text-xs font-bold text-[#46657a] transition-colors hover:bg-[#f5f9fc] hover:text-[#072a3f]"
                 >
-                  <Shuffle className="w-3.5 h-3.5 text-[#0b3c5d]" />
-                  <span>Ordre de passage</span>
+                  Rubriques ({exam.rubric_count ?? 0})
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => onSelectExamForEvaluation(exam.id)}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-xs transition-colors min-h-[44px]"
-              >
-                <span>Évaluer</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+                {onSelectExamForPassOrder && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectExamForPassOrder(exam.id)}
+                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-2 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#e6f0f7]"
+                  >
+                    <Shuffle className="h-3.5 w-3.5 text-[#0b3c5d]" />
+                    <span>Ordre de passage</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSelectExamForEvaluation(exam.id)}
+                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#072a3f] px-4 py-2 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"
+                >
+                  <span>Évaluer</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </LearningCardFooter>
+          </LearningCard>
         ))}
       </div>}
 

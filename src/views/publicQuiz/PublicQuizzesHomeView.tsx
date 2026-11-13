@@ -1,8 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, BookOpen, Clock, Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
+import { Search, BookOpen, Sparkles, ArrowRight, AlertCircle } from 'lucide-react';
 import { dataService } from '../../services/dataService';
 import { Quiz } from '../../types';
 import { getPublicQuizDescription } from './publicQuizConfig';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../../components/LearningCard';
 
 interface PublicQuizzesHomeViewProps {
   onOpenQuiz: (publicId: string) => void;
@@ -198,48 +205,54 @@ export const PublicQuizzesHomeView: React.FC<PublicQuizzesHomeViewProps> = ({
             ) : (
               <div className="grid grid-cols-1 gap-4">
                 {filtered.map(({ quiz, level, theme, questionsCount }) => (
-                  <button
+                  <LearningCard
                     key={quiz.public_id}
+                    asButton
                     onClick={() => onOpenQuiz(String(quiz.public_id))}
-                    className="text-left rounded-3xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors p-5 focus:outline-none focus:ring-2 focus:ring-emerald-600/40"
+                    className="group"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 text-xs font-semibold">
-                            {quiz.category || 'Autre'}
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/10 text-emerald-800 px-3 py-1 text-xs font-semibold">
-                            <Sparkles className="h-3.5 w-3.5" />
-                            Public
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-xs font-semibold">
-                            {level}
-                          </span>
-                          <span className="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-3 py-1 text-xs font-semibold">
-                            {theme}
-                          </span>
-                        </div>
-                        <h2 className="mt-3 font-serif text-xl leading-snug break-words">{quiz.title}</h2>
-                        {quiz.description && (
-                          <p className="mt-2 text-slate-600 text-sm break-words">{quiz.description}</p>
-                        )}
-                        <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Clock className="h-4 w-4" />
-                            {formatDuration(quiz.duration_minutes)}
-                          </span>
-                          <span>•</span>
-                          <span>{questionsCount} question{questionsCount > 1 ? 's' : ''}</span>
-                          <span>•</span>
-                          <span>Barème : {quiz.total_points || 20} pts</span>
-                        </div>
-                      </div>
-                      <div className="shrink-0 h-11 w-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center">
-                        <ArrowRight className="h-5 w-5" />
-                      </div>
+                    <LearningCardHeader
+                      kicker={
+                        <>
+                          {quiz.category || 'Autre'}
+                          {level !== 'Non renseigné' ? ` · ${level}` : ''}
+                          {theme && theme !== 'Général' ? ` · ${theme}` : ''}
+                        </>
+                      }
+                      status={
+                        <StatusBadge tone="live" icon={<Sparkles className="h-3 w-3" />}>
+                          Public
+                        </StatusBadge>
+                      }
+                    />
+
+                    <div className="min-w-0 space-y-1.5">
+                      <h2 className="break-words text-lg font-extrabold leading-snug text-[#072a3f] transition-colors group-hover:text-[#0b3c5d]">
+                        {quiz.title}
+                      </h2>
+                      {quiz.description && (
+                        <p className="line-clamp-2 break-words text-xs leading-relaxed text-[#46657a] sm:text-sm">
+                          {quiz.description}
+                        </p>
+                      )}
                     </div>
-                  </button>
+
+                    <LearningCardMetrics
+                      columns={3}
+                      items={[
+                        { label: 'Durée', value: formatDuration(quiz.duration_minutes) },
+                        { label: 'Questions', value: `${questionsCount}` },
+                        { label: 'Barème', value: `${quiz.total_points || 20} pts` }
+                      ]}
+                    />
+
+                    <LearningCardFooter>
+                      <span className="flex min-h-[42px] w-full items-center justify-between rounded-xl bg-[#072a3f] px-4 py-2 text-xs font-extrabold text-white transition-colors group-hover:bg-[#0b3c5d] sm:text-[13px]">
+                        <span>Commencer le quiz</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </LearningCardFooter>
+                  </LearningCard>
                 ))}
               </div>
             )}

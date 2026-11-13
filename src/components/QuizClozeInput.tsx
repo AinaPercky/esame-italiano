@@ -159,12 +159,12 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
   const filledCount = currentValues.filter(v => Boolean(v?.trim())).length;
 
   return (
-    <div className="space-y-4">
-      {/* Conteneur principal de la phrase façon Duolingo */}
-      <div className={`relative rounded-3xl border-2 p-5 sm:p-7 shadow-sm transition-all ${
+    <div className="space-y-3.5">
+      {/* Conteneur principal de la phrase à compléter */}
+      <div className={`relative rounded-2xl border border-[#d8e6ee] p-4 sm:p-6 shadow-xs transition-all ${
         disabled 
-          ? 'bg-slate-50 border-slate-200' 
-          : 'bg-white border-slate-200 hover:border-slate-300'
+          ? 'bg-[#f7fafc] border-[#d8e6ee]' 
+          : 'bg-white border-[#d8e6ee] hover:border-[#b9cfdd]'
       }`}>
         
         {/* En-tête informatif si plusieurs trous (ex: 4 verbes) */}
@@ -190,7 +190,7 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
               const hasBlankAfter = idx < renderedBlankCount;
               const val = currentValues[idx] || '';
               // Largeur dynamique adaptative selon la longueur du mot saisi
-              const dynamicWidth = Math.max(84, Math.min(340, Math.max(val.length, 3) * 14 + 32));
+              const dynamicWidth = Math.max(96, Math.min(380, Math.max(val.length, 3) * 14 + 34));
 
               return (
                 <React.Fragment key={idx}>
@@ -249,7 +249,7 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
             <div className="flex flex-wrap items-center gap-3">
               {Array.from({ length: renderedBlankCount }).map((_, idx) => {
                 const val = currentValues[idx] || '';
-                const dynamicWidth = Math.max(140, Math.min(340, Math.max(val.length, 6) * 14 + 36));
+                const dynamicWidth = Math.max(200, Math.min(460, Math.max(val.length, 8) * 14 + 44));
 
                 return (
                   <div key={idx} className="flex items-center gap-2">

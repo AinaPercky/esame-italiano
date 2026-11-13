@@ -3,7 +3,13 @@ import { Loader2 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { Quiz } from '../types';
-import { playTimerBeep, primeTimerAudio } from '../utils/timerAudio';
+import {
+  isTimerBeepEnabled,
+  playTimerBeep,
+  primeTimerAudio,
+  setTimerBeepEnabled,
+  useAssessmentTimerBeeper
+} from '../utils/timerAudio';
 
 import { PublicQuizzesHomeView } from './publicQuiz/PublicQuizzesHomeView';
 import { PublicQuizStartScreen } from './publicQuiz/PublicQuizStartScreen';
@@ -103,8 +109,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isQuizActive = screen === 'quiz';
   const hasSubmittedRef = useRef(false);
-  const timerCueRef = useRef<{ questionKey: string; played: Set<number> }>({ questionKey: '', played: new Set() });
-  const finalQuizBeepSecondRef = useRef<number>(-1);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isTimerBeepEnabled());
   const correctionAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionForCorrection = quiz?.questions[currentIndex];
   const isCorrectionModalOpen = Boolean(
@@ -325,34 +330,29 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     return () => clearInterval(interval);
   }, [isQuizActive, quiz?.id, isCorrectionModalOpen]);
 
-  // Signal sonore global : un bip chaque seconde pendant les cinq dernières secondes.
-  useEffect(() => {
-    if (!isQuizActive || isCorrectionModalOpen || totalTimeLeftMs <= 0 || totalTimeLeftMs > 5_000) return;
-    const secondsRemaining = Math.ceil(totalTimeLeftMs / 1_000);
-    if (finalQuizBeepSecondRef.current === secondsRemaining) return;
-    finalQuizBeepSecondRef.current = secondsRemaining;
-    playTimerBeep();
-  }, [isQuizActive, isCorrectionModalOpen, totalTimeLeftMs]);
-
   useEffect(() => {
     if (isQuizActive && totalTimeLeftMs <= 0) handleSubmit();
   }, [isQuizActive, totalTimeLeftMs, handleSubmit]);
 
-  // Bips selon le temps alloué à la question courante, jamais sur le temps global du quiz.
-  useEffect(() => {
-    if (!isQuizActive || !quiz || isCorrectionModalOpen || questionTimeLeftMs <= 0) return;
-    if (totalTimeLeftMs <= 5_000) return;
-    const questionKey = `${quiz.id}:${currentIndex}`;
-    if (timerCueRef.current.questionKey !== questionKey) {
-      timerCueRef.current = { questionKey, played: new Set() };
+  const handleToggleSound = useCallback(() => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    setTimerBeepEnabled(next);
+    if (next) {
+      primeTimerAudio();
+      playTimerBeep(true);
     }
-    const remainingSeconds = Math.ceil(questionTimeLeftMs / 1000);
-    const questionSeconds = Math.ceil(timePerQuestionMs / 1000);
-    const cueSeconds = new Set([Math.ceil(questionSeconds / 2), 5, 3, 2, 1]);
-    if (!cueSeconds.has(remainingSeconds) || timerCueRef.current.played.has(remainingSeconds)) return;
-    timerCueRef.current.played.add(remainingSeconds);
-    playTimerBeep();
-  }, [isQuizActive, quiz, currentIndex, isCorrectionModalOpen, questionTimeLeftMs, timePerQuestionMs, totalTimeLeftMs]);
+  }, [soundEnabled]);
+
+  useAssessmentTimerBeeper({
+    active: isQuizActive && Boolean(quiz),
+    paused: isCorrectionModalOpen,
+    questionKey: quiz ? `${quiz.id}:${currentIndex}` : '',
+    questionTotalSeconds: Math.max(1, Math.ceil(timePerQuestionMs / 1000)),
+    questionSecondsRemaining: Math.max(0, Math.ceil(questionTimeLeftMs / 1000)),
+    totalSecondsRemaining: Math.max(0, Math.ceil(totalTimeLeftMs / 1000)),
+    soundEnabled
+  });
 
   // ─────────────────────────────────────────────────────────────────────────
   // Per-question countdown timer
@@ -493,8 +493,6 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     timePerQuestionMsRef.current = startingQuestionTimeMs;
     setTimePerQuestionMs(startingQuestionTimeMs);
     hasSubmittedRef.current = false;
-    finalQuizBeepSecondRef.current = -1;
-    timerCueRef.current = { questionKey: `${qId}:${startingIndex}`, played: new Set() };
     primeTimerAudio();
     saveToStorage(storageKey(qId, 'studentName'), normalizedStudentName);
     saveToStorage(storageKey(qId, 'questionOrder'), questionsWithItemOrders.map((question) => question.id));
@@ -557,10 +555,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     setTimePerQuestionMs(firstQuestionTimeMs);
     setQuestionTimeLeftMs(firstQuestionTimeMs);
     setTotalTimeLeftMs(getQuizTotalTimeSeconds(q) * 1000);
-    finalQuizBeepSecondRef.current = -1;
     timeZeroFiredRef.current = -1;
     hasSubmittedRef.current = false;
-    timerCueRef.current = { questionKey: `${q.id}:0`, played: new Set() };
     setResult(null);
     setScreen('start');
   }, []);
@@ -706,39 +702,41 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const feedback = showCorrectionAtEnd
       ? undefined
       : perQuestionFeedback[currentQuestion.id];
+    const completedMap = (quiz.questions || []).map(
+      (q) => Boolean(validatedSet[q.id] || (answers[q.id] || '').trim())
+    );
 
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-900">
-        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-2 sm:px-6 sm:py-6">
-          <PublicQuizQuestionScreen
-            question={currentQuestion}
-            quizTitle={quiz.title}
-            totalTimeLeftMs={totalTimeLeftMs}
-            totalTimeDurationMs={totalQuizDurationMs}
-            questionTimeDurationMs={timePerQuestionMs}
-            questionIndex={currentIndex}
-            totalQuestions={totalQuestions}
-            answer={currentAnswer}
-            isValidated={isCurrentValidated}
-            canGoBack={false}
-            progressPercent={progressPercent}
-            timeLeft={questionTimeLeftMs}
-            timeTone={timeTone}
-            feedback={feedback}
-            showCorrection={!showCorrectionAtEnd}
-            onAnswerChange={(val) => {
-              setAnswers((prev) => {
-                const next = { ...prev, [currentQuestion.id]: val };
-                answersRef.current = next;
-                return next;
-              });
-            }}
-            onValidate={handleValidate}
-            onNext={handleNext}
-            onPrevious={() => {}}
-          />
-        </div>
-      </div>
+      <PublicQuizQuestionScreen
+        question={currentQuestion}
+        quizTitle={quiz.title}
+        totalTimeLeftMs={totalTimeLeftMs}
+        totalTimeDurationMs={totalQuizDurationMs}
+        questionTimeDurationMs={timePerQuestionMs}
+        questionIndex={currentIndex}
+        totalQuestions={totalQuestions}
+        completedMap={completedMap}
+        answer={currentAnswer}
+        isValidated={isCurrentValidated}
+        canGoBack={false}
+        progressPercent={progressPercent}
+        timeLeft={questionTimeLeftMs}
+        timeTone={timeTone}
+        feedback={feedback}
+        showCorrection={!showCorrectionAtEnd}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onAnswerChange={(val) => {
+          setAnswers((prev) => {
+            const next = { ...prev, [currentQuestion.id]: val };
+            answersRef.current = next;
+            return next;
+          });
+        }}
+        onValidate={handleValidate}
+        onNext={handleNext}
+        onPrevious={() => {}}
+      />
     );
   }
 

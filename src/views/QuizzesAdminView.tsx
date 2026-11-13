@@ -7,18 +7,15 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Users,
   Trash2,
   Edit3,
   Sparkles,
   Save,
   X,
   Award,
-  Calendar,
   Flame,
   ListChecks,
   Check,
-  RefreshCw,
   HelpCircle,
   Eye,
   StopCircle,
@@ -52,6 +49,13 @@ import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 import { VerbesTrousEditor } from '../components/verbesTrous/VerbesTrousEditor';
 import { downloadQuizWorkbookPdf } from '../utils/quizWorkbookPdf';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../components/LearningCard';
 
 interface QuizzesAdminViewProps {
   classes: ClassRoom[];
@@ -1214,186 +1218,172 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {filteredQuizzes.map((quiz) => {
                 const isLive = quiz.status === 'launched';
                 const isClosed = quiz.status === 'closed';
                 const quizSubs = submissions.filter(s => s.quiz_id === quiz.id);
+                const classNamesText = quiz.class_ids && quiz.class_ids.length > 1
+                  ? quiz.class_ids.map(cid => classes.find(item => item.id === cid)?.name || 'Classe').join(', ')
+                  : (quiz.class_name || 'Classe');
+                const avgScore = quizSubs.length > 0
+                  ? (quizSubs.reduce((a, b) => a + b.score_20, 0) / quizSubs.length).toFixed(1)
+                  : null;
+
+                const statusBadge = isLive ? (
+                  <StatusBadge
+                    tone="live"
+                    icon={<Play className="h-3 w-3 fill-current" />}
+                    title="Le quiz reste accessible jusqu’à sa clôture manuelle."
+                  >
+                    En direct
+                  </StatusBadge>
+                ) : isClosed ? (
+                  <StatusBadge tone="neutral" icon={<Lock className="h-3 w-3" />}>
+                    Clôturé
+                  </StatusBadge>
+                ) : (
+                  <StatusBadge tone="warning" icon={<Clock className="h-3 w-3" />}>
+                    Brouillon
+                  </StatusBadge>
+                );
 
                 return (
-                  <div
-                    key={quiz.id}
-                    className={`bg-white rounded-2xl p-5 border transition-all ${
-                      isLive 
-                        ? 'border-emerald-500 shadow-md ring-2 ring-emerald-500/20' 
-                        : 'border-slate-200 shadow-2xs hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
-                            {quiz.category || 'Autre'}
-                          </span>
-                          {quiz.level && <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-100">{quiz.level}</span>}
-                          {quiz.class_ids && quiz.class_ids.length > 1 ? (
-                            quiz.class_ids.map(cid => {
-                              const c = classes.find(item => item.id === cid);
-                              return (
-                                <span key={cid} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
-                                  {c?.name || 'Classe'}
-                                </span>
-                              );
-                            })
-                          ) : (
-                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
-                              {quiz.class_name || 'Classe'}
-                            </span>
-                          )}
+                  <LearningCard key={quiz.id} active={isLive}>
+                    <LearningCardHeader
+                      kicker={
+                        <>
+                          {quiz.category || 'Autre'}
+                          {quiz.level ? ` · ${quiz.level}` : ''}
+                          {` · ${classNamesText}`}
+                          {quiz.is_public ? ' · Public' : ' · Privé'}
+                        </>
+                      }
+                      status={statusBadge}
+                    />
 
-                          {isLive && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
-                              <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                              <span title="Le quiz reste accessible jusqu’à sa clôture manuelle.">EN DIRECT • jusqu’à clôture</span>
-                            </span>
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="break-words text-base font-extrabold leading-snug text-[#072a3f] sm:text-lg">
+                        {quiz.title}
+                      </h3>
+                      {quiz.description && (
+                        <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
+                          {quiz.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <LearningCardMetrics
+                      columns={3}
+                      items={[
+                        {
+                          label: 'Questions',
+                          value: `${quiz.questions?.length || 0}`,
+                          hint: `Barème ${quiz.total_points || 20} pts`
+                        },
+                        {
+                          label: 'Durée totale',
+                          value: formatQuizDuration(getQuizTotalTimeSeconds(quiz))
+                        },
+                        {
+                          label: 'Participation',
+                          value: `${quizSubs.length} élève${quizSubs.length > 1 ? 's' : ''}`,
+                          hint: avgScore ? `Moyenne ${avgScore}/20` : 'Aucune copie',
+                          tone: avgScore ? 'accent' : 'default'
+                        }
+                      ]}
+                    />
+
+                    <LearningCardFooter>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAnalyticsClassId(quiz.class_ids?.[0] || quiz.class_id || selectedClassId || classes[0]?.id || '');
+                              setActiveAnalyticsQuizId(quiz.id);
+                            }}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#0b3c5d] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#072a3f] cursor-pointer"
+                            title="Analyse pédagogique simple des résultats, tendances et réponses"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                            <span>Analyse</span>
+                          </button>
+
+                          {quiz.status === 'draft' && (
+                            <button
+                              type="button"
+                              onClick={() => handleLaunchQuiz(quiz.id)}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#2fa36b] px-3 py-1.5 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-[#248556] cursor-pointer"
+                              title="Lancer le quiz jusqu’à sa clôture manuelle"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Lancer</span>
+                            </button>
                           )}
 
                           {isClosed && (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
-                              Clôturé
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleLaunchQuiz(quiz.id, true)}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#eed9aa] bg-[#fef9ec] px-3 py-1.5 text-xs font-bold text-[#8a5108] transition-colors hover:bg-[#fdf2d6] cursor-pointer"
+                              title="Relancer ce quiz jusqu’à sa clôture manuelle; les élèves ayant déjà soumis ne pourront pas le refaire"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Relancer</span>
+                            </button>
                           )}
 
-                          {quiz.status === 'draft' && (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-                              Brouillon
-                            </span>
+                          {isClosed && !quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
+                            <button
+                              type="button"
+                              onClick={() => void handleGrantQuizRetry(quiz)}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#edf5fa] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#dcebf5] cursor-pointer"
+                              title="Accorder une seconde chance qui sera active à la prochaine relance"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Seconde chance</span>
+                            </button>
                           )}
 
-                          {quiz.is_public ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                              <Globe className="w-3 h-3 text-indigo-600" />
-                              <span>Public (Lien actif)</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                              <Lock className="w-3 h-3 text-slate-400" />
-                              <span>Privé</span>
-                            </span>
+                          {isLive && (
+                            <>
+                              {!quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleGrantQuizRetry(quiz)}
+                                  className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#edf5fa] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#dcebf5] cursor-pointer"
+                                  title="Autoriser une seconde tentative pour un élève"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Seconde chance</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTrackingClassFilter('all');
+                                  setActiveTrackingQuizId(quiz.id);
+                                }}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-[#072a3f] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#0b3c5d] cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Suivre</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCloseQuiz(quiz.id)}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-800 transition-colors hover:bg-rose-100 cursor-pointer"
+                                title="Clôturer le quiz maintenant"
+                              >
+                                <StopCircle className="w-3.5 h-3.5" />
+                                <span>Clôturer</span>
+                              </button>
+                            </>
                           )}
                         </div>
 
-                        <h3 className="font-bold text-slate-900 text-base">{quiz.title}</h3>
-                        {quiz.description && (
-                          <p className="text-xs text-slate-500 line-clamp-2">{quiz.description}</p>
-                        )}
-                      </div>
-
-                      <div className="text-right sm:shrink-0 text-xs font-mono text-slate-500">
-                        <div>{quiz.questions?.length || 0} questions</div>
-                        <div>Barème : {quiz.total_points || 20} pts</div>
-                        <div>Temps total : {formatQuizDuration(getQuizTotalTimeSeconds(quiz))}</div>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar / Submissions count */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Users className="w-4 h-4 text-slate-400" />
-                        <span><strong>{quizSubs.length}</strong> élève(s) ayant composé</span>
-                        {quizSubs.length > 0 && (
-                          <span className="text-slate-400">• Moyenne : <strong>{(quizSubs.reduce((a, b) => a + b.score_20, 0) / quizSubs.length).toFixed(1)}/20</strong></span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAnalyticsClassId(quiz.class_ids?.[0] || quiz.class_id || selectedClassId || classes[0]?.id || '');
-                            setActiveAnalyticsQuizId(quiz.id);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                          title="Analyse pédagogique simple des résultats, tendances et réponses"
-                        >
-                          <BarChart3 className="w-3.5 h-3.5" />
-                          <span>Analyse pédagogique</span>
-                        </button>
-
-                        {quiz.status === 'draft' && (
-                          <button
-                            type="button"
-                            onClick={() => handleLaunchQuiz(quiz.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Lancer le quiz jusqu’à sa clôture manuelle"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Lancer</span>
-                          </button>
-                        )}
-
-                        {isClosed && (
-                          <button
-                            type="button"
-                            onClick={() => handleLaunchQuiz(quiz.id, true)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
-                            title="Relancer ce quiz jusqu’à sa clôture manuelle; les élèves ayant déjà soumis ne pourront pas le refaire"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Relancer</span>
-                          </button>
-                        )}
-
-                        {isClosed && !quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
-                          <button
-                            type="button"
-                            onClick={() => void handleGrantQuizRetry(quiz)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                            title="Accorder une seconde chance qui sera active à la prochaine relance"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Seconde chance</span>
-                          </button>
-                        )}
-
-                        {isLive && (
-                          <>
-                            {!quiz.is_public && quiz.attendance_mode === 'strict_presence' && (
-                              <button
-                                type="button"
-                                onClick={() => void handleGrantQuizRetry(quiz)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-700 hover:bg-violet-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                                title="Autoriser une seconde tentative pour un élève"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Seconde chance</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTrackingClassFilter('all');
-                                setActiveTrackingQuizId(quiz.id);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Suivre en direct</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCloseQuiz(quiz.id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                              title="Clôturer le quiz maintenant"
-                            >
-                              <StopCircle className="w-3.5 h-3.5" />
-                              <span>Clôturer</span>
-                            </button>
-                          </>
-                        )}
-
-                        {/* Public Quiz Controls (accessible for any quiz status) */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           {!quiz.is_public ? (
                             <button
                               type="button"
@@ -1403,7 +1393,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                                 if (onRefresh) onRefresh();
                                 setSharingQuiz(updated);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-2.5 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#e6f0f7] cursor-pointer"
                               title="Rendre ce quiz accessible publiquement via un lien direct sans connexion"
                             >
                               <Globe className="w-3.5 h-3.5" />
@@ -1414,11 +1404,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setSharingQuiz(quiz)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#bfe3ce] bg-[#eef9f3] px-2.5 py-1.5 text-xs font-bold text-[#145c3d] transition-colors hover:bg-[#e0f4e9] cursor-pointer"
                                 title="Voir le lien public et télécharger le QR Code"
                               >
                                 <QrCode className="w-3.5 h-3.5" />
-                                <span>Partager & QR</span>
+                                <span>QR</span>
                               </button>
                               <button
                                 type="button"
@@ -1430,46 +1420,48 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                                     setSharingQuiz(null);
                                   }
                                 }}
-                                className="inline-flex items-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors cursor-pointer"
+                                className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-[#d8e6ee] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#46657a] transition-colors hover:bg-[#f5f9fc] cursor-pointer"
                                 title="Rendre ce quiz privé (dépublier le lien)"
                               >
-                                <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Rendre Privé</span>
+                                <Lock className="w-3.5 h-3.5" />
+                                <span>Privé</span>
                               </button>
                             </>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => downloadQuizWorkbookPdf(quiz)}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#d8e6ee] bg-white px-2.5 py-1.5 text-xs font-bold text-[#072a3f] transition-colors hover:bg-[#f5f9fc] cursor-pointer"
+                            title="Télécharger une version imprimable du quiz, sans les réponses"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(quiz)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white text-[#46657a] transition-colors hover:bg-[#f5f9fc] hover:text-[#072a3f]"
+                            title="Modifier le quiz"
+                            aria-label="Modifier le quiz"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQuiz(quiz.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
+                            title="Supprimer le quiz"
+                            aria-label="Supprimer le quiz"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => downloadQuizWorkbookPdf(quiz)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
-                          title="Télécharger une version imprimable du quiz, sans les réponses"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Cahier PDF</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(quiz)}
-                          className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="Modifier le quiz"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteQuiz(quiz.id)}
-                          className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Supprimer le quiz"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
-                    </div>
-                  </div>
+                    </LearningCardFooter>
+                  </LearningCard>
                 );
               })}
             </div>

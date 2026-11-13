@@ -1,22 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { 
-  ArrowLeft, 
   BookOpen, 
   CheckCircle2, 
-  Clock3, 
   Search, 
   SlidersHorizontal, 
-  Sparkles, 
   X, 
-  ChevronRight,
-  TrendingUp,
-  Layers,
-  Award
+  ChevronRight
 } from 'lucide-react';
 import { AuthUser } from '../services/authService';
 import { lessonsService } from '../services/lessonsService';
 import { Lesson, LessonLevel, LessonProgress, LessonType } from '../types/lessons';
 import { LessonPlayer } from '../components/lessons/LessonRenderer';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  LearningModuleHeader,
+  StatusBadge
+} from '../components/LearningCard';
 import '../components/lessons/lessonExperience.css';
 import '../components/lessons/lessonGuidedQuiz.css';
 import '../components/lessons/lessonPlayer.css';
@@ -125,270 +127,248 @@ export const LessonsStudentView: React.FC<{
   }
 
   return (
-    <div className="lessons-root min-h-full">
-      <div className="mx-auto max-w-6xl px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        
-        {/* Welcome & Progress Banner */}
-        <section className="rounded-3xl border border-[#d5e2f3] bg-gradient-to-br from-white via-[#f7faff] to-[#edf4fc] p-4 sm:p-6 shadow-xs">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] font-bold text-emerald-800">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>PARCOURS D'ITALIEN EN LIGNE</span>
-              </div>
-              <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[#072a3f]">
-                Leçons de cours
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-600 max-w-xl">
-                Apprenez l'italien pas à pas : observez les dialogues, découvrez les règles et consolidez vos connaissances.
-              </p>
-            </div>
-
-            {/* Progression Box */}
-            <div className="rounded-2xl border border-[#d5e2f3] bg-white p-3.5 sm:p-4 shadow-2xs sm:min-w-[220px]">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle2 size={15} className="text-emerald-600" />
-                  <span>Votre progression</span>
-                </span>
-                <span className="font-mono text-emerald-700 font-extrabold">
-                  {completedCount} / {totalPublished}
-                </span>
-              </div>
-              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                <span>{progressPercent}% achevé</span>
-                {completedCount === totalPublished && totalPublished > 0 && (
-                  <span className="text-emerald-700 font-bold">Bravo ! Tout est terminé 🎉</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Search & Filter Toolbar */}
-        <section className="rounded-2xl border border-[#d5e2f3] bg-white p-3 sm:p-4 shadow-2xs space-y-3">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-3 text-slate-400" size={16} />
-            <input
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Rechercher une leçon par thème, mot-clé…"
-              className="w-full rounded-xl border border-[#d5e2f3] bg-[#f8fbff] py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#072a3f]"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 p-0.5"
-                aria-label="Effacer la recherche"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-
-          {/* Quick Filter Pills (Type & Level) */}
-          <div className="space-y-2">
-            {/* Type Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-scroll pb-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">
-                Type :
+    <div className="w-full min-w-0 space-y-5">
+      <LearningModuleHeader
+        kicker="Parcours d’italien en ligne"
+        title="Leçons de cours"
+        description="Apprenez l’italien pas à pas : observez les dialogues, découvrez les règles et consolidez vos connaissances."
+        aside={
+          <div className="rounded-[18px] border border-[#d8e6ee] bg-white px-4 py-3 shadow-[0_4px_14px_rgba(7,42,63,0.04)] sm:min-w-[250px]">
+            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-bold text-[#072a3f]">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 size={15} className="text-[#2fa36b]" />
+                <span>Votre progression</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setType('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                  type === 'all'
-                    ? 'bg-[#072a3f] text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tous les types
-              </button>
-              {(['grammaire', 'vocabulaire', 'fonction', 'theme', 'prononciation'] as LessonType[]).map(t => {
-                const cfg = TYPE_CONFIG[t];
-                const isSelected = type === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setType(t)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                      isSelected
-                        ? 'bg-[#072a3f] text-white shadow-xs'
-                        : `${cfg?.bg || 'bg-slate-100'} ${cfg?.text || 'text-slate-700'} hover:opacity-85`
-                    }`}
-                  >
-                    {cfg?.label || t}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Level Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-scroll">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 hidden sm:inline">
-                Niveau :
+              <span className="font-extrabold tabular-nums text-[#145c3d]">
+                {completedCount} / {totalPublished}
               </span>
-              <button
-                type="button"
-                onClick={() => setLevel('all')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                  level === 'all'
-                    ? 'bg-[#072a3f] text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tous les niveaux
-              </button>
-              {(['A1', 'A2', 'B1', 'B2', 'C1'] as LessonLevel[]).map(l => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => setLevel(l)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
-                    level === l
-                      ? 'bg-[#2fa36b] text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[#e6f0f7]">
+              <div
+                className="h-full rounded-full bg-[#2fa36b] transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium text-[#607f93]">
+              <span className="tabular-nums">{progressPercent}% achevé</span>
+              {completedCount === totalPublished && totalPublished > 0 && (
+                <span className="font-bold text-[#145c3d]">Parcours terminé</span>
+              )}
             </div>
           </div>
-        </section>
+        }
+      />
 
-        {/* Global Error Banner */}
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs sm:text-sm text-rose-800 shadow-xs flex items-center justify-between">
-            <span>{error}</span>
-            <button type="button" onClick={() => setError('')} className="p-1 hover:text-rose-950">
+      {/* Search & Filter Toolbar */}
+      <section className="space-y-3 rounded-[22px] border border-[#d8e6ee] bg-white p-3.5 shadow-[0_6px_20px_rgba(7,42,63,0.04)] sm:p-4">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-3 text-[#607f93]" size={16} />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Rechercher une leçon par thème, mot-clé…"
+            className="w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] py-2.5 pl-10 pr-9 text-xs text-[#072a3f] placeholder:text-[#607f93] focus:border-[#0b3c5d] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3c5d]/15 sm:text-sm"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="absolute right-3 top-3 p-0.5 text-[#607f93] hover:text-[#072a3f]"
+              aria-label="Effacer la recherche"
+            >
               <X size={15} />
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Loading state */}
-        {loading ? (
-          <div className="rounded-3xl border border-[#d5e2f3] bg-white p-12 text-center text-slate-500 shadow-2xs">
-            <div className="h-8 w-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm font-semibold">Chargement des parcours de leçons…</p>
-          </div>
-        ) : visible.length === 0 ? (
-          /* Empty state */
-          <div className="rounded-3xl border border-dashed border-[#d5e2f3] bg-white p-10 sm:p-14 text-center text-slate-500 shadow-2xs">
-            <SlidersHorizontal className="mx-auto mb-3 text-slate-400" size={32} />
-            <p className="font-bold text-base text-slate-800">Aucune leçon ne correspond à vos filtres.</p>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              Essayez de modifier votre recherche ou réinitialisez les critères sélectionnés.
-            </p>
-            {(query || type !== 'all' || level !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('');
-                  setType('all');
-                  setLevel('all');
-                }}
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#072a3f] text-white text-xs font-bold shadow-xs hover:bg-[#0b3c5d] active:scale-95 transition-all"
-              >
-                Réinitialiser les filtres
-              </button>
-            )}
-          </div>
-        ) : (
-          /* Lesson Cards Grid */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
-            {visible.map(lesson => {
-              const p = progress[lesson.id];
-              const cfg = TYPE_CONFIG[lesson.type] || { label: lesson.type, color: '#2f6fd6', bg: 'bg-blue-100', text: 'text-blue-800' };
-              const isDone = p?.status === 'done';
-              const isStarted = p?.status === 'started';
-
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar touch-scroll">
+            <span className="mr-1 hidden shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#607f93] sm:inline">
+              Type :
+            </span>
+            <button
+              type="button"
+              onClick={() => setType('all')}
+              className={`min-h-9 shrink-0 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                type === 'all'
+                  ? 'bg-[#072a3f] text-white shadow-xs'
+                  : 'bg-[#f5f9fc] text-[#46657a] hover:bg-[#e6f0f7] hover:text-[#072a3f]'
+              }`}
+            >
+              Tous les types
+            </button>
+            {(['grammaire', 'vocabulaire', 'fonction', 'theme', 'prononciation'] as LessonType[]).map(t => {
+              const cfg = TYPE_CONFIG[t];
+              const isSelected = type === t;
               return (
                 <button
+                  key={t}
                   type="button"
-                  key={lesson.id}
-                  onClick={() => setSelected(lesson)}
-                  className="group relative flex flex-col justify-between rounded-3xl border border-[#d5e2f3] bg-white p-4 sm:p-5 text-left shadow-2xs transition-all hover:-translate-y-1 hover:shadow-lg active:scale-98 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#072a3f]"
+                  onClick={() => setType(t)}
+                  className={`min-h-9 shrink-0 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#072a3f] text-white shadow-xs'
+                      : 'bg-[#f5f9fc] text-[#46657a] hover:bg-[#e6f0f7] hover:text-[#072a3f]'
+                  }`}
                 >
-                  <div>
-                    {/* Top Badges */}
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span 
-                          className="rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-white shadow-2xs"
-                          style={{ background: cfg.color }}
-                        >
-                          {cfg.label}
-                        </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">
-                          {lesson.level}
-                        </span>
-                      </div>
-
-                      {/* Status indicator pill */}
-                      {isDone ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                          <CheckCircle2 size={12} className="text-emerald-700" />
-                          Terminée
-                        </span>
-                      ) : isStarted ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-600 animate-pulse" />
-                          En cours
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold text-slate-400">
-                          À découvrir
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Titles */}
-                    <h2 className="font-display text-lg sm:text-xl font-extrabold text-[#072a3f] leading-snug group-hover:text-[#0b3c5d] transition-colors">
-                      {lesson.title_it}
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-500 font-medium line-clamp-2">
-                      {lesson.title_fr}
-                    </p>
-
-                    {lesson.objective && (
-                      <p className="mt-2 text-[11px] text-slate-600 bg-slate-50 rounded-xl p-2 font-normal line-clamp-2 border border-slate-100">
-                        {lesson.objective}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Footer Row */}
-                  <div className="mt-4 flex items-center justify-between border-t border-[#eef3fa] pt-3 text-xs font-bold text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock3 size={13} className="text-slate-400" />
-                      {lesson.duration_min} min
-                    </span>
-
-                    <span className={`inline-flex items-center gap-1 transition-transform group-hover:translate-x-0.5 ${
-                      isDone ? 'text-emerald-700' : isStarted ? 'text-amber-700' : 'text-[#072a3f]'
-                    }`}>
-                      <span>{isDone ? 'Relire' : isStarted ? 'Continuer' : 'Commencer'}</span>
-                      <ChevronRight size={14} />
-                    </span>
-                  </div>
+                  {cfg?.label || t}
                 </button>
               );
             })}
           </div>
-        )}
-      </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-scroll">
+            <span className="mr-1 hidden shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#607f93] sm:inline">
+              Niveau :
+            </span>
+            <button
+              type="button"
+              onClick={() => setLevel('all')}
+              className={`min-h-8 shrink-0 whitespace-nowrap rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                level === 'all'
+                  ? 'bg-[#072a3f] text-white shadow-xs'
+                  : 'bg-[#f5f9fc] text-[#46657a] hover:bg-[#e6f0f7] hover:text-[#072a3f]'
+              }`}
+            >
+              Tous les niveaux
+            </button>
+            {(['A1', 'A2', 'B1', 'B2', 'C1'] as LessonLevel[]).map(l => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLevel(l)}
+                className={`min-h-8 shrink-0 whitespace-nowrap rounded-xl px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  level === l
+                    ? 'bg-[#2fa36b] text-white shadow-xs'
+                    : 'bg-[#f5f9fc] text-[#46657a] hover:bg-[#e6f0f7] hover:text-[#072a3f]'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 shadow-xs sm:text-sm">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError('')} className="p-1 hover:text-rose-950">
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-[22px] border border-[#d8e6ee] bg-white p-12 text-center text-[#607f93] shadow-[0_6px_20px_rgba(7,42,63,0.04)]">
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-3 border-[#2fa36b] border-t-transparent" />
+          <p className="text-sm font-semibold">Chargement des parcours de leçons…</p>
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-[22px] border border-dashed border-[#b9cfdd] bg-white/90 p-10 text-center text-[#607f93] sm:p-14">
+          <SlidersHorizontal className="mx-auto mb-3 text-[#607f93]" size={32} />
+          <p className="text-base font-bold text-[#072a3f]">Aucune leçon ne correspond à vos filtres.</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs text-[#607f93] sm:text-sm">
+            Essayez de modifier votre recherche ou réinitialisez les critères sélectionnés.
+          </p>
+          {(query || type !== 'all' || level !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery('');
+                setType('all');
+                setLevel('all');
+              }}
+              className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#072a3f] px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-[#0b3c5d]"
+            >
+              Réinitialiser les filtres
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {visible.map(lesson => {
+            const p = progress[lesson.id];
+            const cfg = TYPE_CONFIG[lesson.type] || { label: lesson.type, color: '#0b3c5d', bg: 'bg-[#e6f0f7]', text: 'text-[#0b3c5d]' };
+            const isDone = p?.status === 'done';
+            const isStarted = p?.status === 'started';
+
+            const statusBadge = isDone ? (
+              <StatusBadge tone="success" icon={<CheckCircle2 size={12} />}>
+                Terminée
+              </StatusBadge>
+            ) : isStarted ? (
+              <StatusBadge tone="info" icon={<BookOpen size={12} />}>
+                En cours
+              </StatusBadge>
+            ) : (
+              <StatusBadge tone="neutral">
+                À découvrir
+              </StatusBadge>
+            );
+
+            return (
+              <LearningCard
+                key={lesson.id}
+                asButton
+                active={isStarted}
+                onClick={() => setSelected(lesson)}
+                className="group"
+              >
+                <LearningCardHeader
+                  kicker={`${cfg.label} · ${lesson.level}`}
+                  status={statusBadge}
+                />
+
+                <div className="min-w-0 space-y-1.5">
+                  <h2 className="break-words font-display text-base font-extrabold leading-snug text-[#072a3f] transition-colors group-hover:text-[#0b3c5d] sm:text-lg">
+                    {lesson.title_it}
+                  </h2>
+                  <p className="line-clamp-1 text-xs font-semibold text-[#0b3c5d] sm:text-[13px]">
+                    {lesson.title_fr}
+                  </p>
+                  {lesson.objective && (
+                    <p className="line-clamp-2 text-xs leading-relaxed text-[#607f93]">
+                      {lesson.objective}
+                    </p>
+                  )}
+                </div>
+
+                <LearningCardMetrics
+                  columns={2}
+                  items={[
+                    {
+                      label: 'Durée estimée',
+                      value: `${lesson.duration_min} min`
+                    },
+                    {
+                      label: 'Parcours',
+                      value: `${lesson.blocks?.length || 0} étape${(lesson.blocks?.length || 0) > 1 ? 's' : ''}`,
+                      tone: isDone ? 'success' : 'default'
+                    }
+                  ]}
+                />
+
+                <LearningCardFooter>
+                  <span
+                    className={`flex min-h-[44px] w-full items-center justify-between rounded-xl px-4 py-2.5 text-xs font-extrabold transition-colors sm:text-[13px] ${
+                      isDone
+                        ? 'border border-[#bfe3ce] bg-[#eef9f3] text-[#145c3d] group-hover:bg-[#e1f4e9]'
+                        : isStarted
+                          ? 'bg-[#2fa36b] text-white shadow-sm group-hover:bg-[#248556]'
+                          : 'bg-[#072a3f] text-white shadow-sm group-hover:bg-[#0b3c5d]'
+                    }`}
+                  >
+                    <span>{isDone ? 'Relire la leçon' : isStarted ? 'Continuer la leçon' : 'Commencer la leçon'}</span>
+                    <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </LearningCardFooter>
+              </LearningCard>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

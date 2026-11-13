@@ -8,9 +8,16 @@ import {getQuestionExpectedAnswers} from '../utils/quizAnswerMatcher';
 import {getCorrectReorderIds} from '../utils/quizReorder';
 import {VerbesTrousEditor} from '../components/verbesTrous/VerbesTrousEditor';
 import {WrittenExamCopy,downloadWrittenExamCopyPdf,getWrittenQuestionAutoScore} from '../components/WrittenExamCopy';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../components/LearningCard';
 import type {Quiz,QuizQuestion} from '../types';
 
-const card='rounded-2xl border border-[#d8e6ee] bg-white p-4 shadow-sm';
+const card='rounded-[22px] border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.04)]';
 const blankExam=():WrittenExam=>({...createWrittenExamFromTemplate(L135_TEMPLATE),title:'Nouvel examen',description:'',sections:[]});
 const localDate=(v?:string|null)=>{if(!v)return '';const d=new Date(v);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 const toIso=(v:string)=>v?new Date(v).toISOString():null;
@@ -116,8 +123,45 @@ export const WrittenExamsView:React.FC<{classes:Array<{id:string;name:string}>}>
    <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3"><span className="text-xs text-slate-500"><ShieldAlert className="mr-1 inline h-4 w-4"/>Événements d’intégrité : {events.length}; les violations confirmées entraînent une note nulle.</span><button disabled={attempts.some(a=>Number(a.expression_writing_max_points||0)>0&&a.expression_writing_score==null)} title={attempts.some(a=>Number(a.expression_writing_max_points||0)>0&&a.expression_writing_score==null)?'Saisissez d’abord toutes les notes d’expression écrite.':''} onClick={async()=>{try{await writtenExamService.publishResults(selectedExamId);setMessage('Résultats publiés.');await openResults(selectedExamId);}catch(e){setError(e instanceof Error?e.message:'Publication impossible.');}}} className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{attempts.some(a=>Number(a.expression_writing_max_points||0)>0&&a.expression_writing_score==null)?'Notes d’expression à saisir':'Publier les résultats'}</button></div>
    {events.length>0&&<div className="max-h-48 overflow-auto rounded-xl bg-amber-50 p-3 text-xs"><h3 className="font-bold">Journal d’intégrité</h3>{events.map(ev=><p key={ev.id} className="mt-1">{new Date(ev.occurred_at).toLocaleString()} · {ev.event_type}</p>)}</div>}
   </section>:<>
-   <div className="grid gap-3 sm:grid-cols-2"><button onClick={()=>start(L135_TEMPLATE)} className={card+' text-left hover:border-[#2fa36b]'}><p className="text-xs font-bold uppercase text-[#2fa36b]" >Canevas B1</p><h2 className="mt-1 font-bold">Canevas L135 – 90 points</h2><p className="mt-1 text-sm text-slate-500">Compréhension 20 · Grammaire 50 · Vocabulaire 10 · Réordonnement 10 · 1 h 45</p></button><button onClick={()=>start(A1_TEMPLATE)} className={card+' text-left hover:border-[#2fa36b]'}><p className="text-xs font-bold uppercase text-[#2fa36b]" >Canevas A1</p><h2 className="mt-1 font-bold">Canevas A1 – 80 points</h2><p className="mt-1 text-sm text-slate-500">Compréhension 20 · Grammaire 25 · Vocabulaire 15 · Complétion 20 · 1 h 20 · /80</p></button></div>
-   <section className={card+" sm:p-5"}><div className="flex flex-wrap items-center justify-between gap-2"><Layers3 className="text-[#2fa36b]"/><h2 className="font-bold">Examens enregistrés</h2></div>{loading?<p className="py-6 text-sm text-slate-500">Chargement…</p>:exams.length===0?<p className="py-6 text-sm text-slate-500">Aucun examen. Créez un sujet ou partez d’un modèle.</p>:<div className="mt-3 divide-y">{exams.map(item=><div key={item.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{item.title}</p><p className="text-xs text-slate-500">{item.level||'—'} · {item.duration_minutes} min · {item.status}</p><p className="text-xs text-slate-500">Classes : {(item.written_exam_classes||[]).map((row:any)=>classes.find(c=>c.id===row.class_id)?.name||'Classe').join(', ')||'Aucune classe assignée'}</p></div><div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><button onClick={()=>void edit(item.id)} className="rounded-lg border px-3 py-2 text-xs font-bold">Modifier l’examen</button><button onClick={()=>void openResults(item.id)} className="rounded-lg border px-3 py-2 text-xs font-bold">Résultats</button><button onClick={async()=>{try{await writtenExamService.close(item.id);await refresh();}catch(e){setError(e instanceof Error?e.message:'Clôture impossible.');}}} className="rounded-lg border px-3 py-2 text-xs">Clôturer</button></div></div>)}</div>}</section>
+   <div className="grid gap-4 sm:grid-cols-2">
+    <LearningCard asButton onClick={()=>start(L135_TEMPLATE)} className="group">
+     <LearningCardHeader kicker="Canevas B1 · 90 points" status={<StatusBadge tone="info">Modèle prêt</StatusBadge>}/>
+     <div className="space-y-1">
+      <h2 className="text-base font-extrabold text-[#072a3f] group-hover:text-[#0b3c5d]">Canevas L135 – 90 points</h2>
+      <p className="text-xs leading-relaxed text-[#46657a]">Compréhension 20 · Grammaire 50 · Vocabulaire 10 · Réordonnement 10 · 1 h 45</p>
+     </div>
+    </LearningCard>
+    <LearningCard asButton onClick={()=>start(A1_TEMPLATE)} className="group">
+     <LearningCardHeader kicker="Canevas A1 · 80 points" status={<StatusBadge tone="info">Modèle prêt</StatusBadge>}/>
+     <div className="space-y-1">
+      <h2 className="text-base font-extrabold text-[#072a3f] group-hover:text-[#0b3c5d]">Canevas A1 – 80 points</h2>
+      <p className="text-xs leading-relaxed text-[#46657a]">Compréhension 20 · Grammaire 25 · Vocabulaire 15 · Complétion 20 · 1 h 20 · /80</p>
+     </div>
+    </LearningCard>
+   </div>
+   <section className={card+" sm:p-5"}>
+    <div className="mb-4 flex flex-wrap items-center gap-2"><Layers3 className="text-[#2fa36b]" size={18}/><h2 className="text-base font-extrabold text-[#072a3f]">Examens enregistrés</h2></div>
+    {loading?<p className="py-6 text-sm text-[#607f93]">Chargement…</p>:exams.length===0?<p className="py-6 text-sm text-[#607f93]">Aucun examen. Créez un sujet ou partez d’un modèle.</p>:<div className="grid gap-4 md:grid-cols-2">{exams.map(item=>{
+     const assignedClasses=(item.written_exam_classes||[]).map((row:any)=>classes.find(c=>c.id===row.class_id)?.name||'Classe').join(', ')||'Aucune classe assignée';
+     const statusTone=item.status==='published'?'live':item.status==='results_published'?'success':item.status==='grading'?'warning':'neutral';
+     const statusLabel=item.status==='published'?'Publié':item.status==='results_published'?'Résultats publiés':item.status==='grading'?'Correction':item.status==='closed'?'Clôturé':'Brouillon';
+     return <LearningCard key={item.id} active={item.status==='published'}>
+      <LearningCardHeader kicker={`${item.level||'CECRL —'} · ${item.duration_minutes} min`} status={<StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>}/>
+      <div className="min-w-0 space-y-1">
+       <h3 className="break-words text-base font-extrabold text-[#072a3f]">{item.title}</h3>
+       <p className="line-clamp-1 text-xs text-[#607f93]">Classes : {assignedClasses}</p>
+      </div>
+      <LearningCardMetrics columns={2} items={[{label:'Durée',value:`${item.duration_minutes} min`},{label:'Classes',value:`${(item.written_exam_classes||[]).length}`}]}/>
+      <LearningCardFooter>
+       <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={()=>void edit(item.id)} className="inline-flex min-h-9 flex-1 items-center justify-center rounded-xl bg-[#072a3f] px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#0b3c5d]">Modifier</button>
+        <button type="button" onClick={()=>void openResults(item.id)} className="inline-flex min-h-9 flex-1 items-center justify-center rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#e6f0f7]">Résultats</button>
+        <button type="button" onClick={async()=>{try{await writtenExamService.close(item.id);await refresh();}catch(e){setError(e instanceof Error?e.message:'Clôture impossible.');}}} className="inline-flex min-h-9 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white px-3 py-1.5 text-xs font-semibold text-[#46657a] transition-colors hover:bg-[#f5f9fc]">Clôturer</button>
+       </div>
+      </LearningCardFooter>
+     </LearningCard>;
+    })}</div>}
+   </section>
   </>}
  </div>;
 };

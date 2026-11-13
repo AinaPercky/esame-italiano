@@ -24,10 +24,17 @@ import {
 } from 'lucide-react';
 import { AuthUser } from '../services/authService';
 import { lessonsService } from '../services/lessonsService';
-import { Lesson, LessonDraft, LessonLevel, LessonType } from '../types/lessons';
+import { Lesson, LessonDraft, LessonType } from '../types/lessons';
 import { validateLessonDraft } from '../utils/lessonValidation';
 import { LessonFullPreview, LessonPlayer } from '../components/lessons/LessonRenderer';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import {
+  LearningCard,
+  LearningCardFooter,
+  LearningCardHeader,
+  LearningCardMetrics,
+  StatusBadge
+} from '../components/LearningCard';
 import '../components/lessons/lessonExperience.css';
 import '../components/lessons/lessonGuidedQuiz.css';
 import '../components/lessons/lessonPlayer.css';
@@ -561,127 +568,111 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
           ) : (
             <>
               {/* MOBILE CARDS VIEW (< md) */}
-              <div className="grid grid-cols-1 gap-3 md:hidden">
+              <div className="grid grid-cols-1 gap-3.5 md:hidden">
                 {filteredLessons.map(lesson => {
-                  const typeColor = TYPE_COLORS[lesson.type] || { bg: 'bg-slate-100', text: 'text-slate-800' };
                   const isPublished = lesson.status === 'published';
                   const isUpdating = updatingStatus === lesson.id;
 
                   return (
-                    <article
-                      key={lesson.id}
-                      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs transition-all"
-                    >
-                      {/* Top Badges Row */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${typeColor.bg} ${typeColor.text}`}>
-                            {lesson.type}
-                          </span>
-                          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                            {lesson.level}
-                          </span>
+                    <LearningCard key={lesson.id} active={isPublished}>
+                      <LearningCardHeader
+                        kicker={`${lesson.type} · ${lesson.level}`}
+                        status={
+                          <StatusBadge tone={isPublished ? 'success' : 'warning'}>
+                            {isPublished ? 'Publié' : 'Brouillon'}
+                          </StatusBadge>
+                        }
+                      />
+
+                      <div className="min-w-0 space-y-1">
+                        <h3 className="break-words font-display text-base font-extrabold leading-snug text-[#072a3f]">
+                          {lesson.title_it}
+                        </h3>
+                        <p className="line-clamp-2 text-xs font-medium text-[#46657a]">
+                          {lesson.title_fr}
+                        </p>
+                      </div>
+
+                      <LearningCardMetrics
+                        columns={2}
+                        items={[
+                          { label: 'Durée', value: `${lesson.duration_min} min` },
+                          {
+                            label: 'Contenu',
+                            value: `${lesson.blocks?.length || 0} bloc(s)`,
+                            hint: lesson.quiz_ref ? 'Quiz lié' : undefined,
+                            tone: lesson.quiz_ref ? 'accent' : 'default'
+                          }
+                        ]}
+                      />
+
+                      <LearningCardFooter>
+                        <div className="flex items-center justify-between gap-1.5">
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => void updatePublication(lesson, isPublished ? 'draft' : 'published')}
+                            className={`inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${
+                              isPublished
+                                ? 'border border-[#cfe1ec] bg-[#f5f9fc] text-[#0b3c5d] active:bg-[#e6f0f7]'
+                                : 'bg-[#2fa36b] text-white active:bg-[#248556]'
+                            }`}
+                          >
+                            {isUpdating ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : isPublished ? (
+                              <EyeOff size={13} />
+                            ) : (
+                              <Globe size={13} />
+                            )}
+                            <span>{isUpdating ? 'Patientez…' : isPublished ? 'Dépublier' : 'Publier'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewTab('student');
+                              setPreview(lesson);
+                            }}
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white text-[#46657a] hover:bg-[#f5f9fc] active:scale-95 transition-all"
+                            title="Aperçu"
+                            aria-label="Aperçu de la leçon"
+                          >
+                            <Eye size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => start({ ...lesson, blocks: lesson.blocks }, lesson.id)}
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white text-[#46657a] hover:bg-[#f5f9fc] active:scale-95 transition-all"
+                            title="Modifier"
+                            aria-label="Modifier la leçon"
+                          >
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => duplicate(lesson)}
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white text-[#46657a] hover:bg-[#f5f9fc] active:scale-95 transition-all"
+                            title="Dupliquer"
+                            aria-label="Dupliquer la leçon"
+                          >
+                            <Copy size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => confirmDelete(lesson)}
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 active:scale-95 transition-all"
+                            title="Supprimer"
+                            aria-label="Supprimer la leçon"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                          isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${isPublished ? 'bg-emerald-600' : 'bg-amber-600'}`} />
-                          {isPublished ? 'Publié' : 'Brouillon'}
-                        </span>
-                      </div>
-
-                      {/* Title & Description */}
-                      <h3 className="font-display text-base font-bold text-slate-900 leading-snug">
-                        {lesson.title_it}
-                      </h3>
-                      <p className="text-xs text-slate-600 mt-0.5 font-medium line-clamp-2">
-                        {lesson.title_fr}
-                      </p>
-
-                      {/* Metadata Row */}
-                      <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-2.5 text-[11px] text-slate-500 font-medium">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock size={13} className="text-slate-400" />
-                          {lesson.duration_min} min
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Layers size={13} className="text-slate-400" />
-                          {lesson.blocks?.length || 0} bloc(s)
-                        </span>
-                        {lesson.quiz_ref && (
-                          <span className="inline-flex items-center gap-1 text-[#2fa36b] font-bold">
-                            <Sparkles size={12} />
-                            Quiz lié
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Mobile Actions Bar */}
-                      <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-slate-100 pt-3">
-                        <button
-                          type="button"
-                          disabled={isUpdating}
-                          onClick={() => void updatePublication(lesson, isPublished ? 'draft' : 'published')}
-                          className={`inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${
-                            isPublished
-                              ? 'border border-slate-300 bg-white text-slate-700 active:bg-slate-100'
-                              : 'bg-emerald-700 text-white active:bg-emerald-800'
-                          }`}
-                        >
-                          {isUpdating ? (
-                            <Loader2 size={13} className="animate-spin" />
-                          ) : isPublished ? (
-                            <EyeOff size={13} />
-                          ) : (
-                            <Globe size={13} />
-                          )}
-                          <span>{isUpdating ? 'Patientez…' : isPublished ? 'Dépublier' : 'Publier'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPreviewTab('student');
-                            setPreview(lesson);
-                          }}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 active:scale-95 transition-all"
-                          title="Aperçu"
-                          aria-label="Aperçu de la leçon"
-                        >
-                          <Eye size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => start({ ...lesson, blocks: lesson.blocks }, lesson.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 active:scale-95 transition-all"
-                          title="Modifier"
-                          aria-label="Modifier la leçon"
-                        >
-                          <Pencil size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => duplicate(lesson)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 active:scale-95 transition-all"
-                          title="Dupliquer"
-                          aria-label="Dupliquer la leçon"
-                        >
-                          <Copy size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => confirmDelete(lesson)}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 active:scale-95 transition-all"
-                          title="Supprimer"
-                          aria-label="Supprimer la leçon"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </article>
+                      </LearningCardFooter>
+                    </LearningCard>
                   );
                 })}
               </div>
