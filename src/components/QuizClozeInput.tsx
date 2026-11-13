@@ -48,6 +48,32 @@ export function parseQuestionClozePrompt(questionText: string): { prompt: string
   return { prompt: 'Complétez la phrase :', sentence: text, hasBlanks: true };
 }
 
+/**
+ * Nombre réel de champs à afficher : tient compte des trous présents dans l'énoncé
+ * même lorsque le serveur ne fournit qu'une seule réponse attendue.
+ */
+export function getClozeRenderedBlankCount(question: QuizQuestion, customSentence?: string): number {
+  const expectedCount = Math.max(
+    1,
+    Number(question.blank_count) || getQuestionExpectedAnswers(question).length
+  );
+  const text = (customSentence || question.question || '').trim();
+  const textBlankCount = Array.from(text.matchAll(new RegExp(BLANK_REGEX.source, 'g'))).length;
+  return textBlankCount > 0 ? Math.max(textBlankCount, expectedCount) : expectedCount;
+}
+
+/** Met à jour un champ sans perdre les autres valeurs déjà saisies. */
+export function updateClozeAnswer(
+  answer: string,
+  index: number,
+  value: string,
+  blankCount: number
+): string {
+  const updated = parseStudentAnswers(answer, blankCount);
+  updated[index] = value;
+  return blankCount === 1 ? value : JSON.stringify(updated);
+}
+
 export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
   question,
   answer,
@@ -60,19 +86,21 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
 }) => {
   const isNavy = theme === 'navy';
   const expectedAnswers = getQuestionExpectedAnswers(question);
-  const blankCount = Math.max(1, question.blank_count || expectedAnswers.length);
+  const blankCount = Math.max(1, Number(question.blank_count) || expectedAnswers.length);
 
-  // Valeurs actuelles saisies par l'élève pour chaque trou
-  const currentValues = parseStudentAnswers(answer, blankCount);
+  // Texte et nombre réel de champs : il faut parser la réponse avec ce nombre,
+  // sinon parseStudentAnswers tronque le tableau à expectedAnswers.length.
+  const rawText = (customSentence || question.question || '').trim();
+  const textMatches = Array.from(rawText.matchAll(BLANK_REGEX));
+  const hasBlanksInText = textMatches.length > 0;
+  const renderedBlankCount = getClozeRenderedBlankCount(question, customSentence);
+
+  // Valeurs actuelles : toutes les cases restent contrôlées même si l'élève en remplit 3+.
+  const currentValues = parseStudentAnswers(answer, renderedBlankCount);
 
   // Suivi du trou actuellement actif pour la barre d'accents
   const [activeBlankIndex, setActiveBlankIndex] = useState<number>(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Texte à afficher pour la phrase à trous
-  const rawText = (customSentence || question.question || '').trim();
-  const textMatches = Array.from(rawText.matchAll(BLANK_REGEX));
-  const hasBlanksInText = textMatches.length > 0;
 
   // Calcul des segments de texte entourant chaque trou
   const segments: string[] = [];
@@ -86,25 +114,9 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
     segments.push(rawText.slice(lastIndex));
   }
 
-  // Nombre effectif de trous (au moins le nombre de matches et au moins le nombre de réponses attendues)
-  const renderedBlankCount = hasBlanksInText 
-    ? Math.max(textMatches.length, blankCount)
-    : blankCount;
-
-  // Mise à jour de la valeur d'un trou spécifique
+  // Mise à jour indépendante d'un trou sans effacer les autres champs.
   const handleValueChange = (index: number, val: string) => {
-    const updated = [...currentValues];
-    while (updated.length < renderedBlankCount) {
-      updated.push('');
-    }
-    updated[index] = val;
-
-    // Enregistrer au format JSON array (ou chaîne simple si 1 seul trou)
-    if (renderedBlankCount === 1) {
-      onChange(val);
-    } else {
-      onChange(JSON.stringify(updated));
-    }
+    onChange(updateClozeAnswer(answer, index, val, renderedBlankCount));
   };
 
   // Insertion d'un caractère accentué italien dans le trou actif
