@@ -976,3 +976,21 @@ begin
   return v_payload;
 end;
 $$;
+
+
+-- Exercise versions are immutable snapshots. A teacher may append a new version,
+-- but cannot rewrite a version already referenced by an attempt.
+drop policy if exists exercise_versions_teacher_manage on public.exercise_versions;
+drop policy if exists exercise_versions_teacher_read on public.exercise_versions;
+drop policy if exists exercise_versions_teacher_insert on public.exercise_versions;
+
+create policy exercise_versions_teacher_read on public.exercise_versions
+for select to authenticated
+using (public.exercise_is_teacher());
+
+create policy exercise_versions_teacher_insert on public.exercise_versions
+for insert to authenticated
+with check (public.exercise_is_teacher() and created_by = auth.uid());
+
+revoke update, delete on public.exercise_versions from authenticated;
+grant select, insert on public.exercise_versions to authenticated;
