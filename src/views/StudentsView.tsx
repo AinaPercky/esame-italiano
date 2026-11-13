@@ -183,7 +183,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 
   // Filtered Students
   const filteredStudents = students.filter(s => {
-    const matchesClass = !classFilter || s.class_id === classFilter;
+    const matchesClass = !classFilter || (s.class_ids ? s.class_ids.includes(classFilter) : s.class_id === classFilter);
     const matchesSearch = !searchTerm ||
       s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -220,9 +220,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 
   const handleExportBulletin = (student: Student, format: 'pdf' | 'png') => {
     const quizSubmissions = dataService.getQuizSubmissions().filter(submission => submission.student_id === student.id);
-    const classQuizzes = dataService.getQuizzes().filter(quiz =>
-      quiz.class_id === student.class_id || quiz.class_ids?.includes(student.class_id)
-    );
+    const studentClassIds = student.class_ids?.length ? student.class_ids : [student.class_id];
+    const classQuizzes = dataService.getQuizzes(studentClassIds);
     const bulletin = {
       student: { ...student, class_name: student.class_name || classes.find(item => item.id === student.class_id)?.name || 'Classe inconnue' },
       quizzes: classQuizzes,

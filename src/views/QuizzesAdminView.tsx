@@ -801,7 +801,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           throw bulkError;
         }
         count = 0;
-        for (const student of trackingClassStudents.filter(item => item.class_id === retryClassId)) {
+        for (const student of trackingClassStudents.filter(item => item.class_ids ? item.class_ids.includes(retryClassId) : item.class_id === retryClassId)) {
           count += await supabaseService.grantQuizRetry(trackingQuiz.id, student.id, retryReason.trim());
         }
       }
@@ -829,11 +829,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     ? (trackingQuiz.class_ids?.length ? trackingQuiz.class_ids : [trackingQuiz.class_id])
     : [];
   const classStudents = trackingQuiz
-    ? students.filter(s => trackingClassIds.includes(s.class_id))
-    : students.filter(s => s.class_id === selectedClassId);
+    ? students.filter(s => s.class_ids ? trackingClassIds.some(id => s.class_ids!.includes(id)) : trackingClassIds.includes(s.class_id))
+    : students.filter(s => s.class_ids ? s.class_ids.includes(selectedClassId) : s.class_id === selectedClassId);
   const trackingClassStudents = trackingClassFilter === 'all'
     ? classStudents
-    : classStudents.filter(student => student.class_id === trackingClassFilter);
+    : classStudents.filter(student => student.class_ids ? student.class_ids.includes(trackingClassFilter) : student.class_id === trackingClassFilter);
   const trackingParticipantsByStudent = new Map(trackingParticipants.map(participant => [participant.student_id, participant]));
   const trackingClasses = classes.filter(classRoom => trackingClassIds.includes(classRoom.id));
   const trackingClassNames = classes
