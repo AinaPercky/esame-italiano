@@ -179,9 +179,33 @@ BEGIN
  RETURN coalesce(result,'[]');
 END $fn$;
 
+-- One immutable answer evaluation per student/question/attempt. The browser cannot
+-- probe alternative answers after it has received feedback for that question.
+CREATE TABLE IF NOT EXISTS public.quiz_question_evaluations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  attempt_number INTEGER NOT NULL,
+  question_id TEXT NOT NULL,
+  answer TEXT NOT NULL DEFAULT '',
+  feedback JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (quiz_id, student_id, attempt_number, question_id)
+);
+ALTER TABLE public.quiz_question_evaluations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.quiz_question_evaluations FROM PUBLIC, anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.evaluate_quiz_question(p_quiz_id TEXT,p_question_id TEXT,p_answer TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
-DECLARE sid TEXT:=public.quiz_current_student_id(); q public.quizzes%ROWTYPE; cids TEXT[]; question JSONB; l public.quiz_launches%ROWTYPE; part public.quiz_participants%ROWTYPE;
+DECLARE
+ sid TEXT:=public.quiz_current_student_id();
+ q public.quizzes%ROWTYPE;
+ cids TEXT[];
+ question JSONB;
+ l public.quiz_launches%ROWTYPE;
+ part public.quiz_participants%ROWTYPE;
+ attempt_no INTEGER;
+ result JSONB;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_quiz_id;
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz non disponible.'; END IF;
@@ -197,18 +221,31 @@ BEGIN
  END IF;
  SELECT value INTO question FROM jsonb_array_elements(coalesce(q.questions,'[]')) WHERE value->>'id'=p_question_id LIMIT 1;
  IF question IS NULL THEN RAISE EXCEPTION 'Question introuvable.'; END IF;
- RETURN public.quiz_grade_question(question,p_answer);
+ SELECT greatest(
+   coalesce((SELECT max(a.attempt_number) FROM public.quiz_attempts a WHERE a.quiz_id=q.id AND a.student_id=sid),0),
+   coalesce((SELECT max(s.attempt_number) FROM public.quiz_submissions s WHERE s.quiz_id=q.id AND s.student_id=sid),0)
+ ) + 1 INTO attempt_no;
+ result:=public.quiz_grade_question(question,p_answer);
+ INSERT INTO public.quiz_question_evaluations(quiz_id,student_id,attempt_number,question_id,answer,feedback)
+ VALUES(q.id,sid,attempt_no,p_question_id,coalesce(p_answer,''),result)
+ ON CONFLICT(quiz_id,student_id,attempt_number,question_id) DO NOTHING;
+ SELECT feedback INTO result FROM public.quiz_question_evaluations
+ WHERE quiz_id=q.id AND student_id=sid AND attempt_number=attempt_no AND question_id=p_question_id;
+ RETURN result;
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_question(p_public_id TEXT,p_question_id TEXT,p_answer TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
-DECLARE q public.quizzes%ROWTYPE; question JSONB;
+DECLARE q public.quizzes%ROWTYPE; question JSONB; result JSONB;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
  IF NOT FOUND THEN RAISE EXCEPTION 'Quiz public introuvable.'; END IF;
  SELECT value INTO question FROM jsonb_array_elements(coalesce(q.questions,'[]')) WHERE value->>'id'=p_question_id LIMIT 1;
  IF question IS NULL THEN RAISE EXCEPTION 'Question introuvable.'; END IF;
- RETURN public.quiz_grade_question(question,p_answer);
+ result:=public.quiz_grade_question(question,p_answer);
+ -- Public quizzes are practice resources, not identity-verified exams. Never return
+ -- expected answers or explanations to anonymous callers.
+ RETURN jsonb_build_object('correct',result->'correct','points',result->'points','maxPoints',result->'maxPoints');
 END $fn$;
 
 -- Keep the previous persistence/attendance checks, but wrap them with authoritative grading.
