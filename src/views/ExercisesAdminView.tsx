@@ -96,27 +96,42 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     setShowAttempts(false);
   };
 
-  const handleSave = async () => {
+  const persistExercise = async (targetStatus: 'draft' | 'published' | 'archived') => {
     setError(''); setMessage('');
     try {
       const document = parseExerciseJson(json);
       const finalTitle = title.trim() || document.metadata.title;
       if (!finalTitle) throw new Error('Le titre est obligatoire.');
-      if (status === 'published' && classIds.length === 0) throw new Error('Attribuez au moins une classe avant de publier.');
+      if (targetStatus === 'published' && classIds.length === 0) {
+        throw new Error('Attribuez au moins une classe avant de publier.');
+      }
       setLoading(true);
+      // Save the latest content first. Publication is a separate server-side
+      // operation that rechecks classes, version and question timers.
       const id = await exerciseService.saveDefinition({
         id: selectedId || null,
-        metadata: { title: finalTitle, description, category, level: level || null, status },
+        metadata: { title: finalTitle, description, category, level: level || null, status: targetStatus === 'published' ? 'draft' : targetStatus },
         questions: document.questions,
         classIds
       });
+      if (targetStatus === 'published') {
+        await exerciseService.publishExercise(id);
+      }
       setSelectedId(id);
-      setMessage(status === 'published' ? 'Exercice publié et attribué aux classes sélectionnées.' : 'Exercice enregistré en brouillon.');
+      setStatus(targetStatus);
+      setMessage(targetStatus === 'published'
+        ? 'Exercice publié et attribué aux classes sélectionnées.'
+        : targetStatus === 'archived'
+          ? 'Exercice archivé.'
+          : 'Exercice enregistré en brouillon.');
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Enregistrement impossible.');
     } finally { setLoading(false); }
   };
+
+  const handleSave = async () => persistExercise(status);
+  const handlePublish = async () => persistExercise('published');
 
   const handleQuestionTimerChange = (questionId: string, seconds: number) => {
     try {
@@ -244,7 +259,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
             <label className="block space-y-1 text-sm font-semibold">Contenu JSON — chaque question doit avoir un temps strictement positif<textarea value={json} onChange={e => setJson(e.target.value)} spellCheck={false} className="min-h-[360px] w-full rounded-xl border border-slate-300 bg-slate-950 p-3 font-mono text-xs text-emerald-100" /></label>
             <p className="text-xs text-slate-500">{parsed ? parsed.questions.length + ' question(s) validée(s), chronométrées.' : 'Le JSON est invalide ou une question ne possède pas de chronomètre valide.'}</p>
             {parsed && <div className="space-y-2 rounded-xl border border-slate-200 p-3"><h3 className="text-sm font-bold text-[#072a3f]">Chronomètre de chaque question</h3>{parsed.questions.map((question, index) => <div key={question.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2 last:border-0"><span className="min-w-0 flex-1 text-xs text-slate-600">{index + 1}. {question.question}</span><label className="flex items-center gap-2 text-xs font-semibold">Secondes<input type="number" min={1} max={3600} step={1} value={question.time_limit_seconds || 1} onChange={e => handleQuestionTimerChange(question.id, Number(e.target.value))} className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-right tabular-nums"/></label></div>)}</div>}
-            <div className="flex flex-wrap gap-2"><button type="button" disabled={loading || !parsed} onClick={() => void handleSave()} className="inline-flex items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Save size={16}/> Enregistrer</button><button type="button" disabled={!parsed} onClick={exportJson} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><Download size={16}/> Exporter JSON</button><button type="button" disabled={!parsed} onClick={handleConvertBack} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><ArrowLeftRight size={16}/> Créer un quiz à partir de cet exercice</button><button type="button" onClick={() => void refresh()} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><RefreshCw size={15}/> Actualiser</button></div>
+            <div className="flex flex-wrap gap-2"><button type="button" disabled={loading || !parsed} onClick={() => void handleSave()} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-[#072a3f] disabled:opacity-40"><Save size={16}/> Enregistrer</button><button type="button" disabled={loading || !parsed || classIds.length === 0} onClick={() => void handlePublish()} className="inline-flex items-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Save size={16}/> Publier</button><button type="button" disabled={!parsed} onClick={exportJson} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><Download size={16}/> Exporter JSON</button><button type="button" disabled={!parsed} onClick={handleConvertBack} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><ArrowLeftRight size={16}/> Créer un quiz à partir de cet exercice</button><button type="button" onClick={() => void refresh()} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><RefreshCw size={15}/> Actualiser</button></div>
           </section>
         </>
       )}
