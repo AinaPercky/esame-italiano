@@ -1456,6 +1456,11 @@ class SupabaseService {
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('*')
         : Promise.resolve({ data: [], error: null });
+      // class_enrollments est volontairement inaccessible au rôle anon.
+      // Seul le professeur authentifié peut lire toutes les inscriptions (RLS).
+      const enrollmentsRequest = isTeacher
+        ? client.from('class_enrollments').select('student_id,class_id,status')
+        : Promise.resolve({ data: [], error: null });
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1477,7 +1482,7 @@ class SupabaseService {
         client.from('exam_pass_order').select('*'),
         quizzesRequest,
         quizSubmissionsRequest,
-        client.from('class_enrollments').select('student_id,class_id,status')
+        enrollmentsRequest
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
@@ -1505,7 +1510,9 @@ class SupabaseService {
       const students: Student[] = (studentsData || []).map(s => ({
         id: s.id,
         class_id: s.class_id,
-        class_ids: activeClassIdsByStudent.get(s.id) || [],
+        // Pour les sessions sans rôle professeur Supabase, conserver la classe
+        // principale issue de students.class_id sans exposer les inscriptions privées.
+        class_ids: activeClassIdsByStudent.get(s.id) || (s.class_id ? [s.class_id] : []),
         first_name: s.first_name,
         last_name: s.last_name,
         email: s.email,
