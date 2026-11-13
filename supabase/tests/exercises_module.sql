@@ -90,7 +90,7 @@ where id = current_setting('test.attempt2')::uuid;
 set role authenticated;
 select set_config('request.jwt.claims','{"email":"student@example.test"}',false);
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
-do $
+do $timeout$
 declare v_result jsonb;
 begin
   v_result := public.submit_exercise_answer(current_setting('test.attempt2')::uuid, '"sono"'::jsonb);
@@ -98,7 +98,7 @@ begin
     raise exception 'Expired question must be graded as a timeout with zero points';
   end if;
 end;
-$;
+$timeout$;
 
 reset role;
 set role authenticated;
