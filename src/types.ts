@@ -322,6 +322,7 @@ export interface ExerciseAttemptQuestion {
   deadline_at: string;
   seconds_remaining: number;
   server_now: string;
+  correction?: ExerciseCorrection;
 }
 
 export interface ExerciseCorrection {
