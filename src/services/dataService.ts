@@ -312,6 +312,7 @@ export const dataService = {
     const newStudent: Student = {
       id: studentId,
       class_id: classId,
+      class_ids: [classId],
       first_name: normalizedFirstName,
       last_name: normalizedLastName,
       gender,
@@ -341,6 +342,9 @@ export const dataService = {
     const updatedStudent = {
       ...state.students[idx],
       ...updates,
+      class_ids: updates.class_id && updates.class_id !== state.students[idx].class_id
+        ? Array.from(new Set([...(state.students[idx].class_ids || [state.students[idx].class_id]), updates.class_id]))
+        : state.students[idx].class_ids,
       first_name: normalizeFirstName(updates.first_name ?? state.students[idx].first_name),
       last_name: normalizeLastName(updates.last_name ?? state.students[idx].last_name),
       email: normalizedEmail,
