@@ -254,7 +254,7 @@ begin
  ) order by s.position),'[]'::jsonb) into v_sections from public.written_exam_sections s where s.version_id=v_version.id;
  return jsonb_build_object('attempt_id',v_attempt.id,'status',v_attempt.status,'deadline_at',v_attempt.deadline_at,'started_at',v_attempt.started_at,'answers',v_attempt.answers,'order_manifest',v_attempt.order_manifest,
  'exam',jsonb_build_object('id',v_exam.id,'title',v_version.title,'description',v_version.description,'level',v_version.level,'target_language',v_version.target_language,'instruction_language',v_version.instruction_language,'duration_minutes',v_version.duration_minutes,'raw_max',v_version.raw_max,'display_scale',v_version.display_scale,'navigation_mode',v_version.navigation_mode,'integrity_settings',v_version.integrity_settings),'sections',v_sections);
-end $function$
+end $function$;
 
 
 -- Regression assertions: the four eligibility functions must no longer use
