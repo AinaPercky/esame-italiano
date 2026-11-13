@@ -31,6 +31,17 @@ test('parseExerciseJson rejects unsupported schema versions', () => {
   })), /version 1/i);
 });
 
+test('parseExerciseJson rejects an empty title and an empty question list', () => {
+  assert.throws(() => parseExerciseJson(JSON.stringify({
+    ...validDocument,
+    metadata: { ...validDocument.metadata, title: '   ' }
+  })), /titre est obligatoire/i);
+  assert.throws(() => parseExerciseJson(JSON.stringify({
+    ...validDocument,
+    questions: []
+  })), /au moins une question/i);
+});
+
 test('convertQuizToExercise preserves questions and supplies the existing quiz timer default', () => {
   const quiz = {
     id: 'quiz-1',
