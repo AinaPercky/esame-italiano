@@ -83,7 +83,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [isWrittenExamFullscreen, setIsWrittenExamFullscreen] = useState(false);
-  const isStandaloneModule = isWrittenExamFullscreen || activeTab === 'exercises';
+  const [isExerciseFullscreen, setIsExerciseFullscreen] = useState(false);
+  const isStandaloneModule = isWrittenExamFullscreen || isExerciseFullscreen;
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
   const [classStudentsList, setClassStudentsList] = useState<Student[]>([]);
@@ -1132,7 +1133,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           />
         )}
 
-        {activeTab === 'exercises' && <ExercisesStudentView onExit={() => setActiveTab('quizzes')} />}
+        {activeTab === 'exercises' && <ExercisesStudentView onFullscreenChange={setIsExerciseFullscreen} />}
 
         {activeTab === 'written_exams' && <StudentWrittenExamsView currentUser={currentUser} onFullscreenChange={setIsWrittenExamFullscreen} />}
 

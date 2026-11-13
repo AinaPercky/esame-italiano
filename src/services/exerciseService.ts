@@ -4,6 +4,7 @@ import type {
   ExerciseCorrection,
   ExerciseDefinition,
   ExerciseAttemptResult,
+  ExerciseAttemptReview,
   Quiz,
   QuizQuestion,
   StudentExerciseItem
@@ -188,6 +189,13 @@ export const exerciseService = {
     const { data, error } = await client.rpc('get_student_exercise_results');
     if (error) throwIfError(error, 'Chargement des résultats impossible');
     return (Array.isArray(data) ? data : []) as ExerciseAttemptResult[];
+  },
+
+  async getStudentAttemptDetails(attemptId: string): Promise<ExerciseAttemptReview> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('get_student_exercise_attempt_details', { p_attempt_id: attemptId });
+    if (error) throwIfError(error, 'Chargement du détail de la tentative impossible');
+    return data as ExerciseAttemptReview;
   },
 
   async listTeacherAttempts(exerciseId: string): Promise<any[]> {
