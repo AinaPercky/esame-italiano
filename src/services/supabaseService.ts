@@ -1641,7 +1641,7 @@ class SupabaseService {
 
       return {
         success: true,
-        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} élèves, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.`,
+        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} élèves, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.${isTeacher ? '' : ' Les inscriptions multi-classes n’ont pas été chargées : une session professeur Supabase est nécessaire ; la classe principale enregistrée dans Supabase est conservée.'}`,
         state: {
           classes,
           students,
