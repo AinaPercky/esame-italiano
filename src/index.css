@@ -677,14 +677,14 @@
 @media (max-width: 639px) {
   .student-tabs {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-items: stretch;
-    gap: 3px;
-    margin-top: 2px;
-    padding: 5px;
+    gap: 5px;
+    margin: 2px 0 4px;
+    padding: 6px;
     border: 1px solid #d8e6ee;
     border-radius: 20px;
-    background: rgba(255, 255, 255, .96);
+    background: rgba(255, 255, 255, .97);
     box-shadow: 0 8px 24px rgba(7, 42, 63, .065);
   }
 
@@ -692,24 +692,25 @@
     position: relative;
     display: flex;
     min-width: 0;
-    min-height: 60px;
+    min-height: 64px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 6px 1px;
+    gap: 5px;
+    padding: 7px 3px;
     border: 1px solid transparent;
     border-radius: 14px;
     color: #607f93;
-    font-size: 9px;
+    font-size: clamp(9px, 2.6vw, 11px);
     font-weight: 750;
-    line-height: 1.2;
+    line-height: 1.15;
     -webkit-tap-highlight-color: transparent;
+    transition: background .18s ease, border-color .18s ease, color .18s ease;
   }
 
   .student-tab > svg {
-    width: 20px;
-    height: 20px;
+    width: 21px;
+    height: 21px;
     color: #7894a6;
     transition: color .18s ease, transform .18s ease;
   }
@@ -730,19 +731,13 @@
     box-shadow: inset 0 0 0 1px rgba(47, 163, 107, .05);
   }
 
-  .student-tab.is-active > svg {
-    color: #2fa36b;
-    transform: translateY(-1px);
-  }
-
-  .student-tab:focus-visible {
-    outline: 3px solid rgba(47, 163, 107, .55);
-    outline-offset: 2px;
-  }
+  .student-tab.is-active > svg { color: #2fa36b; transform: translateY(-1px); }
+  .student-tab:active { transform: scale(.97); }
+  .student-tab:focus-visible { outline: 3px solid rgba(47, 163, 107, .55); outline-offset: 2px; }
 }
 
 @media (max-width: 359px) {
-  .student-tabs { gap: 4px; padding: 6px; }
-  .student-tab { min-height: 62px; font-size: 9px; }
+  .student-tabs { gap: 3px; padding: 5px; }
+  .student-tab { min-height: 58px; font-size: 9px; }
   .student-tab > svg { width: 18px; height: 18px; }
 }
