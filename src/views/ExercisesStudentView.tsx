@@ -178,7 +178,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     return (
       <div className="min-h-svh bg-[#f4f8fb] text-slate-900">
         {renderModuleHeader(returnToList, 'Mes exercices')}
-        <main className="mx-auto w-full max-w-5xl space-y-4 px-3 py-5 sm:px-6 sm:py-8">
+        <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-5 sm:px-6 sm:py-8">
       <section className="mx-auto max-w-3xl space-y-4">
         <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Exercice autonome</p><h1 className="text-xl font-black text-[#072a3f]">Question {active.question_number} / {active.question_count}</h1></div><div className={'flex items-center gap-2 rounded-xl px-3 py-2 font-mono text-lg font-black ' + (remaining <= 5 ? 'bg-rose-100 text-rose-700' : 'bg-[#e6f0f7] text-[#072a3f]')}><Clock size={18}/>{formatSeconds(remaining)}</div></div>
         <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#2fa36b] transition-all" style={{width: (active.question_number / active.question_count * 100) + '%'}}/></div>
@@ -233,14 +233,14 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           </section>
         </div>
       )}
-        </main>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="w-full min-w-0">
-      <main className="mx-auto w-full max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-8">
     <div className="mx-auto max-w-5xl space-y-5">
       <header><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Entraînement autonome</p><h1 className="text-2xl font-black text-[#072a3f]">Mes exercices</h1><p className="mt-1 text-sm text-slate-500">Les exercices attribués à votre classe. Vous pouvez vous entraîner autant de fois que vous le souhaitez ; ces résultats ne sont pas des notes officielles.</p></header>
       {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
@@ -248,7 +248,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       <section className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="mb-3 font-bold text-[#072a3f]">Historique de mes tentatives</h2>{results.length === 0 ? <p className="text-sm text-slate-500">Aucun résultat enregistré.</p> : <div className="space-y-2">{results.map(result => { const item = items.find(x => x.id === result.exercise_id); return <div key={result.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 text-sm"><div><p className="font-semibold">{item?.title || 'Exercice'}</p><p className="text-xs text-slate-500">{new Date(result.started_at).toLocaleString()}</p></div><strong className="tabular-nums">{result.score} / {result.max_score}</strong></div>; })}</div>}</section>
       <button type="button" onClick={() => void refresh()} className="text-xs font-semibold text-[#0b3c5d]">Actualiser</button>
     </div>
-      </main>
+      </div>
     </div>
   );
 };
