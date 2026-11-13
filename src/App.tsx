@@ -20,6 +20,7 @@ import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
 import { StudentPublicReportView } from './views/StudentPublicReportView';
 import { QuizzesAdminView } from './views/QuizzesAdminView';
+import { ExercisesAdminView } from './views/ExercisesAdminView';
 import { PublicQuizView } from './views/PublicQuizView';
 import { StudentSpaceView } from './views/StudentSpaceView';
 import { LessonsAdminView } from './views/LessonsAdminView';
@@ -373,6 +374,8 @@ export default function App() {
               onRefresh={reloadData}
             />
           )}
+
+          {currentTab === 'exercises' && <ExercisesAdminView classes={classes} />}
 
           {currentTab === 'lessons' && (
             <LessonsAdminView currentUser={currentUser} />
