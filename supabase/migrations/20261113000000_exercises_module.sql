@@ -559,3 +559,87 @@ grant execute on function public.advance_exercise_attempt(uuid) to authenticated
 grant execute on function public.list_student_exercises() to authenticated;
 grant execute on function public.get_student_exercise_results() to authenticated;
 grant execute on function public.get_teacher_exercise_attempts(uuid) to authenticated;
+
+
+create or replace function public.save_exercise_definition(
+  p_exercise_id uuid,
+  p_metadata jsonb,
+  p_content jsonb,
+  p_class_ids uuid[]
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_id uuid := p_exercise_id;
+  v_version_id uuid;
+  v_version_number integer;
+  v_question_count integer;
+begin
+  if not public.exercise_is_teacher() then raise exception 'Accès professeur requis.'; end if;
+  if nullif(trim(p_metadata ->> 'title'),'') is null then raise exception 'Le titre est obligatoire.'; end if;
+  if jsonb_typeof(p_content -> 'questions') <> 'array' then raise exception 'Le contenu doit contenir un tableau questions.'; end if;
+  v_question_count := jsonb_array_length(p_content -> 'questions');
+  if v_question_count < 1 then raise exception 'Ajoutez au moins une question.'; end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_content -> 'questions') q(value)
+    where nullif(trim(q.value ->> 'id'),'') is null
+       or coalesce((q.value ->> 'time_limit_seconds')::integer,0) <= 0
+       or coalesce((q.value ->> 'points')::numeric,0) < 0
+       or coalesce(q.value ->> 'type','') not in ('qcm','text','reorder','verbes_trous')
+  ) then
+    raise exception 'Chaque question doit avoir un identifiant, un type compatible et un temps strictement positif.';
+  end if;
+  if coalesce(array_length(p_class_ids,1),0) > 0 and exists (
+    select 1 from unnest(p_class_ids) c(id)
+    where not exists (select 1 from public.classes cl where cl.id=c.id)
+  ) then raise exception 'Une classe sélectionnée est introuvable.'; end if;
+
+  if v_id is null then
+    insert into public.exercises(title,description,category,level,status,created_by)
+    values (
+      trim(p_metadata ->> 'title'),
+      nullif(trim(p_metadata ->> 'description'),''),
+      coalesce(nullif(trim(p_metadata ->> 'category'),''),'Autre'),
+      nullif(trim(p_metadata ->> 'level'),''),
+      'draft',
+      auth.uid()
+    ) returning id into v_id;
+    v_version_number := 1;
+  else
+    update public.exercises
+    set title=trim(p_metadata ->> 'title'),
+        description=nullif(trim(p_metadata ->> 'description'),''),
+        category=coalesce(nullif(trim(p_metadata ->> 'category'),''),'Autre'),
+        level=nullif(trim(p_metadata ->> 'level'),''),
+        updated_at=now()
+    where id=v_id and created_by=auth.uid();
+    if not found then raise exception 'Exercice introuvable ou non modifiable.'; end if;
+    select coalesce(max(version_number),0)+1 into v_version_number
+    from public.exercise_versions where exercise_id=v_id;
+  end if;
+
+  insert into public.exercise_versions(exercise_id,version_number,content,created_by)
+  values (v_id,v_version_number,p_content,auth.uid())
+  returning id into v_version_id;
+
+  update public.exercises
+  set current_version_id=v_version_id,
+      status=case when coalesce(array_length(p_class_ids,1),0)>0 then coalesce(nullif(p_metadata ->> 'status',''),'draft') else 'draft' end,
+      published_at=case when coalesce(array_length(p_class_ids,1),0)>0 and p_metadata ->> 'status'='published' then coalesce(published_at,now()) else published_at end,
+      updated_at=now()
+  where id=v_id;
+
+  delete from public.exercise_class_assignments where exercise_id=v_id;
+  insert into public.exercise_class_assignments(exercise_id,class_id)
+  select v_id, c.id from unnest(coalesce(p_class_ids,'{}'::uuid[])) c(id)
+  on conflict do nothing;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.save_exercise_definition(uuid,jsonb,jsonb,uuid[]) to authenticated;
