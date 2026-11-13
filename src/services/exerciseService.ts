@@ -24,6 +24,9 @@ function throwIfError(error: any, fallback: string): never {
 }
 
 function normalizeQuestions(questions: QuizQuestion[], requireTimers = true): QuizQuestion[] {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error('Ajoutez au moins une question.');
+  }
   return questions.map((question, index) => {
     const id = String(question.id || 'question-' + (index + 1));
     const seconds = Number(question.time_limit_seconds);
@@ -38,6 +41,7 @@ function normalizeQuestions(questions: QuizQuestion[], requireTimers = true): Qu
 }
 
 export function createExerciseJson(exercise: Pick<ExerciseDefinition, 'title' | 'description' | 'category' | 'level' | 'questions'>) {
+  if (!String(exercise.title || '').trim()) throw new Error('Le titre est obligatoire.');
   return {
     schema: SCHEMA,
     schema_version: SCHEMA_VERSION,
@@ -64,12 +68,14 @@ export function parseExerciseJson(raw: string): ReturnType<typeof createExercise
   if (!parsed.metadata || !Array.isArray(parsed.questions)) {
     throw new Error('Le fichier doit contenir metadata et questions.');
   }
+  const title = String(parsed.metadata.title || '').trim();
+  if (!title) throw new Error('Le titre est obligatoire.');
   const questions = normalizeQuestions(parsed.questions);
   return {
     schema: SCHEMA,
     schema_version: SCHEMA_VERSION,
     metadata: {
-      title: String(parsed.metadata.title || '').trim(),
+      title,
       description: String(parsed.metadata.description || ''),
       category: String(parsed.metadata.category || 'Autre'),
       level: parsed.metadata.level || null
