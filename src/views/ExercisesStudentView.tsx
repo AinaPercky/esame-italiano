@@ -36,6 +36,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const timeoutLock = useRef(false);
+  const advanceLock = useRef(false);
   const serverClockOffset = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -98,7 +99,8 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   };
 
   const next = useCallback(async () => {
-    if (!active) return;
+    if (!active || advanceLock.current) return;
+    advanceLock.current = true;
     setSubmitting(true); setError('');
     try {
       const result = await exerciseService.advance(active.attempt_id);
@@ -114,7 +116,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         setRemaining(nextQuestion.seconds_remaining);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Passage à la question suivante impossible.'); }
-    finally { setSubmitting(false); }
+    finally { advanceLock.current = false; setSubmitting(false); }
   }, [active, onFullscreenChange, refresh]);
 
   useEffect(() => {
