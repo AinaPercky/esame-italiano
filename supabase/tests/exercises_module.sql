@@ -38,6 +38,7 @@ declare
   v_attempt jsonb;
   v_attempt_id uuid;
   v_correction jsonb;
+  v_retry jsonb;
   v_advance jsonb;
   v_count integer;
 begin
@@ -64,6 +65,10 @@ begin
   end if;
   if v_correction ->> 'expected' <> 'sono' then
     raise exception 'Correction did not reveal the expected answer after submission';
+  end if;
+  v_retry := public.submit_exercise_answer(v_attempt_id, '"wrong"'::jsonb);
+  if v_retry ->> 'points' <> v_correction ->> 'points' then
+    raise exception 'Retrying an already committed answer must return the same correction';
   end if;
 
   v_advance := public.advance_exercise_attempt(v_attempt_id);
