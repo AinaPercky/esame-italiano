@@ -66,7 +66,7 @@ BEGIN
      expverb:=public.quiz_norm_answer(phrase->>'verbe'); phrase_score:=0;
      IF chosen<>'' AND chosen=expverb AND NOT chosen=ANY(used) THEN phrase_score:=phrase_score+1; END IF;
      IF chosen<>'' AND NOT chosen=ANY(used) AND EXISTS(
-       SELECT 1 FROM jsonb_array_elements_text(phrase->'reponses') r WHERE public.quiz_norm_answer(r)=typed AND typed<>''
+       SELECT 1 FROM jsonb_array_elements_text(phrase->'reponses') r WHERE public.quiz_norm_answer(r.value)=typed AND typed<>''
      ) THEN phrase_score:=phrase_score+2; END IF;
      IF chosen<>'' THEN used:=array_append(used,chosen); END IF;
      earned:=earned+least(per_phrase,phrase_score);
@@ -153,8 +153,14 @@ BEGIN
  RETURN public.quiz_sanitize_payload(to_jsonb(q));
 END $$;
 
+CREATE OR REPLACE FUNCTION public.get_public_quiz_catalog()
+RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=public,pg_temp AS $
+ SELECT coalesce(jsonb_agg(public.quiz_sanitize_payload(to_jsonb(q))),'[]'::jsonb)
+ FROM public.quizzes q WHERE q.is_public=TRUE AND q.status<>'draft';
+$;
+
 CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
 DECLARE sid TEXT:=public.quiz_current_student_id(); cid TEXT; result JSONB;
 BEGIN
  SELECT class_id::text INTO cid FROM public.students WHERE id::text=sid;
@@ -282,16 +288,20 @@ REVOKE ALL ON FUNCTION public.quiz_grade_all(TEXT,JSONB) FROM PUBLIC,anon,authen
 REVOKE ALL ON FUNCTION public.quiz_sanitize_payload(JSONB) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.get_public_quiz(TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_student_quiz_catalog() FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.get_public_quiz_catalog() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.evaluate_quiz_question(TEXT,TEXT,TEXT) FROM PUBLIC,anon;
 REVOKE ALL ON FUNCTION public.evaluate_public_quiz_question(TEXT,TEXT,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.submit_quiz_presence_submission(JSONB) FROM PUBLIC,anon;
 REVOKE ALL ON FUNCTION public.submit_quiz_submission(JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_public_quiz(TEXT) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_student_quiz_catalog() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_public_quiz_catalog() TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.evaluate_quiz_question(TEXT,TEXT,TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.evaluate_public_quiz_question(TEXT,TEXT,TEXT) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_quiz_presence_submission(JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_quiz_submission(JSONB) TO anon,authenticated;
+REVOKE ALL ON FUNCTION public.quiz_is_teacher() FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.quiz_current_student_id() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.quiz_is_teacher() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.quiz_current_student_id() TO authenticated;
 NOTIFY pgrst,'reload schema';
