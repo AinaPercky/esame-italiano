@@ -99,6 +99,9 @@ begin
     raise exception 'Vous êtes déjà inscrit dans cette classe.';
   end if;
   if v_mode='direct' then
+    update public.class_enrollment_requests
+      set status='cancelled', updated_at=now()
+      where student_id=v_student_id and class_id=p_class_id and status='pending';
     insert into public.class_enrollments(student_id,class_id,status,source) values(v_student_id,p_class_id,'active','self_service');
     return jsonb_build_object('status','active','class_id',p_class_id);
   end if;
@@ -123,6 +126,9 @@ begin
   if not found then raise exception 'Demande introuvable.'; end if;
   if v_request.status<>'pending' then raise exception 'Cette demande a déjà été traitée.'; end if;
   if p_decision='approved' then
+    if exists(select 1 from public.classes where id=v_request.class_id and archived_at is not null) then
+      raise exception 'Cette classe est archivée et ne peut plus recevoir d’inscription.';
+    end if;
     if exists(select 1 from public.class_enrollments where student_id=v_request.student_id and class_id=v_request.class_id and status in ('active','suspended')) then
       raise exception 'Cet élève possède déjà une inscription active dans cette classe.';
     end if;
@@ -206,5 +212,15 @@ for select to anon, authenticated using (true);
 drop policy if exists classes_teacher_manage on public.classes;
 create policy classes_teacher_manage on public.classes
 for all to authenticated
+using (public.class_enrollment_is_teacher())
+with check (public.class_enrollment_is_teacher());
+
+-- Replace the legacy public ALL policy: class records are readable, but only the
+-- configured teacher account may create, edit, or archive them.
+drop policy if exists "Classes full access" on public.classes;
+drop policy if exists classes_read_available on public.classes;
+create policy classes_read_available on public.classes for select to anon,authenticated using (true);
+drop policy if exists classes_teacher_manage on public.classes;
+create policy classes_teacher_manage on public.classes for all to authenticated
 using (public.class_enrollment_is_teacher())
 with check (public.class_enrollment_is_teacher());
