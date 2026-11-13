@@ -51,12 +51,16 @@ select set_config(
   'test.exercise_id',
   public.save_exercise_definition(
     null,
-    '{"title":"Exercice CI","description":"Test","category":"Grammaire","level":"A1","status":"published"}'::jsonb,
+    '{"title":"Exercice CI","description":"Test","category":"Grammaire","level":"A1","status":"draft"}'::jsonb,
     '{"questions":[{"id":"q1","type":"qcm","question":"Qual è la risposta?","options":["sono","sei","è"],"correct_answer":"sono","points":2,"time_limit_seconds":30,"explanation":"Sono è la prima persona."}]}'::jsonb,
     array['33333333-3333-4333-8333-333333333333'::uuid]
   )::text,
   false
 );
+
+-- An exercise remains a draft after saving and is only made available after
+-- the explicit, validated publication RPC.
+select public.publish_exercise(current_setting('test.exercise_id')::uuid);
 
 reset role;
 set role authenticated;
