@@ -207,8 +207,8 @@ using(exists(
     and ce.class_id=exercise_class_assignments.class_id and ce.status='active'
 ));
 
--- Only administrators may create, update, archive, or delete class records.
--- Anonymous and authenticated users can still read class names for public portals.
+-- Replace the legacy unrestricted class policy. Classes remain readable for the public
+-- learning portal, but only the configured teacher can create, update, or archive them.
 drop policy if exists "Classes full access" on public.classes;
 drop policy if exists classes_read_available on public.classes;
 create policy classes_read_available on public.classes
@@ -219,30 +219,27 @@ for all to authenticated
 using (public.class_enrollment_is_teacher())
 with check (public.class_enrollment_is_teacher());
 
--- Replace the legacy public ALL policy: class records are readable, but only the
--- configured teacher account may create, edit, or archive them.
-drop policy if exists "Classes full access" on public.classes;
-drop policy if exists classes_read_available on public.classes;
-create policy classes_read_available on public.classes for select to anon,authenticated using (true);
-drop policy if exists classes_teacher_manage on public.classes;
-create policy classes_teacher_manage on public.classes for all to authenticated
-using (public.class_enrollment_is_teacher())
-with check (public.class_enrollment_is_teacher());
+-- Archiving a class closes pending requests without deleting enrollment history.
 create or replace function public.cancel_pending_requests_for_archived_class()
-returns trigger language plpgsql security definer set search_path=public
-as $
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $archive$
 begin
   if old.archived_at is null and new.archived_at is not null then
     update public.class_enrollment_requests
-      set status='cancelled', reviewed_at=now(), review_note='Classe archivée', updated_at=now()
-      where class_id=new.id and status='pending';
+    set status = 'cancelled',
+        reviewed_at = now(),
+        review_note = 'Classe archivée',
+        updated_at = now()
+    where class_id = new.id and status = 'pending';
   end if;
   return new;
 end;
-$;
-revoke all on function public.cancel_pending_requests_for_archived_class() from public,anon,authenticated;
+$archive$;
+revoke all on function public.cancel_pending_requests_for_archived_class() from public, anon, authenticated;
 drop trigger if exists classes_cancel_pending_enrollment_requests on public.classes;
 create trigger classes_cancel_pending_enrollment_requests
 after update of archived_at on public.classes
 for each row execute function public.cancel_pending_requests_for_archived_class();
-
