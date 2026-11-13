@@ -353,17 +353,15 @@ class SupabaseService {
       const { count: studentsCount } = await testClient.from('students').select('*', { count: 'exact', head: true });
       const { count: examsCount } = await testClient.from('exams').select('*', { count: 'exact', head: true });
       const { count: evalsCount } = await testClient.from('evaluations').select('*', { count: 'exact', head: true });
-      const { count: quizzesCount, error: quizzesError } = await testClient
-        .from('quizzes')
-        .select('*', { count: 'exact', head: true });
-      const { count: quizSubmissionsCount, error: submissionsError } = await testClient
-        .from('quiz_submissions')
-        .select('*', { count: 'exact', head: true });
-
-      if (quizzesError || submissionsError) {
+      // Les tables quiz ne sont volontairement plus lisibles directement avec la clé anon.
+      // Vérifier le catalogue public via la RPC sécurisée plutôt que contourner les nouvelles RLS.
+      const { data: publicQuizzes, error: quizzesError } = await testClient.rpc('get_public_quiz_catalog');
+      const quizzesCount = Array.isArray(publicQuizzes) ? publicQuizzes.length : 0;
+      const quizSubmissionsCount = 0; // Les résultats sont réservés aux sessions authentifiées.
+      if (quizzesError) {
         return {
           success: false,
-          message: "La connexion Supabase fonctionne, mais les tables des quiz sont absentes ou inaccessibles. Copiez et exécutez la migration « Ajouter les tables Quiz » depuis ce panneau Paramètres."
+          message: "La connexion Supabase fonctionne, mais la RPC sécurisée des quiz est absente ou inaccessible. Appliquez la migration de sécurité des quiz."
         };
       }
 
