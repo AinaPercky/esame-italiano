@@ -141,7 +141,7 @@ BEGIN
    SELECT (q-'correct_answer'-'answers'-'explanation'-'phrases'-'points_par_phrase') ||
      CASE WHEN q->>'type'='verbes_trous' AND q ? 'verbes_trous' THEN
        jsonb_build_object('verbes_trous',(q->'verbes_trous')||jsonb_build_object('phrases',
-         (SELECT coalesce(jsonb_agg(p-'verbe'-'reponses'),'[]') FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) p)))
+         (SELECT coalesce(jsonb_agg(phrase_item.value-'verbe'-'reponses'),'[]') FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) AS phrase_item)))
      WHEN q->>'type'='reorder' THEN jsonb_build_object('items',
        (SELECT coalesce(jsonb_agg(item ORDER BY random()),'[]') FROM jsonb_array_elements(coalesce(q->'items','[]')) item))
      ELSE '{}'::jsonb END clean
