@@ -209,7 +209,7 @@ DECLARE
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_quiz_id;
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz non disponible.'; END IF;
- SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id=sid AND status='active';
+ SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id::text=sid AND status='active';
  IF coalesce(array_length(cids,1),0)=0 THEN SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid; END IF;
  IF NOT (coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
  IF q.attendance_mode='strict_presence' AND NOT coalesce(q.is_public,FALSE) THEN
@@ -305,7 +305,7 @@ BEGIN
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz indisponible.'; END IF;
  IF auth.uid() IS NOT NULL THEN
    sid:=public.quiz_current_student_id();
-   SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id=sid AND status='active';
+   SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id::text=sid AND status='active';
    IF coalesce(array_length(cids,1),0)=0 THEN SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid; END IF;
    IF NOT (coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
    SELECT coalesce(jsonb_object_agg(question_id,answer),'{}'::jsonb) INTO saved_answers
