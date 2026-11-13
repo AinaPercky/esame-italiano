@@ -304,9 +304,9 @@ begin
 
   select content into v_content from public.exercise_versions where id = v_attempt.version_id;
   v_question_id := v_attempt.question_order ->> v_attempt.current_question_index;
-  select q into v_question
-  from jsonb_array_elements(v_content -> 'questions') q
-  where q ->> 'id' = v_question_id;
+  select q.value into v_question
+  from jsonb_array_elements(v_content -> 'questions') q(value)
+  where q.value ->> 'id' = v_question_id;
   if v_question is null then raise exception 'Question introuvable dans la version de l’exercice.'; end if;
 
   v_safe := v_question - 'correct_answer' - 'answers' - 'explanation';
@@ -423,7 +423,7 @@ begin
   end if;
 
   select content into v_content from public.exercise_versions where id = v_attempt.version_id;
-  select q into v_question from jsonb_array_elements(v_content -> 'questions') q where q ->> 'id' = v_question_id;
+  select q.value into v_question from jsonb_array_elements(v_content -> 'questions') q(value) where q.value ->> 'id' = v_question_id;
   v_timed_out := now() > v_attempt.current_question_deadline_at;
   v_grade := case when v_timed_out
     then jsonb_build_object('correct',false,'points',0,'max_points',coalesce((v_question ->> 'points')::numeric,0),'expected',coalesce(v_question -> 'answers',v_question -> 'correct_answer',v_question #> '{verbes_trous,phrases}'),'explanation',v_question -> 'explanation')
@@ -474,7 +474,7 @@ begin
 
   select content into v_content from public.exercise_versions where id = v_attempt.version_id;
   v_next_id := v_attempt.question_order ->> (v_attempt.current_question_index + 1);
-  select q into v_next_question from jsonb_array_elements(v_content -> 'questions') q where q ->> 'id' = v_next_id;
+  select q.value into v_next_question from jsonb_array_elements(v_content -> 'questions') q(value) where q.value ->> 'id' = v_next_id;
 
   update public.exercise_attempts
   set current_question_index = current_question_index + 1,
