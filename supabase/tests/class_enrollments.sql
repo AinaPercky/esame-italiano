@@ -36,3 +36,26 @@ begin
   end if;
 end;
 $$;
+
+-- All class-targeted learning modules must resolve the student's active memberships.
+do $multi_class_content$
+declare v_definition text;
+begin
+  select pg_get_functiondef('public.list_student_exercises()'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 or position('join lateral' in lower(v_definition))=0 then
+    raise exception 'Student exercise list must use active memberships without duplicate exercises';
+  end if;
+  select pg_get_functiondef('public.start_exercise_attempt(uuid)'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Exercise launch is not multi-class aware'; end if;
+  select pg_get_functiondef('public.get_teacher_exercise_attempts(uuid)'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Teacher exercise report is not multi-class aware'; end if;
+  select pg_get_functiondef('public.list_available_written_exams()'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Written exam listing is not multi-class aware'; end if;
+  select pg_get_functiondef('public.start_written_exam(uuid)'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Written exam launch is not multi-class aware'; end if;
+  select pg_get_functiondef('public.launch_quiz_with_presence(text)'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Quiz launch is not multi-class aware'; end if;
+  select pg_get_functiondef('public.submit_quiz_presence_submission(jsonb)'::regprocedure) into v_definition;
+  if position('class_enrollments' in v_definition)=0 then raise exception 'Quiz submission is not multi-class aware'; end if;
+end;
+$multi_class_content$;
