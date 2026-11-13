@@ -24,7 +24,9 @@ import {
   ImagePlus,
   Trash2,
   Loader2,
-  School
+  School,
+  Settings,
+  ArrowLeft
 } from 'lucide-react';
 import { AuthUser, authService } from '../services/authService';
 import { dataService } from '../services/dataService';
@@ -77,7 +79,6 @@ import {
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
-  { id: 'classes', label: 'Mes classes', shortLabel: 'Classes', icon: School },
   { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
   { id: 'exercises', label: 'Exercices', shortLabel: 'Exercices', icon: CheckCircle2 },
   { id: 'lessons', label: 'Leçons de cours', shortLabel: 'Leçons', icon: Sparkles },
@@ -104,7 +105,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'classes' | 'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [isWrittenExamFullscreen, setIsWrittenExamFullscreen] = useState(false);
   const [isExerciseFullscreen, setIsExerciseFullscreen] = useState(false);
   const isStandaloneModule = isWrittenExamFullscreen || isExerciseFullscreen;
@@ -197,6 +198,23 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   useEffect(() => {
     if (studentRecord?.avatar_url) setEditAvatar(studentRecord.avatar_url);
   }, [studentRecord?.avatar_url]);
+
+  const refreshEnrollments = async () => {
+    const studentId = currentUser.student_id || studentRecord?.id;
+    if (!studentId) {
+      setActiveEnrollmentClassIds([]);
+      setClassEnrollmentsLoaded(true);
+      return;
+    }
+    try {
+      const items = await enrollmentService.listMyEnrollments(studentId);
+      setActiveEnrollmentClassIds(items.filter(item => item.status === 'active').map(item => item.class_id));
+    } catch (error) {
+      console.warn('Chargement des inscriptions impossible :', error);
+    } finally {
+      setClassEnrollmentsLoaded(true);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -974,6 +992,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const greetingName = studentRecord?.first_name || currentUser.name.trim().split(/\s+/)[0] || currentUser.name;
   const studentGender = studentRecord?.gender || currentUser.gender || 'homme';
   const welcomePhoto = studentGender === 'femme' ? '/student-space-welcome-female.webp' : studentHeroPhoto;
+  const activeClassNames = activeEnrollmentClassIds
+    .map(id => classesList.find(c => c.id === id)?.name)
+    .filter((name): name is string => Boolean(name));
+  const primaryClassName =
+    activeClassNames.join(', ')
+    || classesList.find(c => c.id === (studentRecord?.class_id || currentUser.class_id))?.name
+    || studentRecord?.class_name
+    || currentUser.class_name
+    || '';
 
   // Vérification de la validation de l'inscription par le professeur
   if (studentRecord && studentRecord.validation_status === 'pending') {
@@ -1073,13 +1100,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              className="student-avatar-ring student-header-avatar student-header-avatar-button"
+              className={`student-avatar-ring student-header-avatar student-header-avatar-button ${
+                activeTab === 'profile' ? 'ring-2 ring-[#2fa36b] ring-offset-2' : ''
+              }`}
               onClick={() => {
                 setActiveTab('profile');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              title={`Accéder au profil de ${currentUser.name}`}
-              aria-label={`Accéder au profil de ${currentUser.name}`}
+              aria-current={activeTab === 'profile' ? 'page' : undefined}
+              title={`Paramètres, profil et classe de ${currentUser.name}`}
+              aria-label={`Paramètres, profil et classe de ${currentUser.name}`}
             >
               <StudentAvatar
                 name={currentUser.name}
@@ -1090,7 +1120,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             <div className="hidden text-right sm:block">
               <div className="max-w-48 truncate text-xs font-bold text-slate-900">{currentUser.name}</div>
               <div className="text-[11px] text-slate-500">
-                N° {currentUser.student_number || '1'} <span aria-hidden="true">·</span> {currentUser.class_name || 'Classe'}
+                N° {currentUser.student_number || '1'} <span aria-hidden="true">·</span> {primaryClassName || 'Classe'}
               </div>
             </div>
             <button type="button" onClick={onLogout} className="student-logout" title="Se déconnecter" aria-label="Se déconnecter">
@@ -1127,7 +1157,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               <h1 id="student-welcome-title">{studentGender === 'femme' ? 'Benvenuta' : 'Benvenuto'}, {greetingName}!</h1>
               <p>Retrouvez les quiz de votre professeur, passez vos évaluations pendant leur disponibilité et suivez vos progrès jour après jour.</p>
               <div className="student-class-meta">
-                <span>{currentUser.class_name || studentRecord?.class_name || 'Espace étudiant'}</span>
+                <span>{primaryClassName || 'Espace étudiant'}</span>
                 <span aria-hidden="true">·</span>
                 <span>Numéro {currentUser.student_number || studentRecord?.student_number || '—'}</span>
               </div>
@@ -1166,10 +1196,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             </button>
           ))}
         </nav>}
-
-        {activeTab === 'classes' && (
-          <StudentClassesView studentId={currentUser.student_id || studentRecord?.id || ''} />
-        )}
 
         {activeTab === 'lessons' && (
           <LessonsStudentView
@@ -1760,119 +1786,164 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
         )}
 
-        {/* Profil et identifiants, accessible via l’avatar de l’en-tête */}
+        {/* Paramètres, profil et gestion des classes, accessibles via l’avatar de l’en-tête */}
         {activeTab === 'profile' && (
-          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-2xs max-w-xl mx-auto space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center">
-                <User className="w-6 h-6" />
+          <div className="mx-auto w-full max-w-6xl space-y-6">
+            <div className="flex flex-col gap-3 rounded-2xl border border-[#d8e6ee] bg-white p-5 shadow-2xs sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e6f0f7] text-[#072a3f]">
+                  <Settings className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-extrabold text-[#072a3f] sm:text-xl">
+                    Paramètres &amp; Mes classes
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Gérez votre classe, vos inscriptions et vos identifiants d’étudiant.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-display font-bold text-lg text-slate-900">
-                  Mes Identifiants Étudiant
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Vérifiez ou mettez à jour votre nom, prénom et numéro d’étudiant.
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('quizzes')}
+                className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-[#d8e6ee] bg-[#f8fbfd] px-4 py-2 text-xs font-bold text-[#072a3f] transition-colors hover:bg-[#e6f0f7] sm:self-auto"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Retour aux quiz</span>
+              </button>
             </div>
 
-            {profileSuccessMsg && (
-              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>{profileSuccessMsg}</span>
-              </div>
-            )}
-
-            {profileErrorMsg && (
-              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-800 flex items-center gap-2" role="alert">
-                <AlertCircle className="w-4 h-4 text-rose-600" />
-                <span>{profileErrorMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Prénom</label>
-                  <input
-                    type="text"
-                    required
-                    value={editFirstName}
-                    onChange={(e) => setEditFirstName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                  />
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs lg:col-span-5 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-800">
+                    <User className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-base font-bold text-slate-900">
+                      Mes Identifiants Étudiant
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Vérifiez ou mettez à jour votre nom, prénom et numéro d’étudiant.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Nom</label>
-                  <input
-                    type="text"
-                    required
-                    value={editLastName}
-                    onChange={(e) => setEditLastName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                {profileSuccessMsg && (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span>{profileSuccessMsg}</span>
+                  </div>
+                )}
+
+                {profileErrorMsg && (
+                  <div className="flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800" role="alert">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>{profileErrorMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Prénom</label>
+                      <input
+                        type="text"
+                        required
+                        value={editFirstName}
+                        onChange={(e) => setEditFirstName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Nom</label>
+                      <input
+                        type="text"
+                        required
+                        value={editLastName}
+                        onChange={(e) => setEditLastName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Classe actuelle</label>
+                    <div className="flex items-center gap-2 rounded-xl border border-[#d8e6ee] bg-[#f5f8fa] px-3 py-2.5 text-xs font-bold text-[#072a3f]">
+                      <School className="h-4 w-4 shrink-0 text-[#2fa36b]" />
+                      <span className="truncate">{primaryClassName || 'Aucune classe active'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Numéro d’étudiant (ex. : 1, 2, 3)</label>
+                    <input
+                      type="text"
+                      required
+                      value={editStudentNumber}
+                      onChange={(e) => setEditStudentNumber(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="student-profile-gender" className="text-xs font-bold text-slate-700">Sexe</label>
+                    <select
+                      id="student-profile-gender"
+                      required
+                      value={editGender}
+                      onChange={e => setEditGender(e.target.value === 'femme' ? 'femme' : 'homme')}
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="homme">Homme</option>
+                      <option value="femme">Femme</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Adresse Email</label>
+                    <input
+                      type="email"
+                      disabled
+                      value={currentUser.email}
+                      className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 p-2.5 text-xs font-mono text-slate-500"
+                    />
+                    <span className="text-[10px] text-slate-400">L'email sert d'identifiant de connexion unique.</span>
+                  </div>
+
+                  {/* Téléchargement / Remplacement de photo de profil */}
+                  <PhotoUploadInput
+                    value={editAvatar}
+                    name={`${editFirstName} ${editLastName}`.trim() || 'Mon Profil'}
+                    onChange={(photo) => setEditAvatar(photo)}
+                    onRemove={() => setEditAvatar('')}
+                    label="Photo de profil"
+                    helperText="Formats JPG, PNG ou WebP acceptés ; la photo est convertie en WebP et compressée automatiquement."
                   />
-                </div>
-              </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Numéro d’étudiant (ex. : 1, 2, 3)</label>
-                <input
-                  type="text"
-                  required
-                  value={editStudentNumber}
-                  onChange={(e) => setEditStudentNumber(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-800 py-3 text-xs font-bold text-white shadow-xs transition-colors hover:bg-amber-900 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      {isSavingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <span>{isSavingProfile ? 'Enregistrement sur Supabase...' : 'Enregistrer mes identifiants'}</span>
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-2xs lg:col-span-7">
+                <StudentClassesView
+                  studentId={currentUser.student_id || studentRecord?.id || ''}
+                  onEnrollmentsChanged={() => {
+                    void refreshEnrollments().then(() => loadData());
+                  }}
                 />
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="student-profile-gender" className="text-xs font-bold text-slate-700">Sexe</label>
-                <select
-                  id="student-profile-gender"
-                  required
-                  value={editGender}
-                  onChange={e => setEditGender(e.target.value === 'femme' ? 'femme' : 'homme')}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                >
-                  <option value="homme">Homme</option>
-                  <option value="femme">Femme</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Adresse Email</label>
-                <input
-                  type="email"
-                  disabled
-                  value={currentUser.email}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-500 font-mono cursor-not-allowed"
-                />
-                <span className="text-[10px] text-slate-400">L'email sert d'identifiant de connexion unique.</span>
-              </div>
-
-              {/* Téléchargement / Remplacement de photo de profil */}
-              <PhotoUploadInput
-                value={editAvatar}
-                name={`${editFirstName} ${editLastName}`.trim() || 'Mon Profil'}
-                onChange={(photo) => setEditAvatar(photo)}
-                onRemove={() => setEditAvatar('')}
-                label="Photo de profil"
-                helperText="Formats JPG, PNG ou WebP acceptés ; la photo est convertie en WebP et compressée automatiquement."
-              />
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSavingProfile}
-                  className="w-full py-3 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait"
-                >
-                  {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  <span>{isSavingProfile ? 'Enregistrement sur Supabase...' : 'Enregistrer mes identifiants'}</span>
-                </button>
-              </div>
-            </form>
+              </section>
+            </div>
           </div>
         )}
 

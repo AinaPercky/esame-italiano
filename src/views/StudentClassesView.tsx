@@ -1,7 +1,7 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {Clock3,GraduationCap,Loader2,PlusCircle,RefreshCw} from 'lucide-react';
 import {enrollmentService,ClassEnrollment,ClassEnrollmentRequest,AvailableClass} from '../services/enrollmentService';
-export const StudentClassesView:React.FC<{studentId:string}>=({studentId})=>{
+export const StudentClassesView:React.FC<{studentId:string;onEnrollmentsChanged?:()=>void}>=({studentId,onEnrollmentsChanged})=>{
  const [enrollments,setEnrollments]=useState<ClassEnrollment[]>([]);
  const [requests,setRequests]=useState<ClassEnrollmentRequest[]>([]);
  const [available,setAvailable]=useState<AvailableClass[]>([]);
@@ -16,7 +16,7 @@ export const StudentClassesView:React.FC<{studentId:string}>=({studentId})=>{
   catch(e){setError(e instanceof Error?e.message:'Chargement impossible.');}finally{setLoading(false);}
  },[studentId]);
  useEffect(()=>{void refresh();},[refresh]);
- const join=async(id:string)=>{setWorking(id);setError(null);setMessage(null);try{const result=await enrollmentService.requestClassEnrollment(id);setMessage(result.status==='active'?'Vous avez rejoint cette classe.':'Votre demande a été envoyée à l’administration.');await refresh();}catch(e){setError(e instanceof Error?e.message:'Inscription impossible.');}finally{setWorking(null);}};
+ const join=async(id:string)=>{setWorking(id);setError(null);setMessage(null);try{const result=await enrollmentService.requestClassEnrollment(id);setMessage(result.status==='active'?'Vous avez rejoint cette classe.':'Votre demande a été envoyée à l’administration.');await refresh();onEnrollmentsChanged?.();}catch(e){setError(e instanceof Error?e.message:'Inscription impossible.');}finally{setWorking(null);}};
  const open=enrollments.filter(e=>e.status==='active'||e.status==='suspended');
  const joined=new Set(open.map(e=>e.class_id));
  const pending=new Set(requests.filter(r=>r.status==='pending').map(r=>r.class_id));
