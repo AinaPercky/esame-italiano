@@ -62,6 +62,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113000000_exercises_module.sql
       - name: Restrict exercise RPC execution to authenticated users
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113070824_restrict_exercise_rpc_execution.sql
+      - name: Add secure student exercise attempt review
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113100000_student_exercise_attempt_details.sql
       - name: Add explicit validated exercise publication
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113071100_publish_exercise_rpc.sql
       - name: Apply written exam migration
