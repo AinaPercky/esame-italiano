@@ -202,7 +202,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   if (active) {
     const q = active.question;
     return (
-      <div className="min-h-svh bg-[#f4f8fb] text-slate-900">
+      <div className="fixed inset-0 z-[100] min-h-svh overflow-y-auto overscroll-contain bg-[#f4f8fb] text-slate-900">
         {renderModuleHeader(returnToList, 'Mes exercices')}
         <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-5 sm:px-6 sm:py-8">
       <section className="mx-auto max-w-3xl space-y-4">
