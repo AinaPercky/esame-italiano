@@ -357,7 +357,6 @@ class SupabaseService {
       // Vérifier le catalogue public via la RPC sécurisée plutôt que contourner les nouvelles RLS.
       const { data: publicQuizzes, error: quizzesError } = await testClient.rpc('get_public_quiz_catalog');
       const quizzesCount = Array.isArray(publicQuizzes) ? publicQuizzes.length : 0;
-      const quizSubmissionsCount = 0; // Les résultats sont réservés aux sessions authentifiées.
       if (quizzesError) {
         return {
           success: false,
@@ -375,7 +374,6 @@ class SupabaseService {
           examsCount: examsCount || 0,
           evaluationsCount: evalsCount || 0,
           quizzesCount: quizzesCount || 0,
-          quizSubmissionsCount: quizSubmissionsCount || 0
         }
       };
     } catch (err: any) {
