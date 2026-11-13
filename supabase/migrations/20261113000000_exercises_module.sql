@@ -580,15 +580,24 @@ declare
 begin
   if not public.exercise_is_teacher() then raise exception 'Accès professeur requis.'; end if;
   if nullif(trim(p_metadata ->> 'title'),'') is null then raise exception 'Le titre est obligatoire.'; end if;
-  if jsonb_typeof(p_content -> 'questions') <> 'array' then raise exception 'Le contenu doit contenir un tableau questions.'; end if;
+  if coalesce(jsonb_typeof(p_content -> 'questions'),'') <> 'array' then raise exception 'Le contenu doit contenir un tableau questions.'; end if;
   v_question_count := jsonb_array_length(p_content -> 'questions');
+  if (select count(distinct q.value ->> 'id') from jsonb_array_elements(p_content -> 'questions') q(value)) <> v_question_count then
+    raise exception 'Chaque question doit avoir un identifiant unique.';
+  end if;
+  if coalesce(nullif(p_metadata ->> 'status',''),'draft') not in ('draft','published','archived') then
+    raise exception 'Statut d’exercice invalide.';
+  end if;
+  if p_metadata ->> 'status' = 'published' and coalesce(array_length(p_class_ids,1),0) = 0 then
+    raise exception 'Attribuez au moins une classe avant de publier.';
+  end if;
   if v_question_count < 1 then raise exception 'Ajoutez au moins une question.'; end if;
   if exists (
     select 1
     from jsonb_array_elements(p_content -> 'questions') q(value)
     where nullif(trim(q.value ->> 'id'),'') is null
        or coalesce((q.value ->> 'time_limit_seconds')::integer,0) <= 0
-       or coalesce((q.value ->> 'points')::numeric,0) < 0
+       or coalesce((q.value ->> 'points')::numeric,0) <= 0
        or coalesce(q.value ->> 'type','') not in ('qcm','text','reorder','verbes_trous')
   ) then
     raise exception 'Chaque question doit avoir un identifiant, un type compatible et un temps strictement positif.';
