@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "node tests/evaluation.test.js"
+    "test": "node tests/evaluation.test.js && node tests/enrollments.test.js && node tests/http-integration.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

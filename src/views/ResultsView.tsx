@@ -756,7 +756,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           isOpen={isClassQRModalOpen}
           onClose={() => setIsClassQRModalOpen(false)}
           exam={exams.find(e => e.id === examFilter) || exams[0]}
-          students={classFilter ? students.filter(s => s.class_id === classFilter) : students}
+          students={classFilter ? students.filter(s => s.class_ids ? s.class_ids.includes(classFilter) : s.class_id === classFilter) : students}
         />
       )}
 

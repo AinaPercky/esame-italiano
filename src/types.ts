@@ -9,6 +9,8 @@ export interface ClassRoom {
   id: string;
   name: string;
   created_at: string;
+  enrollment_mode?: 'direct' | 'approval';
+  archived_at?: string | null;
   student_count?: number;
   exam_count?: number;
 }
@@ -16,6 +18,7 @@ export interface ClassRoom {
 export interface Student {
   id: string;
   class_id: string;
+  class_ids?: string[]; // Inscriptions actives, chargées depuis class_enrollments.
   first_name: string;
   last_name: string;
   gender?: 'homme' | 'femme';

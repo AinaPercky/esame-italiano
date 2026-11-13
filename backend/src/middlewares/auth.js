@@ -1,4 +1,4 @@
-const { supabase, isConfigured } = require('../config/supabase');
+const { supabase, isConfigured, createAuthenticatedClient } = require('../config/supabase');
 
 /**
  * Middleware d'authentification vérifiant le jeton Supabase JWT
@@ -23,6 +23,8 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Jeton invalide ou expiré.' });
     }
     req.user = user;
+    const userClient = createAuthenticatedClient(token);
+    if (userClient) req.supabase = userClient;
     next();
   } catch (err) {
     return res.status(500).json({ error: 'Erreur lors de la vérification de l\'authentification.' });

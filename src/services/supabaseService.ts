@@ -246,7 +246,16 @@ class SupabaseService {
       throw new Error(`Impossible de charger la classe de l’élève : ${classError.message}`);
     }
 
-    return { ...student, class_name: classroom?.name } as Student;
+    const { data: activeEnrollments, error: enrollmentError } = await client
+      .from('class_enrollments')
+      .select('class_id')
+      .eq('student_id', student.id)
+      .eq('status', 'active');
+    if (enrollmentError) {
+      await client.auth.signOut();
+      throw new Error(`Impossible de charger les inscriptions de l’élève : ${enrollmentError.message}`);
+    }
+    return { ...student, class_name: classroom?.name, class_ids: (activeEnrollments || []).map(item => item.class_id) } as Student;
   }
 
   public async registerStudentAuth(email: string, password: string, studentId: string): Promise<boolean> {
@@ -391,6 +400,8 @@ class SupabaseService {
       await client.from('classes').upsert({
         id: c.id,
         name: c.name,
+        enrollment_mode: c.enrollment_mode || 'approval',
+        archived_at: c.archived_at || null,
         created_at: c.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
     } catch (e) {
@@ -400,130 +411,13 @@ class SupabaseService {
 
   public async deleteClass(id: string): Promise<void> {
     const client = this.getClient();
-    if (!client) {
-      throw new Error('Suppression impossible : Supabase n’est pas configuré ou accessible.');
-    }
-    if (!isUUID(id)) {
-      throw new Error('Suppression impossible dans Supabase : identifiant de classe invalide.');
-    }
-
-    const failOnError = (operation: string, error: { message: string } | null) => {
-      if (error) {
-        throw new Error(`Suppression Supabase (${operation}) impossible : ${error.message}`);
-      }
-    };
-
-    const { data: students, error: studentsError } = await client
-      .from('students')
-      .select('id, avatar_url')
-      .eq('class_id', id);
-    failOnError('chargement des élèves', studentsError);
-
-    const { data: exams, error: examsError } = await client
-      .from('exams')
-      .select('id')
-      .eq('class_id', id);
-    failOnError('chargement des examens', examsError);
-
-    const studentIds = (students || []).map(student => student.id);
-    const examIds = (exams || []).map(exam => exam.id);
-    const evaluationIds = new Set<string>();
-
-    if (studentIds.length > 0) {
-      const { data: studentEvaluations, error } = await client
-        .from('evaluations')
-        .select('id')
-        .in('student_id', studentIds);
-      failOnError('chargement des évaluations des élèves', error);
-      (studentEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
-    }
-    if (examIds.length > 0) {
-      const { data: examEvaluations, error } = await client
-        .from('evaluations')
-        .select('id')
-        .in('exam_id', examIds);
-      failOnError('chargement des évaluations des examens', error);
-      (examEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
-    }
-
-    const avatarPaths = (students || [])
-      .filter(student => student.avatar_url && isUUID(student.id))
-      .flatMap(student => [`avatars/${student.id}.jpg`, `avatars/${student.id}.png`, `avatars/${student.id}.webp`]);
-    if (avatarPaths.length > 0) {
-      const { error } = await client.storage.from('student-avatars').remove(avatarPaths);
-      failOnError('suppression des photos de profil', error);
-    }
-
-    const { error: submissionsError } = await client
-      .from('quiz_submissions')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des résultats de quiz', submissionsError);
-
-    const { error: quizzesError } = await client
-      .from('quizzes')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des quiz', quizzesError);
-
-    if (evaluationIds.size > 0) {
-      const { error } = await client
-        .from('evaluation_details')
-        .delete()
-        .in('evaluation_id', Array.from(evaluationIds));
-      failOnError('suppression des détails d’évaluation', error);
-
-      const { error: evaluationsError } = await client
-        .from('evaluations')
-        .delete()
-        .in('id', Array.from(evaluationIds));
-      failOnError('suppression des évaluations orales', evaluationsError);
-    }
-
-    if (studentIds.length > 0) {
-      const { error } = await client
-        .from('exam_pass_order')
-        .delete()
-        .in('student_id', studentIds);
-      failOnError('suppression des ordres de passage des élèves', error);
-    }
-
-    if (examIds.length > 0) {
-      const { error: passOrderError } = await client
-        .from('exam_pass_order')
-        .delete()
-        .in('exam_id', examIds);
-      failOnError('suppression des ordres de passage des examens', passOrderError);
-
-      const { error: rubricsError } = await client
-        .from('exam_rubrics')
-        .delete()
-        .in('exam_id', examIds);
-      failOnError('suppression des rubriques', rubricsError);
-    }
-
-    const { error: deleteStudentsError } = await client
-      .from('students')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des élèves', deleteStudentsError);
-
-    const { error: deleteExamsError } = await client
-      .from('exams')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des examens', deleteExamsError);
-
-    const { data: deletedClass, error: deleteClassError } = await client
-      .from('classes')
-      .delete()
-      .eq('id', id)
-      .select('id')
-      .maybeSingle();
-    failOnError('suppression de la classe', deleteClassError);
-    if (!deletedClass) {
-      throw new Error('Suppression Supabase impossible : classe introuvable ou droits de suppression insuffisants.');
-    }
+    if (!client) throw new Error('Archivage impossible : Supabase n’est pas configuré ou accessible.');
+    if (!isUUID(id)) throw new Error('Archivage impossible : identifiant de classe invalide.');
+    const { data, error } = await client.from('classes')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id).is('archived_at', null).select('id').maybeSingle();
+    if (error) throw new Error(`Archivage Supabase impossible : ${error.message}`);
+    if (!data) throw new Error('Classe introuvable ou déjà archivée.');
   }
 
   // --- STUDENTS ---
@@ -660,6 +554,17 @@ class SupabaseService {
       .from('students')
       .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, validation_status, created_at, updated_at')
       .order('created_at', { ascending: false });
+    const { data: activeEnrollments, error: enrollmentsError } = await client
+      .from('class_enrollments')
+      .select('student_id,class_id')
+      .eq('status', 'active');
+    if (enrollmentsError) throw new Error(`Erreur lors du chargement des inscriptions : ${enrollmentsError.message}`);
+    const classIdsByStudent = new Map<string, string[]>();
+    (activeEnrollments || []).forEach(item => {
+      const ids = classIdsByStudent.get(item.student_id) || [];
+      if (!ids.includes(item.class_id)) ids.push(item.class_id);
+      classIdsByStudent.set(item.student_id, ids);
+    });
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('validation_status')) {
@@ -669,6 +574,7 @@ class SupabaseService {
           .order('created_at', { ascending: false });
         return (fallback.data || []).map(s => ({
           ...s,
+          class_ids: classIdsByStudent.get(s.id) || [],
           validation_status: 'approved'
         })) as Student[];
       }
@@ -676,6 +582,7 @@ class SupabaseService {
     }
     return (data || []).map(s => ({
       ...s,
+      class_ids: classIdsByStudent.get(s.id) || [],
       gender: s.gender || 'homme',
       validation_status: s.validation_status || 'pending'
     })) as Student[];
@@ -1536,7 +1443,8 @@ class SupabaseService {
         { data: detailsData, error: errD },
         { data: passOrderData, error: errPO },
         { data: quizzesData, error: errQ },
-        { data: quizSubmissionsData, error: errQS }
+        { data: quizSubmissionsData, error: errQS },
+        { data: enrollmentsData, error: errEnrollments }
       ] = await Promise.all([
         client.from('classes').select('*'),
         client.from('students').select('*'),
@@ -1546,7 +1454,8 @@ class SupabaseService {
         client.from('evaluation_details').select('*'),
         client.from('exam_pass_order').select('*'),
         client.from('quizzes').select('*'),
-        client.from('quiz_submissions').select('*')
+        client.from('quiz_submissions').select('*'),
+        client.from('class_enrollments').select('student_id,class_id,status')
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
@@ -1554,16 +1463,27 @@ class SupabaseService {
       if (errE) throw new Error(`Exams: ${errE.message}`);
       if (errQ) throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
+      if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
         id: c.id,
         name: c.name,
+        enrollment_mode: c.enrollment_mode || 'approval',
+        archived_at: c.archived_at || null,
         created_at: c.created_at
       }));
+
+      const activeClassIdsByStudent = new Map<string, string[]>();
+      (enrollmentsData || []).filter(item => item.status === 'active').forEach(item => {
+        const ids = activeClassIdsByStudent.get(item.student_id) || [];
+        if (!ids.includes(item.class_id)) ids.push(item.class_id);
+        activeClassIdsByStudent.set(item.student_id, ids);
+      });
 
       const students: Student[] = (studentsData || []).map(s => ({
         id: s.id,
         class_id: s.class_id,
+        class_ids: activeClassIdsByStudent.get(s.id) || [],
         first_name: s.first_name,
         last_name: s.last_name,
         email: s.email,

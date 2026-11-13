@@ -65,7 +65,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
 
   const currentExam = dataService.getExamById(selectedExamId) || studentExams[0];
   const examClassStudents = currentExam 
-    ? allStudents.filter(s => s.class_id === currentExam.class_id)
+    ? allStudents.filter(s => s.class_ids ? s.class_ids.includes(currentExam.class_id) : s.class_id === currentExam.class_id)
     : allStudents;
 
   const effectiveStudentId = lockedStudentId || selectedStudentId;

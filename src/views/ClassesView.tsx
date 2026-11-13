@@ -4,8 +4,8 @@ import { ClassRoom } from '../types';
 
 interface ClassesViewProps {
   classes: ClassRoom[];
-  onCreateClass: (name: string) => void;
-  onUpdateClass: (id: string, name: string) => void;
+  onCreateClass: (name: string, enrollmentMode: 'direct' | 'approval') => void;
+  onUpdateClass: (id: string, name: string, enrollmentMode: 'direct' | 'approval') => void;
   onDeleteClass: (id: string) => Promise<void>;
   onSelectClassStudents: (classId: string) => void;
 }
@@ -20,6 +20,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassRoom | null>(null);
   const [classNameInput, setClassNameInput] = useState('');
+  const [enrollmentModeInput, setEnrollmentModeInput] = useState<'direct' | 'approval'>('approval');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
@@ -29,9 +30,9 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
     if (!classNameInput.trim()) return;
 
     if (editingClass) {
-      onUpdateClass(editingClass.id, classNameInput.trim());
+      onUpdateClass(editingClass.id, classNameInput.trim(), enrollmentModeInput);
     } else {
-      onCreateClass(classNameInput.trim());
+      onCreateClass(classNameInput.trim(), enrollmentModeInput);
     }
 
     setClassNameInput('');
@@ -42,12 +43,14 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   const openCreateModal = () => {
     setEditingClass(null);
     setClassNameInput('');
+    setEnrollmentModeInput('approval');
     setIsModalOpen(true);
   };
 
   const openEditModal = (cls: ClassRoom) => {
     setEditingClass(cls);
     setClassNameInput(cls.name);
+    setEnrollmentModeInput(cls.enrollment_mode || 'approval');
     setIsModalOpen(true);
   };
 
@@ -116,7 +119,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                 {cls.name}
               </h3>
               <p className="text-xs text-slate-400 mb-4">
-                Créée le {new Date(cls.created_at).toLocaleDateString('fr-FR')}
+                Créée le {new Date(cls.created_at).toLocaleDateString('fr-FR')} · {cls.enrollment_mode === 'direct' ? 'Inscription directe' : 'Validation requise'}{cls.archived_at ? ' · Archivée' : ''}
               </p>
 
               <div className="grid grid-cols-2 gap-2 text-xs py-3 border-y border-slate-100 mb-4">
@@ -175,6 +178,14 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Mode d'inscription</label>
+                <select value={enrollmentModeInput} onChange={e => setEnrollmentModeInput(e.target.value as 'direct' | 'approval')} className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                  <option value="approval">Avec validation administrative</option>
+                  <option value="direct">Inscription directe</option>
+                </select>
+                <p className="mt-1 text-[11px] text-slate-500">Ce réglage concerne les nouvelles inscriptions.</p>
+              </div>
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"
@@ -203,10 +214,10 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
               <Trash2 className="w-6 h-6" />
             </div>
             <h3 className="font-semibold text-slate-900 text-base mb-2">
-              Supprimer cette classe ?
+              Archiver cette classe ?
             </h3>
             <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Cette action supprimera définitivement la classe, ses élèves, leurs photos et notes, les résultats de quiz, ainsi que les examens et données associés. Les comptes d’élèves enregistrés dans ce navigateur seront aussi supprimés.
+              La classe sera masquée des nouvelles inscriptions. Les élèves, leurs autres classes, les examens, les quiz et tous les résultats historiques seront conservés.
             </p>
             {deleteError && (
               <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-[#b7d3e4] bg-[#e6f0f7] p-3 text-left text-xs text-[#072a3f]">
@@ -236,15 +247,15 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                     await onDeleteClass(confirmDeleteId);
                     setConfirmDeleteId(null);
                   } catch (error) {
-                    console.error('Erreur lors de la suppression de la classe :', error);
-                    setDeleteError(error instanceof Error ? error.message : 'La suppression de la classe a échoué. Réessayez.');
+                    console.error('Erreur lors de l’archivage de la classe :', error);
+                    setDeleteError(error instanceof Error ? error.message : 'L’archivage de la classe a échoué. Réessayez.');
                   } finally {
                     setIsDeletingClass(false);
                   }
                 }}
                 className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#0b3c5d] hover:bg-[#072a3f] active:bg-[#072a3f] disabled:cursor-wait disabled:opacity-60 rounded-lg min-h-[44px]"
               >
-                {isDeletingClass ? 'Suppression en cours…' : 'Confirmer la suppression'}
+                {isDeletingClass ? 'Archivage en cours…' : 'Confirmer l’archivage'}
               </button>
             </div>
           </div>

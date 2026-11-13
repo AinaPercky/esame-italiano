@@ -10,6 +10,7 @@ import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './views/DashboardView';
 import { ClassesView } from './views/ClassesView';
 import { StudentsView } from './views/StudentsView';
+import { ClassEnrollmentsView } from './views/ClassEnrollmentsView';
 import { ExamsView } from './views/ExamsView';
 import { WrittenExamsView } from './views/WrittenExamsView';
 import { OralEvaluationView } from './views/OralEvaluationView';
@@ -384,12 +385,12 @@ export default function App() {
           {currentTab === 'classes' && (
             <ClassesView
               classes={classes}
-              onCreateClass={(name) => {
-                dataService.createClass(name);
+              onCreateClass={(name, enrollmentMode) => {
+                dataService.createClass(name, enrollmentMode);
                 reloadData();
               }}
-              onUpdateClass={(id, name) => {
-                dataService.updateClass(id, name);
+              onUpdateClass={(id, name, enrollmentMode) => {
+                dataService.updateClass(id, name, enrollmentMode);
                 reloadData();
               }}
               onDeleteClass={async (id) => {
@@ -398,6 +399,10 @@ export default function App() {
               }}
               onSelectClassStudents={handleSelectClassStudents}
             />
+          )}
+
+          {currentTab === 'enrollments' && (
+            <ClassEnrollmentsView classes={classes} students={students} currentUserId={currentUser.id} />
           )}
 
           {currentTab === 'students' && (

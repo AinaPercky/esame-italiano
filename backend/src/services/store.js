@@ -131,6 +131,16 @@ const initialPassOrder = [
 let memoryStore = {
   classes: [...initialClasses],
   students: [...initialStudents],
+  enrollments: initialStudents.map(student => ({
+    id: 'legacy_' + student.id,
+    student_id: student.id,
+    class_id: student.class_id,
+    status: 'active',
+    source: 'legacy',
+    started_at: student.created_at,
+    ended_at: null
+  })),
+  enrollmentRequests: [],
   exams: [...initialExams],
   rubrics: [...initialRubrics],
   evaluations: [...initialEvaluations],

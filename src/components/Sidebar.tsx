@@ -60,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Classes & Étudiants',
       items: [
         { id: 'classes', label: 'Gestion des Classes', icon: School },
+        { id: 'enrollments', label: 'Inscriptions aux classes', icon: School },
         { id: 'students', label: 'Gestion des Élèves', icon: Users }
       ]
     },
