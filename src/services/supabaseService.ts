@@ -75,9 +75,10 @@ export function isSupabaseMissingRpcError(
   if (!error) return false;
   const code = (error.code || '').toUpperCase();
   const message = error.message || '';
+  // 42883 couvre aussi les erreurs de type PostgreSQL (ex. uuid = text).
+  // Ne le traiter comme une RPC absente que si le message désigne réellement une fonction.
   const isMissing =
     code === 'PGRST202' ||
-    code === '42883' ||
     /could not find the function|function .* does not exist/i.test(message);
   if (!isMissing) return false;
   if (!rpcName) return true;
