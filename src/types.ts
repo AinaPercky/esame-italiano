@@ -281,3 +281,68 @@ export interface DailyGrade {
   average_score_20: number; // Total des points obtenus / total possible, ramené sur 20
   submissions: QuizSubmission[];
 }
+
+
+// =========================================================================
+// MODULE EXERCICES (distinct des quiz notés)
+// =========================================================================
+export type ExerciseStatus = 'draft' | 'published' | 'archived';
+
+export interface ExerciseDefinition {
+  id: string;
+  title: string;
+  description?: string | null;
+  category: string;
+  level?: CEFRLevel | null;
+  status: ExerciseStatus;
+  created_at: string;
+  updated_at?: string;
+  current_version_id?: string | null;
+  current_version_number?: number;
+  questions: QuizQuestion[];
+  class_ids: string[];
+}
+
+export interface StudentExerciseItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  category: string;
+  level?: CEFRLevel | null;
+  assigned_at: string;
+  attempt_count: number;
+  active_attempt_id?: string | null;
+}
+
+export interface ExerciseAttemptQuestion {
+  attempt_id: string;
+  question: QuizQuestion;
+  question_number: number;
+  question_count: number;
+  deadline_at: string;
+  seconds_remaining: number;
+  server_now: string;
+  correction?: ExerciseCorrection;
+}
+
+export interface ExerciseCorrection {
+  correct: boolean;
+  points: number;
+  max_points: number;
+  expected: unknown;
+  explanation?: string | null;
+  timed_out: boolean;
+  question_id: string;
+  student_answer?: unknown;
+}
+
+export interface ExerciseAttemptResult {
+  id: string;
+  exercise_id: string;
+  score: number;
+  max_score: number;
+  status: 'in_progress' | 'completed';
+  started_at: string;
+  completed_at?: string | null;
+  answers?: Record<string, unknown>;
+}

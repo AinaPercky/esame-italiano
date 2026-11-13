@@ -52,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, group: 'Vue d\'ensemble' },
     { id: 'lessons', label: 'Leçons de cours', icon: BookOpen, group: 'Quiz & Cours', badge: 'Cours' },
     { id: 'quizzes', label: 'Quiz en Direct & Notes', icon: Sparkles, highlight: true, group: 'Quiz & Cours' },
+    { id: 'exercises', label: 'Exercices', icon: BookOpen, group: 'Quiz & Cours' },
     { id: 'classes', label: 'Gestion des Classes', icon: School, group: 'Classes & Étudiants' },
     { id: 'students', label: 'Gestion des Élèves', icon: Users, group: 'Classes & Étudiants' },
     { id: 'written-exams', label: 'Examens écrits', icon: FileText, group: 'Examens écrits' },

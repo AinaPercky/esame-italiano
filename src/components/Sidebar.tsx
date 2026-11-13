@@ -67,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Quiz & QCM',
       items: [
         { id: 'quizzes', label: 'Quiz en Direct & Notes', icon: Sparkles, highlight: true },
+        { id: 'exercises', label: 'Exercices', icon: BookOpen },
         { id: 'lessons', label: 'Leçons de cours', icon: BookOpen }
       ]
     },
