@@ -49,6 +49,18 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   const parsed = useMemo(() => {
     try { return parseExerciseJson(json); } catch { return null; }
   }, [json]);
+  const selectedExercise = items.find(item => item.id === selectedId);
+  const questionStats = (selectedExercise?.questions || []).map(question => {
+    const responses = attempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
+    return {
+      id: question.id,
+      label: question.question,
+      responses: responses.length,
+      correct: responses.filter((detail: any) => detail.correct).length,
+      points: responses.reduce((sum: number, detail: any) => sum + Number(detail.points || 0), 0),
+      maxPoints: responses.reduce((sum: number, detail: any) => sum + Number(detail.max_points || 0), 0)
+    };
+  });
 
   const resetEditor = () => {
     setSelectedId('');
@@ -194,6 +206,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       {showAttempts ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-[#072a3f]">Tentatives des élèves</h2><button type="button" onClick={() => setShowAttempts(false)} className="text-sm font-semibold text-[#0b3c5d]">Retour</button></div>
+          {questionStats.length > 0 && <div className="mb-5"><h3 className="mb-2 text-sm font-bold text-[#072a3f]">Analyse par question</h3><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="p-2">Question</th><th className="p-2">Réponses</th><th className="p-2">Correctes</th><th className="p-2">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-b border-slate-100"><td className="max-w-md p-2">{row.label}</td><td className="p-2">{row.responses}</td><td className="p-2">{row.correct}</td><td className="p-2 tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
           {attempts.length === 0 ? <p className="text-sm text-slate-500">Aucune tentative pour cet exercice.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Élève</th><th className="p-2">Classe</th><th className="p-2">Résultat</th><th className="p-2">État</th><th className="p-2">Date</th></tr></thead><tbody>{attempts.map(row => <tr key={row.attempt_id} className="border-b border-slate-100"><td className="p-2 font-semibold">{row.student_name}</td><td className="p-2">{row.class_name}</td><td className="p-2 tabular-nums">{row.score} / {row.max_score}</td><td className="p-2">{row.status === 'completed' ? 'Terminée' : 'En cours'}</td><td className="p-2">{new Date(row.started_at).toLocaleString()}</td></tr>)}</tbody></table></div>}
         </section>
       ) : (
