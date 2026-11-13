@@ -17,7 +17,7 @@ returns jsonb
 language sql stable
 as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb, '{}'::jsonb)
-$$$;
+$$;
 
 create or replace function auth.uid()
 returns uuid
