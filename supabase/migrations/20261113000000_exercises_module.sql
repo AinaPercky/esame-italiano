@@ -643,3 +643,183 @@ end;
 $$;
 
 grant execute on function public.save_exercise_definition(uuid,jsonb,jsonb,uuid[]) to authenticated;
+
+
+-- Restore the feedback screen after a refresh without restarting the question timer.
+create or replace function public.exercise_question_for_student(p_attempt_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_attempt public.exercise_attempts%rowtype;
+  v_content jsonb;
+  v_question jsonb;
+  v_question_id text;
+  v_safe jsonb;
+  v_answer public.exercise_answers%rowtype;
+  v_payload jsonb;
+begin
+  select * into v_attempt from public.exercise_attempts where id = p_attempt_id;
+  if not found or (v_attempt.student_id <> public.exercise_current_student_id() and not public.exercise_is_teacher()) then
+    raise exception 'Tentative introuvable ou accès interdit.';
+  end if;
+  if v_attempt.status <> 'in_progress' then raise exception 'Cette tentative est terminée.'; end if;
+
+  select content into v_content from public.exercise_versions where id = v_attempt.version_id;
+  v_question_id := v_attempt.question_order ->> v_attempt.current_question_index;
+  select q into v_question
+  from jsonb_array_elements(v_content -> 'questions') q
+  where q ->> 'id' = v_question_id;
+  if v_question is null then raise exception 'Question introuvable dans la version de l’exercice.'; end if;
+
+  v_safe := v_question - 'correct_answer' - 'answers' - 'explanation';
+  if v_question -> 'verbes_trous' is not null then
+    v_safe := jsonb_set(v_safe, '{verbes_trous}',
+      jsonb_build_object(
+        'titre', v_question #> '{verbes_trous,titre}',
+        'consigne', v_question #> '{verbes_trous,consigne}',
+        'points_par_phrase', v_question #> '{verbes_trous,points_par_phrase}',
+        'banque', v_question #> '{verbes_trous,banque}',
+        'phrases', coalesce((
+          select jsonb_agg(jsonb_build_object('id', p.value -> 'id','debut',p.value -> 'debut','fin',p.value -> 'fin') order by p.ordinality)
+          from jsonb_array_elements(v_question #> '{verbes_trous,phrases}') with ordinality p(value, ordinality)
+        ), '[]'::jsonb)
+      )
+    );
+  end if;
+
+  v_payload := jsonb_build_object(
+    'attempt_id', v_attempt.id,
+    'question', v_safe,
+    'question_number', v_attempt.current_question_index + 1,
+    'question_count', jsonb_array_length(v_attempt.question_order),
+    'deadline_at', v_attempt.current_question_deadline_at,
+    'seconds_remaining', greatest(0, floor(extract(epoch from (v_attempt.current_question_deadline_at - now())))::integer),
+    'server_now', now()
+  );
+
+  select * into v_answer from public.exercise_answers
+  where attempt_id = p_attempt_id and question_id = v_question_id;
+  if found then
+    v_payload := v_payload || jsonb_build_object('correction', jsonb_build_object(
+      'correct', v_answer.is_correct,
+      'points', v_answer.points_awarded,
+      'max_points', v_answer.max_points,
+      'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+      'explanation', v_question -> 'explanation',
+      'timed_out', v_answer.timed_out,
+      'question_id', v_question_id
+    ));
+  end if;
+  return v_payload;
+end;
+$$;
+
+-- Verbes à trous answers are JSON objects keyed by phrase id.
+create or replace function public.exercise_grade_question(p_question jsonb, p_answer jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_type text := coalesce(p_question ->> 'type', '');
+  v_expected jsonb := '[]'::jsonb;
+  v_student jsonb := p_answer;
+  v_correct integer := 0;
+  v_total integer := 0;
+  v_points numeric := greatest(0, coalesce((p_question ->> 'points')::numeric, 0));
+  v_awarded numeric := 0;
+  v_expected_text text;
+  v_student_text text;
+  v_item jsonb;
+  v_phrase jsonb;
+  v_responses jsonb;
+  v_expected_order jsonb := '[]'::jsonb;
+begin
+  if v_type = 'qcm' then
+    v_expected_text := trim(coalesce(p_question ->> 'correct_answer', ''));
+    v_student_text := trim(coalesce(p_answer #>> '{}', ''));
+    if v_student_text = v_expected_text then v_correct := 1;
+    elsif v_student_text ~ '^[0-9]+$' then
+      begin
+        if (p_question -> 'options' ->> v_student_text::integer) = v_expected_text then v_correct := 1; end if;
+      exception when others then null;
+      end;
+    end if;
+    v_total := 1;
+    v_awarded := case when v_correct = 1 then v_points else 0 end;
+  elsif v_type = 'text' then
+    if jsonb_typeof(p_question -> 'answers') = 'array' and jsonb_array_length(p_question -> 'answers') > 0 then
+      v_expected := p_question -> 'answers';
+    else
+      select coalesce(jsonb_agg(to_jsonb(trim(part))), '[]'::jsonb)
+      into v_expected
+      from regexp_split_to_table(coalesce(p_question ->> 'correct_answer',''), '\s*[|;]\s*') as part
+      where trim(part) <> '';
+    end if;
+    if jsonb_typeof(v_student) = 'string' then
+      begin v_student := (v_student #>> '{}')::jsonb;
+      exception when others then v_student := jsonb_build_array(v_student #>> '{}'); end;
+    end if;
+    if jsonb_typeof(v_student) <> 'array' then v_student := jsonb_build_array(coalesce(v_student #>> '{}','')); end if;
+    v_total := greatest(1, jsonb_array_length(v_expected));
+    for v_item, v_correct in
+      select e.value, e.ordinality::integer
+      from jsonb_array_elements(v_expected) with ordinality e(value, ordinality)
+    loop
+      v_student_text := lower(regexp_replace(trim(coalesce(v_student ->> (v_correct - 1),'')), '\s+', ' ', 'g'));
+      v_expected_text := lower(regexp_replace(trim(coalesce(v_item #>> '{}','')), '\s+', ' ', 'g'));
+      if v_student_text = v_expected_text or exists (
+        select 1 from regexp_split_to_table(coalesce(v_item #>> '{}',''), '\s*[/;|]\s*') a
+        where lower(regexp_replace(trim(a), '\s+', ' ', 'g')) = v_student_text
+      ) then v_awarded := v_awarded + (v_points / v_total); end if;
+    end loop;
+    v_correct := case when v_awarded >= v_points then 1 else 0 end;
+  elsif v_type = 'reorder' then
+    select coalesce(jsonb_agg(case when jsonb_typeof(x.value) = 'object' then x.value -> 'id' else x.value end order by x.ordinality), '[]'::jsonb)
+    into v_expected_order
+    from jsonb_array_elements(coalesce(p_question -> 'items','[]'::jsonb)) with ordinality x(value, ordinality);
+    if jsonb_typeof(v_student) = 'string' then
+      begin v_student := (v_student #>> '{}')::jsonb; exception when others then null; end;
+    end if;
+    v_total := 1;
+    if v_student = v_expected_order then v_correct := 1; v_awarded := v_points; end if;
+  elsif v_type = 'verbes_trous' then
+    if jsonb_typeof(v_student) = 'string' then
+      begin v_student := (v_student #>> '{}')::jsonb;
+      exception when others then v_student := '{}'::jsonb; end;
+    end if;
+    v_total := greatest(1, jsonb_array_length(coalesce(p_question #> '{verbes_trous,phrases}','[]'::jsonb)));
+    for v_phrase, v_correct in
+      select p.value, p.ordinality::integer
+      from jsonb_array_elements(coalesce(p_question #> '{verbes_trous,phrases}','[]'::jsonb)) with ordinality p(value, ordinality)
+    loop
+      v_responses := coalesce(v_phrase -> 'reponses', '[]'::jsonb);
+      v_student_text := lower(regexp_replace(trim(coalesce(
+        v_student -> (v_phrase ->> 'id') ->> 'texte_saisi',
+        v_student ->> (v_phrase ->> 'id'),
+        v_student ->> (v_correct - 1),
+        ''
+      )), '\s+', ' ', 'g'));
+      if exists (
+        select 1 from jsonb_array_elements_text(v_responses) r(value)
+        where lower(regexp_replace(trim(r.value), '\s+', ' ', 'g')) = v_student_text
+      ) then v_awarded := v_awarded + (v_points / v_total); end if;
+    end loop;
+    v_correct := case when v_awarded >= v_points then 1 else 0 end;
+  else
+    raise exception 'Type de question non pris en charge: %', v_type;
+  end if;
+
+  return jsonb_build_object(
+    'correct', (v_correct = 1),
+    'points', round(v_awarded, 2),
+    'max_points', round(v_points, 2),
+    'expected', coalesce(p_question -> 'answers', p_question -> 'correct_answer', p_question #> '{verbes_trous,phrases}'),
+    'explanation', p_question -> 'explanation'
+  );
+end;
+$$;
