@@ -229,7 +229,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   };
 
   const hasCompletedQuiz = (quizId: string) => {
-    const { stId, stName, stNum, classId } = getStudentQueryInfo();
+    const { stId, stName, stNum } = getStudentQueryInfo();
     const liveSubs = dataService.getStudentSubmissions(stId, stName, stNum);
     const allQuizSubs = dataService.getQuizSubmissions(quizId);
 
@@ -275,7 +275,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
     const classId = st?.class_id || currentUser.class_id;
 
-    const { stId, stName, stNum, classId: studentClassId } = getStudentQueryInfo();
+    const { stId, stName, stNum } = getStudentQueryInfo();
     let subs: QuizSubmission[] = [];
     if (stId) {
       subs = dataService.getStudentSubmissions(stId, stName, stNum);

@@ -196,3 +196,15 @@ using(exists(
   where ce.student_id=public.exercise_current_student_id()
     and ce.class_id=exercise_class_assignments.class_id and ce.status='active'
 ));
+
+-- Only administrators may create, update, archive, or delete class records.
+-- Anonymous and authenticated users can still read class names for public portals.
+drop policy if exists "Classes full access" on public.classes;
+drop policy if exists classes_read_available on public.classes;
+create policy classes_read_available on public.classes
+for select to anon, authenticated using (true);
+drop policy if exists classes_teacher_manage on public.classes;
+create policy classes_teacher_manage on public.classes
+for all to authenticated
+using (public.class_enrollment_is_teacher())
+with check (public.class_enrollment_is_teacher());

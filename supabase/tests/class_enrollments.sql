@@ -19,5 +19,11 @@ begin
   if not exists(select 1 from pg_policies where schemaname='public' and tablename='class_enrollments' and policyname='class_enrollments_read_own_or_teacher') then
     raise exception 'Enrollment RLS policy is missing';
   end if;
+  if exists(select 1 from pg_policies where schemaname='public' and tablename='classes' and policyname='Classes full access') then
+    raise exception 'Legacy unrestricted class policy is still active';
+  end if;
+  if not exists(select 1 from pg_policies where schemaname='public' and tablename='classes' and policyname='classes_teacher_manage') then
+    raise exception 'Class administration policy is missing';
+  end if;
 end;
 $$;
