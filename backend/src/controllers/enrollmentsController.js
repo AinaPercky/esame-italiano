@@ -1,11 +1,14 @@
 const { memoryStore, generateId } = require('../services/store');
+const { isConfigured } = require('../config/supabase');
 
 const TEACHER_EMAIL = (process.env.TEACHER_EMAIL || 'ainapercky@gmail.com').trim().toLowerCase();
 const OPEN_STATUSES = new Set(['active', 'suspended']);
 const END_STATUSES = new Set(['completed', 'abandoned', 'expelled']);
 
 const requireTeacher = (req, res) => {
-  if ((req.user?.email || '').trim().toLowerCase() !== TEACHER_EMAIL) {
+  const email = (req.user?.email || '').trim().toLowerCase();
+  const authorized = email === TEACHER_EMAIL || (!isConfigured && email === 'prof@scuola.it');
+  if (!authorized) {
     res.status(403).json({ error: 'Action réservée à l’administration.' });
     return false;
   }
@@ -80,10 +83,15 @@ exports.requestEnrollment = async (req, res) => {
 exports.listAllEnrollments = async (req, res) => {
   if (!requireTeacher(req, res)) return;
   try {
-    if (!req.supabase) return res.json(memoryStore.enrollments || []);
-    const { data, error } = await req.supabase.from('class_enrollments')
-      .select('id,student_id,class_id,status,source,started_at,ended_at,end_reason,student:students(id,first_name,last_name,email,student_number),class:classes(id,name,enrollment_mode)')
-      .order('started_at', { ascending: false });
+    const classId = req.params.classId || req.query.class_id;
+    if (!req.supabase) {
+      const rows = memoryStore.enrollments || [];
+      return res.json(classId ? rows.filter(item => item.class_id === classId) : rows);
+    }
+    let query = req.supabase.from('class_enrollments')
+      .select('id,student_id,class_id,status,source,started_at,ended_at,end_reason,student:students(id,first_name,last_name,email,student_number),class:classes(id,name,enrollment_mode)');
+    if (classId) query = query.eq('class_id', classId);
+    const { data, error } = await query.order('started_at', { ascending: false });
     if (error) throw error;
     return res.json(data || []);
   } catch (error) { return sendError(res, error); }
@@ -107,6 +115,8 @@ exports.enrollStudent = async (req, res) => {
     const { student_id } = req.body;
     if (!student_id || !req.params.classId) return res.status(400).json({ error: 'Élève et classe obligatoires.' });
     if (!req.supabase) {
+      const targetClass = memoryStore.classes.find(item => item.id === req.params.classId && !item.archived_at);
+      if (!targetClass) return res.status(404).json({ error: 'Classe introuvable ou archivée.' });
       memoryStore.enrollments ||= [];
       const exists = memoryStore.enrollments.some(item => item.student_id === student_id && item.class_id === req.params.classId && OPEN_STATUSES.has(item.status));
       if (exists) return res.status(409).json({ error: 'Élève déjà inscrit dans cette classe.' });
@@ -114,6 +124,10 @@ exports.enrollStudent = async (req, res) => {
       memoryStore.enrollments.push(item);
       return res.status(201).json(item);
     }
+    const { data: targetClass, error: classError } = await req.supabase.from('classes')
+      .select('id').eq('id', req.params.classId).is('archived_at', null).maybeSingle();
+    if (classError) throw classError;
+    if (!targetClass) return res.status(404).json({ error: 'Classe introuvable ou archivée.' });
     const { data, error } = await req.supabase.from('class_enrollments')
       .insert({ student_id, class_id: req.params.classId, status: 'active', source: 'admin' })
       .select('*').single();
