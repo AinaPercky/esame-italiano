@@ -246,7 +246,16 @@ class SupabaseService {
       throw new Error(`Impossible de charger la classe de l’élève : ${classError.message}`);
     }
 
-    return { ...student, class_name: classroom?.name } as Student;
+    const { data: activeEnrollments, error: enrollmentError } = await client
+      .from('class_enrollments')
+      .select('class_id')
+      .eq('student_id', student.id)
+      .eq('status', 'active');
+    if (enrollmentError) {
+      await client.auth.signOut();
+      throw new Error(`Impossible de charger les inscriptions de l’élève : ${enrollmentError.message}`);
+    }
+    return { ...student, class_name: classroom?.name, class_ids: (activeEnrollments || []).map(item => item.class_id) } as Student;
   }
 
   public async registerStudentAuth(email: string, password: string, studentId: string): Promise<boolean> {
@@ -1421,7 +1430,8 @@ class SupabaseService {
         { data: detailsData, error: errD },
         { data: passOrderData, error: errPO },
         { data: quizzesData, error: errQ },
-        { data: quizSubmissionsData, error: errQS }
+        { data: quizSubmissionsData, error: errQS },
+        { data: enrollmentsData, error: errEnrollments }
       ] = await Promise.all([
         client.from('classes').select('*'),
         client.from('students').select('*'),
@@ -1431,7 +1441,8 @@ class SupabaseService {
         client.from('evaluation_details').select('*'),
         client.from('exam_pass_order').select('*'),
         client.from('quizzes').select('*'),
-        client.from('quiz_submissions').select('*')
+        client.from('quiz_submissions').select('*'),
+        client.from('class_enrollments').select('student_id,class_id,status')
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
@@ -1439,6 +1450,7 @@ class SupabaseService {
       if (errE) throw new Error(`Exams: ${errE.message}`);
       if (errQ) throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
+      if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
         id: c.id,
@@ -1448,9 +1460,17 @@ class SupabaseService {
         created_at: c.created_at
       }));
 
+      const activeClassIdsByStudent = new Map<string, string[]>();
+      (enrollmentsData || []).filter(item => item.status === 'active').forEach(item => {
+        const ids = activeClassIdsByStudent.get(item.student_id) || [];
+        if (!ids.includes(item.class_id)) ids.push(item.class_id);
+        activeClassIdsByStudent.set(item.student_id, ids);
+      });
+
       const students: Student[] = (studentsData || []).map(s => ({
         id: s.id,
         class_id: s.class_id,
+        class_ids: activeClassIdsByStudent.get(s.id) || [],
         first_name: s.first_name,
         last_name: s.last_name,
         email: s.email,

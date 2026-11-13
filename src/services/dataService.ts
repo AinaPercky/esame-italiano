@@ -201,7 +201,7 @@ export const dataService = {
   // =========================================================================
   getClasses(): ClassRoom[] {
     return state.classes.map(c => {
-      const studentCount = state.students.filter(s => s.class_id === c.id).length;
+      const studentCount = state.students.filter(s => s.class_ids ? s.class_ids.includes(c.id) : s.class_id === c.id).length;
       const examCount = state.exams.filter(e => e.class_id === c.id).length;
       return { enrollment_mode: 'approval', ...c, student_count: studentCount, exam_count: examCount };
     });
@@ -253,7 +253,7 @@ export const dataService = {
   getStudents(classId?: string, search?: string): Student[] {
     let list = [...state.students];
     if (classId) {
-      list = list.filter(s => s.class_id === classId);
+      list = list.filter(s => s.class_ids ? s.class_ids.includes(classId) : s.class_id === classId);
     }
     if (search) {
       const q = search.toLowerCase();
@@ -765,7 +765,7 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) return [];
 
-    const classStudents = state.students.filter(s => s.class_id === exam.class_id);
+    const classStudents = state.students.filter(s => s.class_ids ? s.class_ids.includes(exam.class_id) : s.class_id === exam.class_id);
     const classStudentIds = new Set(classStudents.map(s => s.id));
 
     let existingOrders = state.passOrder
@@ -829,7 +829,7 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
 
-    const classStudents = state.students.filter(s => s.class_id === exam.class_id);
+    const classStudents = state.students.filter(s => s.class_ids ? s.class_ids.includes(exam.class_id) : s.class_id === exam.class_id);
     if (classStudents.length === 0) throw new Error('Aucun élève dans cette classe');
 
     // Fisher-Yates
@@ -867,7 +867,7 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
 
-    const classStudents = state.students.filter(s => s.class_id === exam.class_id);
+    const classStudents = state.students.filter(s => s.class_ids ? s.class_ids.includes(exam.class_id) : s.class_id === exam.class_id);
     if (classStudents.length === 0) throw new Error('Aucun élève dans cette classe');
 
     // Réinitialiser selon l'ordre d'origine de la liste des élèves :
@@ -917,7 +917,7 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
 
-    const classStudents = state.students.filter(s => s.class_id === exam.class_id);
+    const classStudents = state.students.filter(s => s.class_ids ? s.class_ids.includes(exam.class_id) : s.class_id === exam.class_id);
     if (classStudents.length === 0) throw new Error('Aucun élève dans cette classe');
 
     // Tri alphabétique par Nom de famille puis Prénom
@@ -1014,7 +1014,7 @@ export const dataService = {
       .sort((a, b) => a.position - b.position);
 
     const maxScore = rubrics.reduce((s, r) => s + (Number(r.points) || 1), 0);
-    const classStudents = state.students.filter(s => s.class_id === exam.class_id);
+    const classStudents = state.students.filter(s => s.class_ids ? s.class_ids.includes(exam.class_id) : s.class_id === exam.class_id);
     const classStudentIds = new Set(classStudents.map(s => s.id));
     const totalStudents = classStudents.length;
 

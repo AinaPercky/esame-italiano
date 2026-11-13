@@ -18,6 +18,7 @@ export interface ClassRoom {
 export interface Student {
   id: string;
   class_id: string;
+  class_ids?: string[]; // Inscriptions actives, chargées depuis class_enrollments.
   first_name: string;
   last_name: string;
   gender?: 'homme' | 'femme';
