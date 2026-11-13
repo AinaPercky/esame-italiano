@@ -333,6 +333,7 @@ export interface ExerciseCorrection {
   explanation?: string | null;
   timed_out: boolean;
   question_id: string;
+  student_answer?: unknown;
 }
 
 export interface ExerciseAttemptResult {
