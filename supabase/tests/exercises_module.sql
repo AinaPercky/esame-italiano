@@ -1,3 +1,34 @@
+-- Exercise server-side grading for all question types.
+do $grade$
+declare
+  v_result jsonb;
+begin
+  v_result := public.exercise_grade_question(
+    '{"type":"text","correct_answer":"parlo | scrivi","points":2}'::jsonb,
+    '["parlo","scrivi"]'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Text multi-blank grading failed';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"reorder","points":1,"items":[{"id":"a"},{"id":"b"}]}'::jsonb,
+    '["a","b"]'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true then
+    raise exception 'Reorder grading failed';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"verbes_trous","points":2,"verbes_trous":{"phrases":[{"id":"1","reponses":["vado"]},{"id":"2","reponses":["sei"]}]}}'::jsonb,
+    '{"1":{"texte_saisi":"vado"},"2":{"texte_saisi":"sei"}}'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Verbes à trous grading failed';
+  end if;
+end;
+$grade$;
+
 -- End-to-end database contract for the exercises module.
 -- Run after 20261113000000_exercises_module.sql in the isolated CI database.
 insert into auth.users(id,email) values
