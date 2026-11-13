@@ -161,22 +161,28 @@ $;
 
 CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
-DECLARE sid TEXT:=public.quiz_current_student_id(); cid TEXT; result JSONB;
+DECLARE sid TEXT:=public.quiz_current_student_id(); cids TEXT[]; result JSONB;
 BEGIN
- SELECT class_id::text INTO cid FROM public.students WHERE id::text=sid;
+ SELECT array_agg(DISTINCT class_id::text) INTO cids
+ FROM public.class_enrollments WHERE student_id=sid AND status='active';
+ IF coalesce(array_length(cids,1),0)=0 THEN
+   SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid;
+ END IF;
  SELECT coalesce(jsonb_agg(public.quiz_sanitize_payload(to_jsonb(q))),'[]') INTO result
- FROM public.quizzes q WHERE cid=ANY(coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id]));
+ FROM public.quizzes q
+ WHERE coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id]);
  RETURN coalesce(result,'[]');
 END $$;
 
 CREATE OR REPLACE FUNCTION public.evaluate_quiz_question(p_quiz_id TEXT,p_question_id TEXT,p_answer TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE sid TEXT:=public.quiz_current_student_id(); q public.quizzes%ROWTYPE; cid TEXT; question JSONB; l public.quiz_launches%ROWTYPE; part public.quiz_participants%ROWTYPE;
+DECLARE sid TEXT:=public.quiz_current_student_id(); q public.quizzes%ROWTYPE; cids TEXT[]; question JSONB; l public.quiz_launches%ROWTYPE; part public.quiz_participants%ROWTYPE;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_quiz_id;
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz non disponible.'; END IF;
- SELECT class_id::text INTO cid FROM public.students WHERE id::text=sid;
- IF cid IS NULL OR NOT cid=ANY(coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
+ SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id=sid AND status='active';
+ IF coalesce(array_length(cids,1),0)=0 THEN SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid; END IF;
+ IF NOT (coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
  IF q.attendance_mode='strict_presence' AND NOT coalesce(q.is_public,FALSE) THEN
    SELECT * INTO l FROM public.quiz_launches WHERE quiz_id=q.id AND status='launched' ORDER BY launched_at DESC LIMIT 1;
    IF NOT FOUND THEN RAISE EXCEPTION 'Aucun lancement actif.'; END IF;
@@ -225,14 +231,15 @@ END $$;
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_submission(p_submission JSONB)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE q public.quizzes%ROWTYPE; sid TEXT; cid TEXT; e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed');
+DECLARE q public.quizzes%ROWTYPE; sid TEXT; cids TEXT[]; e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed');
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_submission->>'quiz_id';
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz indisponible.'; END IF;
  IF auth.uid() IS NOT NULL THEN
    sid:=public.quiz_current_student_id();
-   SELECT class_id::text INTO cid FROM public.students WHERE id::text=sid;
-   IF cid IS NULL OR NOT cid=ANY(coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
+   SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id=sid AND status='active';
+   IF coalesce(array_length(cids,1),0)=0 THEN SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid; END IF;
+   IF NOT (coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
  ELSE
    IF NOT coalesce(q.is_public,FALSE) THEN RAISE EXCEPTION 'Connexion étudiant requise.'; END IF;
    sid:=p_submission->>'student_id';
