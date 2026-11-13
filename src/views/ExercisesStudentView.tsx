@@ -320,15 +320,12 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                       <button type="button" onClick={() => void begin(item.id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-3 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:bg-[#0b3c5d] active:scale-[.98]">
                         <Play size={15}/> Nouvelle tentative
                       </button>
-                      {item.active_attempt_id ? (
-                        <button type="button" onClick={() => void begin(item.id,item.active_attempt_id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b9d0dd] bg-[#f5f9fc] px-3 py-2.5 text-xs font-extrabold text-[#0b3c5d] transition hover:bg-[#e6f0f7]">
-                          <RotateCcw size={15}/> Reprendre
-                        </button>
-                      ) : (
-                        <button type="button" disabled={!bestResult || reviewLoading} onClick={() => void openBestAttempt(item.id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b9d0dd] bg-[#f5f9fc] px-3 py-2.5 text-xs font-extrabold text-[#0b3c5d] transition hover:bg-[#e6f0f7] disabled:cursor-not-allowed disabled:opacity-45">
-                          <Eye size={15}/> Voir ma meilleure tentative
-                        </button>
-                      )}
+                      {item.active_attempt_id && <button type="button" onClick={() => void begin(item.id,item.active_attempt_id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b9d0dd] bg-[#f5f9fc] px-3 py-2.5 text-xs font-extrabold text-[#0b3c5d] transition hover:bg-[#e6f0f7]">
+                        <RotateCcw size={15}/> Reprendre
+                      </button>}
+                      {bestResult && <button type="button" disabled={reviewLoading} onClick={() => void openBestAttempt(item.id)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#cfe6d8] bg-[#f1f9f4] px-3 py-2.5 text-xs font-extrabold text-[#17613e] transition hover:bg-[#e4f5eb] disabled:opacity-45">
+                        <Eye size={15}/> Voir ma meilleure tentative
+                      </button>}
                     </div>
                     <button type="button" onClick={() => { setHistoryExerciseId(current => current === item.id ? null : item.id); setAttemptReview(null); }} aria-expanded={historyExerciseId === item.id} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-[#f1f6f9] px-3 py-2 text-xs font-bold text-[#49697d] transition hover:border-[#d5e4ec] hover:bg-[#e6f0f7]">
                       <History size={14}/>{historyExerciseId === item.id ? 'Masquer l’historique' : 'Historique des tentatives'}<span className="rounded-full bg-white px-2 py-0.5 text-[10px] tabular-nums">{exerciseResults.length}</span>
