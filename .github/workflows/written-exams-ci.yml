@@ -60,6 +60,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_ci_bootstrap.sql
       - name: Apply exercises module schema and RPCs
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113000000_exercises_module.sql
+      - name: Restrict exercise RPC execution to authenticated users
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113070824_restrict_exercise_rpc_execution.sql
       - name: Apply written exam migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261108000000_composite_written_exams.sql
       - name: Apply verb-bank question migration
