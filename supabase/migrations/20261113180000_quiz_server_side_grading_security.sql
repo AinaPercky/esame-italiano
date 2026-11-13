@@ -113,7 +113,7 @@ BEGIN
    ELSE earned:=CASE WHEN correct_n=1 THEN pts ELSE 0 END; END IF;
    ok:=correct_n=n;
  END IF;
- RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display);
+ RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display,'explanation',q->'explanation');
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.quiz_grade_all(p_quiz_id TEXT, p_answers JSONB)
@@ -138,7 +138,7 @@ RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $fn$
 DECLARE qs JSONB;
 BEGIN
  SELECT coalesce(jsonb_agg(clean),'[]') INTO qs FROM (
-   SELECT (q-'correct_answer'-'answers') ||
+   SELECT (q-'correct_answer'-'answers'-'explanation'-'phrases'-'points_par_phrase') ||
      CASE WHEN q->>'type'='verbes_trous' AND q ? 'verbes_trous' THEN
        jsonb_build_object('verbes_trous',(q->'verbes_trous')||jsonb_build_object('phrases',
          (SELECT coalesce(jsonb_agg(p-'verbe'-'reponses'),'[]') FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) p)))
