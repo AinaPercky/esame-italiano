@@ -169,7 +169,7 @@ RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp A
 DECLARE sid TEXT:=public.quiz_current_student_id(); cids TEXT[]; result JSONB;
 BEGIN
  SELECT array_agg(DISTINCT class_id::text) INTO cids
- FROM public.class_enrollments WHERE student_id=sid AND status='active';
+ FROM public.class_enrollments WHERE student_id::text=sid AND status='active';
  IF coalesce(array_length(cids,1),0)=0 THEN
    SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid;
  END IF;
