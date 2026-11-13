@@ -65,10 +65,39 @@ export interface ConnectionTestResult {
   };
 }
 
+export const QUIZ_SECURITY_MIGRATION_WARNING =
+  'La migration SQL « Sécurité & correction serveur des quiz » n’est pas encore installée dans Supabase (fonctions RPC get_public_quiz_catalog / get_student_quiz_catalog absentes). Les autres données restent accessibles ; le professeur doit copier et exécuter cette migration dans Paramètres > Guide de configuration Supabase.';
+
+export function isSupabaseMissingRpcError(
+  error: { code?: string; message?: string } | null | undefined,
+  rpcName?: string
+): boolean {
+  if (!error) return false;
+  const code = (error.code || '').toUpperCase();
+  const message = error.message || '';
+  const isMissing =
+    code === 'PGRST202' ||
+    code === '42883' ||
+    /could not find the function|function .* does not exist/i.test(message);
+  if (!isMissing) return false;
+  if (!rpcName) return true;
+  return message.toLowerCase().includes(rpcName.toLowerCase());
+}
+
 class SupabaseService {
   private client: SupabaseClient | null = null;
   private currentConfig: SupabaseConfig = this.loadConfig();
   private quizWriteQueues = new Map<string, Promise<void>>();
+  private lastImportedAuthKey: string | null = null;
+  private quizSecurityWarning: string | null = null;
+
+  public getLastImportedAuthKey(): string | null {
+    return this.lastImportedAuthKey;
+  }
+
+  public getQuizSecurityWarning(): string | null {
+    return this.quizSecurityWarning;
+  }
 
   public loadConfig(): SupabaseConfig {
     // Supabase est obligatoire : aucun fallback vers une configuration locale.
@@ -360,7 +389,9 @@ class SupabaseService {
       if (quizzesError) {
         return {
           success: false,
-          message: "La connexion Supabase fonctionne, mais la RPC sécurisée des quiz est absente ou inaccessible. Appliquez la migration de sécurité des quiz."
+          message: isSupabaseMissingRpcError(quizzesError)
+            ? "La connexion Supabase fonctionne, mais la migration « Sécurité & correction serveur des quiz » (RPC get_public_quiz_catalog / get_student_quiz_catalog) n'a pas encore été exécutée dans Supabase SQL Editor. Copiez-la depuis le Guide de configuration Supabase ci-dessus et exécutez-la."
+            : "La connexion Supabase fonctionne, mais la RPC sécurisée des quiz est absente ou inaccessible. Appliquez la migration de sécurité des quiz."
         };
       }
 
@@ -912,7 +943,12 @@ class SupabaseService {
     const clean = (publicIdOrId || '').trim();
     if (!clean) return null;
     const { data, error } = await client.rpc('get_public_quiz', { p_public_id: clean });
-    if (error) throw new Error(`Chargement sécurisé du quiz public : ${error.message}`);
+    if (error) {
+      if (isSupabaseMissingRpcError(error)) {
+        throw new Error('La migration « Sécurité & correction serveur des quiz » (RPC get_public_quiz) doit être exécutée dans Supabase SQL Editor par le professeur.');
+      }
+      throw new Error(`Chargement sécurisé du quiz public : ${error.message}`);
+    }
     if (!data || typeof data !== 'object') return null;
     const q: any = data;
     return {
@@ -1181,7 +1217,12 @@ class SupabaseService {
     const { data, error } = await client.rpc('evaluate_quiz_question', {
       p_quiz_id: quizId, p_question_id: questionId, p_answer: answer
     });
-    if (error) throw new Error(`Correction serveur du quiz : ${error.message}`);
+    if (error) {
+      if (isSupabaseMissingRpcError(error)) {
+        throw new Error('Correction serveur indisponible : la migration « Sécurité & correction serveur des quiz » (RPC evaluate_quiz_question) doit être appliquée dans Supabase.');
+      }
+      throw new Error(`Correction serveur du quiz : ${error.message}`);
+    }
     return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
   }
 
@@ -1193,7 +1234,12 @@ class SupabaseService {
     const { data, error } = await client.rpc('evaluate_public_quiz_question', {
       p_public_id: publicId, p_question_id: questionId, p_answer: answer
     });
-    if (error) throw new Error(`Correction serveur du quiz public : ${error.message}`);
+    if (error) {
+      if (isSupabaseMissingRpcError(error)) {
+        throw new Error('Correction serveur indisponible : la migration « Sécurité & correction serveur des quiz » (RPC evaluate_public_quiz_question) doit être appliquée dans Supabase.');
+      }
+      throw new Error(`Correction serveur du quiz public : ${error.message}`);
+    }
     return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
   }
 
@@ -1440,19 +1486,33 @@ class SupabaseService {
     }
 
     try {
+      this.quizSecurityWarning = null;
       const { data: authData } = await client.auth.getUser();
+      this.lastImportedAuthKey = authData.user?.id || 'anon';
       const isAuthenticated = Boolean(authData.user);
       let isTeacher = false;
+      let missingQuizSecurityRpc = false;
       if (isAuthenticated) {
         const { data, error } = await client.rpc('quiz_is_teacher');
-        if (error) throw new Error(`Vérification du rôle quiz : ${error.message}`);
-        isTeacher = Boolean(data);
+        if (error) {
+          if (isSupabaseMissingRpcError(error)) {
+            missingQuizSecurityRpc = true;
+            console.warn('[Supabase] RPC quiz_is_teacher absente du cache de schéma :', error.message);
+          } else {
+            throw new Error(`Vérification du rôle quiz : ${error.message}`);
+          }
+        } else {
+          isTeacher = Boolean(data);
+        }
       }
-      const quizzesRequest = isTeacher
-        ? client.from('quizzes').select('*')
-        : isAuthenticated
-          ? client.rpc('get_student_quiz_catalog')
-          : client.rpc('get_public_quiz_catalog');
+      // Ne jamais contourner la RLS sur la table brute quizzes lorsque !isTeacher.
+      const quizzesRequest = missingQuizSecurityRpc
+        ? Promise.resolve({ data: [], error: null })
+        : isTeacher
+          ? client.from('quizzes').select('*')
+          : isAuthenticated
+            ? client.rpc('get_student_quiz_catalog')
+            : client.rpc('get_public_quiz_catalog');
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('*')
         : Promise.resolve({ data: [], error: null });
@@ -1488,7 +1548,21 @@ class SupabaseService {
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
-      if (errQ) throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
+
+      let safeQuizzesData = quizzesData;
+      if (errQ) {
+        if (!isTeacher && isSupabaseMissingRpcError(errQ)) {
+          missingQuizSecurityRpc = true;
+          safeQuizzesData = [];
+          console.warn('[Supabase] RPC catalogue quiz absente (migration SQL requise) :', errQ.message);
+        } else {
+          throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
+        }
+      }
+      if (missingQuizSecurityRpc) {
+        this.quizSecurityWarning = QUIZ_SECURITY_MIGRATION_WARNING;
+      }
+
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
       if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
@@ -1579,7 +1653,7 @@ class SupabaseService {
         created_at: po.created_at
       }));
 
-      const quizzes: Quiz[] = (quizzesData || []).map((q: any) => ({
+      const quizzes: Quiz[] = (safeQuizzesData || []).map((q: any) => ({
         id: q.id,
         public_id: q.public_id || undefined,
         is_public: Boolean(q.is_public),
@@ -1608,7 +1682,7 @@ class SupabaseService {
           .filter(s => !existingStudentIds.has(s.student_id))
           .map(s => s.student_id)
       ));
-      if (orphanedStudentIds.length > 0) {
+      if (isTeacher && orphanedStudentIds.length > 0) {
         void (async () => {
           try {
             await client.from('quiz_submissions').delete().in('student_id', orphanedStudentIds);

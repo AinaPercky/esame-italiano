@@ -1185,7 +1185,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         {/* TAB 1: QUIZZES EN DIRECT & HISTORIQUE */}
         {activeTab === 'quizzes' && !activeQuiz && (
           <div className="space-y-6">
-            
+            {dataService.getQuizSecurityWarning() && (
+              <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs font-medium text-amber-950">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                <span>{dataService.getQuizSecurityWarning()}</span>
+              </div>
+            )}
+
             {presenceStartError && (
               <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold text-rose-900">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />

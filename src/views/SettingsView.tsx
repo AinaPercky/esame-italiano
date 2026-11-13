@@ -39,6 +39,7 @@ import {
 } from '../data/quizPresenceMigration';
 import { QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL } from '../data/quizAttemptSubmissionMigration';
 import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
+import { QUIZ_SECURITY_MIGRATION_SQL } from '../data/quizSecurityMigration';
 
 interface SettingsViewProps {
   onResetData: () => void;
@@ -57,6 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedPresenceInitializationMigration, setCopiedPresenceInitializationMigration] = useState(false);
   const [copiedIndividualRetryMigration, setCopiedIndividualRetryMigration] = useState(false);
   const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
+  const [copiedQuizSecurityMigration, setCopiedQuizSecurityMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -182,6 +184,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration soumission multi-tentatives:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration corrective des soumissions de quiz.' });
+    }
+  };
+
+  const handleCopyQuizSecurityMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(QUIZ_SECURITY_MIGRATION_SQL);
+      setCopiedQuizSecurityMigration(true);
+      setTimeout(() => setCopiedQuizSecurityMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration sécurité quiz:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration Sécurité & correction serveur des quiz.' });
     }
   };
 
@@ -325,6 +338,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   };
 
   const isConfigured = supabaseService.isConfigured();
+  const quizSecurityWarning = dataService.getQuizSecurityWarning();
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12 min-w-0 w-full">
@@ -465,6 +479,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
         </button>
       </div>
 
+      {quizSecurityWarning && (
+        <div role="alert" className="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5 text-xs">
+            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <span>{quizSecurityWarning}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyQuizSecurityMigration}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-cyan-800 hover:bg-cyan-900 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 min-h-[38px]"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>{copiedQuizSecurityMigration ? '✓ Migration Sécurité copiée !' : 'Copier la migration Sécurité Quiz'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Guide Pas à Pas pour configurer Supabase */}
       {showSqlGuide && (
         <div className="p-4 sm:p-5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-3.5 animate-in fade-in duration-200">
@@ -576,6 +607,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyQuizSecurityMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-cyan-800 hover:bg-cyan-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedQuizSecurityMigration ? '✓ Migration Sécurité Quiz copiée !' : 'Copier migration Sécurité & correction serveur des quiz'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -615,6 +654,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-amber-800">
               Pour l’erreur « no unique or exclusion constraint matching the ON CONFLICT specification », copiez puis exécutez le correctif « soumissions multi-tentatives ». Il aligne les RPC sur la clé unique quiz/élève/tentative, conserve l’historique et ne supprime aucune note.
+            </span>
+            <span className="text-[11px] text-cyan-800">
+              Si Supabase signale que <code>get_public_quiz_catalog</code> ou <code>get_student_quiz_catalog</code> est absent du cache de schéma, exécutez « Sécurité &amp; correction serveur des quiz » dans Supabase &gt; SQL Editor : cette migration additive installe les catalogues sécurisés, la correction côté serveur et recharge le cache PostgREST sans supprimer de données.
             </span>
           </div>
         </div>

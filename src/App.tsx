@@ -184,6 +184,25 @@ export default function App() {
     };
   }, [initialDataReady]);
 
+  useEffect(() => {
+    if (!initialDataReady || authLoading) return;
+    const targetAuthKey = session?.user?.id || 'anon';
+    if (supabaseService.getLastImportedAuthKey() === targetAuthKey) return;
+
+    let cancelled = false;
+    dataService.initFromCloud()
+      .then(() => {
+        if (!cancelled) reloadData();
+      })
+      .catch(error => {
+        console.warn('Rechargement Supabase après changement de session ignoré :', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialDataReady, authLoading, session?.user?.id]);
+
   // 1. Si l'élève a scanné le Code QR -> Afficher la Fiche Officielle en lecture seule
   const urlParams = new URLSearchParams(window.location.search);
   const studentViewExamId = urlParams.get('exam') || '';

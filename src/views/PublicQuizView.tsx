@@ -255,19 +255,21 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setLoadError(null);
 
       let q: Quiz | null = null;
+      let fetchErrorMessage: string | null = null;
       try {
         // Toujours charger une version nettoyée par le serveur, même si l'état local
         // du navigateur contient une copie professeur avec les réponses attendues.
         q = await supabaseService.fetchPublicQuiz(activeQuizId);
       } catch (err) {
         console.error('Erreur chargement sécurisé du quiz public:', err);
+        fetchErrorMessage = err instanceof Error ? err.message : null;
       }
 
       if (cancelled) return;
 
       if (!q) {
         sourceQuizRef.current = null;
-        setLoadError('Quiz introuvable. Vérifiez le lien ou contactez votre enseignant.');
+        setLoadError(fetchErrorMessage || 'Quiz introuvable. Vérifiez le lien ou contactez votre enseignant.');
         setScreen('start');
         return;
       }

@@ -61,14 +61,18 @@ export const PublicQuizzesHomeView: React.FC<PublicQuizzesHomeViewProps> = ({
   useEffect(() => {
     let active = true;
 
-    const load = async () => {
+    const load = () => {
       setLoading(true);
       setError(null);
       try {
         // Use local state — public quizzes are synced during initFromCloud()
         const local = dataService.getQuizzes().filter(q => Boolean(q.is_public));
+        const securityWarning = dataService.getQuizSecurityWarning();
         if (!active) return;
         setQuizzes(local);
+        if (local.length === 0 && securityWarning) {
+          setError(securityWarning);
+        }
       } catch (e: any) {
         if (!active) return;
         setError(e?.message || 'Impossible de charger la liste des quiz publics.');
@@ -78,9 +82,11 @@ export const PublicQuizzesHomeView: React.FC<PublicQuizzesHomeViewProps> = ({
       }
     };
 
-    void load();
+    load();
+    const unsub = dataService.subscribe(load);
     return () => {
       active = false;
+      unsub();
     };
   }, []);
 

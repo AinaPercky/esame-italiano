@@ -186,6 +186,10 @@ export const dataService = {
     return true;
   },
 
+  getQuizSecurityWarning(): string | null {
+    return supabaseService.getQuizSecurityWarning();
+  },
+
   // Recharger les données cloud; aucune réinitialisation locale de démonstration.
   async resetToDefault() {
     const res = await supabaseService.importFromSupabase();

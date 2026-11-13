@@ -60,7 +60,7 @@ export const QuizClozeInput: React.FC<QuizClozeInputProps> = ({
 }) => {
   const isNavy = theme === 'navy';
   const expectedAnswers = getQuestionExpectedAnswers(question);
-  const blankCount = Math.max(1, expectedAnswers.length);
+  const blankCount = Math.max(1, question.blank_count || expectedAnswers.length);
 
   // Valeurs actuelles saisies par l'élève pour chaque trou
   const currentValues = parseStudentAnswers(answer, blankCount);
