@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Upload, Plus, Save, FileText, BarChart3, ArrowLeftRight, RefreshCw } from 'lucide-react';
+import { Download, Upload, Plus, Save, FileText, BarChart3, ArrowLeftRight, RefreshCw, Users, CheckCircle2, Clock3, CircleDashed, Filter } from 'lucide-react';
 import type { ClassRoom, ExerciseDefinition, Quiz } from '../types';
 import { dataService } from '../services/dataService';
 import { exerciseService, convertQuizToExercise, parseExerciseJson } from '../services/exerciseService';
@@ -32,7 +32,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [attempts, setAttempts] = useState<any[]>([]);
-  const [showAttempts, setShowAttempts] = useState(false);
+  const [showAttempts, setShowAttempts] = useState(false);\n  const [attemptClassFilter, setAttemptClassFilter] = useState('all');
 
   const refresh = async () => {
     setLoading(true);
@@ -231,10 +231,62 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       {message && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div>}
 
       {showAttempts ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-[#072a3f]">Tentatives des élèves</h2><button type="button" onClick={() => setShowAttempts(false)} className="text-sm font-semibold text-[#0b3c5d]">Retour</button></div>
-          {questionStats.length > 0 && <div className="mb-5"><h3 className="mb-2 text-sm font-bold text-[#072a3f]">Analyse par question</h3><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="p-2">Question</th><th className="p-2">Réponses</th><th className="p-2">Correctes</th><th className="p-2">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-b border-slate-100"><td className="max-w-md p-2">{row.label}</td><td className="p-2">{row.responses}</td><td className="p-2">{row.correct}</td><td className="p-2 tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
-          {attempts.length === 0 ? <p className="text-sm text-slate-500">Aucune tentative pour cet exercice.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Élève</th><th className="p-2">Classe</th><th className="p-2">Résultat</th><th className="p-2">État</th><th className="p-2">Date</th></tr></thead><tbody>{attempts.map(row => <tr key={row.attempt_id} className="border-b border-slate-100"><td className="p-2 font-semibold">{row.student_name}</td><td className="p-2">{row.class_name}</td><td className="p-2 tabular-nums">{row.score} / {row.max_score}</td><td className="p-2">{row.status === 'completed' ? 'Terminée' : 'En cours'}</td><td className="p-2">{new Date(row.started_at).toLocaleString()}</td></tr>)}</tbody></table></div>}
+        <section className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-[#072a3f] to-[#0b3c5d] p-5 text-white shadow-sm">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Suivi pédagogique</p>
+              <h2 className="mt-1 text-xl font-black">{selectedExercise?.title || 'Tentatives des élèves'}</h2>
+              <p className="mt-1 text-sm text-white/70">Suivi de tous les étudiants des classes attribuées</p>
+            </div>
+            <button type="button" onClick={() => { setShowAttempts(false); setAttemptClassFilter('all'); }} className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">Retour aux exercices</button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-[#072a3f]"><Filter size={16}/> Filtrer les résultats</div>
+            <select aria-label="Filtrer les tentatives par classe" value={attemptClassFilter} onChange={e => setAttemptClassFilter(e.target.value)} className="min-w-[210px] rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2fa36b] focus:ring-2 focus:ring-emerald-100">
+              <option value="all">Toutes les classes</option>
+              {classes.filter(c => selectedExercise?.class_ids.includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between text-slate-500"><span className="text-xs font-semibold">Étudiants concernés</span><Users size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{attemptSummary.total}</p></article>
+            <article className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"><div className="flex items-center justify-between text-emerald-700"><span className="text-xs font-semibold">Terminés</span><CheckCircle2 size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-emerald-800">{attemptSummary.completed}</p></article>
+            <article className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4"><div className="flex items-center justify-between text-amber-700"><span className="text-xs font-semibold">En cours</span><Clock3 size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-amber-800">{attemptSummary.inProgress}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between text-slate-500"><span className="text-xs font-semibold">Non commencés</span><CircleDashed size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-slate-700">{attemptSummary.notStarted}</p></article>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-4">
+              <div><h3 className="font-bold text-[#072a3f]">Progression des étudiants</h3><p className="mt-0.5 text-xs text-slate-500">La meilleure note est conservée pour faciliter le suivi.</p></div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{attemptSummary.total} étudiant(s)</span>
+            </div>
+            {filteredAttempts.length === 0 ? <div className="p-8 text-center"><Users className="mx-auto mb-2 text-slate-300" size={30}/><p className="font-semibold text-slate-600">Aucun étudiant dans cette sélection</p><p className="mt-1 text-xs text-slate-400">Vérifiez les classes attribuées à cet exercice.</p></div> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Étudiant</th><th className="px-4 py-3">Classe</th><th className="px-4 py-3">Progression</th><th className="px-4 py-3">Meilleure note</th><th className="px-4 py-3">Tentatives</th><th className="px-4 py-3">Dernière activité</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAttempts.map((row, index) => {
+                      const done = row.status === 'completed';
+                      const running = row.status === 'in_progress';
+                      const score = row.best_score;
+                      const scoreMax = row.max_score;
+                      return <tr key={row.student_id} className="transition hover:bg-slate-50/80">
+                        <td className="px-4 py-3"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e6f0f7] text-xs font-black text-[#0b3c5d]">{String(row.student_name || '?').trim().split(/\s+/).map((part: string) => part[0]).slice(0,2).join('').toUpperCase()}</span><div><p className="font-bold text-[#072a3f]">{row.student_name}</p>{row.student_number && <p className="text-[11px] text-slate-400">N° {row.student_number}</p>}</div></div></td>
+                        <td className="px-4 py-3 text-slate-600">{row.class_name}</td>
+                        <td className="px-4 py-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ' + (done ? 'bg-emerald-50 text-emerald-700' : running ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={'h-1.5 w-1.5 rounded-full ' + (done ? 'bg-emerald-500' : running ? 'bg-amber-500' : 'bg-slate-400')}/>{done ? 'Terminé' : running ? 'En cours' : 'Non commencé'}</span></td>
+                        <td className="px-4 py-3 font-bold tabular-nums text-[#072a3f]">{score !== null && score !== undefined ? <>{score} <span className="font-medium text-slate-400">/ {scoreMax}</span></> : <span className="font-medium text-slate-400">—</span>}</td>
+                        <td className="px-4 py-3 tabular-nums text-slate-600">{row.attempt_count}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{row.started_at ? new Date(row.started_at).toLocaleString() : 'Aucune activité'}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {questionStats.length > 0 && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4"><h3 className="font-bold text-[#072a3f]">Analyse par question</h3><p className="mt-1 text-xs text-slate-500">Réponses des dernières tentatives, selon le filtre sélectionné.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Question</th><th className="p-3">Réponses</th><th className="p-3">Correctes</th><th className="p-3">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="max-w-md p-3 text-slate-700">{row.label}</td><td className="p-3 tabular-nums">{row.responses}</td><td className="p-3 tabular-nums">{row.correct}</td><td className="p-3 font-semibold tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
         </section>
       ) : (
         <>
