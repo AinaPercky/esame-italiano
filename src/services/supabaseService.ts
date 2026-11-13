@@ -554,6 +554,17 @@ class SupabaseService {
       .from('students')
       .select('id, class_id, first_name, last_name, gender, email, student_number, avatar_url, validation_status, created_at, updated_at')
       .order('created_at', { ascending: false });
+    const { data: activeEnrollments, error: enrollmentsError } = await client
+      .from('class_enrollments')
+      .select('student_id,class_id')
+      .eq('status', 'active');
+    if (enrollmentsError) throw new Error(`Erreur lors du chargement des inscriptions : ${enrollmentsError.message}`);
+    const classIdsByStudent = new Map<string, string[]>();
+    (activeEnrollments || []).forEach(item => {
+      const ids = classIdsByStudent.get(item.student_id) || [];
+      if (!ids.includes(item.class_id)) ids.push(item.class_id);
+      classIdsByStudent.set(item.student_id, ids);
+    });
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('validation_status')) {
@@ -563,6 +574,7 @@ class SupabaseService {
           .order('created_at', { ascending: false });
         return (fallback.data || []).map(s => ({
           ...s,
+          class_ids: classIdsByStudent.get(s.id) || [],
           validation_status: 'approved'
         })) as Student[];
       }
@@ -570,6 +582,7 @@ class SupabaseService {
     }
     return (data || []).map(s => ({
       ...s,
+      class_ids: classIdsByStudent.get(s.id) || [],
       gender: s.gender || 'homme',
       validation_status: s.validation_status || 'pending'
     })) as Student[];
