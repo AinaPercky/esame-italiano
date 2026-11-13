@@ -338,7 +338,7 @@ DO $fn$ DECLARE t TEXT; p RECORD; BEGIN
  END LOOP;
 END $fn$;
 
-REVOKE ALL ON public.quizzes,public.quiz_submissions,public.quiz_attempts,public.quiz_participants,public.quiz_launches,public.quiz_retry_grants FROM anon;
+REVOKE ALL ON public.quizzes,public.quiz_submissions,public.quiz_attempts,public.quiz_participants,public.quiz_launches,public.quiz_retry_grants FROM PUBLIC, anon;
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.quizzes TO authenticated;
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.quiz_submissions TO authenticated;
 GRANT SELECT ON public.quiz_attempts,public.quiz_participants,public.quiz_launches,public.quiz_retry_grants TO authenticated;
