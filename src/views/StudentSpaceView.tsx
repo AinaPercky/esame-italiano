@@ -51,10 +51,12 @@ import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizCloz
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
 import { LessonsStudentView } from './LessonsStudentView';
 import { StudentWrittenExamsView } from './StudentWrittenExamsView';
+import { ExercisesStudentView } from './ExercisesStudentView';
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
   { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
+  { id: 'exercises', label: 'Exercices', shortLabel: 'Exercices', icon: CheckCircle2 },
   { id: 'lessons', label: 'Leçons de cours', shortLabel: 'Leçons', icon: Sparkles },
   { id: 'daily_grades', label: 'Notes journalières', shortLabel: 'Notes', icon: TrendingUp },
   { id: 'leaderboard', label: 'Classement de classe', shortLabel: 'Classe', icon: Trophy },
@@ -79,7 +81,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [isWrittenExamFullscreen, setIsWrittenExamFullscreen] = useState(false);
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
@@ -1128,6 +1130,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             onOpenQuiz={() => setActiveTab('quizzes')}
           />
         )}
+
+        {activeTab === 'exercises' && <ExercisesStudentView />}
 
         {activeTab === 'written_exams' && <StudentWrittenExamsView currentUser={currentUser} onFullscreenChange={setIsWrittenExamFullscreen} />}
 
