@@ -366,7 +366,7 @@ class SupabaseService {
 
       return {
         success: true,
-        message: `Connexion Supabase réussie. Tables des quiz et résultats vérifiées.`,
+        message: `Connexion Supabase réussie. Catalogue public des quiz vérifié.`,
         details: {
           tablesCreated: true,
           classesCount: classesCount || 0,
