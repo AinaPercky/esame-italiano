@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { Quiz } from '../types';
 import {
@@ -255,14 +254,13 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       setScreen('loading');
       setLoadError(null);
 
-      let q: Quiz | null = dataService.getPublicQuiz(activeQuizId);
-
-      if (!q) {
-        try {
-          q = await supabaseService.fetchPublicQuiz(activeQuizId);
-        } catch (err) {
-          console.error('Erreur chargement quiz distant:', err);
-        }
+      let q: Quiz | null = null;
+      try {
+        // Toujours charger une version nettoyée par le serveur, même si l'état local
+        // du navigateur contient une copie professeur avec les réponses attendues.
+        q = await supabaseService.fetchPublicQuiz(activeQuizId);
+      } catch (err) {
+        console.error('Erreur chargement sécurisé du quiz public:', err);
       }
 
       if (cancelled) return;
