@@ -1576,7 +1576,7 @@ class SupabaseService {
         created_at: po.created_at
       }));
 
-      const quizzes: Quiz[] = (quizzesData || []).map(q => ({
+      const quizzes: Quiz[] = (quizzesData || []).map((q: any) => ({
         id: q.id,
         public_id: q.public_id || undefined,
         is_public: Boolean(q.is_public),
