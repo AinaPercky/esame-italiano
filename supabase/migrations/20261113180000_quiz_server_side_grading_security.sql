@@ -245,7 +245,7 @@ BEGIN
  result:=public.quiz_grade_question(question,p_answer);
  -- Public quizzes are practice resources, not identity-verified exams. Never return
  -- expected answers or explanations to anonymous callers.
- RETURN jsonb_build_object('correct',result->'correct','points',result->'points','maxPoints',result->'maxPoints');
+ RETURN jsonb_build_object('correct',result->'correct','points',result->'points','maxPoints',result->'maxPoints','expected','','studentAnswer',coalesce(p_answer,''),'explanation',NULL);
 END $fn$;
 
 -- Keep the previous persistence/attendance checks, but wrap them with authoritative grading.
@@ -264,7 +264,7 @@ CREATE OR REPLACE FUNCTION public.submit_quiz_presence_submission(p_submission J
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE
  sid TEXT:=public.quiz_current_student_id();
- quiz_id TEXT:=p_submission->>'quiz_id';
+ v_quiz_id TEXT:=p_submission->>'quiz_id';
  attempt_no INTEGER;
  saved_answers JSONB;
  e JSONB;
@@ -278,9 +278,9 @@ BEGIN
  ) + 1 INTO attempt_no;
  SELECT coalesce(jsonb_object_agg(question_id,answer),'{}'::jsonb) INTO saved_answers
  FROM public.quiz_question_evaluations
- WHERE quiz_id=quiz_id AND student_id=sid AND attempt_number=attempt_no;
+ WHERE quiz_question_evaluations.quiz_id=v_quiz_id AND quiz_question_evaluations.student_id=sid AND quiz_question_evaluations.attempt_number=attempt_no;
  -- Submitted browser answers are deliberately ignored for authenticated quizzes.
- e:=public.quiz_grade_all(quiz_id,coalesce(saved_answers,'{}'::jsonb));
+ e:=public.quiz_grade_all(v_quiz_id,coalesce(saved_answers,'{}'::jsonb));
  IF status='timeout' THEN e:=jsonb_set(jsonb_set(e,'{rawScore}','0'),'{score20}','0'); END IF;
  payload:=p_submission||jsonb_build_object(
    'answers',coalesce(saved_answers,'{}'::jsonb),
