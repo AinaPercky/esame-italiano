@@ -262,18 +262,44 @@ REVOKE ALL ON FUNCTION public.submit_quiz_submission_legacy_unsafe(JSONB) FROM P
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_presence_submission(p_submission JSONB)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
-DECLARE e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed'); result JSONB;
+DECLARE
+ sid TEXT:=public.quiz_current_student_id();
+ quiz_id TEXT:=p_submission->>'quiz_id';
+ attempt_no INTEGER;
+ saved_answers JSONB;
+ e JSONB;
+ payload JSONB;
+ status TEXT:=coalesce(p_submission->>'status','completed');
+ result JSONB;
 BEGIN
- e:=public.quiz_grade_all(p_submission->>'quiz_id',coalesce(p_submission->'answers','{}'));
+ SELECT greatest(
+   coalesce((SELECT max(a.attempt_number) FROM public.quiz_attempts a WHERE a.quiz_id=quiz_id AND a.student_id=sid),0),
+   coalesce((SELECT max(s.attempt_number) FROM public.quiz_submissions s WHERE s.quiz_id=quiz_id AND s.student_id=sid),0)
+ ) + 1 INTO attempt_no;
+ SELECT coalesce(jsonb_object_agg(question_id,answer),'{}'::jsonb) INTO saved_answers
+ FROM public.quiz_question_evaluations
+ WHERE quiz_id=quiz_id AND student_id=sid AND attempt_number=attempt_no;
+ -- Submitted browser answers are deliberately ignored for authenticated quizzes.
+ e:=public.quiz_grade_all(quiz_id,coalesce(saved_answers,'{}'::jsonb));
  IF status='timeout' THEN e:=jsonb_set(jsonb_set(e,'{rawScore}','0'),'{score20}','0'); END IF;
- payload:=p_submission||jsonb_build_object('score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback');
+ payload:=p_submission||jsonb_build_object(
+   'answers',coalesce(saved_answers,'{}'::jsonb),
+   'score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback'
+ );
  SELECT public.submit_quiz_presence_submission_legacy_unsafe(payload) INTO result;
  RETURN result;
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_submission(p_submission JSONB)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
-DECLARE q public.quizzes%ROWTYPE; sid TEXT; cids TEXT[]; e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed');
+DECLARE
+ q public.quizzes%ROWTYPE;
+ sid TEXT;
+ cids TEXT[];
+ e JSONB;
+ payload JSONB;
+ status TEXT:=coalesce(p_submission->>'status','completed');
+ saved_answers JSONB;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_submission->>'quiz_id';
  IF NOT FOUND OR q.status<>'launched' THEN RAISE EXCEPTION 'Quiz indisponible.'; END IF;
@@ -282,14 +308,21 @@ BEGIN
    SELECT array_agg(DISTINCT class_id::text) INTO cids FROM public.class_enrollments WHERE student_id=sid AND status='active';
    IF coalesce(array_length(cids,1),0)=0 THEN SELECT ARRAY[class_id::text] INTO cids FROM public.students WHERE id::text=sid; END IF;
    IF NOT (coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id])) THEN RAISE EXCEPTION 'Accès refusé.'; END IF;
+   SELECT coalesce(jsonb_object_agg(question_id,answer),'{}'::jsonb) INTO saved_answers
+   FROM public.quiz_question_evaluations
+   WHERE quiz_id=q.id AND student_id=sid AND attempt_number=1;
  ELSE
    IF NOT coalesce(q.is_public,FALSE) THEN RAISE EXCEPTION 'Connexion étudiant requise.'; END IF;
    sid:=p_submission->>'student_id';
    IF coalesce(sid,'')='' THEN RAISE EXCEPTION 'Identifiant étudiant requis.'; END IF;
+   saved_answers:=coalesce(p_submission->'answers','{}'::jsonb);
  END IF;
- e:=public.quiz_grade_all(q.id,coalesce(p_submission->'answers','{}'));
+ e:=public.quiz_grade_all(q.id,coalesce(saved_answers,'{}'::jsonb));
  IF status='timeout' THEN e:=jsonb_set(jsonb_set(e,'{rawScore}','0'),'{score20}','0'); END IF;
- payload:=p_submission||jsonb_build_object('student_id',sid,'score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback');
+ payload:=p_submission||jsonb_build_object(
+   'student_id',sid,'answers',coalesce(saved_answers,'{}'::jsonb),
+   'score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback'
+ );
  PERFORM public.submit_quiz_submission_legacy_unsafe(payload);
 END $fn$;
 
