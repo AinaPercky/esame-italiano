@@ -28,9 +28,8 @@ exports.getStudents = async (req, res) => {
     } else {
       list = memoryStore.students.map(student => {
         const memberships = (memoryStore.enrollments || []).filter(e => e.student_id === student.id && e.status === 'active').map(e => e.class_id);
-        const classIds = memberships.length ? memberships : [student.class_id];
         const cls = memoryStore.classes.find(c => c.id === student.class_id);
-        return { ...student, class_ids: classIds, class_name: cls ? cls.name : 'Inconnue' };
+        return { ...student, class_ids: memberships, class_name: cls ? cls.name : 'Inconnue' };
       });
     }
     if (class_id) list = list.filter(student => student.class_ids.includes(class_id));
@@ -70,7 +69,7 @@ exports.getStudentById = async (req, res) => {
     const evaluations = memoryStore.evaluations.filter(e => e.student_id === id);
     const enrollments = (memoryStore.enrollments || []).filter(e => e.student_id === id);
     const classIds = enrollments.filter(e => e.status === 'active').map(e => e.class_id);
-    return res.json({ ...student, class_ids: classIds.length ? classIds : [student.class_id], class_name: cls ? cls.name : 'Inconnue', enrollments, evaluations });
+    return res.json({ ...student, class_ids: classIds, class_name: cls ? cls.name : 'Inconnue', enrollments, evaluations });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

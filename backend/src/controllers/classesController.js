@@ -24,9 +24,7 @@ exports.getClasses = async (req, res) => {
     }
     const classesWithCounts = memoryStore.classes.map(c => {
       const enrolled = memoryStore.enrollments || [];
-      const studentCount = enrolled.length
-        ? enrolled.filter(e => e.class_id === c.id && e.status === 'active').length
-        : memoryStore.students.filter(s => s.class_id === c.id).length;
+      const studentCount = enrolled.filter(e => e.class_id === c.id && e.status === 'active').length;
       const examCount = memoryStore.exams.filter(e => e.class_id === c.id).length;
       return { ...c, enrollment_mode: normalizeMode(c.enrollment_mode), student_count: studentCount, exam_count: examCount };
     });
@@ -54,9 +52,10 @@ exports.getClassById = async (req, res) => {
     const cls = memoryStore.classes.find(c => c.id === id);
     if (!cls) return res.status(404).json({ error: 'Classe introuvable' });
     const enrollments = (memoryStore.enrollments || []).filter(e => e.class_id === id);
-    const students = enrollments.length
-      ? enrollments.filter(e => e.status === 'active').map(e => memoryStore.students.find(s => s.id === e.student_id)).filter(Boolean)
-      : memoryStore.students.filter(s => s.class_id === id);
+    const students = enrollments
+      .filter(e => e.status === 'active')
+      .map(e => memoryStore.students.find(s => s.id === e.student_id))
+      .filter(Boolean);
     const exams = memoryStore.exams.filter(e => e.class_id === id);
     return res.json({ ...cls, students, enrollments, exams });
   } catch (error) {

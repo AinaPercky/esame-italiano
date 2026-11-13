@@ -54,6 +54,18 @@ const call = async (handler, req = {}) => {
     const available = await call(enrollments.listAvailableClasses);
     assert.ok(!available.body.some(c => c.id === 'c1'));
 
+    // Expelling the last active membership must not resurrect the student from the legacy class_id pointer.
+    const lastMembership = memoryStore.enrollments.find(e => e.student_id === 's2' && e.class_id === 'c1');
+    const expelledLast = await call(enrollments.updateEnrollmentStatus, {
+      params: { enrollmentId: lastMembership.id },
+      body: { status: 'expelled', end_reason: 'Test last membership' }
+    });
+    assert.strictEqual(expelledLast.statusCode, 200);
+    const oldClassRoster = await call(students.getStudents, { query: { class_id: 'c1' } });
+    assert.ok(!oldClassRoster.body.some(s => s.id === 's2'), 'Un élève expulsé ne doit plus réapparaître dans son ancienne classe');
+    const studentDetail = await call(students.getStudentById, { params: { id: 's2' } });
+    assert.ok(!studentDetail.body.class_ids.includes('c1'), 'La fiche élève ne doit pas rétablir une inscription terminée');
+
     // Class creation keeps free-form names and supports both enrollment modes without adding a level/type.
     const created = await call(classes.createClass, { body: { name: 'Rattrapage grammaire', enrollment_mode: 'direct' } });
     assert.strictEqual(created.statusCode, 201);
