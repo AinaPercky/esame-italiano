@@ -75,6 +75,7 @@ declare
   v_correction jsonb;
   v_retry jsonb;
   v_advance jsonb;
+  v_review jsonb;
   v_count integer;
 begin
   if jsonb_array_length(public.list_student_exercises()) <> 1 then
@@ -122,6 +123,13 @@ begin
 
   v_count := jsonb_array_length(public.get_student_exercise_results());
   if v_count <> 1 then raise exception 'Student attempt history was not persisted'; end if;
+
+  v_review := public.get_student_exercise_attempt_details(v_attempt_id);
+  if v_review #>> '{questions,0,answer}' <> 'wrong'
+     or v_review #>> '{questions,0,expected}' <> 'sono'
+     or v_review #>> '{questions,0,explanation}' <> 'Sono è la prima persona.' then
+    raise exception 'Student attempt review must return their answer, expected answer and explanation';
+  end if;
 
   -- A second independent attempt is allowed.
   v_attempt := public.start_exercise_attempt(v_exercise_id);
