@@ -17,11 +17,11 @@ router.use(requireAuth);
 // Routes : Classes
 // -----------------------------------------------------------------------------
 router.get('/classes', classesCtrl.getClasses);
+router.get('/classes/available', enrollmentsCtrl.listAvailableClasses);
 router.post('/classes', classesCtrl.createClass);
 router.get('/classes/:id', classesCtrl.getClassById);
 router.put('/classes/:id', classesCtrl.updateClass);
 router.delete('/classes/:id', classesCtrl.deleteClass);
-router.get('/classes/available', enrollmentsCtrl.listAvailableClasses);
 router.get('/classes/:classId/enrollments', enrollmentsCtrl.listAllEnrollments);
 router.post('/classes/:classId/enrollments', enrollmentsCtrl.enrollStudent);
 router.post('/classes/:classId/enrollment-requests', enrollmentsCtrl.requestEnrollment);
