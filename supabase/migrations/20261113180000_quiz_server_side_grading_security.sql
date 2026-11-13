@@ -158,7 +158,6 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=public,pg_temp AS $
  SELECT coalesce(jsonb_agg(public.quiz_sanitize_payload(to_jsonb(q))),'[]'::jsonb)
  FROM public.quizzes q WHERE q.is_public=TRUE AND q.status<>'draft';
 $;
-
 CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
 DECLARE sid TEXT:=public.quiz_current_student_id(); cids TEXT[]; result JSONB;
