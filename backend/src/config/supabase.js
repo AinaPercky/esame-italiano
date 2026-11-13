@@ -28,7 +28,17 @@ if (isConfigured && createClient) {
   }
 }
 
+const createAuthenticatedClient = (accessToken) => {
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!createClient || !supabaseUrl || !anonKey || !accessToken) return null;
+  return createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } }
+  });
+};
+
 module.exports = {
   supabase,
-  isConfigured
+  isConfigured,
+  createAuthenticatedClient
 };

@@ -7,6 +7,7 @@ const examsCtrl = require('../controllers/examsController');
 const evaluationsCtrl = require('../controllers/evaluationsController');
 const passOrderCtrl = require('../controllers/passOrderController');
 const statsCtrl = require('../controllers/statisticsController');
+const enrollmentsCtrl = require('../controllers/enrollmentsController');
 const { requireAuth } = require('../middlewares/auth');
 
 // Middleware global d'authentification pour les routes protégées
@@ -20,6 +21,16 @@ router.post('/classes', classesCtrl.createClass);
 router.get('/classes/:id', classesCtrl.getClassById);
 router.put('/classes/:id', classesCtrl.updateClass);
 router.delete('/classes/:id', classesCtrl.deleteClass);
+router.get('/classes/available', enrollmentsCtrl.listAvailableClasses);
+router.get('/classes/:classId/enrollments', enrollmentsCtrl.listAllEnrollments);
+router.post('/classes/:classId/enrollments', enrollmentsCtrl.enrollStudent);
+router.post('/classes/:classId/enrollment-requests', enrollmentsCtrl.requestEnrollment);
+router.get('/students/me/enrollments', enrollmentsCtrl.listMyEnrollments);
+router.get('/students/me/enrollment-requests', enrollmentsCtrl.listMyRequests);
+router.get('/enrollments', enrollmentsCtrl.listAllEnrollments);
+router.patch('/enrollments/:enrollmentId/status', enrollmentsCtrl.updateEnrollmentStatus);
+router.get('/enrollment-requests', enrollmentsCtrl.listAllRequests);
+router.post('/enrollment-requests/:requestId/review', enrollmentsCtrl.reviewRequest);
 
 // -----------------------------------------------------------------------------
 // Routes : Élèves (Students)
