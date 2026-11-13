@@ -79,8 +79,26 @@ begin
   if (v_attempt ->> 'attempt_id')::uuid = v_attempt_id then
     raise exception 'A new attempt must have its own identifier';
   end if;
+  perform set_config('test.attempt2', v_attempt ->> 'attempt_id', false);
 end;
 $$;
+
+reset role;
+update public.exercise_attempts
+set current_question_deadline_at = now() - interval '1 second'
+where id = current_setting('test.attempt2')::uuid;
+set role authenticated;
+select set_config('request.jwt.claims','{"email":"student@example.test"}',false);
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+do $
+declare v_result jsonb;
+begin
+  v_result := public.submit_exercise_answer(current_setting('test.attempt2')::uuid, '"sono"'::jsonb);
+  if coalesce((v_result ->> 'timed_out')::boolean,false) is not true or coalesce((v_result ->> 'points')::numeric,1) <> 0 then
+    raise exception 'Expired question must be graded as a timeout with zero points';
+  end if;
+end;
+$;
 
 reset role;
 set role authenticated;
