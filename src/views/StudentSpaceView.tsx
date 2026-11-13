@@ -83,6 +83,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [isWrittenExamFullscreen, setIsWrittenExamFullscreen] = useState(false);
+  const isStandaloneModule = isWrittenExamFullscreen || activeTab === 'exercises';
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
   const [classStudentsList, setClassStudentsList] = useState<Student[]>([]);
@@ -1016,8 +1017,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   }
 
   return (
-    <div className={`student-space min-h-svh flex flex-col text-slate-900 ${isWrittenExamFullscreen ? "written-exam-fullscreen-active" : ""}`}>
-      {!isWrittenExamFullscreen && <header className="student-topbar sticky top-0 z-20 px-3 py-2.5 sm:px-6 sm:py-3">
+    <div className={`student-space min-h-svh flex flex-col text-slate-900 ${isStandaloneModule ? "written-exam-fullscreen-active" : ""}`}>
+      {!isStandaloneModule && <header className="student-topbar sticky top-0 z-20 px-3 py-2.5 sm:px-6 sm:py-3">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <img src="/percky-lingua-logo.webp" alt="" className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11" />
@@ -1059,8 +1060,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       </header>}
 
       {/* Main Container */}
-      <main className={isWrittenExamFullscreen ? "fixed inset-0 z-[100] flex min-h-svh w-full flex-col overflow-y-auto bg-slate-50 p-0" : "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6"}>
-        {!isWrittenExamFullscreen && <section className="student-welcome" aria-labelledby="student-welcome-title">
+      <main className={isStandaloneModule ? "fixed inset-0 z-[100] flex min-h-svh w-full flex-col overflow-y-auto bg-slate-50 p-0" : "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-3 py-4 sm:gap-6 sm:px-6 sm:py-6"}>
+        {!isStandaloneModule && <section className="student-welcome" aria-labelledby="student-welcome-title">
           <div className="student-welcome-photo" aria-hidden="true">
             <img src={welcomePhoto} alt="" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = studentHeroPhoto; }} />
             <div className="student-welcome-photo-fade" />
@@ -1107,7 +1108,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
         </section>}
 
-        {!isWrittenExamFullscreen && <nav className="student-tabs" aria-label="Navigation de l’espace étudiant">
+        {!isStandaloneModule && <nav className="student-tabs" aria-label="Navigation de l’espace étudiant">
           {STUDENT_TABS.map(({ id, label, shortLabel, icon: Icon }) => (
             <button
               key={id}
@@ -1131,7 +1132,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           />
         )}
 
-        {activeTab === 'exercises' && <ExercisesStudentView />}
+        {activeTab === 'exercises' && <ExercisesStudentView onExit={() => setActiveTab('quizzes')} />}
 
         {activeTab === 'written_exams' && <StudentWrittenExamsView currentUser={currentUser} onFullscreenChange={setIsWrittenExamFullscreen} />}
 
@@ -2004,7 +2005,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
       </main>
 
-      {!isWrittenExamFullscreen && <footer className="student-footer">
+      {!isStandaloneModule && <footer className="student-footer">
         PerckyLingua • Apprendre et progresser en italien
       </footer>}
 
