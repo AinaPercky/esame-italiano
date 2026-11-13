@@ -25,7 +25,7 @@ begin
   where e.status='published';
   return v_result;
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.start_exercise_attempt(p_exercise_id uuid)
  RETURNS jsonb
@@ -88,7 +88,7 @@ begin
 
   return public.exercise_question_for_student(v_attempt.id);
 end;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.list_available_written_exams()
  RETURNS jsonb
@@ -201,7 +201,7 @@ begin
 
   return v_result;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.start_written_exam(p_exam_id uuid)
  RETURNS jsonb
