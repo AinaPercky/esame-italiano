@@ -52,7 +52,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
   const activeClass = classes.find(c => c.id === selectedClassId);
   const classStudents = useMemo(() => {
     if (!selectedClassId) return students;
-    return students.filter(s => s.class_id === selectedClassId);
+    return students.filter(s => s.class_ids ? s.class_ids.includes(selectedClassId) : s.class_id === selectedClassId);
   }, [students, selectedClassId]);
 
   const eligibleStudentIds = useMemo(() => {

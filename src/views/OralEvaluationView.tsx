@@ -68,7 +68,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // 3. Ordre de passage officiel et élèves classés selon cet ordre
   const classStudents = useMemo(() => {
-    return students.filter(s => s.class_id === selectedClassId);
+    return students.filter(s => s.class_ids ? s.class_ids.includes(selectedClassId) : s.class_id === selectedClassId);
   }, [students, selectedClassId]);
 
   const passOrderItems = useMemo(() => {
