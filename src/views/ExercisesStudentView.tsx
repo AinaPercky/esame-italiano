@@ -22,15 +22,16 @@ const correctionText = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-interface ExercisesStudentViewProps { onExit: () => void; }
+interface ExercisesStudentViewProps { onFullscreenChange: (fullscreen: boolean) => void; }
 
-export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onExit }) => {
+export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFullscreenChange }) => {
   const [items, setItems] = useState<StudentExerciseItem[]>([]);
   const [results, setResults] = useState<ExerciseAttemptResult[]>([]);
   const [active, setActive] = useState<ExerciseAttemptQuestion | null>(null);
   const [answer, setAnswer] = useState('');
   const [correction, setCorrection] = useState<ExerciseCorrection | null>(null);
   const [remaining, setRemaining] = useState(0);
+  const [correctionSeconds, setCorrectionSeconds] = useState(10);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -89,19 +90,21 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onEx
         : await exerciseService.startAttempt(exerciseId);
       serverClockOffset.current = Date.now() - new Date(current.server_now).getTime();
       setActive(current);
+      onFullscreenChange(true);
       setCorrection(current.correction || null);
       setAnswer(current.correction?.student_answer == null ? '' : String(current.correction.student_answer));
       setRemaining(current.seconds_remaining);
     } catch (e) { setError(e instanceof Error ? e.message : 'Démarrage impossible.'); }
   };
 
-  const next = async () => {
+  const next = useCallback(async () => {
     if (!active) return;
     setSubmitting(true); setError('');
     try {
       const result = await exerciseService.advance(active.attempt_id);
       if ('completed' in result && result.completed) {
         setActive(null); setCorrection(null); setAnswer('');
+        onFullscreenChange(false);
         await refresh();
       } else {
         const nextQuestion = result as ExerciseAttemptQuestion;
@@ -112,7 +115,22 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onEx
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Passage à la question suivante impossible.'); }
     finally { setSubmitting(false); }
-  };
+  }, [active, onFullscreenChange, refresh]);
+
+  useEffect(() => {
+    if (!active || !correction || correction.correct) return;
+    const startedAt = Date.now();
+    setCorrectionSeconds(10);
+    const timer = window.setInterval(() => {
+      const secondsLeft = Math.max(0, Math.ceil((10_000 - (Date.now() - startedAt)) / 1000));
+      setCorrectionSeconds(secondsLeft);
+      if (secondsLeft === 0) {
+        window.clearInterval(timer);
+        void next();
+      }
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [active?.attempt_id, active?.question_number, correction?.correct, correction?.timed_out, next]);
 
   const renderQuestion = (question: QuizQuestion) => {
     if (question.type === 'qcm') {
@@ -144,6 +162,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onEx
   );
 
   const returnToList = () => {
+    onFullscreenChange(false);
     setActive(null);
     setCorrection(null);
     setAnswer('');
@@ -165,19 +184,53 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onEx
         <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between text-xs text-slate-500"><span>{q.points} point(s)</span><span>Temps limité à cette question</span></div>
           <h2 className="text-lg font-bold leading-relaxed text-[#072a3f]">{q.question}</h2>
-          {correction ? (
-            <div className={'rounded-xl border p-4 ' + (correction.correct ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
-              <div className="flex items-center gap-2 font-bold">{correction.correct ? <CheckCircle2 className="text-emerald-600"/> : <XCircle className="text-amber-700"/>}{correction.timed_out ? 'Temps écoulé' : correction.correct ? 'Bonne réponse' : 'Réponse incorrecte'}</div>
-              <p className="mt-2 text-sm">Votre réponse : <strong>{answer || 'Aucune réponse'}</strong></p>
-              <p className="mt-1 text-sm">Réponse attendue : <strong>{correctionText(correction.expected)}</strong></p>
-              {correction.explanation && <p className="mt-2 text-sm text-slate-700">{correction.explanation}</p>}
-              <p className="mt-3 text-sm font-bold">Points : {correction.points} / {correction.max_points}</p>
+          {correction?.correct ? (
+            <div role="status" className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600"/>
+              <div><p className="font-bold">Bonne réponse !</p><p className="text-sm">Points obtenus : {correction.points} / {correction.max_points}</p></div>
+            </div>
+          ) : correction ? (
+            <div role="status" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+              <p className="font-bold"><XCircle className="mr-2 inline h-4 w-4"/>Réponse incorrecte</p>
+              <p>La correction détaillée s’affiche séparément.</p>
             </div>
           ) : renderQuestion(q)}
-          {!correction ? <button type="button" disabled={submitting || remaining <= 0} onClick={() => void submit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{submitting ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} Valider la réponse</button> : <button type="button" disabled={submitting} onClick={() => void next()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? <Loader2 className="animate-spin" size={16}/> : <ArrowRight size={16}/>} {active.question_number === active.question_count ? 'Terminer l’exercice' : 'Question suivante'}</button>}
+          {!correction ? <button type="button" disabled={submitting || remaining <= 0} onClick={() => void submit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-3 text-sm font-bold text-white disabled:opacity-40">{submitting ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>} Valider la réponse</button> : correction.correct ? <button type="button" disabled={submitting} onClick={() => void next()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? <Loader2 className="animate-spin" size={16}/> : <ArrowRight size={16}/>} {active.question_number === active.question_count ? 'Terminer l’exercice' : 'Question suivante'}</button> : null}
         </article>
         <p className="text-center text-xs text-slate-500">Une fois validée, une question ne peut plus être modifiée. La correction ne consomme pas de temps.</p>
       </section>
+      {correction && !correction.correct && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#072a3f]/70 p-3 backdrop-blur-sm sm:p-6" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="exercise-correction-title" className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 bg-[#0b3c5d] px-4 py-3 text-white sm:px-5">
+              <div className="flex items-center gap-2"><XCircle className="h-5 w-5 text-rose-300"/><h2 id="exercise-correction-title" className="font-bold">Correction de la réponse</h2></div>
+              <span className="rounded-lg bg-white/15 px-3 py-1 font-mono text-sm font-bold tabular-nums">{correctionSeconds}s</span>
+            </div>
+            <div className="space-y-3 p-4 sm:p-5">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-rose-700">Votre réponse</p>
+                <p className="break-words text-sm font-bold text-rose-950">{correctionText((correction.student_answer ?? answer) || 'Aucune réponse')}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Bonne réponse</p>
+                <p className="break-words text-sm font-bold text-emerald-950">{correctionText(correction.expected)}</p>
+              </div>
+              {correction.explanation && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Explication</p>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-violet-950">{correctionText(correction.explanation)}</p>
+                </div>
+              )}
+              <div className="flex flex-col-reverse items-stretch justify-between gap-2 pt-1 sm:flex-row sm:items-center">
+                <p className="text-xs text-slate-500">Cette pause pédagogique n’est pas décomptée du temps.</p>
+                <button type="button" disabled={submitting} onClick={() => void next()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRight className="h-4 w-4"/>} Continuer
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
         </main>
       </div>
     );
@@ -185,7 +238,6 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onEx
 
   return (
     <div className="min-h-svh bg-[#f4f8fb] text-slate-900">
-      {renderModuleHeader(onExit, "Retour à l'espace étudiant")}
       <main className="mx-auto w-full max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-8">
     <div className="mx-auto max-w-5xl space-y-5">
       <header><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Entraînement autonome</p><h1 className="text-2xl font-black text-[#072a3f]">Mes exercices</h1><p className="mt-1 text-sm text-slate-500">Les exercices attribués à votre classe. Vous pouvez vous entraîner autant de fois que vous le souhaitez ; ces résultats ne sont pas des notes officielles.</p></header>
