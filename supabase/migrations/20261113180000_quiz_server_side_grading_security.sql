@@ -92,7 +92,7 @@ BEGIN
    FOR idx IN 0..n-1 LOOP
      item:=exp_parts->idx;
      IF jsonb_typeof(item)='array' THEN
-       part_ok:=EXISTS(SELECT 1 FROM jsonb_array_elements_text(item) a WHERE public.quiz_text_matches(coalesce(stu_parts->>idx,''),a));
+       part_ok:=EXISTS(SELECT 1 FROM jsonb_array_elements_text(item) AS a(value) WHERE public.quiz_text_matches(coalesce(stu_parts->>idx,''),a.value));
        part:=(SELECT string_agg(value,' / ') FROM jsonb_array_elements_text(item));
      ELSE
        part:=coalesce(item#>>'{}',''); part_ok:=public.quiz_text_matches(coalesce(stu_parts->>idx,''),part);
