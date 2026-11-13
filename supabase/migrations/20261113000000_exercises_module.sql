@@ -823,3 +823,146 @@ begin
   );
 end;
 $$;
+
+
+-- Freeze a shuffled option order per attempt, so refreshes do not reshuffle choices.
+alter table public.exercise_attempts
+  add column if not exists option_orders jsonb not null default '{}'::jsonb;
+
+create or replace function public.start_exercise_attempt(p_exercise_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_student_id uuid := public.exercise_current_student_id();
+  v_exercise public.exercises%rowtype;
+  v_version public.exercise_versions%rowtype;
+  v_order jsonb;
+  v_option_orders jsonb;
+  v_attempt public.exercise_attempts%rowtype;
+  v_total numeric := 0;
+  v_question jsonb;
+begin
+  if v_student_id is null then raise exception 'Profil étudiant validé introuvable.'; end if;
+  select e.* into v_exercise
+  from public.exercises e
+  join public.exercise_class_assignments a on a.exercise_id = e.id
+  join public.students s on s.class_id = a.class_id
+  where e.id = p_exercise_id and e.status = 'published' and s.id = v_student_id
+  limit 1;
+  if not found then raise exception 'Cet exercice n’est pas disponible pour votre classe.'; end if;
+
+  select * into v_version from public.exercise_versions where id = v_exercise.current_version_id;
+  if not found then raise exception 'Version de l’exercice introuvable.'; end if;
+  if jsonb_array_length(v_version.content -> 'questions') = 0 then raise exception 'Cet exercice ne contient aucune question.'; end if;
+  if exists (
+    select 1 from jsonb_array_elements(v_version.content -> 'questions') q(value)
+    where coalesce((q.value ->> 'time_limit_seconds')::integer,0) <= 0
+  ) then raise exception 'Chaque question doit avoir un temps imparti strictement positif.'; end if;
+
+  select jsonb_agg(q.value ->> 'id' order by random()),
+         coalesce(sum((q.value ->> 'points')::numeric),0)
+  into v_order, v_total
+  from jsonb_array_elements(v_version.content -> 'questions') q(value);
+
+  select coalesce(jsonb_object_agg(q.value ->> 'id', shuffled.options), '{}'::jsonb)
+  into v_option_orders
+  from jsonb_array_elements(v_version.content -> 'questions') q(value)
+  cross join lateral (
+    select jsonb_agg(o.value order by random()) as options
+    from jsonb_array_elements(coalesce(q.value -> 'options','[]'::jsonb)) o(value)
+  ) shuffled
+  where jsonb_typeof(q.value -> 'options') = 'array';
+
+  select q.value into v_question
+  from jsonb_array_elements(v_version.content -> 'questions') q(value)
+  where q.value ->> 'id' = v_order ->> 0;
+
+  insert into public.exercise_attempts(
+    exercise_id, version_id, student_id, question_order, option_orders, current_question_index,
+    current_question_started_at, current_question_deadline_at, max_score
+  ) values (
+    p_exercise_id, v_version.id, v_student_id, v_order, v_option_orders, 0,
+    now(), now() + make_interval(secs => (v_question ->> 'time_limit_seconds')::integer), v_total
+  ) returning * into v_attempt;
+
+  return public.exercise_question_for_student(v_attempt.id);
+end;
+$$;
+
+-- Replace the payload function to use the frozen shuffled options.
+create or replace function public.exercise_question_for_student(p_attempt_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_attempt public.exercise_attempts%rowtype;
+  v_content jsonb;
+  v_question jsonb;
+  v_question_id text;
+  v_safe jsonb;
+  v_answer public.exercise_answers%rowtype;
+  v_payload jsonb;
+begin
+  select * into v_attempt from public.exercise_attempts where id = p_attempt_id;
+  if not found or (v_attempt.student_id <> public.exercise_current_student_id() and not public.exercise_is_teacher()) then
+    raise exception 'Tentative introuvable ou accès interdit.';
+  end if;
+  if v_attempt.status <> 'in_progress' then raise exception 'Cette tentative est terminée.'; end if;
+
+  select content into v_content from public.exercise_versions where id = v_attempt.version_id;
+  v_question_id := v_attempt.question_order ->> v_attempt.current_question_index;
+  select q.value into v_question
+  from jsonb_array_elements(v_content -> 'questions') q(value)
+  where q.value ->> 'id' = v_question_id;
+  if v_question is null then raise exception 'Question introuvable dans la version de l’exercice.'; end if;
+
+  v_safe := v_question - 'correct_answer' - 'answers' - 'explanation';
+  if v_question ? 'options' then
+    v_safe := jsonb_set(v_safe, '{options}', coalesce(v_attempt.option_orders -> v_question_id, v_question -> 'options'));
+  end if;
+  if v_question -> 'verbes_trous' is not null then
+    v_safe := jsonb_set(v_safe, '{verbes_trous}',
+      jsonb_build_object(
+        'titre', v_question #> '{verbes_trous,titre}',
+        'consigne', v_question #> '{verbes_trous,consigne}',
+        'points_par_phrase', v_question #> '{verbes_trous,points_par_phrase}',
+        'banque', v_question #> '{verbes_trous,banque}',
+        'phrases', coalesce((
+          select jsonb_agg(jsonb_build_object('id', p.value -> 'id','debut',p.value -> 'debut','fin',p.value -> 'fin') order by p.ordinality)
+          from jsonb_array_elements(v_question #> '{verbes_trous,phrases}') with ordinality p(value, ordinality)
+        ), '[]'::jsonb)
+      )
+    );
+  end if;
+
+  v_payload := jsonb_build_object(
+    'attempt_id', v_attempt.id,
+    'question', v_safe,
+    'question_number', v_attempt.current_question_index + 1,
+    'question_count', jsonb_array_length(v_attempt.question_order),
+    'deadline_at', v_attempt.current_question_deadline_at,
+    'seconds_remaining', greatest(0, floor(extract(epoch from (v_attempt.current_question_deadline_at - now())))::integer),
+    'server_now', now()
+  );
+
+  select * into v_answer from public.exercise_answers
+  where attempt_id = p_attempt_id and question_id = v_question_id;
+  if found then
+    v_payload := v_payload || jsonb_build_object('correction', jsonb_build_object(
+      'correct', v_answer.is_correct,
+      'points', v_answer.points_awarded,
+      'max_points', v_answer.max_points,
+      'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+      'explanation', v_question -> 'explanation',
+      'timed_out', v_answer.timed_out,
+      'question_id', v_question_id
+    ));
+  end if;
+  return v_payload;
+end;
+$$;
