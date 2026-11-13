@@ -980,7 +980,8 @@ begin
       'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
       'explanation', v_question -> 'explanation',
       'timed_out', v_answer.timed_out,
-      'question_id', v_question_id
+      'question_id', v_question_id,
+      'student_answer', v_answer.answer
     ));
   end if;
   return v_payload;
