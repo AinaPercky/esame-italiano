@@ -1608,10 +1608,15 @@ export const dataService = {
     // En cloud, la remise verrouille la même ligne quiz que la clôture.
     // Une seule des deux opérations gagne la course; une note réelle ne peut
     // pas être remplacée par un résultat manqué.
-    const savedAtomically = ((quiz.attendance_mode === 'strict_presence' && !quiz.is_public) || allowAuthorizedRetry)
+    const serverSubmission = ((quiz.attendance_mode === 'strict_presence' && !quiz.is_public) || allowAuthorizedRetry)
       ? await supabaseService.submitQuizPresenceSubmission(submission)
       : await supabaseService.submitQuizSubmissionAtomically(submission);
-    if (!savedAtomically) await supabaseService.saveQuizSubmission(submission);
+    if (serverSubmission) {
+      // L'état local reflète la note recalculée par PostgreSQL, jamais la note du navigateur.
+      Object.assign(submission, serverSubmission);
+    } else {
+      await supabaseService.saveQuizSubmission(submission);
+    }
 
     if (existingIdx !== -1 && (retryGrantId || allowAuthorizedRetry)) {
       state.quizSubmissions.unshift(submission);
