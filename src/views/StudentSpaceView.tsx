@@ -46,7 +46,7 @@ import {
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
-import { isQuestionAnswerCorrect, calculateQuestionPointsEarned, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../utils/quizAnswerMatcher';
+import { calculateQuestionPointsEarned } from '../utils/quizAnswerMatcher';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
@@ -692,11 +692,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     quizSubmissionLockRef.current = false;
   };
 
-  // Fonction utilitaire pour tester si une réponse est correcte
-  const isAnswerCorrect = (q: QuizQuestion, studentAns: string) => {
-    return isQuestionAnswerCorrect(q, studentAns);
-  };
-
   // Passage à la question suivante ou soumission finale
   const advanceToNextQuestion = (updatedAnswers: Record<string, string>) => {
     if (!activeQuiz) return;
@@ -722,7 +717,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   };
 
   // Traiter la réponse de la question : si fausse, afficher l'explication pendant 13s
-  const processQuestionProgression = (
+  const processQuestionProgression = async (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
   ) => {
@@ -731,40 +726,53 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!currentQ) return;
 
     const studentAns = updatedAnswers[currentQ.id] || '';
-    const correct = isAnswerCorrect(currentQ, studentAns);
+    let evaluation: { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
 
-    if (correct) {
-      // Bonne réponse : passage direct et fluide à la question suivante
-      advanceToNextQuestion(updatedAnswers);
-    } else {
-      // Réponse fausse ou temps écoulé :
-      // Afficher la correction et l'explication pendant 13 secondes (temps hors chronomètre quiz)
-      setIncorrectFeedback({
-        isOpen: true,
-        questionNumber: currentQuestionIndex + 1,
-        questionText: currentQ.question,
-        studentAnswer: currentQ.type === 'reorder'
-          ? formatReorderAnswer(currentQ, studentAns)
-          : currentQ.type === 'text'
-          ? formatTextAnswerForDisplay(currentQ, studentAns)
-          : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-          ? currentQ.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return `${phrase.debut || ''}__[${response?.verbe_choisi || '—'}]__ ${response?.texte_saisi || '—'}${phrase.fin || ''}`; }).join('\n')
-          : studentAns,
-        correctAnswer: currentQ.type === 'reorder'
-          ? formatCorrectReorderAnswer(currentQ)
-          : currentQ.type === 'text'
-          ? formatCorrectTextAnswerForDisplay(currentQ)
-          : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-          ? currentQ.verbes_trous.phrases.map((phrase) => `${phrase.debut || ''}__[${phrase.verbe || ''}]__ ${(phrase.reponses || []).join(' / ')}${phrase.fin || ''}`).join('\n')
-          : currentQ.correct_answer,
-        explanation: currentQ.explanation,
-        countdown: CORRECTION_DISPLAY_SECONDS,
-        pendingNextAnswers: updatedAnswers,
-        isTimeout,
-        points: calculateQuestionPointsEarned(currentQ, studentAns).awardedPoints,
-        maxPoints: calculateQuestionPointsEarned(currentQ, studentAns).maxPoints
-      });
+    try {
+      // Les quiz officiels sont corrigés exclusivement par PostgreSQL.
+      // Seul le mode tutoriel local conserve sa correction pédagogique locale.
+      evaluation = isPracticeMode
+        ? (() => {
+            const local = calculateQuestionPointsEarned(currentQ, studentAns);
+            return {
+              correct: local.isFullyCorrect,
+              points: local.awardedPoints,
+              maxPoints: local.maxPoints,
+              expected: '',
+              studentAnswer: studentAns
+            };
+          })()
+        : await supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns);
+    } catch (error: any) {
+      setQuizSubmissionError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
+      return;
     }
+
+    if (evaluation.correct) {
+      advanceToNextQuestion(updatedAnswers);
+      return;
+    }
+
+    const studentDisplay = currentQ.type === 'verbes_trous' && currentQ.verbes_trous
+      ? currentQ.verbes_trous.phrases.map((phrase) => {
+          const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)];
+          return `${phrase.debut || ''}__[${response?.verbe_choisi || '—'}]__ ${response?.texte_saisi || '—'}${phrase.fin || ''}`;
+        }).join('\\n')
+      : evaluation.studentAnswer || studentAns;
+
+    setIncorrectFeedback({
+      isOpen: true,
+      questionNumber: currentQuestionIndex + 1,
+      questionText: currentQ.question,
+      studentAnswer: studentDisplay,
+      correctAnswer: evaluation.expected,
+      explanation: currentQ.explanation,
+      countdown: CORRECTION_DISPLAY_SECONDS,
+      pendingNextAnswers: updatedAnswers,
+      isTimeout,
+      points: evaluation.points,
+      maxPoints: evaluation.maxPoints
+    });
   };
 
   // Si le temps de la question est écoulé -> note 0 pour cette question et on analyse
