@@ -913,18 +913,21 @@ class SupabaseService {
   public async fetchPublicQuiz(publicIdOrId: string): Promise<Quiz | null> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase n'est pas encore configuré.");
-
     const clean = (publicIdOrId || '').trim();
     if (!clean) return null;
-
-    const mapRowToQuiz = (q: any): Quiz => ({
+    const { data, error } = await client.rpc('get_public_quiz', { p_public_id: clean });
+    if (error) throw new Error(`Chargement sécurisé du quiz public : ${error.message}`);
+    if (!data || typeof data !== 'object') return null;
+    const q: any = data;
+    return {
       id: q.id,
       public_id: q.public_id || undefined,
-      is_public: true, // Force public for external access
+      is_public: true,
       attendance_mode: q.attendance_mode || 'legacy',
       class_id: q.class_id,
       class_ids: q.class_ids || (q.class_id ? [q.class_id] : undefined),
       category: normalizeQuizCategory(q.category),
+      level: q.level ?? null,
       title: q.title,
       description: q.description || undefined,
       created_at: q.created_at,
@@ -934,37 +937,7 @@ class SupabaseService {
       expires_at: q.expires_at || undefined,
       questions: Array.isArray(q.questions) ? q.questions : [],
       total_points: Number(q.total_points) || 20
-    });
-
-    // Évite une comparaison UUID = slug qui provoque une 400 côté PostgREST.
-    if (isUUID(clean)) {
-      const { data: byPublicId } = await client
-        .from('quizzes')
-        .select('*')
-        .eq('public_id', clean)
-        .maybeSingle();
-
-      if (byPublicId) return mapRowToQuiz(byPublicId);
-    }
-
-    const { data: byId } = await client
-      .from('quizzes')
-      .select('*')
-      .eq('id', clean)
-      .maybeSingle();
-
-    if (byId) return mapRowToQuiz(byId);
-
-    // Fallback: fetch any quiz if exact match fails
-    const { data: anyQuiz } = await client
-      .from('quizzes')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-
-    if (anyQuiz) return mapRowToQuiz(anyQuiz);
-
-    return null;
+    };
   }
 
   public async deleteQuiz(id: string): Promise<void> {
@@ -1197,6 +1170,30 @@ class SupabaseService {
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
     return true;
+  }
+
+  public async evaluateQuizQuestion(quizId: string, questionId: string, answer: string): Promise<{
+    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string;
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour corriger une réponse.');
+    const { data, error } = await client.rpc('evaluate_quiz_question', {
+      p_quiz_id: quizId, p_question_id: questionId, p_answer: answer
+    });
+    if (error) throw new Error(`Correction serveur du quiz : ${error.message}`);
+    return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
+  }
+
+  public async evaluatePublicQuizQuestion(publicId: string, questionId: string, answer: string): Promise<{
+    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string;
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour corriger une réponse.');
+    const { data, error } = await client.rpc('evaluate_public_quiz_question', {
+      p_public_id: publicId, p_question_id: questionId, p_answer: answer
+    });
+    if (error) throw new Error(`Correction serveur du quiz public : ${error.message}`);
+    return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
   }
 
   public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<boolean> {
@@ -1434,6 +1431,11 @@ class SupabaseService {
     }
 
     try {
+      const { data: isTeacher, error: teacherCheckError } = await client.rpc('quiz_is_teacher');
+      if (teacherCheckError) throw new Error(`Vérification du rôle quiz : ${teacherCheckError.message}`);
+      const quizzesRequest = isTeacher
+        ? client.from('quizzes').select('*')
+        : client.rpc('get_student_quiz_catalog');
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1453,7 +1455,7 @@ class SupabaseService {
         client.from('evaluations').select('*'),
         client.from('evaluation_details').select('*'),
         client.from('exam_pass_order').select('*'),
-        client.from('quizzes').select('*'),
+        quizzesRequest,
         client.from('quiz_submissions').select('*'),
         client.from('class_enrollments').select('student_id,class_id,status')
       ]);
