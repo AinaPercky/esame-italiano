@@ -1,14 +1,14 @@
 -- Server-side quiz grading and scoped access. Additive; preserves historical results.
 CREATE OR REPLACE FUNCTION public.quiz_norm_answer(v TEXT, strip_end BOOLEAN DEFAULT FALSE)
-RETURNS TEXT LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+RETURNS TEXT LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $fn$
  SELECT CASE WHEN strip_end
    THEN regexp_replace(regexp_replace(lower(btrim(coalesce(v,''))), '[’‘]', '''', 'g'), '[.?!;:]+$', '')
    ELSE regexp_replace(regexp_replace(lower(btrim(coalesce(v,''))), '[’‘]', '''', 'g'), '\s+', ' ', 'g')
  END
-$$;
+$fn$;
 
 CREATE OR REPLACE FUNCTION public.quiz_text_matches(student TEXT, expected TEXT)
-RETURNS BOOLEAN LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE AS $fn$
 DECLARE s TEXT := public.quiz_norm_answer(student, TRUE); alt TEXT;
 BEGIN
  IF s = '' THEN RETURN FALSE; END IF;
@@ -17,10 +17,10 @@ BEGIN
    IF s = public.quiz_norm_answer(alt, TRUE) THEN RETURN TRUE; END IF;
  END LOOP;
  RETURN FALSE;
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.quiz_grade_question(q JSONB, answer TEXT)
-RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $$
+RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $fn$
 DECLARE
  t TEXT := coalesce(q->>'type','text'); raw TEXT := btrim(coalesce(answer,''));
  expected TEXT := btrim(coalesce(q->>'correct_answer',''));
@@ -108,10 +108,10 @@ BEGIN
    ok:=correct_n=n;
  END IF;
  RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display);
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.quiz_grade_all(p_quiz_id TEXT, p_answers JSONB)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE; question JSONB; entry JSONB; fb JSONB:='{}'; raw NUMERIC:=0; maxp NUMERIC:=0; score20 NUMERIC:=0;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_quiz_id;
@@ -125,10 +125,10 @@ BEGIN
  IF coalesce(q.total_points,0)>0 THEN maxp:=q.total_points; END IF;
  IF maxp>0 THEN score20:=round(raw/maxp*20,1); END IF;
  RETURN jsonb_build_object('rawScore',round(raw,2),'maxScore',round(maxp,2),'score20',score20,'feedback',fb);
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.quiz_sanitize_payload(p JSONB)
-RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $$
+RETURNS JSONB LANGUAGE plpgsql IMMUTABLE AS $fn$
 DECLARE qs JSONB;
 BEGIN
  SELECT coalesce(jsonb_agg(clean),'[]') INTO qs FROM (
@@ -142,24 +142,24 @@ BEGIN
    FROM jsonb_array_elements(coalesce(p->'questions','[]')) q
  ) x;
  RETURN (p-'questions')||jsonb_build_object('questions',qs);
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.get_public_quiz(p_public_id TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
  IF NOT FOUND THEN RETURN NULL; END IF;
  RETURN public.quiz_sanitize_payload(to_jsonb(q));
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.get_public_quiz_catalog()
-RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
  SELECT coalesce(jsonb_agg(public.quiz_sanitize_payload(to_jsonb(q))),'[]'::jsonb)
  FROM public.quizzes q WHERE q.is_public=TRUE AND q.status<>'draft';
-$$;
+$fn$;
 CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE sid TEXT:=public.quiz_current_student_id(); cids TEXT[]; result JSONB;
 BEGIN
  SELECT array_agg(DISTINCT class_id::text) INTO cids
@@ -171,10 +171,10 @@ BEGIN
  FROM public.quizzes q
  WHERE coalesce(cids,ARRAY[]::text[]) && coalesce(nullif(q.class_ids,ARRAY[]::text[]),ARRAY[q.class_id]);
  RETURN coalesce(result,'[]');
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.evaluate_quiz_question(p_quiz_id TEXT,p_question_id TEXT,p_answer TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE sid TEXT:=public.quiz_current_student_id(); q public.quizzes%ROWTYPE; cids TEXT[]; question JSONB; l public.quiz_launches%ROWTYPE; part public.quiz_participants%ROWTYPE;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_quiz_id;
@@ -192,10 +192,10 @@ BEGIN
  SELECT value INTO question FROM jsonb_array_elements(coalesce(q.questions,'[]')) WHERE value->>'id'=p_question_id LIMIT 1;
  IF question IS NULL THEN RAISE EXCEPTION 'Question introuvable.'; END IF;
  RETURN public.quiz_grade_question(question,p_answer);
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_question(p_public_id TEXT,p_question_id TEXT,p_answer TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE; question JSONB;
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
@@ -203,22 +203,22 @@ BEGIN
  SELECT value INTO question FROM jsonb_array_elements(coalesce(q.questions,'[]')) WHERE value->>'id'=p_question_id LIMIT 1;
  IF question IS NULL THEN RAISE EXCEPTION 'Question introuvable.'; END IF;
  RETURN public.quiz_grade_question(question,p_answer);
-END $$;
+END $fn$;
 
 -- Keep the previous persistence/attendance checks, but wrap them with authoritative grading.
-DO $$ BEGIN
+DO $fn$ BEGIN
  IF to_regprocedure('public.submit_quiz_presence_submission(jsonb)') IS NOT NULL AND to_regprocedure('public.submit_quiz_presence_submission_legacy_unsafe(jsonb)') IS NULL THEN
    ALTER FUNCTION public.submit_quiz_presence_submission(JSONB) RENAME TO submit_quiz_presence_submission_legacy_unsafe;
  END IF;
  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL AND to_regprocedure('public.submit_quiz_submission_legacy_unsafe(jsonb)') IS NULL THEN
    ALTER FUNCTION public.submit_quiz_submission(JSONB) RENAME TO submit_quiz_submission_legacy_unsafe;
  END IF;
-END $$;
+END $fn$;
 REVOKE ALL ON FUNCTION public.submit_quiz_presence_submission_legacy_unsafe(JSONB) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.submit_quiz_submission_legacy_unsafe(JSONB) FROM PUBLIC,anon,authenticated;
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_presence_submission(p_submission JSONB)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed'); result JSONB;
 BEGIN
  e:=public.quiz_grade_all(p_submission->>'quiz_id',coalesce(p_submission->'answers','{}'));
@@ -226,10 +226,10 @@ BEGIN
  payload:=p_submission||jsonb_build_object('score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback');
  SELECT public.submit_quiz_presence_submission_legacy_unsafe(payload) INTO result;
  RETURN result;
-END $$;
+END $fn$;
 
 CREATE OR REPLACE FUNCTION public.submit_quiz_submission(p_submission JSONB)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE; sid TEXT; cids TEXT[]; e JSONB; payload JSONB; status TEXT:=coalesce(p_submission->>'status','completed');
 BEGIN
  SELECT * INTO q FROM public.quizzes WHERE id=p_submission->>'quiz_id';
@@ -248,10 +248,10 @@ BEGIN
  IF status='timeout' THEN e:=jsonb_set(jsonb_set(e,'{rawScore}','0'),'{score20}','0'); END IF;
  payload:=p_submission||jsonb_build_object('student_id',sid,'score',e->'rawScore','max_score',e->'maxScore','score_20',e->'score20','feedback',e->'feedback');
  PERFORM public.submit_quiz_submission_legacy_unsafe(payload);
-END $$;
+END $fn$;
 
 -- Remove permissive historical policies on all quiz result/launch tables.
-DO $$ DECLARE t TEXT; p RECORD; BEGIN
+DO $fn$ DECLARE t TEXT; p RECORD; BEGIN
  FOREACH t IN ARRAY ARRAY['quizzes','quiz_submissions','quiz_attempts','quiz_participants','quiz_launches','quiz_retry_grants'] LOOP
   IF to_regclass('public.'||t) IS NOT NULL THEN
    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
@@ -260,7 +260,7 @@ DO $$ DECLARE t TEXT; p RECORD; BEGIN
    END LOOP;
   END IF;
  END LOOP;
-END $$;
+END $fn$;
 
 REVOKE ALL ON public.quizzes,public.quiz_submissions,public.quiz_attempts,public.quiz_participants,public.quiz_launches,public.quiz_retry_grants FROM anon;
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.quizzes TO authenticated;
