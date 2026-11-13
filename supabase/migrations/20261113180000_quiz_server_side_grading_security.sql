@@ -43,7 +43,8 @@ BEGIN
    BEGIN correct_order := (q->>'correct_answer')::jsonb; EXCEPTION WHEN OTHERS THEN correct_order := item_ids; END;
    IF jsonb_typeof(correct_order)<>'array' OR jsonb_array_length(correct_order)<>jsonb_array_length(item_ids) THEN correct_order:=item_ids; END IF;
    BEGIN student_order := raw::jsonb; EXCEPTION WHEN OTHERS THEN student_order:='[]'; END;
-   ok := jsonb_typeof(student_order)='array' AND student_order=correct_order AND jsonb_array_length(student_order)=jsonb_array_length(item_ids);
+   IF jsonb_typeof(student_order)<>'array' THEN student_order:='[]'; END IF;
+   ok := student_order=correct_order AND jsonb_array_length(student_order)=jsonb_array_length(item_ids);
    earned := CASE WHEN ok THEN pts ELSE 0 END;
    SELECT coalesce(string_agg(value->>'text',' → ' ORDER BY ord),'') INTO exp_display
    FROM jsonb_array_elements(coalesce(q->'items','[]')) WITH ORDINALITY x(value,ord)
