@@ -237,7 +237,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   }
 
   return (
-    <div className="min-h-svh bg-[#f4f8fb] text-slate-900">
+    <div className="w-full min-w-0">
       <main className="mx-auto w-full max-w-5xl space-y-5 px-3 py-5 sm:px-6 sm:py-8">
     <div className="mx-auto max-w-5xl space-y-5">
       <header><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Entraînement autonome</p><h1 className="text-2xl font-black text-[#072a3f]">Mes exercices</h1><p className="mt-1 text-sm text-slate-500">Les exercices attribués à votre classe. Vous pouvez vous entraîner autant de fois que vous le souhaitez ; ces résultats ne sont pas des notes officielles.</p></header>
