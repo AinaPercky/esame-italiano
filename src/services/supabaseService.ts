@@ -391,6 +391,8 @@ class SupabaseService {
       await client.from('classes').upsert({
         id: c.id,
         name: c.name,
+        enrollment_mode: c.enrollment_mode || 'approval',
+        archived_at: c.archived_at || null,
         created_at: c.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
     } catch (e) {
@@ -400,130 +402,13 @@ class SupabaseService {
 
   public async deleteClass(id: string): Promise<void> {
     const client = this.getClient();
-    if (!client) {
-      throw new Error('Suppression impossible : Supabase n’est pas configuré ou accessible.');
-    }
-    if (!isUUID(id)) {
-      throw new Error('Suppression impossible dans Supabase : identifiant de classe invalide.');
-    }
-
-    const failOnError = (operation: string, error: { message: string } | null) => {
-      if (error) {
-        throw new Error(`Suppression Supabase (${operation}) impossible : ${error.message}`);
-      }
-    };
-
-    const { data: students, error: studentsError } = await client
-      .from('students')
-      .select('id, avatar_url')
-      .eq('class_id', id);
-    failOnError('chargement des élèves', studentsError);
-
-    const { data: exams, error: examsError } = await client
-      .from('exams')
-      .select('id')
-      .eq('class_id', id);
-    failOnError('chargement des examens', examsError);
-
-    const studentIds = (students || []).map(student => student.id);
-    const examIds = (exams || []).map(exam => exam.id);
-    const evaluationIds = new Set<string>();
-
-    if (studentIds.length > 0) {
-      const { data: studentEvaluations, error } = await client
-        .from('evaluations')
-        .select('id')
-        .in('student_id', studentIds);
-      failOnError('chargement des évaluations des élèves', error);
-      (studentEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
-    }
-    if (examIds.length > 0) {
-      const { data: examEvaluations, error } = await client
-        .from('evaluations')
-        .select('id')
-        .in('exam_id', examIds);
-      failOnError('chargement des évaluations des examens', error);
-      (examEvaluations || []).forEach(evaluation => evaluationIds.add(evaluation.id));
-    }
-
-    const avatarPaths = (students || [])
-      .filter(student => student.avatar_url && isUUID(student.id))
-      .flatMap(student => [`avatars/${student.id}.jpg`, `avatars/${student.id}.png`, `avatars/${student.id}.webp`]);
-    if (avatarPaths.length > 0) {
-      const { error } = await client.storage.from('student-avatars').remove(avatarPaths);
-      failOnError('suppression des photos de profil', error);
-    }
-
-    const { error: submissionsError } = await client
-      .from('quiz_submissions')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des résultats de quiz', submissionsError);
-
-    const { error: quizzesError } = await client
-      .from('quizzes')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des quiz', quizzesError);
-
-    if (evaluationIds.size > 0) {
-      const { error } = await client
-        .from('evaluation_details')
-        .delete()
-        .in('evaluation_id', Array.from(evaluationIds));
-      failOnError('suppression des détails d’évaluation', error);
-
-      const { error: evaluationsError } = await client
-        .from('evaluations')
-        .delete()
-        .in('id', Array.from(evaluationIds));
-      failOnError('suppression des évaluations orales', evaluationsError);
-    }
-
-    if (studentIds.length > 0) {
-      const { error } = await client
-        .from('exam_pass_order')
-        .delete()
-        .in('student_id', studentIds);
-      failOnError('suppression des ordres de passage des élèves', error);
-    }
-
-    if (examIds.length > 0) {
-      const { error: passOrderError } = await client
-        .from('exam_pass_order')
-        .delete()
-        .in('exam_id', examIds);
-      failOnError('suppression des ordres de passage des examens', passOrderError);
-
-      const { error: rubricsError } = await client
-        .from('exam_rubrics')
-        .delete()
-        .in('exam_id', examIds);
-      failOnError('suppression des rubriques', rubricsError);
-    }
-
-    const { error: deleteStudentsError } = await client
-      .from('students')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des élèves', deleteStudentsError);
-
-    const { error: deleteExamsError } = await client
-      .from('exams')
-      .delete()
-      .eq('class_id', id);
-    failOnError('suppression des examens', deleteExamsError);
-
-    const { data: deletedClass, error: deleteClassError } = await client
-      .from('classes')
-      .delete()
-      .eq('id', id)
-      .select('id')
-      .maybeSingle();
-    failOnError('suppression de la classe', deleteClassError);
-    if (!deletedClass) {
-      throw new Error('Suppression Supabase impossible : classe introuvable ou droits de suppression insuffisants.');
-    }
+    if (!client) throw new Error('Archivage impossible : Supabase n’est pas configuré ou accessible.');
+    if (!isUUID(id)) throw new Error('Archivage impossible : identifiant de classe invalide.');
+    const { data, error } = await client.from('classes')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id).is('archived_at', null).select('id').maybeSingle();
+    if (error) throw new Error(`Archivage Supabase impossible : ${error.message}`);
+    if (!data) throw new Error('Classe introuvable ou déjà archivée.');
   }
 
   // --- STUDENTS ---
@@ -1558,6 +1443,8 @@ class SupabaseService {
       const classes: ClassRoom[] = (classesData || []).map(c => ({
         id: c.id,
         name: c.name,
+        enrollment_mode: c.enrollment_mode || 'approval',
+        archived_at: c.archived_at || null,
         created_at: c.created_at
       }));
 

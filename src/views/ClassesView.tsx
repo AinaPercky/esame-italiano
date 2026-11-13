@@ -4,8 +4,8 @@ import { ClassRoom } from '../types';
 
 interface ClassesViewProps {
   classes: ClassRoom[];
-  onCreateClass: (name: string) => void;
-  onUpdateClass: (id: string, name: string) => void;
+  onCreateClass: (name: string, enrollmentMode: 'direct' | 'approval') => void;
+  onUpdateClass: (id: string, name: string, enrollmentMode: 'direct' | 'approval') => void;
   onDeleteClass: (id: string) => Promise<void>;
   onSelectClassStudents: (classId: string) => void;
 }
@@ -20,6 +20,7 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassRoom | null>(null);
   const [classNameInput, setClassNameInput] = useState('');
+  const [enrollmentModeInput, setEnrollmentModeInput] = useState<'direct' | 'approval'>('approval');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingClass, setIsDeletingClass] = useState(false);
@@ -29,9 +30,9 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
     if (!classNameInput.trim()) return;
 
     if (editingClass) {
-      onUpdateClass(editingClass.id, classNameInput.trim());
+      onUpdateClass(editingClass.id, classNameInput.trim(), enrollmentModeInput);
     } else {
-      onCreateClass(classNameInput.trim());
+      onCreateClass(classNameInput.trim(), enrollmentModeInput);
     }
 
     setClassNameInput('');
@@ -42,12 +43,14 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
   const openCreateModal = () => {
     setEditingClass(null);
     setClassNameInput('');
+    setEnrollmentModeInput('approval');
     setIsModalOpen(true);
   };
 
   const openEditModal = (cls: ClassRoom) => {
     setEditingClass(cls);
     setClassNameInput(cls.name);
+    setEnrollmentModeInput(cls.enrollment_mode || 'approval');
     setIsModalOpen(true);
   };
 
@@ -175,6 +178,14 @@ export const ClassesView: React.FC<ClassesViewProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Mode d'inscription</label>
+                <select value={enrollmentModeInput} onChange={e => setEnrollmentModeInput(e.target.value as 'direct' | 'approval')} className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                  <option value="approval">Avec validation administrative</option>
+                  <option value="direct">Inscription directe</option>
+                </select>
+                <p className="mt-1 text-[11px] text-slate-500">Ce réglage concerne les nouvelles inscriptions.</p>
+              </div>
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-2">
                 <button
                   type="button"

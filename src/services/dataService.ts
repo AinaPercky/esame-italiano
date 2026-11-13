@@ -203,16 +203,17 @@ export const dataService = {
     return state.classes.map(c => {
       const studentCount = state.students.filter(s => s.class_id === c.id).length;
       const examCount = state.exams.filter(e => e.class_id === c.id).length;
-      return { ...c, student_count: studentCount, exam_count: examCount };
+      return { enrollment_mode: 'approval', ...c, student_count: studentCount, exam_count: examCount };
     });
   },
 
-  createClass(name: string): ClassRoom {
+  createClass(name: string, enrollmentMode: 'direct' | 'approval' = 'approval'): ClassRoom {
     const trimmed = name.trim();
     if (!trimmed) throw new Error('Le nom de la classe est requis');
     const newClass: ClassRoom = {
       id: generateUUID(),
       name: trimmed,
+      enrollment_mode: enrollmentMode,
       created_at: new Date().toISOString()
     };
     state.classes.push(newClass);
@@ -224,10 +225,11 @@ export const dataService = {
     return newClass;
   },
 
-  updateClass(id: string, name: string): ClassRoom {
+  updateClass(id: string, name: string, enrollmentMode?: 'direct' | 'approval'): ClassRoom {
     const idx = state.classes.findIndex(c => c.id === id);
     if (idx === -1) throw new Error('Classe introuvable');
     state.classes[idx].name = name.trim();
+    if (enrollmentMode) state.classes[idx].enrollment_mode = enrollmentMode;
     persistState();
     notifySubscribers();
 
@@ -237,24 +239,10 @@ export const dataService = {
   },
 
   async deleteClass(id: string): Promise<void> {
+    // L'action historique « supprimer » devient un archivage non destructif.
     await supabaseService.deleteClass(id);
-
-    const classStudentIds = new Set(state.students.filter(s => s.class_id === id).map(s => s.id));
-    const classExamIds = new Set(state.exams.filter(e => e.class_id === id).map(e => e.id));
-    const classQuizIds = new Set((state.quizzes || []).filter(quiz => quiz.class_id === id).map(quiz => quiz.id));
-
-    state.classes = state.classes.filter(c => c.id !== id);
-    state.students = state.students.filter(s => s.class_id !== id);
-    state.exams = state.exams.filter(e => e.class_id !== id);
-    state.rubrics = state.rubrics.filter(r => !classExamIds.has(r.exam_id));
-    state.evaluations = state.evaluations.filter(ev => !classExamIds.has(ev.exam_id) && !classStudentIds.has(ev.student_id));
-    state.passOrder = state.passOrder.filter(po => !classExamIds.has(po.exam_id) && !classStudentIds.has(po.student_id));
-    state.quizzes = (state.quizzes || []).filter(quiz => quiz.class_id !== id);
-    state.quizSubmissions = (state.quizSubmissions || []).filter(submission =>
-      submission.class_id !== id && !classQuizIds.has(submission.quiz_id) && !classStudentIds.has(submission.student_id)
-    );
-    authService.removeStudentAccountsForClass(id);
-
+    const idx = state.classes.findIndex(item => item.id === id);
+    if (idx !== -1) state.classes[idx] = { ...state.classes[idx], archived_at: new Date().toISOString() };
     persistState();
     notifySubscribers();
   },
@@ -1135,15 +1123,14 @@ export const dataService = {
   // QUIZZES & ÉVALUATIONS JOURNALIÈRES (ESAME)
   // =========================================================================
 
-  getQuizzes(classId?: string): Quiz[] {
+  getQuizzes(classId?: string | string[]): Quiz[] {
     this.checkAndApplyExpiredQuizzes();
     let list = state.quizzes || [];
-    if (classId) {
-      // Filter quizzes that belong to the specified class (check class_ids array, fallback to class_id)
-      list = list.filter(q => {
-        // Check new class_ids array first, then fall back to class_id for backward compatibility
+    if (classId !== undefined) {
+      const requestedClassIds = Array.isArray(classId) ? classId : [classId];
+      list = requestedClassIds.length === 0 ? [] : list.filter(q => {
         const classIds = q.class_ids || [q.class_id];
-        return classIds.includes(classId);
+        return requestedClassIds.some(id => classIds.includes(id));
       });
     }
     return list.map(q => {

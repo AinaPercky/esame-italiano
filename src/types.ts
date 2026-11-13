@@ -9,6 +9,8 @@ export interface ClassRoom {
   id: string;
   name: string;
   created_at: string;
+  enrollment_mode?: 'direct' | 'approval';
+  archived_at?: string | null;
   student_count?: number;
   exam_count?: number;
 }

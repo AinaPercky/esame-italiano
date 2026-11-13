@@ -23,7 +23,8 @@ import {
   Lock,
   ImagePlus,
   Trash2,
-  Loader2
+  Loader2,
+  School
 } from 'lucide-react';
 import { AuthUser, authService } from '../services/authService';
 import { dataService } from '../services/dataService';
@@ -63,6 +64,8 @@ import {
 import { LessonsStudentView } from './LessonsStudentView';
 import { StudentWrittenExamsView } from './StudentWrittenExamsView';
 import { ExercisesStudentView } from './ExercisesStudentView';
+import { StudentClassesView } from './StudentClassesView';
+import { enrollmentService } from '../services/enrollmentService';
 import {
   LearningCard,
   LearningCardFooter,
@@ -74,6 +77,7 @@ import {
 import studentHeroPhoto from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 const STUDENT_TABS = [
+  { id: 'classes', label: 'Mes classes', shortLabel: 'Classes', icon: School },
   { id: 'quizzes', label: 'Quiz du professeur', shortLabel: 'Quiz', icon: BookOpen },
   { id: 'exercises', label: 'Exercices', shortLabel: 'Exercices', icon: CheckCircle2 },
   { id: 'lessons', label: 'Leçons de cours', shortLabel: 'Leçons', icon: Sparkles },
@@ -100,13 +104,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
+  const [activeTab, setActiveTab] = useState<'classes' | 'quizzes' | 'exercises' | 'lessons' | 'daily_grades' | 'leaderboard' | 'oral_exam' | 'written_exams' | 'profile'>('quizzes');
   const [isWrittenExamFullscreen, setIsWrittenExamFullscreen] = useState(false);
   const [isExerciseFullscreen, setIsExerciseFullscreen] = useState(false);
   const isStandaloneModule = isWrittenExamFullscreen || isExerciseFullscreen;
   const [classDailyGrades, setClassDailyGrades] = useState<DailyGrade[]>([]);
   const [classesList, setClassesList] = useState<ClassRoom[]>([]);
   const [classStudentsList, setClassStudentsList] = useState<Student[]>([]);
+  const [activeEnrollmentClassIds, setActiveEnrollmentClassIds] = useState<string[]>([]);
+  const [classEnrollmentsLoaded, setClassEnrollmentsLoaded] = useState(false);
   const [timeoutNotice, setTimeoutNotice] = useState<boolean>(false);
   const [antiCheatNotice, setAntiCheatNotice] = useState<boolean>(false);
   
@@ -193,6 +199,22 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   }, [studentRecord?.avatar_url]);
 
   useEffect(() => {
+    let cancelled = false;
+    const studentId = currentUser.student_id || studentRecord?.id;
+    if (!studentId) {
+      setActiveEnrollmentClassIds([]);
+      setClassEnrollmentsLoaded(true);
+      return;
+    }
+    setClassEnrollmentsLoaded(false);
+    enrollmentService.listMyEnrollments(studentId)
+      .then(items => { if (!cancelled) setActiveEnrollmentClassIds(items.filter(item => item.status === 'active').map(item => item.class_id)); })
+      .catch(error => { console.warn('Chargement des inscriptions impossible :', error); if (!cancelled) setActiveEnrollmentClassIds([]); })
+      .finally(() => { if (!cancelled) setClassEnrollmentsLoaded(true); });
+    return () => { cancelled = true; };
+  }, [currentUser.student_id, studentRecord?.id]);
+
+  useEffect(() => {
     setEditGender(studentRecord?.gender || currentUser.gender || 'homme');
   }, [currentUser.gender, studentRecord?.gender]);
 
@@ -208,7 +230,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   const hasCompletedQuiz = (quizId: string) => {
     const { stId, stName, stNum, classId } = getStudentQueryInfo();
-    const liveSubs = dataService.getStudentSubmissions(stId, stName, stNum, classId);
+    const liveSubs = dataService.getStudentSubmissions(stId, stName, stNum);
     const allQuizSubs = dataService.getQuizSubmissions(quizId);
 
     const matchedBySubs = liveSubs.some(s => s.quiz_id === quizId);
@@ -256,7 +278,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const { stId, stName, stNum, classId: studentClassId } = getStudentQueryInfo();
     let subs: QuizSubmission[] = [];
     if (stId) {
-      subs = dataService.getStudentSubmissions(stId, stName, stNum, studentClassId);
+      subs = dataService.getStudentSubmissions(stId, stName, stNum);
       const dgs = dataService.getStudentDailyGrades(stId);
       setMySubmissions(subs);
       setDailyGrades(dgs);
@@ -267,7 +289,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setClassDailyGrades(allClassDg);
 
     // RÈGLE : Les quizs non lancés (draft) ne doivent pas être affichés dans l'interface de l'élève (sauf s'ils ont déjà été soumis)
-    const rawQList = dataService.getQuizzes(classId);
+    const quizClassIds = classEnrollmentsLoaded ? activeEnrollmentClassIds : (classId ? [classId] : []);
+    const rawQList = dataService.getQuizzes(quizClassIds);
     const qList = rawQList.filter(q => q.status === 'launched' || subs.some(s => s.quiz_id === q.id));
     setQuizzes(qList);
   };
@@ -280,7 +303,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       unsub();
       clearInterval(interval);
     };
-  }, [currentUser]);
+  }, [currentUser, activeEnrollmentClassIds, classEnrollmentsLoaded]);
 
   // Inclure aussi les quiz déjà soumis : une seconde chance peut rouvrir un quiz clôturé.
   const strictPresenceQuizIdsKey = quizzes
@@ -1135,6 +1158,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             </button>
           ))}
         </nav>}
+
+        {activeTab === 'classes' && (
+          <StudentClassesView studentId={currentUser.student_id || studentRecord?.id || ''} />
+        )}
 
         {activeTab === 'lessons' && (
           <LessonsStudentView
