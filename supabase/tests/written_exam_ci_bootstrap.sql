@@ -41,5 +41,6 @@ create table public.students (
   last_name text not null,
   email text not null,
   student_number text,
-  validation_status text not null default 'approved'
+  validation_status text not null default 'approved',
+  created_at timestamptz not null default now()
 );
