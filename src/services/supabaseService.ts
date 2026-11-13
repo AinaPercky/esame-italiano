@@ -1178,7 +1178,7 @@ class SupabaseService {
   }
 
   public async evaluateQuizQuestion(quizId: string, questionId: string, answer: string): Promise<{
-    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string;
+    correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string;
   }> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour corriger une réponse.');
