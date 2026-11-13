@@ -726,7 +726,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!currentQ) return;
 
     const studentAns = updatedAnswers[currentQ.id] || '';
-    let evaluation: { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
+    let evaluation: { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string };
 
     try {
       // Les quiz officiels sont corrigés exclusivement par PostgreSQL.
@@ -766,7 +766,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       questionText: currentQ.question,
       studentAnswer: studentDisplay,
       correctAnswer: evaluation.expected,
-      explanation: currentQ.explanation,
+      explanation: evaluation.explanation,
       countdown: CORRECTION_DISPLAY_SECONDS,
       pendingNextAnswers: updatedAnswers,
       isTimeout,
