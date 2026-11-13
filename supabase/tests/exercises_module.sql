@@ -62,7 +62,7 @@ begin
   if coalesce((v_correction ->> 'correct')::boolean,true) then
     raise exception 'Incorrect answer was graded as correct';
   end if;
-  if v_correction ->> 'expected' <> '"sono"' then
+  if v_correction ->> 'expected' <> 'sono' then
     raise exception 'Correction did not reveal the expected answer after submission';
   end if;
 
