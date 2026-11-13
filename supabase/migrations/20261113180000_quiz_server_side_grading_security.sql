@@ -276,7 +276,7 @@ GRANT SELECT ON public.quiz_attempts,public.quiz_participants,public.quiz_launch
 CREATE POLICY quiz_teacher_manage ON public.quizzes FOR ALL TO authenticated
  USING ((SELECT public.quiz_is_teacher())) WITH CHECK ((SELECT public.quiz_is_teacher()));
 CREATE POLICY quiz_submission_read_scoped ON public.quiz_submissions FOR SELECT TO authenticated
- USING ((SELECT public.quiz_is_teacher()) OR student_id=(SELECT public.quiz_current_student_id()));
+ USING (CASE WHEN (SELECT public.quiz_is_teacher()) THEN TRUE ELSE student_id=(SELECT public.quiz_current_student_id()) END);
 CREATE POLICY quiz_submission_teacher_insert ON public.quiz_submissions FOR INSERT TO authenticated
  WITH CHECK ((SELECT public.quiz_is_teacher()));
 CREATE POLICY quiz_submission_teacher_update ON public.quiz_submissions FOR UPDATE TO authenticated
@@ -288,8 +288,8 @@ CREATE POLICY quiz_attempts_read_scoped ON public.quiz_attempts FOR SELECT TO au
 CREATE POLICY quiz_participants_read_scoped ON public.quiz_participants FOR SELECT TO authenticated
  USING ((SELECT public.quiz_is_teacher()) OR student_id=(SELECT public.quiz_current_student_id()));
 CREATE POLICY quiz_launches_read_scoped ON public.quiz_launches FOR SELECT TO authenticated
- USING ((SELECT public.quiz_is_teacher()) OR EXISTS(
-   SELECT 1 FROM public.quiz_participants p WHERE p.launch_id=quiz_launches.id AND p.student_id=(SELECT public.quiz_current_student_id())));
+ USING (CASE WHEN (SELECT public.quiz_is_teacher()) THEN TRUE ELSE EXISTS(
+   SELECT 1 FROM public.quiz_participants p WHERE p.launch_id=quiz_launches.id AND p.student_id=(SELECT public.quiz_current_student_id())) END);
 CREATE POLICY quiz_retry_grants_read_scoped ON public.quiz_retry_grants FOR SELECT TO authenticated
  USING ((SELECT public.quiz_is_teacher()) OR student_id=(SELECT public.quiz_current_student_id()));
 
