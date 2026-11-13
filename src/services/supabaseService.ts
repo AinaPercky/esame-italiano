@@ -1444,11 +1444,22 @@ class SupabaseService {
     }
 
     try {
-      const { data: isTeacher, error: teacherCheckError } = await client.rpc('quiz_is_teacher');
-      if (teacherCheckError) throw new Error(`Vérification du rôle quiz : ${teacherCheckError.message}`);
+      const { data: authData } = await client.auth.getUser();
+      const isAuthenticated = Boolean(authData.user);
+      let isTeacher = false;
+      if (isAuthenticated) {
+        const { data, error } = await client.rpc('quiz_is_teacher');
+        if (error) throw new Error(`Vérification du rôle quiz : ${error.message}`);
+        isTeacher = Boolean(data);
+      }
       const quizzesRequest = isTeacher
         ? client.from('quizzes').select('*')
-        : client.rpc('get_student_quiz_catalog');
+        : isAuthenticated
+          ? client.rpc('get_student_quiz_catalog')
+          : client.rpc('get_public_quiz_catalog');
+      const quizSubmissionsRequest = isAuthenticated
+        ? client.from('quiz_submissions').select('*')
+        : Promise.resolve({ data: [], error: null });
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1469,7 +1480,7 @@ class SupabaseService {
         client.from('evaluation_details').select('*'),
         client.from('exam_pass_order').select('*'),
         quizzesRequest,
-        client.from('quiz_submissions').select('*'),
+        quizSubmissionsRequest,
         client.from('class_enrollments').select('student_id,class_id,status')
       ]);
 
