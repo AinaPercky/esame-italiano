@@ -717,8 +717,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
                   <div className="p-1.5 bg-white/70 rounded">Élèves : <strong>{testResult.details.studentsCount}</strong></div>
                   <div className="p-1.5 bg-white/70 rounded">Examens : <strong>{testResult.details.examsCount}</strong></div>
                   <div className="p-1.5 bg-white/70 rounded">Évaluations : <strong>{testResult.details.evaluationsCount}</strong></div>
-                  <div className="p-1.5 bg-white/70 rounded">Quiz : <strong>{testResult.details.quizzesCount}</strong></div>
-                  <div className="p-1.5 bg-white/70 rounded">Résultats quiz : <strong>{testResult.details.quizSubmissionsCount}</strong></div>
+                  <div className="p-1.5 bg-white/70 rounded">Quiz publics : <strong>{testResult.details.quizzesCount}</strong></div>
+                  <div className="p-1.5 bg-white/70 rounded">Résultats quiz : <strong>{testResult.details.quizSubmissionsCount ?? 'Accès protégé'}</strong></div>
                 </div>
               )}
             </div>
