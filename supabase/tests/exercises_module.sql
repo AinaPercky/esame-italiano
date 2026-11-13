@@ -102,6 +102,15 @@ begin
     raise exception 'Retrying an already committed answer must return the same correction';
   end if;
 
+  -- Reloading the current question after submission must restore the student's answer and correction.
+  v_retry := public.get_exercise_current_question(v_attempt_id);
+  if v_retry #>> '{correction,student_answer}' <> 'wrong' then
+    raise exception 'Resuming a submitted question must restore the original student answer';
+  end if;
+  if coalesce((v_retry #>> '{correction,correct}')::boolean,true) then
+    raise exception 'Resuming a submitted question must restore its correction state';
+  end if;
+
   v_advance := public.advance_exercise_attempt(v_attempt_id);
   if coalesce((v_advance ->> 'completed')::boolean,false) is not true then
     raise exception 'Single-question exercise should complete after advancing';
