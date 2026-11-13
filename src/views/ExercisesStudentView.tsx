@@ -29,6 +29,7 @@ export const ExercisesStudentView: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const timeoutLock = useRef(false);
+  const serverClockOffset = useRef(0);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
@@ -48,7 +49,7 @@ export const ExercisesStudentView: React.FC = () => {
   useEffect(() => {
     if (!active || correction) return;
     const update = () => {
-      const seconds = Math.max(0, Math.ceil((new Date(active.deadline_at).getTime() - Date.now()) / 1000));
+      const seconds = Math.max(0, Math.ceil((new Date(active.deadline_at).getTime() - (Date.now() - serverClockOffset.current)) / 1000));
       setRemaining(seconds);
     };
     update();
@@ -80,7 +81,9 @@ export const ExercisesStudentView: React.FC = () => {
       const current = attemptId
         ? await exerciseService.resumeAttempt(attemptId)
         : await exerciseService.startAttempt(exerciseId);
+      serverClockOffset.current = Date.now() - new Date(current.server_now).getTime();
       setActive(current);
+      setCorrection(current.correction || null);
       setRemaining(current.seconds_remaining);
     } catch (e) { setError(e instanceof Error ? e.message : 'Démarrage impossible.'); }
   };
@@ -94,9 +97,11 @@ export const ExercisesStudentView: React.FC = () => {
         setActive(null); setCorrection(null); setAnswer('');
         await refresh();
       } else {
-        setActive(result as ExerciseAttemptQuestion);
-        setCorrection(null); setAnswer(''); timeoutLock.current = false;
-        setRemaining((result as ExerciseAttemptQuestion).seconds_remaining);
+        const nextQuestion = result as ExerciseAttemptQuestion;
+        serverClockOffset.current = Date.now() - new Date(nextQuestion.server_now).getTime();
+        setActive(nextQuestion);
+        setCorrection(nextQuestion.correction || null); setAnswer(''); timeoutLock.current = false;
+        setRemaining(nextQuestion.seconds_remaining);
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Passage à la question suivante impossible.'); }
     finally { setSubmitting(false); }
