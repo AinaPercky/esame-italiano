@@ -218,9 +218,9 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                 <p className="break-words text-sm font-bold text-emerald-950">{correctionText(correction.expected)}</p>
               </div>
               {correction.explanation && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Explication</p>
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-violet-950">{correctionText(correction.explanation)}</p>
+                <div className="rounded-xl border border-slate-200 bg-slate-100 p-3">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">Explication</p>
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">{correctionText(correction.explanation)}</p>
                 </div>
               )}
               <div className="flex flex-col-reverse items-stretch justify-between gap-2 pt-1 sm:flex-row sm:items-center">
