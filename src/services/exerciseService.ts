@@ -121,6 +121,12 @@ export const exerciseService = {
     return String(data);
   },
 
+  async publishExercise(exerciseId: string): Promise<void> {
+    const client = requireClient();
+    const { error } = await client.rpc('publish_exercise', { p_exercise_id: exerciseId });
+    if (error) throwIfError(error, 'Publication de l’exercice impossible');
+  },
+
   async listTeacherExercises(): Promise<ExerciseDefinition[]> {
     const client = requireClient();
     const { data, error } = await client
