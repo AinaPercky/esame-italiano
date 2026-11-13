@@ -708,14 +708,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           : currentQ.type === 'text'
           ? formatTextAnswerForDisplay(currentQ, studentAns)
           : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-          ? currentQ.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return (response?.verbe_choisi || '—') + ' → ' + (response?.texte_saisi || '—'); }).join(' · ')
+          ? currentQ.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return `${phrase.debut || ''}__[${response?.verbe_choisi || '—'}]__ ${response?.texte_saisi || '—'}${phrase.fin || ''}`; }).join('\n')
           : studentAns,
         correctAnswer: currentQ.type === 'reorder'
           ? formatCorrectReorderAnswer(currentQ)
           : currentQ.type === 'text'
           ? formatCorrectTextAnswerForDisplay(currentQ)
           : currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-          ? currentQ.verbes_trous.phrases.map((phrase) => (phrase.verbe || '') + ' → ' + (phrase.reponses || []).join(' / ')).join(' · ')
+          ? currentQ.verbes_trous.phrases.map((phrase) => `${phrase.debut || ''}__[${phrase.verbe || ''}]__ ${(phrase.reponses || []).join(' / ')}${phrase.fin || ''}`).join('\n')
           : currentQ.correct_answer,
         explanation: currentQ.explanation,
         countdown: CORRECTION_DISPLAY_SECONDS,
@@ -1734,7 +1734,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             <XCircle className="w-3.5 h-3.5 text-rose-600" />
                             <span>Votre réponse</span>
                           </div>
-                          <div className="font-semibold text-rose-950 truncate">
+                          <div className="font-semibold text-rose-950 whitespace-pre-line leading-relaxed text-xs break-words">
                             {incorrectFeedback.studentAnswer ? `« ${incorrectFeedback.studentAnswer} »` : '(Aucune réponse saisie)'}
                           </div>
                           <span className="text-[10px] text-rose-600 font-bold block mt-1">
@@ -1748,7 +1748,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             <span>Bonne réponse</span>
                           </div>
-                          <div className="font-bold text-emerald-950 truncate">
+                          <div className="font-bold text-emerald-950 whitespace-pre-line leading-relaxed text-xs break-words">
                             « {incorrectFeedback.correctAnswer} »
                           </div>
                           <span className="text-[10px] text-emerald-700 font-bold block mt-1">

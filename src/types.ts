@@ -141,6 +141,14 @@ export interface ExamStatistics {
 // QUIZ & ÉVALUATIONS JOURNALIÈRES (ESAME)
 // =========================================================================
 
+export interface VerbesTrousPhrase {
+  id: string | number;
+  debut: string;
+  fin: string;
+  verbe?: string;
+  reponses?: string[];
+}
+
 export interface QuizQuestion {
   id: string;
   type: 'qcm' | 'text' | 'reorder' | 'verbes_trous'; // QCM, réponse saisie, remise en ordre ou banque de verbes
@@ -152,7 +160,11 @@ export interface QuizQuestion {
   points: number; // Barème pour cette question (ex: 2, 4, 5 points)
   explanation?: string; // Explication pédagogique affichée lors de la correction
   time_limit_seconds?: number; // Temps individuel de réponse; valeur par défaut selon le type si absent
-  verbes_trous?: { titre?: string; consigne?: string; points_par_phrase?: number; banque: string[]; phrases: Array<{ id: string | number; debut: string; fin: string; verbe?: string; reponses?: string[] }> };
+  titre?: string;
+  consigne?: string;
+  points_par_phrase?: number;
+  phrases?: VerbesTrousPhrase[];
+  verbes_trous?: { titre?: string; consigne?: string; points_par_phrase?: number; banque: string[]; phrases: VerbesTrousPhrase[] };
 }
 
 export interface QuizReorderItem {

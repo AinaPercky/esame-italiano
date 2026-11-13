@@ -32,7 +32,8 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [attempts, setAttempts] = useState<any[]>([]);
-  const [showAttempts, setShowAttempts] = useState(false);\n  const [attemptClassFilter, setAttemptClassFilter] = useState('all');
+  const [showAttempts, setShowAttempts] = useState(false);
+  const [attemptClassFilter, setAttemptClassFilter] = useState('all');
 
   const refresh = async () => {
     setLoading(true);
@@ -50,8 +51,23 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     try { return parseExerciseJson(json); } catch { return null; }
   }, [json]);
   const selectedExercise = items.find(item => item.id === selectedId);
+  const filteredAttempts = useMemo(() => {
+    if (attemptClassFilter === 'all') return attempts;
+    return attempts.filter(row => row.class_id === attemptClassFilter);
+  }, [attempts, attemptClassFilter]);
+  const attemptSummary = useMemo(() => {
+    const completed = filteredAttempts.filter(row => row.status === 'completed').length;
+    const inProgress = filteredAttempts.filter(row => row.status === 'in_progress').length;
+    const notStarted = filteredAttempts.length - completed - inProgress;
+    return {
+      total: filteredAttempts.length,
+      completed,
+      inProgress,
+      notStarted
+    };
+  }, [filteredAttempts]);
   const questionStats = (selectedExercise?.questions || []).map(question => {
-    const responses = attempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
+    const responses = filteredAttempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
     return {
       id: question.id,
       label: question.question,
@@ -215,6 +231,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     setError(''); setMessage('');
     try {
       setSelectedId(item.id);
+      setAttemptClassFilter('all');
       setAttempts(await exerciseService.listTeacherAttempts(item.id));
       setShowAttempts(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'Résultats indisponibles.'); }

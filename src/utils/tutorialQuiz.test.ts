@@ -10,19 +10,22 @@ describe('tutoriel local des quiz étudiants', () => {
     assert.equal(quiz.questions.length, 5);
     assert.deepEqual(
       [...new Set(quiz.questions.map((question) => question.type))].sort(),
-      ['qcm', 'reorder', 'text']
+      ['qcm', 'reorder', 'text', 'verbes_trous'].sort()
     );
     assert.equal(quiz.total_points, 20);
-    assert.deepEqual(quiz.questions.map((question) => question.time_limit_seconds), [15, 15, 25, 44, 35]);
-    assert.equal(getQuizTotalTimeSeconds(quiz), 134);
+    assert.deepEqual(quiz.questions.map((question) => question.time_limit_seconds), [15, 15, 25, 35, 40]);
+    assert.equal(getQuizTotalTimeSeconds(quiz), 130);
   });
 
-  it('calcule 20/20 localement pour des réponses correctes, dont le reorder et le cloze', () => {
+  it('calcule 20/20 localement pour des réponses correctes, dont le reorder et verbes_trous', () => {
     const quiz = createTutorialQuiz();
     const answers = Object.fromEntries(quiz.questions.map((question) => {
       if (question.type === 'reorder') return [question.id, question.correct_answer];
-      if (question.type === 'text' && question.answers?.length) {
-        return [question.id, JSON.stringify(question.answers)];
+      if (question.type === 'verbes_trous') {
+        return [question.id, JSON.stringify({
+          choices: { 0: 'alzarsi', 1: 'lavarsi' },
+          saisies: { 0: 'mi alzo', 1: 'ti lavi' }
+        })];
       }
       return [question.id, question.correct_answer.split(/\s*[\/;|]\s*/)[0]];
     }));
@@ -36,11 +39,14 @@ describe('tutoriel local des quiz étudiants', () => {
 
   it('attribue les points partiels d’une phrase à trous sans consulter de service de données', () => {
     const quiz = createTutorialQuiz();
-    const cloze = quiz.questions.find((question) => question.id === 'tutorial-text-cloze');
-    assert.ok(cloze);
+    const vt = quiz.questions.find((question) => question.id === 'tutorial-verbes-trous');
+    assert.ok(vt);
 
     const result = scoreTutorialQuiz(quiz, {
-      [cloze.id]: JSON.stringify(['vado', 'sbagliato'])
+      [vt.id]: JSON.stringify({
+        choices: { 0: 'alzarsi' },
+        saisies: { 0: 'mi alzo' }
+      })
     });
 
     assert.equal(result.score, 2);

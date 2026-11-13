@@ -99,12 +99,39 @@ export function noterQuiz(
   answerValue: unknown,
   answerKeyPhrases?: VerbesTrousAnswerKeyPhrase[]
 ): VerbesTrousScore {
-  const answers = parseVerbesTrousAnswers(answerValue);
   const keyPhrases = answerKeyPhrases || (definition.phrases as VerbesTrousAnswerKeyPhrase[]);
   const pointsParPhrase = Number(definition.points_par_phrase) || 3;
+  let rawObj: any = {};
+  if (typeof answerValue === 'string') {
+    try {
+      rawObj = JSON.parse(answerValue);
+    } catch {
+      rawObj = {};
+    }
+  } else if (answerValue && typeof answerValue === 'object') {
+    rawObj = answerValue;
+  }
+
+  let answersMap: Record<string, VerbesTrousPhraseAnswer> = {};
+  if (rawObj && typeof rawObj === 'object' && !Array.isArray(rawObj)) {
+    if ('choices' in rawObj || 'saisies' in rawObj) {
+      const choices = rawObj.choices || {};
+      const saisies = rawObj.saisies || {};
+      keyPhrases.forEach((phrase, idx) => {
+        const verb = choices[idx] !== undefined ? choices[idx] : choices[phrase.id];
+        const text = saisies[idx] !== undefined ? saisies[idx] : saisies[phrase.id];
+        if (verb || text) {
+          answersMap[String(phrase.id)] = { verbe_choisi: verb || null, texte_saisi: text || '' };
+        }
+      });
+    } else {
+      answersMap = parseVerbesTrousAnswers(answerValue);
+    }
+  }
+
   const usedVerbs = new Set<string>();
   const phrases = keyPhrases.map((phrase) => {
-    const answer = answers[String(phrase.id)];
+    const answer = answersMap[String(phrase.id)];
     const chosen = normalizeVerbesTrousAnswer(answer?.verbe_choisi);
     if (chosen && usedVerbs.has(chosen)) return noterPhrase(phrase, undefined, pointsParPhrase);
     if (chosen) usedVerbs.add(chosen);

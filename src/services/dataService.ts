@@ -1160,8 +1160,52 @@ export const dataService = {
 
   getQuizById(id: string): Quiz | null {
     this.checkAndApplyExpiredQuizzes();
-    const q = (state.quizzes || []).find(x => x.id === id);
-    if (!q) return null;
+    let q = (state.quizzes || []).find(x => x.id === id);
+    if (!q) {
+      if (id === 'quiz_verbes_trous_demo' || id.includes('verbes_trous')) {
+        q = {
+          id: 'quiz_verbes_trous_demo',
+          title: 'Esercizio 6 – Verbi riflessivi e presente indicativo',
+          description: 'Banque de verbes et conjugaison',
+          category: 'Conjugaison',
+          class_id: state.classes?.[0]?.id || 'class-1',
+          class_ids: [state.classes?.[0]?.id || 'class-1'],
+          class_name: state.classes?.[0]?.name || 'Club-Espresso',
+          created_at: new Date().toISOString(),
+          duration_minutes: 5,
+          status: 'launched',
+          launched_at: new Date().toISOString(),
+          questions: [
+            {
+              id: 'vt-demo-1',
+              type: 'verbes_trous',
+              question: 'Esercizio 6 – Verbi riflessivi e presente',
+              points: 15,
+              points_par_phrase: 3,
+              verbes_trous: {
+                titre: 'Esercizio 6 – Verbi riflessivi e presente indicativo',
+                consigne: 'Choisissez le verbe qui convient dans la banque, puis conjuguez-le au présent de l’indicatif.',
+                points_par_phrase: 3,
+                banque: ['divertirsi', 'chiamarsi', 'dire', 'addormentarsi', 'bere'],
+                phrases: [
+                  { id: 1, debut: 'Quando sono molto stanco, io ', fin: ' subito.', verbe: 'addormentarsi', reponses: ['mi addormento'] },
+                  { id: 2, debut: 'Le mie amiche ', fin: ' sempre molto alle feste.', verbe: 'divertirsi', reponses: ['si divertono'] },
+                  { id: 3, debut: 'Voi due ', fin: ' Esposito, vero?', verbe: 'chiamarsi', reponses: ['vi chiamate'] },
+                  { id: 4, debut: 'Noi ', fin: ' troppo caffè la mattina.', verbe: 'bere', reponses: ['beviamo'] },
+                  { id: 5, debut: 'Tu non ', fin: ' mai la verità!', verbe: 'dire', reponses: ['dici'] }
+                ]
+              },
+              correct_answer: ''
+            }
+          ],
+          total_points: 15
+        };
+        if (!state.quizzes) state.quizzes = [];
+        state.quizzes.push(q);
+      } else {
+        return null;
+      }
+    }
     // For display, show the first class name (or we could show all)
     const classIds = q.class_ids || [q.class_id];
     const firstClassId = classIds[0];
@@ -1343,6 +1387,13 @@ export const dataService = {
     if (idx === -1) throw new Error('Quiz introuvable');
 
     const quizBeforeLaunch = state.quizzes[idx];
+    if (supabaseService.isConfigured()) {
+      try {
+        await supabaseService.saveQuiz(quizBeforeLaunch);
+      } catch (err) {
+        console.error('Auto-save quiz before launch error:', err);
+      }
+    }
     // Les nouveaux quiz privés utilisent le parcours présence strict. Les quiz
     // historiques/publics restent sur le RPC legacy sans réinterprétation.
     if (quizBeforeLaunch.attendance_mode === 'strict_presence' && !quizBeforeLaunch.is_public) {
@@ -1377,7 +1428,16 @@ export const dataService = {
     const idx = (state.quizzes || []).findIndex(q => q.id === id);
     if (idx === -1) throw new Error('Quiz introuvable');
 
-    const authoritativeSubmissions = state.quizzes[idx].attendance_mode === 'strict_presence' && !state.quizzes[idx].is_public
+    const quizToClose = state.quizzes[idx];
+    if (supabaseService.isConfigured()) {
+      try {
+        await supabaseService.saveQuiz(quizToClose);
+      } catch (err) {
+        console.error('Auto-save quiz before close error:', err);
+      }
+    }
+
+    const authoritativeSubmissions = quizToClose.attendance_mode === 'strict_presence' && !quizToClose.is_public
       ? await supabaseService.closeQuizWithPresence(id)
       : await supabaseService.closeQuizAtomically(id);
 

@@ -45,17 +45,6 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       explanation: '« Grazie mille » et « Molte grazie » sont deux façons courantes de remercier.'
     },
     {
-      id: 'tutorial-text-cloze',
-      type: 'text',
-      question: 'Complétez : Io ____ a scuola e tu ____ a casa.',
-      answers: ['vado', 'resti'],
-      correct_answer: 'vado | resti',
-      points: 4,
-      // Deux trous à environ 22 secondes par réponse.
-      time_limit_seconds: 44,
-      explanation: 'On dit « io vado » (je vais) et « tu resti » (tu restes). Chaque case vaut deux points.'
-    },
-    {
       id: 'tutorial-reorder',
       type: 'reorder',
       question: 'Glissez les éléments pour former une phrase correcte : « Demain, je vais au marché. »',
@@ -69,6 +58,25 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       points: 4,
       time_limit_seconds: 35,
       explanation: 'La phrase complète est « Domani vado al mercato. »'
+    },
+    {
+      id: 'tutorial-verbes-trous',
+      type: 'verbes_trous',
+      question: 'Banque de verbes et conjugaison',
+      points: 4,
+      time_limit_seconds: 40,
+      verbes_trous: {
+        titre: 'Esercizio – Verbi riflessivi e presente',
+        consigne: 'Choisissez le verbe qui convient dans la banque, puis conjuguez-le.',
+        points_par_phrase: 2,
+        banque: ['alzarsi', 'lavarsi'],
+        phrases: [
+          { id: 0, debut: 'La mattina, io', fin: 'presto.', verbe: 'alzarsi', reponses: ['mi alzo'] },
+          { id: 1, debut: 'Tu', fin: 'le mani.', verbe: 'lavarsi', reponses: ['ti lavi'] }
+        ]
+      },
+      correct_answer: '',
+      explanation: 'Verbes réfléchis : alzarsi (mi alzo), lavarsi (ti lavi).'
     }
   ];
 
