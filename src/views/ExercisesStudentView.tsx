@@ -14,7 +14,11 @@ const formatSeconds = (seconds: number) => {
 const correctionText = (value: unknown): string => {
   if (value == null) return '—';
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join(' · ');
+  if (Array.isArray(value)) return value.map((item, index) => {
+    if (typeof item === 'string') return item;
+    if (item && Array.isArray((item as any).reponses)) return 'Phrase ' + (index + 1) + ' : ' + (item as any).reponses.join(' / ');
+    return JSON.stringify(item);
+  }).join(' · ');
   return JSON.stringify(value);
 };
 
@@ -84,6 +88,7 @@ export const ExercisesStudentView: React.FC = () => {
       serverClockOffset.current = Date.now() - new Date(current.server_now).getTime();
       setActive(current);
       setCorrection(current.correction || null);
+      setAnswer(current.correction?.student_answer == null ? '' : String(current.correction.student_answer));
       setRemaining(current.seconds_remaining);
     } catch (e) { setError(e instanceof Error ? e.message : 'Démarrage impossible.'); }
   };
