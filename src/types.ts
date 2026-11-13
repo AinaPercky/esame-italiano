@@ -336,6 +336,35 @@ export interface ExerciseCorrection {
   student_answer?: unknown;
 }
 
+
+export interface ExerciseAttemptReviewQuestion {
+  question_id: string;
+  question: string;
+  type: string;
+  points: number;
+  answer: unknown;
+  correct: boolean;
+  points_awarded: number;
+  max_points: number;
+  timed_out: boolean;
+  expected: unknown;
+  explanation?: string | null;
+  options?: string[];
+  items?: QuizReorderItem[];
+  verbes_trous?: QuizQuestion['verbes_trous'];
+}
+
+export interface ExerciseAttemptReview {
+  attempt_id: string;
+  exercise_id: string;
+  score: number;
+  max_score: number;
+  status: 'in_progress' | 'completed';
+  started_at: string;
+  completed_at?: string | null;
+  questions: ExerciseAttemptReviewQuestion[];
+}
+
 export interface ExerciseAttemptResult {
   id: string;
   exercise_id: string;
