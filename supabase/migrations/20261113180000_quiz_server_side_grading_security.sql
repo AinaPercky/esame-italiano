@@ -53,7 +53,7 @@ BEGIN
    per_phrase := coalesce(nullif((q#>>'{verbes_trous,points_par_phrase}')::numeric,0),3);
    BEGIN ans:=raw::jsonb; EXCEPTION WHEN OTHERS THEN ans:='{}'; END;
    choices:=coalesce(ans->'choices','{}'); saisies:=coalesce(ans->'saisies','{}');
-   FOR phrase,idx IN SELECT value,ord::integer FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) WITH ORDINALITY LOOP
+   FOR phrase,idx IN SELECT value,ord::integer FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) WITH ORDINALITY AS x(value,ord) LOOP
      IF coalesce(phrase->>'verbe','')='' OR jsonb_typeof(phrase->'reponses')<>'array' THEN CONTINUE; END IF;
      n:=n+1;
      IF ans ? 'choices' OR ans ? 'saisies' THEN
