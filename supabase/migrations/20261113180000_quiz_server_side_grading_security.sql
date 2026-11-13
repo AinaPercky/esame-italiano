@@ -46,10 +46,14 @@ BEGIN
    IF jsonb_typeof(student_order)<>'array' THEN student_order:='[]'; END IF;
    ok := student_order=correct_order AND jsonb_array_length(student_order)=jsonb_array_length(item_ids);
    earned := CASE WHEN ok THEN pts ELSE 0 END;
-   SELECT coalesce(string_agg(value->>'text',' → ' ORDER BY ord),'') INTO exp_display
-   FROM jsonb_array_elements(coalesce(q->'items','[]')) WITH ORDINALITY x(value,ord)
-   WHERE correct_order @> jsonb_build_array(value->>'id');
+   SELECT coalesce(string_agg(i.value->>'text',' → ' ORDER BY x.ord),'') INTO exp_display
+   FROM jsonb_array_elements_text(correct_order) WITH ORDINALITY x(id,ord)
+   JOIN jsonb_array_elements(coalesce(q->'items','[]')) i(value) ON i.value->>'id'=x.id;
+   SELECT coalesce(string_agg(i.value->>'text',' → ' ORDER BY x.ord),'') INTO student_display
+   FROM jsonb_array_elements_text(student_order) WITH ORDINALITY x(id,ord)
+   JOIN jsonb_array_elements(coalesce(q->'items','[]')) i(value) ON i.value->>'id'=x.id;
  ELSIF t='verbes_trous' AND q ? 'verbes_trous' THEN
+   exp_display := '';
    per_phrase := coalesce(nullif((q#>>'{verbes_trous,points_par_phrase}')::numeric,0),3);
    BEGIN ans:=raw::jsonb; EXCEPTION WHEN OTHERS THEN ans:='{}'; END;
    choices:=coalesce(ans->'choices','{}'); saisies:=coalesce(ans->'saisies','{}');
@@ -75,6 +79,7 @@ BEGIN
    END LOOP;
    maxpts:=n*per_phrase; ok:=n>0 AND earned=maxpts;
  ELSE
+   exp_display := '';
    IF jsonb_typeof(q->'answers')='array' AND jsonb_array_length(q->'answers')>0 THEN exp_parts:=q->'answers';
    ELSIF left(expected,1)='[' THEN
      BEGIN exp_parts:=expected::jsonb; EXCEPTION WHEN OTHERS THEN exp_parts:=jsonb_build_array(expected); END;
