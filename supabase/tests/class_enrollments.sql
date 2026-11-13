@@ -25,6 +25,9 @@ begin
   if not exists(select 1 from pg_policies where schemaname='public' and tablename='classes' and policyname='classes_teacher_manage') then
     raise exception 'Class administration policy is missing';
   end if;
+  if not exists(select 1 from pg_policies where schemaname='public' and tablename='class_enrollment_requests' and policyname='class_enrollment_requests_cancel_own') then
+    raise exception 'Student request cancellation policy is missing';
+  end if;
   if exists(select 1 from pg_policies where schemaname='public' and tablename='classes' and policyname='Classes full access') then
     raise exception 'Legacy unrestricted class policy is still active';
   end if;

@@ -170,6 +170,10 @@ with check (
 drop policy if exists class_enrollment_requests_update_teacher on public.class_enrollment_requests;
 create policy class_enrollment_requests_update_teacher on public.class_enrollment_requests for update to authenticated
 using(public.class_enrollment_is_teacher()) with check(public.class_enrollment_is_teacher());
+drop policy if exists class_enrollment_requests_cancel_own on public.class_enrollment_requests;
+create policy class_enrollment_requests_cancel_own on public.class_enrollment_requests for update to authenticated
+using(student_id=public.class_enrollment_current_student_id() and status='pending')
+with check(student_id=public.class_enrollment_current_student_id() and status='cancelled');
 
 revoke all on public.class_enrollments from anon,public;
 revoke all on public.class_enrollment_requests from anon,public;
@@ -224,3 +228,21 @@ drop policy if exists classes_teacher_manage on public.classes;
 create policy classes_teacher_manage on public.classes for all to authenticated
 using (public.class_enrollment_is_teacher())
 with check (public.class_enrollment_is_teacher());
+create or replace function public.cancel_pending_requests_for_archived_class()
+returns trigger language plpgsql security definer set search_path=public
+as $
+begin
+  if old.archived_at is null and new.archived_at is not null then
+    update public.class_enrollment_requests
+      set status='cancelled', reviewed_at=now(), review_note='Classe archivée', updated_at=now()
+      where class_id=new.id and status='pending';
+  end if;
+  return new;
+end;
+$;
+revoke all on function public.cancel_pending_requests_for_archived_class() from public,anon,authenticated;
+drop trigger if exists classes_cancel_pending_enrollment_requests on public.classes;
+create trigger classes_cancel_pending_enrollment_requests
+after update of archived_at on public.classes
+for each row execute function public.cancel_pending_requests_for_archived_class();
+
