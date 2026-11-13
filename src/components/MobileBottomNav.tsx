@@ -14,6 +14,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentTab, on
     { id: 'dashboard', label: 'Accueil', icon: LayoutDashboard },
     { id: 'lessons', label: 'Cours', icon: BookOpen },
     { id: 'quizzes', label: 'Quiz', icon: Sparkles },
+    { id: 'exercises', label: 'Exercices', icon: BookOpen },
     { id: 'evaluation', label: 'Évaluer', icon: Mic, highlight: true },
     { id: 'results', label: 'Notes', icon: Award },
     { id: 'students', label: 'Élèves', icon: Users }
