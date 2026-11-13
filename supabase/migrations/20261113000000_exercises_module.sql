@@ -408,6 +408,7 @@ declare
   v_question jsonb;
   v_question_id text;
   v_grade jsonb;
+  v_existing public.exercise_answers%rowtype;
   v_timed_out boolean;
   v_points numeric;
 begin
@@ -418,12 +419,21 @@ begin
   if v_attempt.status <> 'in_progress' then raise exception 'Cette tentative est déjà terminée.'; end if;
 
   v_question_id := v_attempt.question_order ->> v_attempt.current_question_index;
-  if exists (select 1 from public.exercise_answers where attempt_id = p_attempt_id and question_id = v_question_id) then
-    raise exception 'La réponse à cette question a déjà été validée.';
-  end if;
-
   select content into v_content from public.exercise_versions where id = v_attempt.version_id;
   select q.value into v_question from jsonb_array_elements(v_content -> 'questions') q(value) where q.value ->> 'id' = v_question_id;
+  select * into v_existing from public.exercise_answers where attempt_id = p_attempt_id and question_id = v_question_id;
+  if found then
+    return jsonb_build_object(
+      'correct', v_existing.is_correct,
+      'points', v_existing.points_awarded,
+      'max_points', v_existing.max_points,
+      'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+      'explanation', v_question -> 'explanation',
+      'timed_out', v_existing.timed_out,
+      'question_id', v_question_id,
+      'student_answer', v_existing.answer
+    );
+  end if;
   v_timed_out := now() > v_attempt.current_question_deadline_at;
   v_grade := case when v_timed_out
     then jsonb_build_object('correct',false,'points',0,'max_points',coalesce((v_question ->> 'points')::numeric,0),'expected',coalesce(v_question -> 'answers',v_question -> 'correct_answer',v_question #> '{verbes_trous,phrases}'),'explanation',v_question -> 'explanation')
