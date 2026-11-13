@@ -154,7 +154,7 @@ CREATE OR REPLACE FUNCTION public.get_public_quiz(p_public_id TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE;
 BEGIN
- SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
+ SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND status<>'draft' AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
  IF NOT FOUND THEN RETURN NULL; END IF;
  RETURN public.quiz_sanitize_payload(to_jsonb(q));
 END $fn$;
@@ -238,7 +238,7 @@ CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_question(p_public_id TEXT
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE q public.quizzes%ROWTYPE; question JSONB; result JSONB;
 BEGIN
- SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
+ SELECT * INTO q FROM public.quizzes WHERE is_public=TRUE AND status<>'draft' AND (public_id::text=p_public_id OR id=p_public_id) LIMIT 1;
  IF NOT FOUND THEN RAISE EXCEPTION 'Quiz public introuvable.'; END IF;
  SELECT value INTO question FROM jsonb_array_elements(coalesce(q.questions,'[]')) WHERE value->>'id'=p_question_id LIMIT 1;
  IF question IS NULL THEN RAISE EXCEPTION 'Question introuvable.'; END IF;
