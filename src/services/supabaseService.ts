@@ -1140,36 +1140,41 @@ class SupabaseService {
     }));
   }
 
-  public async submitQuizSubmissionAtomically(submission: QuizSubmission): Promise<boolean> {
+  public async submitQuizSubmissionAtomically(submission: QuizSubmission): Promise<QuizSubmission | null> {
     const client = this.getClient();
     if (!client) {
       if (this.isConfigured()) throw new Error('Le client Supabase est indisponible; le résultat n’a pas été enregistré.');
-      return false;
+      return null;
     }
 
     const { error } = await client.rpc('submit_quiz_submission', {
       p_submission: {
-        id: submission.id,
-        quiz_id: submission.quiz_id,
-        quiz_title: submission.quiz_title,
-        student_id: submission.student_id,
-        student_name: submission.student_name,
-        student_number: submission.student_number || null,
-        class_id: submission.class_id,
-        class_name: submission.class_name || null,
-        started_at: submission.started_at,
-        submitted_at: submission.submitted_at || null,
-        answers: submission.answers || {},
-        score: submission.score,
-        max_score: submission.max_score,
-        score_20: submission.score_20,
-        status: submission.status,
-        feedback: submission.feedback || {},
-        date: submission.date
+        id: submission.id, quiz_id: submission.quiz_id, quiz_title: submission.quiz_title,
+        student_id: submission.student_id, student_name: submission.student_name,
+        student_number: submission.student_number || null, class_id: submission.class_id,
+        class_name: submission.class_name || null, started_at: submission.started_at,
+        submitted_at: submission.submitted_at || null, answers: submission.answers || {},
+        status: submission.status, date: submission.date
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
-    return true;
+
+    const { data, error: readError } = await client.from('quiz_submissions').select('*')
+      .eq('quiz_id', submission.quiz_id).eq('student_id', submission.student_id)
+      .order('attempt_number', { ascending: false }).limit(1).maybeSingle();
+    if (readError) throw new Error(`Lecture du résultat corrigé par le serveur : ${readError.message}`);
+    if (!data) throw new Error('Le serveur a enregistré le quiz sans retourner son résultat.');
+    return {
+      ...submission,
+      id: data.id,
+      score: Number(data.score) || 0,
+      max_score: Number(data.max_score) || 20,
+      score_20: Number(data.score_20) || 0,
+      status: data.status,
+      feedback: data.feedback || {},
+      submitted_at: data.submitted_at || submission.submitted_at,
+      attempt_number: Number(data.attempt_number) || submission.attempt_number
+    };
   }
 
   public async evaluateQuizQuestion(quizId: string, questionId: string, answer: string): Promise<{
@@ -1196,20 +1201,28 @@ class SupabaseService {
     return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
   }
 
-  public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<boolean> {
+  public async submitQuizPresenceSubmission(submission: QuizSubmission): Promise<QuizSubmission> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase est requis pour soumettre ce quiz.');
-    const { error } = await client.rpc('submit_quiz_presence_submission', {
+    const { data, error } = await client.rpc('submit_quiz_presence_submission', {
       p_submission: {
         id: submission.id, quiz_id: submission.quiz_id, student_name: submission.student_name,
         student_number: submission.student_number || null, class_id: submission.class_id,
         class_name: submission.class_name || null, started_at: submission.started_at,
-        answers: submission.answers || {}, score: submission.score, max_score: submission.max_score,
-        score_20: submission.score_20, status: submission.status, feedback: submission.feedback || {}
+        answers: submission.answers || {}, status: submission.status
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
-    return true;
+    return {
+      ...submission,
+      score: Number(data?.score) || 0,
+      max_score: Number(data?.max_score) || submission.max_score,
+      score_20: Number(data?.score_20) || 0,
+      status: data?.status || submission.status,
+      feedback: data?.feedback || {},
+      submitted_at: data?.submitted_at || submission.submitted_at,
+      attempt_number: Number(data?.attempt_number) || submission.attempt_number
+    };
   }
 
   public async syncQuizData(quizzes: Quiz[] = [], submissions: QuizSubmission[] = []): Promise<void> {
