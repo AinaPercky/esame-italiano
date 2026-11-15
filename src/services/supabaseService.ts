@@ -1518,6 +1518,12 @@ class SupabaseService {
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('*')
         : Promise.resolve({ data: [], error: null });
+      // Les élèves ne peuvent lire que leurs copies complètes via RLS.
+      // Cette RPC ne renvoie que les notes de référence et métadonnées publiques
+      // des élèves actifs de leurs propres classes (jamais les réponses/corrections).
+      const classLeaderboardRequest = isAuthenticated && !isTeacher
+        ? client.rpc('get_class_quiz_leaderboard')
+        : Promise.resolve({ data: [], error: null });
       // class_enrollments est volontairement inaccessible au rôle anon.
       // Seul le professeur authentifié peut lire toutes les inscriptions (RLS).
       const enrollmentsRequest = isTeacher
@@ -1533,6 +1539,7 @@ class SupabaseService {
         { data: passOrderData, error: errPO },
         { data: quizzesData, error: errQ },
         { data: quizSubmissionsData, error: errQS },
+        { data: classLeaderboardData, error: errClassLeaderboard },
         { data: enrollmentsData, error: errEnrollments }
       ] = await Promise.all([
         client.from('classes').select('*'),
@@ -1544,6 +1551,7 @@ class SupabaseService {
         client.from('exam_pass_order').select('*'),
         quizzesRequest,
         quizSubmissionsRequest,
+        classLeaderboardRequest,
         enrollmentsRequest
       ]);
 
@@ -1566,6 +1574,7 @@ class SupabaseService {
       }
 
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
+      if (errClassLeaderboard) throw new Error(`Classement de classe (migration requise) : ${errClassLeaderboard.message}`);
       if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
@@ -1676,7 +1685,13 @@ class SupabaseService {
       }));
 
       const existingStudentIds = new Set(students.map(s => s.id));
-      const activeSubmissionsData = (quizSubmissionsData || []).filter(s => existingStudentIds.has(s.student_id));
+      // Priorité aux copies complètes de l'élève connecté; les lignes RPC
+      // agrégées complètent uniquement les résultats des autres camarades.
+      const submissionsById = new Map<string, any>();
+      (classLeaderboardData || []).forEach((row: any) => submissionsById.set(row.id, row));
+      (quizSubmissionsData || []).forEach((row: any) => submissionsById.set(row.id, row));
+      const mergedSubmissionsData = Array.from(submissionsById.values());
+      const activeSubmissionsData = mergedSubmissionsData.filter(s => existingStudentIds.has(s.student_id));
 
       // Nettoyer en arrière-plan les soumissions orphelines d'élèves déjà supprimés dans Supabase
       const orphanedStudentIds = Array.from(new Set(
