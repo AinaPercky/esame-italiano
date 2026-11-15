@@ -1222,7 +1222,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
               {filteredQuizzes.map((quiz) => {
                 const isLive = quiz.status === 'launched';
                 const isClosed = quiz.status === 'closed';
-                const quizSubs = submissions.filter(s => s.quiz_id === quiz.id);
+                // Une seule note par élève : la meilleure tentative marquée par le serveur.
+                const quizSubs = submissions.filter(s => s.quiz_id === quiz.id && s.is_counted !== false);
                 const classNamesText = quiz.class_ids && quiz.class_ids.length > 1
                   ? quiz.class_ids.map(cid => classes.find(item => item.id === cid)?.name || 'Classe').join(', ')
                   : (quiz.class_name || 'Classe');
@@ -1576,7 +1577,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   {trackingClassStudents.map(st => {
                     const sub = trackingSubmissions
                       .filter(s => s.student_id === st.id)
-                      .sort((a, b) => new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime())[0];
+                      .sort((a, b) =>
+                        Number(b.is_counted !== false) - Number(a.is_counted !== false) ||
+                        b.score_20 - a.score_20 ||
+                        new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime()
+                      )[0];
                     const participant = trackingParticipantsByStudent.get(st.id);
                     const status = participant?.presence_status;
                     const statusLabel = status === 'retry_authorized'
