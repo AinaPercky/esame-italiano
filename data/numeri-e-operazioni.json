@@ -1,0 +1,399 @@
+{
+  "title": "I numeri e le operazioni – Da zero a un milione",
+  "level": "A1",
+  "description": "Esercizio di ripasso sui numeri da 0 a 1 000 000 e sulle quattro operazioni: addizione, sottrazione, moltiplicazione e divisione.",
+  "category": "Vocabulaire",
+  "duration_minutes": 15,
+  "questions": [
+    {
+      "type": "qcm",
+      "question": "Come si scrive 0 in lettere?",
+      "options": [
+        "Zero",
+        "Uno",
+        "Dieci",
+        "Cento"
+      ],
+      "correct_answer": "Zero",
+      "points": 1,
+      "explanation": "Zero è il numero 0.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è il numero corrispondente a «diciassette»?",
+      "options": [
+        "16",
+        "17",
+        "18",
+        "70"
+      ],
+      "correct_answer": "17",
+      "points": 1,
+      "explanation": "Diciassette = 17.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Come si scrive 21 in lettere?",
+      "options": [
+        "Ventuno",
+        "Ventidue",
+        "Ventiuno",
+        "Ventun"
+      ],
+      "correct_answer": "Ventuno",
+      "points": 1,
+      "explanation": "Davanti a uno, venti perde la vocale finale: ventuno.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è la forma corretta di 23?",
+      "options": [
+        "Ventitre",
+        "Ventitré",
+        "Ventitrè",
+        "Venti tre"
+      ],
+      "correct_answer": "Ventitré",
+      "points": 1,
+      "explanation": "Ventitré si scrive con l'accento acuto finale.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Come si scrive 28 in lettere?",
+      "options": [
+        "Ventotto",
+        "Ventiotto",
+        "Ventiocto",
+        "Vent'otto"
+      ],
+      "correct_answer": "Ventotto",
+      "points": 1,
+      "explanation": "Ventotto perde la -i di venti e raddoppia la t.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "«Trentacinque» corrisponde a quale numero?",
+      "options": [
+        "305",
+        "35",
+        "53",
+        " treinta y cinco"
+      ],
+      "correct_answer": "35",
+      "points": 1,
+      "explanation": "Trentacinque = 35.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è il numero 46 in lettere?",
+      "options": [
+        "Quarantasei",
+        "Quaranta sei",
+        "Quarantasei",
+        "Quarantasei"
+      ],
+      "correct_answer": "Quarantasei",
+      "points": 1,
+      "explanation": "46 si scrive quarantasei.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Come si scrive 99 in lettere?",
+      "options": [
+        "Novant nove",
+        "Novantanove",
+        "Novanta-nove",
+        "Novantanovanta"
+      ],
+      "correct_answer": "Novantanove",
+      "points": 1,
+      "explanation": "Novantanove = 99.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è il numero corrispondente a «centododici»?",
+      "options": [
+        "102",
+        "112",
+        "120",
+        "212"
+      ],
+      "correct_answer": "112",
+      "points": 1,
+      "explanation": "Centododici = 100 + 12 = 112.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Come si scrive 180 in lettere?",
+      "options": [
+        "Centootanta",
+        "Centottanta",
+        "Centoottanta",
+        "Centottento"
+      ],
+      "correct_answer": "Centottanta",
+      "points": 1,
+      "explanation": "Centottanta = 180.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "«Duecentoquarantacinque» corrisponde a:",
+      "options": [
+        "245",
+        "254",
+        "225",
+        "2 045"
+      ],
+      "correct_answer": "245",
+      "points": 1,
+      "explanation": "Duecento + quarantacinque = 245.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è la forma corretta per 1 000?",
+      "options": [
+        "Un mille",
+        "Mille",
+        "Uno mille",
+        "Un mila"
+      ],
+      "correct_answer": "Mille",
+      "points": 1,
+      "explanation": "Il numero 1 000 si dice mille.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Come si dice 2 000 in italiano?",
+      "options": [
+        "Due mille",
+        "Duemila",
+        "Due mila",
+        "Duemille"
+      ],
+      "correct_answer": "Duemila",
+      "points": 1,
+      "explanation": "Da 2 000 in poi si usa mila: duemila.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "«Ventitremila» corrisponde a:",
+      "options": [
+        "23 000",
+        "32 000",
+        "203 000",
+        "2 300"
+      ],
+      "correct_answer": "23 000",
+      "points": 1,
+      "explanation": "Ventitré mila = 23 000; nella parola composta si scrive ventitremila.",
+      "time_limit_seconds": 20
+    },
+    {
+      "type": "qcm",
+      "question": "Come si scrive 105 000 in lettere?",
+      "options": [
+        "Centocinquemila",
+        "Cento cinque mila",
+        "Centomilacinque",
+        "Centocinque milioni"
+      ],
+      "correct_answer": "Centocinquemila",
+      "points": 1,
+      "explanation": "105 000 = centocinquemila.",
+      "time_limit_seconds": 20
+    },
+    {
+      "type": "qcm",
+      "question": "Qual è il numero corrispondente a «settecentomila»?",
+      "options": [
+        "70 000",
+        "700 000",
+        "7 000 000",
+        "700"
+      ],
+      "correct_answer": "700 000",
+      "points": 1,
+      "explanation": "Settecentomila = 700 000.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Come si dice 1 000 000?",
+      "options": [
+        "Un milione",
+        "Uno milione",
+        "Un mila",
+        "Dieci milioni"
+      ],
+      "correct_answer": "Un milione",
+      "points": 1,
+      "explanation": "1 000 000 si dice un milione; il plurale è milioni.",
+      "time_limit_seconds": 18
+    },
+    {
+      "type": "qcm",
+      "question": "Quale numero è più grande?",
+      "options": [
+        "Novec novantanovemila",
+        "Novecentonovantanovemila",
+        "Novant novemila",
+        "Novecentomila"
+      ],
+      "correct_answer": "Novecentonovantanovemila",
+      "points": 1,
+      "explanation": "Novecentonovantanovemila = 999 000, più di 900 000.",
+      "time_limit_seconds": 20
+    },
+    {
+      "type": "qcm",
+      "question": "Quanto fa 8 + 7?",
+      "options": [
+        "Quindici",
+        "Quattordici",
+        "Sedici",
+        "Diciassette"
+      ],
+      "correct_answer": "Quindici",
+      "points": 1,
+      "explanation": "Otto più sette fa quindici.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quanto fa 9 × 6?",
+      "options": [
+        "Cinquantaquattro",
+        "Quarantacinque",
+        "Sessantaquattro",
+        "Cinquantasei"
+      ],
+      "correct_answer": "Cinquantaquattro",
+      "points": 1,
+      "explanation": "Nove per sei fa cinquantaquattro.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quanto fa 50 − 18?",
+      "options": [
+        "Trentadue",
+        "Trentotto",
+        "Ventidue",
+        "Quarantadue"
+      ],
+      "correct_answer": "Trentadue",
+      "points": 1,
+      "explanation": "Cinquanta meno diciotto fa trentadue.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quanto fa 81 ÷ 9?",
+      "options": [
+        "Nove",
+        "Otto",
+        "Sette",
+        "Undici"
+      ],
+      "correct_answer": "Nove",
+      "points": 1,
+      "explanation": "Ottantuno diviso nove fa nove.",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quale parola indica l'addizione?",
+      "options": [
+        "Più",
+        "Meno",
+        "Per",
+        "Diviso"
+      ],
+      "correct_answer": "Più",
+      "points": 1,
+      "explanation": "Più indica l'addizione (+).",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quale parola indica la moltiplicazione?",
+      "options": [
+        "Per",
+        "Più",
+        "Meno",
+        "Uguale"
+      ],
+      "correct_answer": "Per",
+      "points": 1,
+      "explanation": "Per indica la moltiplicazione (×).",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "qcm",
+      "question": "Quale parola indica la divisione?",
+      "options": [
+        "Diviso",
+        "Meno",
+        "Più",
+        "Per"
+      ],
+      "correct_answer": "Diviso",
+      "points": 1,
+      "explanation": "Diviso indica la divisione (÷).",
+      "time_limit_seconds": 15
+    },
+    {
+      "type": "text",
+      "question": "Scrivi in lettere il numero 42.",
+      "correct_answer": "quarantadue",
+      "points": 1,
+      "explanation": "Quarantadue si scrive in una sola parola.",
+      "time_limit_seconds": 30
+    },
+    {
+      "type": "text",
+      "question": "Scrivi in cifre: «trecentosessantotto».",
+      "correct_answer": "368",
+      "points": 1,
+      "explanation": "Trecento + sessantotto = 368.",
+      "time_limit_seconds": 30
+    },
+    {
+      "type": "text",
+      "question": "Calcola e scrivi il risultato in cifre: 125 + 75 = ?",
+      "correct_answer": "200",
+      "points": 1,
+      "explanation": "Centoventicinque più settantacinque fa duecento.",
+      "time_limit_seconds": 30
+    },
+    {
+      "type": "text",
+      "question": "Calcola e scrivi il risultato in cifre: 12 × 8 = ?",
+      "correct_answer": "96",
+      "points": 1,
+      "explanation": "Dodici per otto fa novantasei.",
+      "time_limit_seconds": 30
+    },
+    {
+      "type": "text",
+      "question": "Calcola e scrivi il risultato in cifre: 1 000 000 − 250 000 = ?",
+      "correct_answer": "750000 / 750 000",
+      "points": 1,
+      "explanation": "Un milione meno duecentocinquantamila fa settecentocinquantamila.",
+      "time_limit_seconds": 35
+    }
+  ]
+}
