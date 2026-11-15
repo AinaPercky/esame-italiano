@@ -1612,7 +1612,7 @@ export const dataService = {
     // En cloud, la remise verrouille la même ligne quiz que la clôture.
     // Une seule des deux opérations gagne la course; une note réelle ne peut
     // pas être remplacée par un résultat manqué.
-    const serverSubmission = ((quiz.attendance_mode === 'strict_presence' && !quiz.is_public) || allowAuthorizedRetry)
+    const serverSubmission = (quiz.attendance_mode === 'strict_presence' && !quiz.is_public)
       ? await supabaseService.submitQuizPresenceSubmission(submission)
       : await supabaseService.submitQuizSubmissionAtomically(submission);
     if (serverSubmission) {
