@@ -1712,7 +1712,14 @@ class SupabaseService {
         score_20: Number(s.score_20) || 0,
         status: s.status,
         feedback: s.feedback || {},
-        date: s.date
+        date: s.date,
+        attempt_number: Number(s.attempt_number) || 1,
+        launch_id: s.launch_id || undefined,
+        attendance_status: s.attendance_status || 'unknown',
+        retry_grant_id: s.retry_grant_id || undefined,
+        // Important: false is meaningful. Do not omit it or every attempt
+        // will be treated as a counted result by the leaderboard.
+        is_counted: s.is_counted !== false
       }));
 
       return {
