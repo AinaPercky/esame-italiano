@@ -140,15 +140,6 @@ BEGIN
     RAISE EXCEPTION 'Quiz indisponible.';
   END IF;
 
-  -- Idempotence : un nouvel envoi réseau du même résultat ne crée pas une
-  -- deuxième tentative et retourne la ligne déjà persistée.
-  SELECT * INTO saved_row
-  FROM public.quiz_submissions
-  WHERE id = submission_id AND quiz_id = q.id;
-  IF FOUND THEN
-    RETURN to_jsonb(saved_row);
-  END IF;
-
   IF auth.uid() IS NOT NULL THEN
     sid := public.quiz_current_student_id();
 
@@ -205,6 +196,15 @@ BEGIN
     WHERE s.quiz_id = q.id AND s.student_id = sid;
   END IF;
 
+  -- Idempotence vérifiée après résolution de l'identité : un étudiant ne peut
+  -- jamais récupérer la soumission d'un autre en réutilisant son identifiant.
+  SELECT * INTO saved_row
+  FROM public.quiz_submissions
+  WHERE id = submission_id AND quiz_id = q.id AND student_id = sid;
+  IF FOUND THEN
+    RETURN to_jsonb(saved_row);
+  END IF;
+
   e := public.quiz_grade_all(q.id, coalesce(saved_answers, '{}'::jsonb));
   IF v_status = 'timeout' THEN
     e := jsonb_set(jsonb_set(e, '{rawScore}', '0'::jsonb), '{score20}', '0'::jsonb);
@@ -253,7 +253,6 @@ BEGIN
 END;
 $function$
 ;
-
 REVOKE ALL ON FUNCTION public.submit_quiz_submission(JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.submit_quiz_submission(JSONB) TO anon, authenticated;
 REVOKE ALL ON FUNCTION public.submit_quiz_presence_submission(JSONB) FROM PUBLIC, anon;
