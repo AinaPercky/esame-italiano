@@ -25,7 +25,7 @@ describe('markBestQuizAttempt', () => {
   });
 
   it('ne remplace pas la meilleure note par une tentative moins bonne', () => {
-    const result = markBestQuizAttempt([
+    const attempts: QuizAttemptScore[] = [
       { id: 'first', attempt_number: 1, score_20: 17 },
       { id: 'retry', attempt_number: 2, score_20: 9 }
     ];
