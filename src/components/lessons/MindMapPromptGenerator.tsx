@@ -69,30 +69,32 @@ Langue de la carte : ${language}
 ## 3. IDENTITÉ GRAPHIQUE PERMANENTE — PERCKYLINGUA
 Toutes les cartes doivent conserver la même signature visuelle, quelle que soit la leçon.
 
-Palette :
+Palette de marque et accents :
 - Bleu profond : #072A3F
 - Bleu secondaire : #0B3C5D
 - Vert pédagogique : #2FA36B
 - Vert italien : #009246
 - Rouge italien : #CE2B37
-- Fond crème très clair : #F3EBD8
+- Orange vif : #F28C28
+- Jaune lumineux : #F4C542
+- Violet : #805AD5
+- Turquoise : #20A4A8
+- Corail : #E85D75
+- Fond blanc pur obligatoire : #FFFFFF
 
 Style :
 - Dessin manuel soigné, inspiré des cartes mentales de Tony Buzan.
+- Fond entièrement blanc pur (#FFFFFF), uniforme, sans texture, sans papier crème, sans ombre, sans dégradé et sans cadre coloré.
 - Aspect naturel, vivant, organique, moderne et légèrement ludique, jamais enfantin.
-- Branches principales épaisses et colorées ; branches secondaires fines et fluides.
-- Illustrations simples, expressives et mémorables.
-- Écriture manuscrite très lisible, sans faute et avec un contraste suffisant.
-- Composition aérée, équilibrée et cohérente avec les autres mind maps PerckyLingua.
+- Branches principales épaisses, très colorées et distinctes ; branches secondaires fines, colorées et fluides.
+- Illustrations nombreuses et pédagogiques : un dessin central détaillé et au moins une petite illustration par branche principale, plus des pictogrammes ou mini-dessins sur les ramifications importantes.
+- Utilise des métaphores visuelles, personnages, objets, flèches, bulles, étoiles, symboles et petites scènes pour rendre les notions mémorables.
+- Dessins colorés à la main, expressifs, précis et variés ; ne remplace pas les illustrations par de simples emojis.
+- Composition riche et vivante mais aérée : remplir harmonieusement l’espace blanc, éviter les grandes zones vides et préserver la lisibilité.
+- Conserver la même identité graphique PerckyLingua entre toutes les leçons.
 
 ## 4. CODE COULEUR
-Attribue une couleur distincte à chaque branche principale et conserve une logique stable :
-- Bleu : concepts, définitions et notions fondamentales.
-- Vert : règles, méthodes et bonnes pratiques.
-- Rouge : exceptions, erreurs fréquentes et points d’attention.
-- Orange ou jaune doux : exemples et applications.
-- Violet : relations, comparaisons et nuances.
-Adapte ces couleurs à la palette générale sans sacrifier la lisibilité.
+Attribue une couleur vive et distincte à chaque branche principale, sans réutiliser la même couleur pour deux branches voisines. Utilise la palette PerckyLingua (bleu, vert, rouge) complétée par orange, jaune, violet, turquoise et corail. Garde une logique stable : bleu pour concepts, vert pour règles, rouge pour exceptions et erreurs, orange/jaune pour exemples, violet/turquoise pour relations et comparaisons. Répète la couleur de la branche sur ses ramifications, mots-clés et illustrations afin de renforcer les associations visuelles. Les couleurs doivent être franches, lumineuses et harmonieuses, jamais ternes.
 
 ## 5. CONTENU ET FIDÉLITÉ
 - Rédige les libellés dans la langue choisie pour la carte.
@@ -105,7 +107,8 @@ Adapte ces couleurs à la palette générale sans sacrifier la lisibilité.
 
 ## 6. FORMAT DE SORTIE
 - Format A4 paysage, haute résolution.
-- Fond crème clair ou blanc cassé.
+- Fond blanc pur #FFFFFF obligatoire sur toute la surface de l’image.
+- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées.
 - Tous les éléments doivent rester dans les limites de l’image.
 - Textes lisibles à l’écran et après impression.
 - Pas de signature, filigrane, titre parasite ou décoration sans intérêt pédagogique.
