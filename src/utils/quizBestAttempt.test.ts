@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { getCountedQuizSubmissions, isCountedQuizSubmission, markBestQuizAttempt, type QuizAttemptScore } from './quizBestAttempt';
+import { aggregateCumulativeQuizGrades, getCountedQuizSubmissions, isCountedQuizSubmission, markBestQuizAttempt, type QuizAttemptScore } from './quizBestAttempt';
 
 describe('markBestQuizAttempt', () => {
   it('retient la meilleure note et conserve toutes les tentatives', () => {
@@ -70,5 +70,45 @@ describe('counted quiz submissions', () => {
     assert.equal(isCountedQuizSubmission({ is_counted: undefined }), true);
     assert.equal(isCountedQuizSubmission({ is_counted: true }), true);
     assert.equal(isCountedQuizSubmission({ is_counted: false }), false);
+  });
+});
+
+describe('cumulative class quiz grades', () => {
+  it('counts each quiz once across dates and calculates a weighted average', () => {
+    const rows = [
+      { id: 'q1-old', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 2, max_score: 10, score_20: 4, is_counted: false, submitted_at: '2026-10-01T10:00:00Z' },
+      { id: 'q1-best', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 8, max_score: 10, score_20: 16, is_counted: true, submitted_at: '2026-10-03T10:00:00Z' },
+      { id: 'q1-duplicate', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 7, max_score: 10, score_20: 14, is_counted: true, submitted_at: '2026-10-02T10:00:00Z' },
+      { id: 'q2', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-2', score: 9, max_score: 30, score_20: 6, is_counted: true, submitted_at: '2026-11-01T10:00:00Z' },
+      { id: 'other-class', student_id: 'student-a', class_id: 'class-b', quiz_id: 'quiz-1', score: 5, max_score: 10, score_20: 10, is_counted: true }
+    ];
+    const result = aggregateCumulativeQuizGrades(rows);
+    const classA = result.find(row => row.class_id === 'class-a');
+    const classB = result.find(row => row.class_id === 'class-b');
+
+    assert.equal(result.length, 2);
+    assert.equal(classA?.quizzes_count, 2);
+    assert.deepEqual(classA?.submissions.map(row => row.id).sort(), ['q1-best', 'q2']);
+    assert.equal(classA?.total_score, 17);
+    assert.equal(classA?.total_possible, 40);
+    assert.equal(classA?.average_score_20, 8.5);
+    assert.equal(classB?.quizzes_count, 1);
+    assert.equal(classB?.average_score_20, 10);
+  });
+
+  it('keeps a legitimate zero score and excludes non-counted attempts', () => {
+    const result = aggregateCumulativeQuizGrades([
+      { id: 'zero', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 0, max_score: 20, score_20: 0, is_counted: true },
+      { id: 'retry-not-counted', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 18, max_score: 20, score_20: 18, is_counted: false }
+    ]);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].quizzes_count, 1);
+    assert.equal(result[0].average_score_20, 0);
+  });
+
+  it('returns no ranking row when the student has no counted quiz', () => {
+    assert.deepEqual(aggregateCumulativeQuizGrades([
+      { id: 'ignored', student_id: 'student-a', class_id: 'class-a', quiz_id: 'quiz-1', score: 18, max_score: 20, score_20: 18, is_counted: false }
+    ]), []);
   });
 });
