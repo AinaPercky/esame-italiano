@@ -1,3 +1,6 @@
+export const isRetryAuthorizedParticipant = (presenceStatus: string | null | undefined): boolean =>
+  presenceStatus === 'retry_authorized';
+
 export const canStudentStartQuiz = (
   quizStatus: string,
   hasSubmission: boolean,
