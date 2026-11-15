@@ -42,6 +42,15 @@ describe('markBestQuizAttempt', () => {
     assert.equal(result.find(x => x.is_counted)?.id, 'new');
   });
 
+  it('préfère une vraie tentative à une ligne missed en cas d’égalité à zéro', () => {
+    const attempts: QuizAttemptScore[] = [
+      { id: 'completed-zero', attempt_number: 1, score_20: 0, status: 'completed', submitted_at: '2026-11-01T10:00:00Z' },
+      { id: 'missed-zero', attempt_number: 2, score_20: 0, status: 'missed', submitted_at: '2026-11-02T10:00:00Z' }
+    ];
+    const result = markBestQuizAttempt(attempts);
+    assert.equal(result.find(x => x.is_counted)?.id, 'completed-zero');
+  });
+
   it('gère une liste vide', () => {
     assert.deepEqual(markBestQuizAttempt([]), []);
   });
