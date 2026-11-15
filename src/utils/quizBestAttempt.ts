@@ -29,6 +29,10 @@ export function markBestQuizAttempt<T extends QuizAttemptScore>(attempts: T[]): 
  * Undefined is retained for backward compatibility with pre-migration local data;
  * Supabase imports must always map the persisted is_counted column explicitly.
  */
+export function isCountedQuizSubmission(submission: { is_counted?: boolean }): boolean {
+  return submission.is_counted !== false;
+}
+
 export function getCountedQuizSubmissions<T extends { is_counted?: boolean }>(submissions: T[]): T[] {
-  return submissions.filter(submission => submission.is_counted !== false);
+  return submissions.filter(isCountedQuizSubmission);
 }
