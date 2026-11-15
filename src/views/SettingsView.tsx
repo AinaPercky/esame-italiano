@@ -39,6 +39,7 @@ import {
 } from '../data/quizPresenceMigration';
 import { QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL } from '../data/quizAttemptSubmissionMigration';
 import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
+import { QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL } from '../data/quizRetryConfirmationMigration';
 import { QUIZ_SECURITY_MIGRATION_SQL } from '../data/quizSecurityMigration';
 
 interface SettingsViewProps {
@@ -57,6 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedPresenceMigration, setCopiedPresenceMigration] = useState(false);
   const [copiedPresenceInitializationMigration, setCopiedPresenceInitializationMigration] = useState(false);
   const [copiedIndividualRetryMigration, setCopiedIndividualRetryMigration] = useState(false);
+  const [copiedRetryConfirmationMigration, setCopiedRetryConfirmationMigration] = useState(false);
   const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
   const [copiedQuizSecurityMigration, setCopiedQuizSecurityMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
@@ -175,6 +177,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
       setActionMessage({ type: 'error', text: 'Impossible de copier le correctif de seconde chance individuelle.' });
     }
   };
+
+  const handleCopyRetryConfirmationMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL);
+      setCopiedRetryConfirmationMigration(true);
+      setTimeout(() => setCopiedRetryConfirmationMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie correctif confirmation seconde chance:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier le correctif de consommation de seconde chance.' });
+    }
+  };
+
 
   const handleCopyQuizAttemptSubmissionMigration = async () => {
     try {
@@ -596,6 +610,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             >
               <Copy className="w-3.5 h-3.5" />
               <span>{copiedIndividualRetryMigration ? '✓ Correctif seconde chance copié !' : 'Corriger la seconde chance individuelle'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyRetryConfirmationMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-violet-700 hover:bg-violet-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedRetryConfirmationMigration ? '✓ Correctif confirmation copié !' : 'Conserver la seconde chance jusqu’à la soumission'}</span>
             </button>
             <button
               type="button"
