@@ -1558,6 +1558,16 @@ class SupabaseService {
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errClassLeaderboard) {
+        const noStudentContext =
+          /Aucune fiche étudiant associée|Session étudiant authentifiée requise|réservée aux comptes étudiants/i
+            .test(errClassLeaderboard.message || '');
+        if (isSupabaseMissingRpcError(errClassLeaderboard) || noStudentContext) {
+          console.warn('[Supabase] Classement de classe agrégé indisponible :', errClassLeaderboard.message);
+        } else {
+          throw new Error(`Classement de classe : ${errClassLeaderboard.message}`);
+        }
+      }
 
       let safeQuizzesData = quizzesData;
       if (errQ) {
