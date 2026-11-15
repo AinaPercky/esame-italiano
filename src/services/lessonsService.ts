@@ -8,7 +8,7 @@ function mapLesson(row: any, blocks: any[] = []): Lesson {
     id: row.id, slug: row.slug, type: row.type, level: row.level, duration_min: Number(row.duration_min) || 10,
     title_it: row.title_it, title_fr: row.title_fr, objective: row.objective, status: row.status,
     method: row.method || 'inductive', sort_order: Number(row.sort_order) || 0, access: row.access || 'free',
-    quiz_ref: row.quiz_ref || null, created_by: row.created_by || null, created_at: row.created_at,
+    quiz_ref: row.quiz_ref || null, mind_map_url: row.mind_map_url || null, created_by: row.created_by || null, created_at: row.created_at,
     updated_at: row.updated_at, blocks: blocks.sort((a, b) => (a.position || 0) - (b.position || 0)).map(block => ({
       id: block.id, lesson_id: block.lesson_id, position: block.position, type: block.type,
       content: block.content || {}, parent_block_id: block.parent_block_id || null
@@ -83,6 +83,41 @@ class LessonsService {
       if (blockError) throw new Error(`Blocs : ${blockError.message}`);
     }
     return mapLesson(data, blocks);
+  }
+  async uploadMindMap(lessonId: string, file: File): Promise<string> {
+    if (!file.type.startsWith('image/')) throw new Error('Veuillez sélectionner un fichier image.');
+    if (file.size > 15 * 1024 * 1024) throw new Error('La photo ne doit pas dépasser 15 Mo.');
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Impossible de lire cette image.')); };
+      img.src = url;
+    });
+    const maxDimension = 1800;
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('La compression de la photo est indisponible sur cet appareil.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Conversion WebP impossible.')), 'image/webp', 0.78));
+    if (blob.type !== 'image/webp') throw new Error('Ce navigateur ne prend pas en charge la conversion WebP.');
+    const client = this.client();
+    const path = `${lessonId}/mind-map-${Date.now()}.webp`;
+    const { error: uploadError } = await client.storage.from('lesson-mindmaps').upload(path, blob, { contentType: 'image/webp', upsert: true });
+    if (uploadError) throw new Error(`Téléversement du mind map : ${uploadError.message}`);
+    const { data } = client.storage.from('lesson-mindmaps').getPublicUrl(path);
+    const { error: updateError } = await client.from('lessons').update({ mind_map_url: data.publicUrl, updated_at: new Date().toISOString() }).eq('id', lessonId);
+    if (updateError) throw new Error(`Enregistrement du mind map : ${updateError.message}`);
+    return data.publicUrl;
+  }
+  async removeMindMap(lessonId: string): Promise<void> {
+    const { error } = await this.client().from('lessons').update({ mind_map_url: null, updated_at: new Date().toISOString() }).eq('id', lessonId);
+    if (error) throw new Error(`Suppression du mind map : ${error.message}`);
   }
   async remove(id: string): Promise<void> {
     const { error } = await this.client().from('lessons').delete().eq('id', id);
