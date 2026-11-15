@@ -26,7 +26,7 @@ export interface Lesson {
   id: string; slug: string; type: LessonType; level: LessonLevel; duration_min: number;
   title_it: string; title_fr: string; objective: string; status: LessonStatus;
   method: LessonMethod; sort_order: number; access: LessonAccess; quiz_ref?: string | null;
-  created_by?: string | null; created_at: string; updated_at: string; blocks: LessonBlock[];
+  created_by?: string | null; created_at: string; updated_at: string; mind_map_url?: string | null; blocks: LessonBlock[];
 }
 export interface LessonProgress {
   user_id: string; lesson_id: string; status: 'started' | 'done';
@@ -40,5 +40,5 @@ export interface LessonDraft {
   slug: string; type: LessonType; level: LessonLevel; duration_min: number;
   title_it: string; title_fr: string; objective: string; status: LessonStatus;
   method: LessonMethod; sort_order: number; access: LessonAccess; quiz_ref?: string | null;
-  blocks: LessonBlock[];
+  mind_map_url?: string | null; blocks: LessonBlock[];
 }

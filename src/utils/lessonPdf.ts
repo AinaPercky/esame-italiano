@@ -34,6 +34,7 @@ export interface LessonPdfOptions {
   displayName?: string;
   logoDataUrl?: string | null;
   avatarDataUrl?: string | null;
+  mindMapDataUrl?: string | null;
 }
 
 export function normalizePdfText(value: unknown): string {
@@ -134,6 +135,7 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
   const logoData = typeof options.logoDataUrl === 'string' ? { data: options.logoDataUrl, width: 1, height: 1 } : logo;
   const avatar = options.avatarDataUrl === undefined ? await loadProfileAvatar(options.avatarUrl) : null;
   const avatarData = typeof options.avatarDataUrl === 'string' ? { data: options.avatarDataUrl, width: 1, height: 1 } : avatar;
+  const mindMap = options.mindMapDataUrl === undefined ? (lesson.mind_map_url ? await loadImageAsPng(lesson.mind_map_url) : null) : (options.mindMapDataUrl ? await loadImageAsPng(options.mindMapDataUrl) : null);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true, putOnlyUsedFonts: true });
   await addEmbeddedFonts(doc);
   const regularFont = doc.getFontList()[FONT_REGULAR] ? FONT_REGULAR : 'helvetica';
@@ -348,6 +350,21 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
   const numbering = { n: 0 };
   orderedCourseBlocks(lesson.blocks || []).forEach(block => renderBlock(block, numbering));
   if (y <= TOP_CONTENT + 5) addParagraph('Le contenu pédagogique de cette leçon sera bientôt disponible.');
+
+  if (mindMap) {
+    doc.addPage();
+    y = TOP_CONTENT;
+    addSection('Mind map — Synthèse visuelle', 1);
+    const maxWidth = CONTENT_WIDTH;
+    const maxHeight = PAGE_HEIGHT - TOP_CONTENT - 48;
+    const ratio = Math.min(maxWidth / mindMap.width, maxHeight / mindMap.height);
+    const imageWidth = mindMap.width * ratio;
+    const imageHeight = mindMap.height * ratio;
+    const imageX = (PAGE_WIDTH - imageWidth) / 2;
+    const availableHeight = PAGE_HEIGHT - (TOP_CONTENT + 18) - 25;
+    const imageY = TOP_CONTENT + 18 + Math.max(0, (availableHeight - imageHeight) / 2);
+    doc.addImage(mindMap.data, 'PNG', imageX, imageY, imageWidth, imageHeight, undefined, 'FAST');
+  }
 
   const pageCount = doc.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
