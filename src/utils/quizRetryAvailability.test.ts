@@ -26,4 +26,23 @@ describe('quiz lock and teacher-authorized retry', () => {
   it('does not unlock a completed quiz merely because the quiz status is launched', () => {
     assert.equal(canStudentStartQuiz('launched', true, false), false);
   });
+
+  it('keeps retry authorization active after presence has been confirmed', () => {
+    assert.equal(isRetryAuthorizedParticipant('retry_authorized'), true);
+    assert.equal(canStudentStartQuiz('launched', true, isRetryAuthorizedParticipant('retry_authorized')), true);
+  });
+
+  it('does not treat ordinary confirmed attendance as a retry authorization', () => {
+    assert.equal(isRetryAuthorizedParticipant('present'), false);
+    assert.equal(canStudentStartQuiz('launched', true, isRetryAuthorizedParticipant('present')), false);
+  });
+
+  it('does not consume the retry grant when presence is confirmed', () => {
+    const confirmationFunction = QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL
+      .split('CREATE OR REPLACE FUNCTION public.confirm_quiz_presence')[1]
+      ?.split('REVOKE ALL ON FUNCTION')[0] || '';
+    assert.match(confirmationFunction, /presence_status = 'retry_authorized'/);
+    assert.match(confirmationFunction, /g\\.used_at IS NULL/);
+    assert.doesNotMatch(confirmationFunction, /UPDATE public\\.quiz_retry_grants[\\s\\S]*?SET used_at/);
+  });
 });
