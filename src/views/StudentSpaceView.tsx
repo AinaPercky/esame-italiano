@@ -878,6 +878,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       setCurrentQuestionIndex(0);
       setLastSubmissionResult(result);
       setIsRetryAttempt(false);
+      setRetryAuthorizedQuizIds(previous => {
+        const next = new Set(previous);
+        next.delete(activeQuiz.id);
+        return next;
+      });
       loadData();
 
       if (isAutoTimeout) {
