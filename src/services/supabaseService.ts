@@ -1189,7 +1189,8 @@ class SupabaseService {
         student_number: submission.student_number || null, class_id: submission.class_id,
         class_name: submission.class_name || null, started_at: submission.started_at,
         submitted_at: submission.submitted_at || null, answers: submission.answers || {},
-        status: submission.status, date: submission.date
+        status: submission.status, date: submission.date,
+        retry_grant_id: submission.retry_grant_id || null
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
