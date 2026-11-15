@@ -21,7 +21,7 @@ import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextA
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
-import { markBestQuizAttempt } from '../utils/quizBestAttempt';
+import { isCountedQuizSubmission, markBestQuizAttempt } from '../utils/quizBestAttempt';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1703,7 +1703,7 @@ export const dataService = {
       const grouped = groups[key];
       const bestByQuiz = new Map<string, QuizSubmission>();
       grouped.forEach(sub => {
-        if (sub.is_counted === false) return;
+        if (!isCountedQuizSubmission(sub)) return;
         const current = bestByQuiz.get(sub.quiz_id);
         if (!current || sub.score_20 > current.score_20 || (sub.score_20 === current.score_20 && (sub.attempt_number || 1) > (current.attempt_number || 1))) bestByQuiz.set(sub.quiz_id, sub);
       });
@@ -1747,7 +1747,7 @@ export const dataService = {
       const grouped = groups[date];
       const bestByQuiz = new Map<string, QuizSubmission>();
       grouped.forEach(sub => {
-        if (sub.is_counted === false) return;
+        if (!isCountedQuizSubmission(sub)) return;
         const current = bestByQuiz.get(sub.quiz_id);
         if (!current || sub.score_20 > current.score_20 || (sub.score_20 === current.score_20 && (sub.attempt_number || 1) > (current.attempt_number || 1))) bestByQuiz.set(sub.quiz_id, sub);
       });

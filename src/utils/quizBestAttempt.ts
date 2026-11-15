@@ -5,6 +5,7 @@ export interface QuizAttemptScore {
   started_at?: string | null;
   attempt_number?: number | null;
   is_counted?: boolean;
+  status?: string | null;
 }
 
 /**
@@ -15,6 +16,7 @@ export function markBestQuizAttempt<T extends QuizAttemptScore>(attempts: T[]): 
   if (attempts.length === 0) return [];
   const ranked = [...attempts].sort((a, b) =>
     (Number(b.score_20) || 0) - (Number(a.score_20) || 0) ||
+    Number(a.status === 'missed') - Number(b.status === 'missed') ||
     (new Date(b.submitted_at || b.started_at || 0).getTime() -
       new Date(a.submitted_at || a.started_at || 0).getTime()) ||
     (Number(b.attempt_number) || 0) - (Number(a.attempt_number) || 0) ||
@@ -22,4 +24,17 @@ export function markBestQuizAttempt<T extends QuizAttemptScore>(attempts: T[]): 
   );
   const bestId = ranked[0].id;
   return attempts.map(attempt => ({ ...attempt, is_counted: attempt.id === bestId }));
+}
+
+/**
+ * Keeps only the canonical attempt used for grades and rankings.
+ * Undefined is retained for backward compatibility with pre-migration local data;
+ * Supabase imports must always map the persisted is_counted column explicitly.
+ */
+export function isCountedQuizSubmission(submission: { is_counted?: boolean }): boolean {
+  return submission.is_counted !== false;
+}
+
+export function getCountedQuizSubmissions<T extends { is_counted?: boolean }>(submissions: T[]): T[] {
+  return submissions.filter(isCountedQuizSubmission);
 }

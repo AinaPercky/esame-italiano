@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Trophy, Calendar, Users, Crown, Medal } from 'lucide-react';
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
+import { isCountedQuizSubmission } from '../utils/quizBestAttempt';
 
 const ALL_DATES = 'all';
 
@@ -69,6 +70,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
+      .filter(submission => isCountedQuizSubmission(submission))
       .filter(submission => students.length === 0 || eligibleStudentIds.has(submission.student_id))
       .forEach(submission => quizzesById.set(submission.quiz_id, submission.quiz_title));
     return Array.from(quizzesById, ([id, title]) => ({ id, title }))
@@ -89,6 +91,9 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
+      // Never average multiple attempts for the same quiz: only the canonical
+      // best attempt contributes to the class or student ranking.
+      .filter(submission => submission.is_counted !== false)
       .filter(submission =>
         (!effectiveQuizId || submission.quiz_id === effectiveQuizId) &&
         (students.length === 0 || eligibleStudentIds.has(submission.student_id))

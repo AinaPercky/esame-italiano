@@ -1518,6 +1518,12 @@ class SupabaseService {
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('*')
         : Promise.resolve({ data: [], error: null });
+      // Les élèves ne peuvent lire que leurs copies complètes via RLS.
+      // Cette RPC ne renvoie que les notes de référence et métadonnées publiques
+      // des élèves actifs de leurs propres classes (jamais les réponses/corrections).
+      const classLeaderboardRequest = isAuthenticated && !isTeacher
+        ? client.rpc('get_class_quiz_leaderboard')
+        : Promise.resolve({ data: [], error: null });
       // class_enrollments est volontairement inaccessible au rôle anon.
       // Seul le professeur authentifié peut lire toutes les inscriptions (RLS).
       const enrollmentsRequest = isTeacher
@@ -1533,6 +1539,7 @@ class SupabaseService {
         { data: passOrderData, error: errPO },
         { data: quizzesData, error: errQ },
         { data: quizSubmissionsData, error: errQS },
+        { data: classLeaderboardData, error: errClassLeaderboard },
         { data: enrollmentsData, error: errEnrollments }
       ] = await Promise.all([
         client.from('classes').select('*'),
@@ -1544,12 +1551,23 @@ class SupabaseService {
         client.from('exam_pass_order').select('*'),
         quizzesRequest,
         quizSubmissionsRequest,
+        classLeaderboardRequest,
         enrollmentsRequest
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errClassLeaderboard) {
+        const noStudentContext =
+          /Aucune fiche étudiant associée|Session étudiant authentifiée requise|réservée aux comptes étudiants/i
+            .test(errClassLeaderboard.message || '');
+        if (isSupabaseMissingRpcError(errClassLeaderboard) || noStudentContext) {
+          console.warn('[Supabase] Classement de classe agrégé indisponible :', errClassLeaderboard.message);
+        } else {
+          throw new Error(`Classement de classe : ${errClassLeaderboard.message}`);
+        }
+      }
 
       let safeQuizzesData = quizzesData;
       if (errQ) {
@@ -1566,6 +1584,7 @@ class SupabaseService {
       }
 
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
+      if (errClassLeaderboard) throw new Error(`Classement de classe (migration requise) : ${errClassLeaderboard.message}`);
       if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
@@ -1676,7 +1695,13 @@ class SupabaseService {
       }));
 
       const existingStudentIds = new Set(students.map(s => s.id));
-      const activeSubmissionsData = (quizSubmissionsData || []).filter(s => existingStudentIds.has(s.student_id));
+      // Priorité aux copies complètes de l'élève connecté; les lignes RPC
+      // agrégées complètent uniquement les résultats des autres camarades.
+      const submissionsById = new Map<string, any>();
+      (classLeaderboardData || []).forEach((row: any) => submissionsById.set(row.id, row));
+      (quizSubmissionsData || []).forEach((row: any) => submissionsById.set(row.id, row));
+      const mergedSubmissionsData = Array.from(submissionsById.values());
+      const activeSubmissionsData = mergedSubmissionsData.filter(s => existingStudentIds.has(s.student_id));
 
       // Nettoyer en arrière-plan les soumissions orphelines d'élèves déjà supprimés dans Supabase
       const orphanedStudentIds = Array.from(new Set(
@@ -1712,7 +1737,14 @@ class SupabaseService {
         score_20: Number(s.score_20) || 0,
         status: s.status,
         feedback: s.feedback || {},
-        date: s.date
+        date: s.date,
+        attempt_number: Number(s.attempt_number) || 1,
+        launch_id: s.launch_id || undefined,
+        attendance_status: s.attendance_status || 'unknown',
+        retry_grant_id: s.retry_grant_id || undefined,
+        // Important: false is meaningful. Do not omit it or every attempt
+        // will be treated as a counted result by the leaderboard.
+        is_counted: s.is_counted !== false
       }));
 
       return {
