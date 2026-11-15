@@ -21,6 +21,7 @@ import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextA
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
+import { markBestQuizAttempt } from '../utils/quizBestAttempt';
 
 interface AppState {
   classes: ClassRoom[];
@@ -1628,13 +1629,11 @@ export const dataService = {
       ...state.quizSubmissions.filter(s => s.quiz_id === quizId && s.student_id === studentId && s.id !== submission.id),
       submission
     ];
-    const bestAttempt = [...sameStudentAttempts].sort((a, b) =>
-      (Number(b.score_20) || 0) - (Number(a.score_20) || 0) ||
-      (new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime()) ||
-      (Number(b.attempt_number) || 0) - (Number(a.attempt_number) || 0)
-    )[0];
-    sameStudentAttempts.forEach(attempt => {
-      attempt.is_counted = attempt.id === bestAttempt?.id;
+    const reconciledAttempts = markBestQuizAttempt(sameStudentAttempts);
+    reconciledAttempts.forEach(attempt => {
+      const stored = state.quizSubmissions.find(s => s.id === attempt.id);
+      if (stored) stored.is_counted = attempt.is_counted;
+      if (attempt.id === submission.id) submission.is_counted = attempt.is_counted;
     });
 
     if (existingIdx !== -1 && (retryGrantId || allowAuthorizedRetry)) {
