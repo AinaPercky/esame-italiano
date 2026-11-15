@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { canStudentStartQuiz, canSubmitQuizAttempt } from './quizRetryAvailability';
+import { canStudentStartQuiz, canSubmitQuizAttempt, isRetryAuthorizedParticipant } from './quizRetryAvailability';
 
 describe('quiz lock and teacher-authorized retry', () => {
   it('locks a completed quiz even if the quiz is still marked launched', () => {
