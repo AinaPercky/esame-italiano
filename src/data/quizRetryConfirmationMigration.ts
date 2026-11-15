@@ -78,5 +78,29 @@ $$;
 
 REVOKE ALL ON FUNCTION public.confirm_quiz_presence(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.confirm_quiz_presence(UUID) TO authenticated;
+
+-- Recover grants consumed by the old confirmation RPC when no retry was submitted.
+-- Completed attempts are never reset.
+UPDATE public.quiz_retry_grants g
+SET used_at = NULL
+FROM public.quiz_participants p
+JOIN public.quiz_launches l ON l.id = p.launch_id
+WHERE g.quiz_id = p.quiz_id
+  AND g.student_id = p.student_id
+  AND g.launch_id = p.launch_id
+  AND g.used_at IS NOT NULL
+  AND p.presence_status = 'retry_authorized'
+  AND p.presence_confirmed_at IS NOT NULL
+  AND l.status = 'launched'
+  AND NOT EXISTS (
+    SELECT 1 FROM public.quiz_attempts a
+    WHERE a.participant_id = p.id AND a.launch_id = p.launch_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM public.quiz_submissions s
+    WHERE s.quiz_id = p.quiz_id AND s.student_id = p.student_id
+      AND s.launch_id = p.launch_id
+  );
+
 NOTIFY pgrst, 'reload schema';
 `;
