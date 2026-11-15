@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Trophy, Calendar, Users, Crown, Medal } from 'lucide-react';
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
+import { getCountedQuizSubmissions } from '../utils/quizBestAttempt';
 
 const ALL_DATES = 'all';
 
@@ -69,7 +70,7 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
         (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
-      .filter(submission => submission.is_counted !== false)
+      .filter(submission => getCountedQuizSubmissions([submission]).length > 0)
       .filter(submission => students.length === 0 || eligibleStudentIds.has(submission.student_id))
       .forEach(submission => quizzesById.set(submission.quiz_id, submission.quiz_title));
     return Array.from(quizzesById, ([id, title]) => ({ id, title }))
