@@ -343,7 +343,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       await Promise.all(quizIds.map(async quizId => {
         try {
           const active = await supabaseService.getStudentActiveLaunch(quizId);
-          resolvedAuthorizations.set(quizId, active?.participant.presence_status === 'retry_authorized');
+          resolvedAuthorizations.set(quizId, active?.participant.presence_status === 'retry_authorized' && !active?.participant.presence_confirmed_at);
         } catch (error) {
           console.warn('Vérification de seconde chance indisponible:', error);
         }
@@ -627,7 +627,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!strictPresence && alreadySubmitted && !quiz.is_public && supabaseService.isConfigured()) {
       try {
         const active = await supabaseService.getStudentActiveLaunch(quiz.id);
-        authorizedLegacyRetry = active?.participant.presence_status === 'retry_authorized';
+        authorizedLegacyRetry = active?.participant.presence_status === 'retry_authorized' && !active?.participant.presence_confirmed_at;
       } catch (error) {
         console.warn('Vérification de seconde chance legacy indisponible:', error);
       }
@@ -642,7 +642,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       try {
         const activeLaunch = await supabaseService.getStudentActiveLaunch(quiz.id);
         if (!activeLaunch) throw new Error('Ce quiz a été clôturé ou vous n’êtes pas inscrit au lancement actif.');
-        const retryAuthorized = activeLaunch.participant.presence_status === 'retry_authorized';
+        const retryAuthorized = activeLaunch.participant.presence_status === 'retry_authorized' && !activeLaunch.participant.presence_confirmed_at;
         if (alreadySubmitted && !retryAuthorized) {
           setPresenceInitialization(null);
           setConfirmDialog({
