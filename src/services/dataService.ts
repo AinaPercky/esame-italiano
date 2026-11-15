@@ -1616,11 +1616,26 @@ export const dataService = {
       ? await supabaseService.submitQuizPresenceSubmission(submission)
       : await supabaseService.submitQuizSubmissionAtomically(submission);
     if (serverSubmission) {
-      // L'état local reflète la note recalculée par PostgreSQL, jamais la note du navigateur.
+      // L'état local reflète la note et le statut de meilleure tentative calculés par PostgreSQL.
       Object.assign(submission, serverSubmission);
     } else {
       await supabaseService.saveQuizSubmission(submission);
     }
+
+    // Réconcilier l'état local avec la note de référence renvoyée par le serveur.
+    // L'historique des tentatives est conservé, une seule est comptabilisée.
+    const sameStudentAttempts = [
+      ...state.quizSubmissions.filter(s => s.quiz_id === quizId && s.student_id === studentId && s.id !== submission.id),
+      submission
+    ];
+    const bestAttempt = [...sameStudentAttempts].sort((a, b) =>
+      (Number(b.score_20) || 0) - (Number(a.score_20) || 0) ||
+      (new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime()) ||
+      (Number(b.attempt_number) || 0) - (Number(a.attempt_number) || 0)
+    )[0];
+    sameStudentAttempts.forEach(attempt => {
+      attempt.is_counted = attempt.id === bestAttempt?.id;
+    });
 
     if (existingIdx !== -1 && (retryGrantId || allowAuthorizedRetry)) {
       state.quizSubmissions.unshift(submission);
