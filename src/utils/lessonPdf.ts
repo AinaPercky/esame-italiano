@@ -356,12 +356,13 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
     y = TOP_CONTENT;
     addSection('Mind map — Synthèse visuelle', 1);
     const maxWidth = CONTENT_WIDTH;
-    const maxHeight = PAGE_HEIGHT - TOP_CONTENT - 30;
+    const maxHeight = PAGE_HEIGHT - TOP_CONTENT - 48;
     const ratio = Math.min(maxWidth / mindMap.width, maxHeight / mindMap.height);
     const imageWidth = mindMap.width * ratio;
     const imageHeight = mindMap.height * ratio;
     const imageX = (PAGE_WIDTH - imageWidth) / 2;
-    const imageY = Math.max(TOP_CONTENT + 10, (PAGE_HEIGHT - imageHeight) / 2);
+    const availableHeight = PAGE_HEIGHT - (TOP_CONTENT + 18) - 25;
+    const imageY = TOP_CONTENT + 18 + Math.max(0, (availableHeight - imageHeight) / 2);
     doc.addImage(mindMap.data, 'PNG', imageX, imageY, imageWidth, imageHeight, undefined, 'FAST');
   }
 
