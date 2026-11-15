@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { markBestQuizAttempt, type QuizAttemptScore } from './quizBestAttempt';
+import { getCountedQuizSubmissions, isCountedQuizSubmission, markBestQuizAttempt, type QuizAttemptScore } from './quizBestAttempt';
 
 describe('markBestQuizAttempt', () => {
   it('retient la meilleure note et conserve toutes les tentatives', () => {
@@ -44,5 +44,22 @@ describe('markBestQuizAttempt', () => {
 
   it('gère une liste vide', () => {
     assert.deepEqual(markBestQuizAttempt([]), []);
+  });
+});
+
+describe('counted quiz submissions', () => {
+  it('excludes historical attempts explicitly marked as not counted', () => {
+    const rows = [
+      { id: 'first', score_20: 2.2, is_counted: false },
+      { id: 'timeout', score_20: 0, is_counted: false },
+      { id: 'best', score_20: 16.9, is_counted: true }
+    ];
+    assert.deepEqual(getCountedQuizSubmissions(rows).map(row => row.id), ['best']);
+  });
+
+  it('keeps legacy rows with no flag while respecting explicit false', () => {
+    assert.equal(isCountedQuizSubmission({ is_counted: undefined }), true);
+    assert.equal(isCountedQuizSubmission({ is_counted: true }), true);
+    assert.equal(isCountedQuizSubmission({ is_counted: false }), false);
   });
 });
