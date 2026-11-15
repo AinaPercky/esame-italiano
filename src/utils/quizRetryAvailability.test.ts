@@ -43,6 +43,6 @@ describe('quiz lock and teacher-authorized retry', () => {
       ?.split('REVOKE ALL ON FUNCTION')[0] || '';
     assert.match(confirmationFunction, /presence_status = 'retry_authorized'/);
     assert.match(confirmationFunction, /g\.used_at IS NULL/);
-    assert.doesNotMatch(confirmationFunction, /UPDATE public\.quiz_retry_grants[\s\\S]*?SET used_at/);
+    assert.equal(confirmationFunction.includes('SET used_at ='), false);
   });
 });
