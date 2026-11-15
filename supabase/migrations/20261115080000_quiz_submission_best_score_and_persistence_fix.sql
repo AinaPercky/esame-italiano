@@ -1,6 +1,8 @@
 -- PerckyLingua — correction du meilleur score et fiabilisation des soumissions
 -- Fonctions appliquées sur Supabase le 15/11/2026.
 -- Les tentatives historiques sont conservées; une seule ligne est comptabilisée.
+-- La fonction classique change de VOID vers JSONB : recréer sa signature.
+DROP FUNCTION IF EXISTS public.submit_quiz_submission(JSONB);
 CREATE OR REPLACE FUNCTION public.submit_quiz_presence_submission(p_submission jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
