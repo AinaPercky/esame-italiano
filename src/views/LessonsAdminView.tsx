@@ -39,6 +39,7 @@ import '../components/lessons/lessonExperience.css';
 import '../components/lessons/lessonGuidedQuiz.css';
 import '../components/lessons/lessonPlayer.css';
 import completeLessonTemplateText from '../../docs/modele-lecon-complet.json?raw';
+import { MindMapPromptGenerator } from '../components/lessons/MindMapPromptGenerator';
 
 const template = (type: LessonType): LessonDraft => ({
   slug: `nouvelle-lecon-${Date.now()}`,
@@ -446,6 +447,8 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             className="min-h-[340px] sm:min-h-[460px] w-full rounded-xl border border-slate-300 bg-slate-950 p-3 sm:p-4 font-mono text-xs text-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             spellCheck={false}
           />
+
+          <MindMapPromptGenerator lessonJson={json} onCopy={copyText} />
 
           <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
