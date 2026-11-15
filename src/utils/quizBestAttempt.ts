@@ -23,3 +23,12 @@ export function markBestQuizAttempt<T extends QuizAttemptScore>(attempts: T[]): 
   const bestId = ranked[0].id;
   return attempts.map(attempt => ({ ...attempt, is_counted: attempt.id === bestId }));
 }
+
+/**
+ * Keeps only the canonical attempt used for grades and rankings.
+ * Undefined is retained for backward compatibility with pre-migration local data;
+ * Supabase imports must always map the persisted is_counted column explicitly.
+ */
+export function getCountedQuizSubmissions<T extends { is_counted?: boolean }>(submissions: T[]): T[] {
+  return submissions.filter(submission => submission.is_counted !== false);
+}
