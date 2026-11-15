@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'src/**'
+      - 'supabase/migrations/**'
       - 'package.json'
       - '.github/workflows/quiz-regression.yml'
   pull_request:
