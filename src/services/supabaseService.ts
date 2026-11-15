@@ -1002,8 +1002,10 @@ class SupabaseService {
       score_20: Number(submission.score_20) || 0,
       status: submission.status,
       feedback: submission.feedback || {},
-      date: submission.date
-    }, { onConflict: 'quiz_id,student_id', ignoreDuplicates: true });
+      date: submission.date,
+      attempt_number: submission.attempt_number || 1,
+      is_counted: submission.is_counted !== false
+    }, { onConflict: 'quiz_id,student_id,attempt_number' });
 
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
   }
@@ -1180,7 +1182,7 @@ class SupabaseService {
       return null;
     }
 
-    const { error } = await client.rpc('submit_quiz_submission', {
+    const { data, error } = await client.rpc('submit_quiz_submission', {
       p_submission: {
         id: submission.id, quiz_id: submission.quiz_id, quiz_title: submission.quiz_title,
         student_id: submission.student_id, student_name: submission.student_name,
@@ -1191,12 +1193,8 @@ class SupabaseService {
       }
     });
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
+    if (!data) throw new Error('Le serveur n’a retourné aucun résultat après la soumission.');
 
-    const { data, error: readError } = await client.from('quiz_submissions').select('*')
-      .eq('quiz_id', submission.quiz_id).eq('student_id', submission.student_id)
-      .order('attempt_number', { ascending: false }).limit(1).maybeSingle();
-    if (readError) throw new Error(`Lecture du résultat corrigé par le serveur : ${readError.message}`);
-    if (!data) throw new Error('Le serveur a enregistré le quiz sans retourner son résultat.');
     return {
       ...submission,
       id: data.id,
@@ -1206,7 +1204,8 @@ class SupabaseService {
       status: data.status,
       feedback: data.feedback || {},
       submitted_at: data.submitted_at || submission.submitted_at,
-      attempt_number: Number(data.attempt_number) || submission.attempt_number
+      attempt_number: Number(data.attempt_number) || submission.attempt_number,
+      is_counted: data.is_counted !== false
     };
   }
 
@@ -1264,7 +1263,8 @@ class SupabaseService {
       status: data?.status || submission.status,
       feedback: data?.feedback || {},
       submitted_at: data?.submitted_at || submission.submitted_at,
-      attempt_number: Number(data?.attempt_number) || submission.attempt_number
+      attempt_number: Number(data?.attempt_number) || submission.attempt_number,
+      is_counted: data?.is_counted !== false
     };
   }
 
