@@ -106,6 +106,9 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [json, setJson] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [mindMapFile, setMindMapFile] = useState<File | null>(null);
+  const [mindMapUrl, setMindMapUrl] = useState<string | null>(null);
+  const [mindMapRemoved, setMindMapRemoved] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   
   // Mobile search & filters
@@ -134,6 +137,9 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const start = (draft: LessonDraft, id?: string) => {
     setEditing(draft);
     setEditingId(id);
+    setMindMapFile(null);
+    setMindMapUrl(draft.mind_map_url || null);
+    setMindMapRemoved(false);
     setJson(JSON.stringify(draft, null, 2));
     setError('');
   };
@@ -182,8 +188,11 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
       const valid = validateLessonDraft(parsed);
       if (!valid.valid || !valid.value) throw new Error(valid.errors.join('\n'));
       const saved = await lessonsService.save(valid.value, editingId, currentUser.id);
+      if (mindMapFile) { const url = await lessonsService.uploadMindMap(saved.id, mindMapFile); saved.mind_map_url = url; }
+      else if (mindMapRemoved && saved.mind_map_url) { await lessonsService.removeMindMap(saved.id); saved.mind_map_url = null; }
       setMessage(saved.slug === valid.value.slug ? 'Leçon enregistrée avec succès.' : `Leçon enregistrée avec le slug « ${saved.slug} » car « ${valid.value.slug} » était déjà utilisé.`);
       setEditing(null);
+      setMindMapFile(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'JSON invalide ou non conforme.');
@@ -437,6 +446,29 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             className="min-h-[340px] sm:min-h-[460px] w-full rounded-xl border border-slate-300 bg-slate-950 p-3 sm:p-4 font-mono text-xs text-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             spellCheck={false}
           />
+
+          <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Mind map du cours (facultatif)</h3>
+                <p className="mt-1 text-xs text-slate-600">Ajoutez une photo JPG, PNG ou WebP. Elle sera redimensionnée (maximum 1 800 px), compressée et convertie en WebP avant l’envoi.</p>
+              </div>
+              <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-[#0b3c5d] px-3 py-2 text-xs font-bold text-white">
+                <Upload size={14} /> Choisir une photo
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/*" className="hidden" onChange={event => {
+                  const file = event.target.files?.[0];
+                  if (file) { setMindMapFile(file); setMindMapUrl(URL.createObjectURL(file)); setMindMapRemoved(false); }
+                  event.currentTarget.value = '';
+                }} />
+              </label>
+            </div>
+            {mindMapUrl && !mindMapRemoved && <div className="mt-3 flex flex-wrap items-start gap-3">
+              <img src={mindMapUrl} alt="Aperçu du mind map" className="max-h-48 max-w-full rounded-lg border border-slate-200 bg-white object-contain" />
+              <button type="button" onClick={() => { setMindMapFile(null); setMindMapUrl(null); setMindMapRemoved(true); }} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 text-xs font-bold text-rose-700"><Trash2 size={13} /> Retirer</button>
+            </div>}
+            {mindMapRemoved && <p className="mt-3 text-xs text-amber-700">Le mind map sera retiré lors de l’enregistrement.</p>}
+            {mindMapFile && <p className="mt-2 text-xs text-emerald-700">Photo sélectionnée : {mindMapFile.name} · conversion WebP à l’enregistrement.</p>}
+          </section>
 
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <button
