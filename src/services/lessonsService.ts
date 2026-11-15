@@ -104,8 +104,16 @@ class LessonsService {
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Conversion WebP impossible.')), 'image/webp', 0.78));
+    const encodeWebp = (quality: number) => new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Conversion WebP impossible.')), 'image/webp', quality));
+    let blob = await encodeWebp(0.76);
     if (blob.type !== 'image/webp') throw new Error('Ce navigateur ne prend pas en charge la conversion WebP.');
+    if (blob.size > 4.5 * 1024 * 1024) {
+      canvas.width = Math.max(1, Math.round(canvas.width * 0.8));
+      canvas.height = Math.max(1, Math.round(canvas.height * 0.8));
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      blob = await encodeWebp(0.62);
+    }
+    if (blob.size > 4.8 * 1024 * 1024) throw new Error('Cette photo reste trop volumineuse après compression. Choisissez une image plus légère.');
     const client = this.client();
     const path = `${lessonId}/mind-map-${Date.now()}.webp`;
     const { error: uploadError } = await client.storage.from('lesson-mindmaps').upload(path, blob, { contentType: 'image/webp', upsert: true });
