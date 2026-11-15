@@ -82,7 +82,7 @@
         "305",
         "35",
         "53",
-        " treinta y cinco"
+        "Trentacinque"
       ],
       "correct_answer": "35",
       "points": 1,
@@ -94,9 +94,9 @@
       "question": "Qual è il numero 46 in lettere?",
       "options": [
         "Quarantasei",
-        "Quaranta sei",
-        "Quarantasei",
-        "Quarantasei"
+        "Quarantasette",
+        "Quarantotto",
+        "Quarantanove"
       ],
       "correct_answer": "Quarantasei",
       "points": 1,
@@ -247,10 +247,10 @@
       "type": "qcm",
       "question": "Quale numero è più grande?",
       "options": [
-        "Novec novantanovemila",
         "Novecentonovantanovemila",
-        "Novant novemila",
-        "Novecentomila"
+        "Novecentomila",
+        "Novantamila",
+        "Novecentonovemila"
       ],
       "correct_answer": "Novecentonovantanovemila",
       "points": 1,
