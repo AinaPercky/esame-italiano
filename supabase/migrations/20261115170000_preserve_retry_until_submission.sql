@@ -57,7 +57,9 @@ BEGIN
       AND g.student_id = v_student
       AND (g.launch_id = p_launch_id OR g.launch_id IS NULL)
       AND g.used_at IS NULL
+      AND g.revoked_at IS NULL
       AND (g.expires_at IS NULL OR g.expires_at > v_clicked_at)
+      AND g.used_attempts < g.max_attempts
     ORDER BY g.created_at
     LIMIT 1
     FOR UPDATE;
