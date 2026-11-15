@@ -12,6 +12,7 @@ describe('quiz submission persistence migration contract', () => {
     assert.match(migration, /DROP FUNCTION IF EXISTS public\.submit_quiz_submission\(JSONB\)/);
     assert.match(migration, /CREATE OR REPLACE FUNCTION public\.submit_quiz_submission\(p_submission jsonb\)[\s\S]*?RETURNS jsonb/i);
     assert.match(migration, /RETURN to_jsonb\(saved_row\)/);
+    assert.match(migration, /WHERE id = submission_id AND quiz_id = q\.id AND student_id = sid/);
   });
 
   it('computes the attempt number from the current quiz and student', () => {
