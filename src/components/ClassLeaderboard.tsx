@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Trophy, Calendar, Users, Crown, Medal } from 'lucide-react';
 import { DailyGrade, ClassRoom, Student } from '../types';
 import { StudentAvatar } from './StudentAvatar';
-import { isCountedQuizSubmission } from '../utils/quizBestAttempt';
+import { aggregateCumulativeQuizGrades, isCountedQuizSubmission } from '../utils/quizBestAttempt';
 
 const ALL_DATES = 'all';
 
@@ -83,45 +83,31 @@ export const ClassLeaderboard: React.FC<ClassLeaderboardProps> = ({
 
   // Filtrer les dailyGrades pour la classe et la date sélectionnées, en excluant les élèves supprimés
   const filteredGrades = useMemo(() => {
-    const submissionsByStudent = new Map<string, DailyGrade['submissions']>();
-    dailyGrades
+    const selectedSubmissions = dailyGrades
       .filter(grade =>
         (!selectedClassId || grade.class_id === selectedClassId) &&
         (selectedDate === ALL_DATES || grade.date === selectedDate) &&
         (students.length === 0 || eligibleStudentIds.has(grade.student_id))
       )
       .flatMap(grade => grade.submissions)
-      // Never average multiple attempts for the same quiz: only the canonical
-      // best attempt contributes to the class or student ranking.
-      .filter(submission => submission.is_counted !== false)
+      .filter(submission => isCountedQuizSubmission(submission))
       .filter(submission =>
         (!effectiveQuizId || submission.quiz_id === effectiveQuizId) &&
         (students.length === 0 || eligibleStudentIds.has(submission.student_id))
-      )
-      .forEach(submission => {
-        const key = `${submission.class_id}_${submission.student_id}`;
-        const submissions = submissionsByStudent.get(key) || [];
-        submissions.push(submission);
-        submissionsByStudent.set(key, submissions);
-      });
+      );
 
-    return Array.from(submissionsByStudent.values()).map(submissions => {
-      const first = submissions[0];
-      const totalScore = submissions.reduce((sum, submission) => sum + submission.score, 0);
-      const totalPossible = submissions.reduce((sum, submission) => sum + submission.max_score, 0);
-
+    return aggregateCumulativeQuizGrades(selectedSubmissions).map(grade => {
+      const first = grade.submissions[0];
       return {
-        student_id: first.student_id,
+        student_id: grade.student_id,
         student_name: first.student_name,
         student_number: first.student_number,
-        class_id: first.class_id,
+        class_id: grade.class_id,
         class_name: first.class_name,
         date: selectedDate,
-        quizzes_count: submissions.length,
-        average_score_20: totalPossible > 0
-          ? Number(((totalScore / totalPossible) * 20).toFixed(2))
-          : 0,
-        submissions
+        quizzes_count: grade.quizzes_count,
+        average_score_20: grade.average_score_20,
+        submissions: grade.submissions
       };
     });
   }, [dailyGrades, selectedClassId, selectedDate, effectiveQuizId, eligibleStudentIds, students.length]);
