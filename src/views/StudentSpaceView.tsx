@@ -627,7 +627,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!strictPresence && alreadySubmitted && !quiz.is_public && supabaseService.isConfigured()) {
       try {
         const active = await supabaseService.getStudentActiveLaunch(quiz.id);
-        authorizedLegacyRetry = active?.participant.presence_status === 'retry_authorized' && !active?.participant.presence_confirmed_at;
+        authorizedLegacyRetry = isRetryAuthorizedParticipant(active?.participant.presence_status);
       } catch (error) {
         console.warn('Vérification de seconde chance legacy indisponible:', error);
       }
