@@ -40,6 +40,7 @@ import '../components/lessons/lessonGuidedQuiz.css';
 import '../components/lessons/lessonPlayer.css';
 import completeLessonTemplateText from '../../docs/modele-lecon-complet.json?raw';
 import { MindMapPromptGenerator } from '../components/lessons/MindMapPromptGenerator';
+import { downloadLessonPdf } from '../utils/lessonPdf';
 
 const template = (type: LessonType): LessonDraft => ({
   slug: `nouvelle-lecon-${Date.now()}`,
@@ -111,6 +112,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [mindMapUrl, setMindMapUrl] = useState<string | null>(null);
   const [mindMapRemoved, setMindMapRemoved] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   
   // Mobile search & filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -162,6 +164,20 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
       setMessage('Modèle complet chargé : personnalisez son contenu et son slug avant enregistrement.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chargement du modèle impossible.');
+    }
+  };
+
+  const downloadPreviewPdf = async () => {
+    if (!preview || downloadingPdf) return;
+    setDownloadingPdf(true);
+    setError('');
+    try {
+      await downloadLessonPdf(preview, { avatarUrl: currentUser.avatar, displayName: currentUser.name });
+      setMessage('PDF du cours téléchargé.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Téléchargement du PDF impossible.');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -311,9 +327,19 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-block font-mono text-xs text-slate-500 truncate max-w-[200px]">
+            <span className="hidden sm:inline-block font-mono text-xs text-slate-500 truncate max-w-[160px]">
               {preview.title_fr}
             </span>
+            <button
+              type="button"
+              onClick={() => void downloadPreviewPdf()}
+              disabled={downloadingPdf}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#072a3f] px-3 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] disabled:cursor-not-allowed disabled:opacity-60"
+              title="Télécharger le PDF du cours"
+            >
+              {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              <span className="hidden sm:inline">{downloadingPdf ? 'Génération…' : 'PDF'}</span>
+            </button>
             <button
               type="button"
               onClick={() => setPreview(null)}
