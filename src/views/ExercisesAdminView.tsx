@@ -297,7 +297,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                       const score = row.best_score;
                       const scoreMax = row.max_score;
                       const percentage = score !== null && score !== undefined && scoreMax > 0 ? Math.round((score / scoreMax) * 100) : null;
-                      const score20 = percentage !== null ? (percentage * 0.2).toFixed(2).replace(/\.00$/, '') : null;
+                      const score20 = score !== null && score !== undefined && scoreMax > 0 ? (score / scoreMax * 20).toFixed(2).replace(/\.00$/, '') : null;
                       return <tr key={row.student_id} className="transition hover:bg-slate-50/80">
                         <td className="px-4 py-3"><div className="flex items-center gap-3"><StudentAvatar name={row.student_name || 'Élève'} src={row.avatar_url || undefined} className="h-9 w-9 border border-[#d8e6ee] text-xs"/><div><p className="font-bold text-[#072a3f]">{row.student_name}</p>{row.student_number && <p className="text-[11px] text-slate-400">N° {row.student_number}</p>}</div></div></td>
                         <td className="px-4 py-3 text-slate-600">{row.class_name}</td>
