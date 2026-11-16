@@ -42,6 +42,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [showAttempts, setShowAttempts] = useState(false);
   const [attemptClassFilter, setAttemptClassFilter] = useState('all');
+  const [reviewStudent, setReviewStudent] = useState<any | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -74,6 +75,28 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       notStarted
     };
   }, [filteredAttempts]);
+  const performanceSummary = useMemo(() => {
+    const scored = filteredAttempts.filter(row => row.best_score !== null && row.best_score !== undefined && Number(row.max_score) > 0);
+    const percentages = scored.map(row => Number(row.best_score) / Number(row.max_score) * 100);
+    const average = percentages.length ? percentages.reduce((sum, value) => sum + value, 0) / percentages.length : null;
+    return {
+      average,
+      successRate: percentages.length ? percentages.filter(value => value >= 50).length / percentages.length * 100 : null,
+      completionRate: filteredAttempts.length ? filteredAttempts.filter(row => row.status === 'completed').length / filteredAttempts.length * 100 : 0,
+      scoredCount: scored.length,
+      averageAttempts: filteredAttempts.length ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) / filteredAttempts.length : 0
+    };
+  }, [filteredAttempts]);
+  const scoreDistribution = useMemo(() => [
+    { label: '0–20 %', min: 0, max: 20 }, { label: '21–40 %', min: 20, max: 40 },
+    { label: '41–60 %', min: 40, max: 60 }, { label: '61–80 %', min: 60, max: 80 },
+    { label: '81–100 %', min: 80, max: 100.001 }
+  ].map(range => ({ ...range, count: filteredAttempts.filter(row => {
+    if (row.best_score === null || row.best_score === undefined || !(Number(row.max_score) > 0)) return false;
+    const pct = Number(row.best_score) / Number(row.max_score) * 100;
+    return pct >= range.min && pct < range.max;
+  }).length })), [filteredAttempts]);
+
   const questionStats = (selectedExercise?.questions || []).map(question => {
     const responses = filteredAttempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
     return {
@@ -289,7 +312,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
             {filteredAttempts.length === 0 ? <div className="p-8 text-center"><Users className="mx-auto mb-2 text-slate-300" size={30}/><p className="font-semibold text-slate-600">Aucun étudiant dans cette sélection</p><p className="mt-1 text-xs text-slate-400">Vérifiez les classes attribuées à cet exercice.</p></div> : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Étudiant</th><th className="px-4 py-3">Classe</th><th className="px-4 py-3">Progression</th><th className="px-4 py-3">Meilleure note</th><th className="px-4 py-3">Tentatives</th><th className="px-4 py-3">Dernière activité</th></tr></thead>
+                  <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Étudiant</th><th className="px-4 py-3">Classe</th><th className="px-4 py-3">Progression</th><th className="px-4 py-3">Meilleure note</th><th className="px-4 py-3">Tentatives</th><th className="px-4 py-3">Actions</th><th className="px-4 py-3">Dernière activité</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredAttempts.map((row, index) => {
                       const done = row.status === 'completed';
@@ -305,6 +328,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                         <td className="px-4 py-3"><div className="font-bold tabular-nums text-[#072a3f]">{score !== null && score !== undefined && scoreMax > 0 ? <>{score} <span className="font-medium text-slate-400">/ {scoreMax}</span></> : <span className="font-medium text-slate-400">—</span>}</div>{percentage !== null && <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#46657a]">{percentage} % · {score20}/20</p>}</td>
                         <td className="px-4 py-3 tabular-nums text-slate-600">{row.attempt_count}</td>
                         <td className="px-4 py-3 text-xs text-slate-500">{row.started_at ? new Date(row.started_at).toLocaleString() : 'Aucune activité'}</td>
+                        <td className="px-4 py-3">{row.best_attempt_id ? <button type="button" onClick={() => setReviewStudent(row)} className="whitespace-nowrap rounded-lg border border-[#cfe0ea] bg-[#f5f9fc] px-3 py-2 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-emerald-50">Voir les réponses</button> : <span className="text-xs text-slate-400">Aucune tentative terminée</span>}</td>
                       </tr>;
                     })}
                   </tbody>
@@ -312,6 +336,39 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
               </div>
             )}
           </div>
+
+          {reviewStudent && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Réponses de la meilleure tentative">
+            <section className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+                <div><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Meilleure tentative</p><h3 className="mt-1 text-lg font-black text-[#072a3f]">{reviewStudent.student_name}</h3><p className="mt-1 text-sm text-slate-500">{reviewStudent.class_name} · {reviewStudent.best_score} / {reviewStudent.max_score} points</p></div>
+                <button type="button" onClick={() => setReviewStudent(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Fermer</button>
+              </header>
+              <div className="space-y-3 overflow-y-auto p-5">
+                {(reviewStudent.best_details || []).map((detail: any, index: number) => {
+                  const question = selectedExercise?.questions.find(item => item.id === detail.question_id);
+                  const expected = question?.answers?.join(' / ') || question?.correct_answer || question?.verbes_trous?.phrases?.map((phrase: any) => phrase.reponses?.join(' / ')).join(' · ') || 'Correction non disponible';
+                  return <article key={detail.question_id} className="rounded-xl border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="font-bold text-[#072a3f]">Question {index + 1} — {question?.question || detail.question_id}</h4><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${detail.correct ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{detail.correct ? 'Correcte' : detail.timed_out ? 'Temps écoulé' : 'À corriger'}</span></div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Réponse de l’élève</p><p className="mt-1 break-words text-sm font-medium text-slate-800">{detail.answer == null ? 'Aucune réponse' : typeof detail.answer === 'string' ? detail.answer : JSON.stringify(detail.answer)}</p></div><div className="rounded-lg bg-emerald-50/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Réponse attendue</p><p className="mt-1 break-words text-sm font-medium text-slate-800">{typeof expected === 'string' ? expected : JSON.stringify(expected)}</p></div></div>
+                    <p className="mt-2 text-xs font-semibold text-slate-600">Points : {detail.points ?? 0} / {detail.max_points ?? question?.points ?? 0}</p>
+                    {question?.explanation && <p className="mt-2 text-xs leading-relaxed text-slate-500">{question.explanation}</p>}
+                  </article>;
+                })}
+                {(!reviewStudent.best_details || reviewStudent.best_details.length === 0) && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Aucun détail de réponse n’a été enregistré pour cette tentative.</p>}
+              </div>
+            </section>
+          </div>}
+
+          <section className="space-y-3">
+            <div><h3 className="font-bold text-[#072a3f]">Data Analysis</h3><p className="mt-1 text-xs text-slate-500">Indicateurs calculés à partir de la meilleure tentative terminée de chaque élève.</p></div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Score moyen</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.average === null ? '—' : performanceSummary.average.toFixed(1) + '%'}</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux de réussite</p><p className="mt-2 text-2xl font-black tabular-nums text-emerald-700">{performanceSummary.successRate === null ? '—' : Math.round(performanceSummary.successRate) + '%'}</p><p className="text-[11px] text-slate-400">Seuil : 50 %</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux d’achèvement</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{Math.round(performanceSummary.completionRate)}%</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Tentatives moyennes</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.averageAttempts.toFixed(1)}</p></article>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h4 className="font-bold text-sm text-[#072a3f]">Répartition des meilleures notes</h4><p className="mt-1 text-xs text-slate-500">Nombre d’élèves par tranche de pourcentage.</p><div className="mt-4 space-y-3">{scoreDistribution.map(bucket => <div key={bucket.label} className="grid grid-cols-[76px_1fr_30px] items-center gap-3 text-xs"><span className="text-slate-500">{bucket.label}</span><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#2fa36b]" style={{width: (performanceSummary.scoredCount ? bucket.count / performanceSummary.scoredCount * 100 : 0) + '%'}}/></div><strong className="text-right tabular-nums text-[#072a3f]">{bucket.count}</strong></div>)}</div></div>
+          </section>
 
           {questionStats.length > 0 && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4"><h3 className="font-bold text-[#072a3f]">Analyse par question</h3><p className="mt-1 text-xs text-slate-500">Réponses des dernières tentatives, selon le filtre sélectionné.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Question</th><th className="p-3">Réponses</th><th className="p-3">Correctes</th><th className="p-3">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="max-w-md p-3 text-slate-700">{row.label}</td><td className="p-3 tabular-nums">{row.responses}</td><td className="p-3 tabular-nums">{row.correct}</td><td className="p-3 font-semibold tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
         </section>
