@@ -69,6 +69,8 @@ Langue de la carte : ${language}
 ## 3. IDENTITÉ GRAPHIQUE PERMANENTE — PERCKYLINGUA
 Toutes les cartes doivent conserver la même signature visuelle, quelle que soit la leçon.
 
+**Direction artistique principale : illustration pédagogique française classique des années 1960, inspirée de l'esprit de la Méthode Boscher.** Retrouve le charme des anciens manuels scolaires illustrés : dessins simples, chaleureux, immédiatement compréhensibles et expressifs, avec une touche rétro authentique. Il s'agit d'une inspiration esthétique, pas d'une reproduction de planches, personnages, compositions ou illustrations existants de la Méthode Boscher.
+
 Palette de marque et accents :
 - Bleu profond : #072A3F
 - Bleu secondaire : #0B3C5D
@@ -82,16 +84,25 @@ Palette de marque et accents :
 - Corail : #E85D75
 - Fond blanc pur obligatoire : #FFFFFF
 
-Style :
-- Dessin manuel soigné, inspiré des cartes mentales de Tony Buzan.
+Style d’illustration :
+- Dessins à l'aspect traditionnel, comme réalisés à la main pour un manuel scolaire illustré des années 1960 : formes simples, volumes légèrement naïfs, proportions douces et expressions lisibles.
+- Contours dessinés à l'encre, nets mais légèrement irréguliers ; aplats de couleurs francs, avec un rendu évoquant la gouache ou les crayons de couleur imprimés.
+- Personnages attachants et expressifs, objets du quotidien, animaux, petites scènes concrètes et mises en situation qui rendent les notions immédiatement compréhensibles.
+- Silhouettes simplifiées, détails limités mais significatifs ; chaque illustration doit expliquer ou mémoriser une idée précise, jamais servir de décoration gratuite.
+- Composition de petites scènes pédagogiques et de vignettes illustrées, dans l'esprit des anciens livres d'apprentissage de la lecture.
+- Palette colorée chaleureuse et légèrement rétro, tout en conservant les couleurs PerckyLingua comme repères dominants. Les couleurs peuvent être nuancées pour évoquer l'impression ancienne, mais doivent rester suffisamment contrastées et lisibles.
+- Typographie des textes claire et très lisible ; les mots-clés peuvent avoir une touche manuscrite scolaire sobre, sans sacrifier la lisibilité ni imiter une police propriétaire.
+- Dessin manuel soigné, associé à une structure radiale et des branches organiques inspirées de Tony Buzan.
 - Fond entièrement blanc pur (#FFFFFF), uniforme, sans texture, sans papier crème, sans ombre, sans dégradé et sans cadre coloré.
-- Aspect naturel, vivant, organique, moderne et légèrement ludique, jamais enfantin.
-- Branches principales épaisses, très colorées et distinctes ; branches secondaires fines, colorées et fluides.
-- Illustrations nombreuses et pédagogiques : un dessin central détaillé et au moins une petite illustration par branche principale, plus des pictogrammes ou mini-dessins sur les ramifications importantes.
-- Utilise des métaphores visuelles, personnages, objets, flèches, bulles, étoiles, symboles et petites scènes pour rendre les notions mémorables.
-- Dessins colorés à la main, expressifs, précis et variés ; ne remplace pas les illustrations par de simples emojis.
-- Composition riche et vivante mais aérée : remplir harmonieusement l’espace blanc, éviter les grandes zones vides et préserver la lisibilité.
-- Conserver la même identité graphique PerckyLingua entre toutes les leçons.
+- Illustrations nombreuses et pédagogiques : un dessin central fort et au moins une illustration par branche principale, plus des mini-scènes ou petits dessins sur les ramifications importantes.
+- Conserver cette même direction artistique rétro-éducative sur toutes les cartes pour créer une identité PerckyLingua reconnaissable.
+
+À ÉVITER ABSOLUMENT :
+- Style 3D, photoréalisme, rendu glossy, effets métalliques ou plastiques.
+- Illustrations vectorielles génériques trop lisses, icônes d'applications modernes, emojis utilisés à la place des dessins.
+- Esthétique futuriste, manga, bande dessinée contemporaine, clipart générique ou design corporate froid.
+- Textures de vieux papier, fond jauni ou crème : le fond reste blanc pur.
+- Surcharge de détails, visages trop complexes, ombres réalistes et dégradés numériques.
 
 ## 4. CODE COULEUR
 Attribue une couleur vive et distincte à chaque branche principale, sans réutiliser la même couleur pour deux branches voisines. Utilise la palette PerckyLingua (bleu, vert, rouge) complétée par orange, jaune, violet, turquoise et corail. Garde une logique stable : bleu pour concepts, vert pour règles, rouge pour exceptions et erreurs, orange/jaune pour exemples, violet/turquoise pour relations et comparaisons. Répète la couleur de la branche sur ses ramifications, mots-clés et illustrations afin de renforcer les associations visuelles. Les couleurs doivent être franches, lumineuses et harmonieuses, jamais ternes.
@@ -115,7 +126,7 @@ Attribue une couleur vive et distincte à chaque branche principale, sans réuti
 - Évite les grandes zones blanches inutilisées et les éléments regroupés uniquement au centre ; la carte doit remplir visuellement la page sans être surchargée.
 - Garde une marge de sécurité discrète d'environ 5 mm pour éviter que les textes et illustrations soient coupés à l'impression ; aucun élément important ne doit toucher le bord.
 - Fond blanc pur #FFFFFF obligatoire sur toute la surface de l’image.
-- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées.
+- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées dans le style pédagogique rétro défini plus haut.
 - Tous les éléments doivent rester dans les limites de l’image, sans rognage ni déformation.
 - Textes lisibles à l’écran et après impression au format A4 paysage.
 - Pas de signature, filigrane, titre parasite ou décoration sans intérêt pédagogique.
