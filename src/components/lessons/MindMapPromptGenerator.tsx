@@ -46,24 +46,24 @@ Niveau : ${level}
 Matière : ${subject}
 Langue de la carte : ${language}
 
-## 1. OBJECTIF PÉDAGOGIQUE
-- Identifie le thème central et les idées essentielles du cours.
-- Organise les informations sous forme de branches hiérarchisées.
-- Fais ressortir les relations entre les notions.
-- Privilégie les mots-clés et expressions courtes plutôt que les paragraphes.
-- Préserve les règles, définitions, exemples et exceptions réellement présents dans le cours.
-- N’invente aucune règle ni information.
-- Adapte la densité et le vocabulaire au niveau ${level}.
-- La carte doit permettre de réviser le cours en un seul regard.
+## 1. OBJECTIF PÉDAGOGIQUE — UN VRAI RÉSUMÉ DU COURS
+- La carte mentale doit être une synthèse fidèle et structurée de la leçon complète, pas une reproduction de son plan ni une seconde fiche de cours.
+- Sélectionne uniquement les notions indispensables à comprendre et mémoriser : concepts, règles, mécanismes, distinctions, exemples courts et exceptions utiles.
+- Condense les explications longues en mots-clés et formulations très courtes, sans perdre leur sens.
+- Ne crée **aucune branche ou section intitulée « À retenir », « À retenir absolument », « L’essentiel », « Résumé », « Conclusion » ou équivalent**. Les éléments importants doivent être intégrés directement dans les branches thématiques auxquelles ils appartiennent.
+- N’ajoute pas de bloc final récapitulatif qui répète les branches déjà présentes.
+- N’invente aucune règle ni information ; adapte la sélection et le vocabulaire au niveau ${level}.
+- La carte doit permettre de retrouver rapidement l'architecture et les idées essentielles de la leçon en un seul regard.
 
-## 2. STRUCTURE — INSPIRATION TONY BUZAN
-- Structure radiale partant du centre.
-- Illustration centrale forte représentant le thème.
-- Entre 3 et 7 branches principales selon la richesse du contenu.
-- Branches organiques, courbes et connectées.
-- Branches secondaires plus fines, avec un mot-clé ou une courte expression.
-- Utilise des associations visuelles, symboles, pictogrammes, mini-dessins et flèches.
-- Montre les liens entre notions lorsqu’ils facilitent la compréhension.
+## 2. STRUCTURE HIÉRARCHIQUE — INSPIRATION TONY BUZAN
+- Structure radiale partant du centre, avec une illustration centrale forte représentant le thème.
+- Crée des branches principales correspondant aux grands thèmes ou notions distinctes du cours (généralement 3 à 7, selon le contenu).
+- **Privilégie les sous-branches et sous-sous-branches dès qu'elles clarifient la hiérarchie** : répartis les détails sous la bonne notion au lieu de multiplier les branches principales.
+- Organise chaque branche selon une logique claire : notion → règle ou caractéristique → cas particuliers / exemple bref.
+- Une idée doit apparaître une seule fois, à l'endroit hiérarchique le plus pertinent. Si elle concerne plusieurs notions, indique un lien ou une flèche entre les branches plutôt que de la recopier.
+- Utilise des mots-clés et expressions courtes ; évite les phrases longues, les paragraphes et les répétitions.
+- Les branches sont organiques, courbes et connectées ; les branches secondaires sont plus fines et les niveaux de ramification doivent être visuellement distincts.
+- Utilise associations visuelles, symboles, pictogrammes, mini-dessins et flèches pour expliquer les relations sans dupliquer le texte.
 - Évite les tableaux, les listes rigides et les encadrés d’infographie classique.
 
 ## 3. IDENTITÉ GRAPHIQUE PERMANENTE — PERCKYLINGUA
@@ -96,14 +96,16 @@ Style :
 ## 4. CODE COULEUR
 Attribue une couleur vive et distincte à chaque branche principale, sans réutiliser la même couleur pour deux branches voisines. Utilise la palette PerckyLingua (bleu, vert, rouge) complétée par orange, jaune, violet, turquoise et corail. Garde une logique stable : bleu pour concepts, vert pour règles, rouge pour exceptions et erreurs, orange/jaune pour exemples, violet/turquoise pour relations et comparaisons. Répète la couleur de la branche sur ses ramifications, mots-clés et illustrations afin de renforcer les associations visuelles. Les couleurs doivent être franches, lumineuses et harmonieuses, jamais ternes.
 
-## 5. CONTENU ET FIDÉLITÉ
-- Rédige les libellés dans la langue choisie pour la carte.
-- Respecte exactement les termes grammaticaux, scientifiques ou techniques.
-- Conserve les exemples utiles et les distinctions importantes.
-- Mets les exceptions en évidence.
-- Évite les répétitions et les détails secondaires.
-- Ne surcharge pas la carte : sélectionne les idées essentielles si le cours est dense.
-- N’ajoute aucun contenu extérieur présenté comme faisant partie du cours.
+## 5. CONTENU, DÉDOUBLONNAGE ET FIDÉLITÉ
+- Rédige les libellés dans la langue choisie pour la carte et respecte exactement les termes grammaticaux, scientifiques ou techniques.
+- Avant de dessiner, analyse l'ensemble du cours et regroupe les informations qui parlent de la même notion.
+- **Chaque notion, règle, définition, exemple ou information ne doit figurer qu'une seule fois dans toute la carte.** Supprime les doublons même si la même idée apparaît dans plusieurs blocs du cours.
+- Ne reformule pas une même information sur une autre branche ; choisis son emplacement le plus logique et crée éventuellement une flèche de renvoi.
+- N'inscris pas les mêmes exemples à plusieurs endroits. Garde seulement l'exemple le plus clair et le plus représentatif.
+- Ne transforme pas les titres de blocs pédagogiques (« À retenir », récapitulatif, rappel, bilan, etc.) en branches. Récupère uniquement les informations nouvelles et utiles qu'ils contiennent, puis intègre-les dans les branches existantes sans répétition.
+- Mets les exceptions en évidence dans la sous-branche de la règle concernée.
+- Écarte les consignes d'activité, questions d'exercice, répétitions, introductions longues et détails secondaires qui n'aident pas à comprendre la leçon.
+- N’ajoute aucun contenu extérieur présenté comme faisant partie du cours ; ne supprime aucune distinction essentielle.
 
 ## 6. FORMAT DE SORTIE — OBLIGATOIRE
 - **Page A4 en orientation paysage (horizontal), dimensions exactes : 297 × 210 mm, ratio 1,414:1.**
