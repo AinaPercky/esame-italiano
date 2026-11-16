@@ -46,28 +46,30 @@ Niveau : ${level}
 Matière : ${subject}
 Langue de la carte : ${language}
 
-## 1. OBJECTIF PÉDAGOGIQUE
-- Identifie le thème central et les idées essentielles du cours.
-- Organise les informations sous forme de branches hiérarchisées.
-- Fais ressortir les relations entre les notions.
-- Privilégie les mots-clés et expressions courtes plutôt que les paragraphes.
-- Préserve les règles, définitions, exemples et exceptions réellement présents dans le cours.
-- N’invente aucune règle ni information.
-- Adapte la densité et le vocabulaire au niveau ${level}.
-- La carte doit permettre de réviser le cours en un seul regard.
+## 1. OBJECTIF PÉDAGOGIQUE — UN VRAI RÉSUMÉ DU COURS
+- La carte mentale doit être une synthèse fidèle et structurée de la leçon complète, pas une reproduction de son plan ni une seconde fiche de cours.
+- Sélectionne uniquement les notions indispensables à comprendre et mémoriser : concepts, règles, mécanismes, distinctions, exemples courts et exceptions utiles.
+- Condense les explications longues en mots-clés et formulations très courtes, sans perdre leur sens.
+- Ne crée **aucune branche ou section intitulée « À retenir », « À retenir absolument », « L’essentiel », « Résumé », « Conclusion » ou équivalent**. Les éléments importants doivent être intégrés directement dans les branches thématiques auxquelles ils appartiennent.
+- N’ajoute pas de bloc final récapitulatif qui répète les branches déjà présentes.
+- N’invente aucune règle ni information ; adapte la sélection et le vocabulaire au niveau ${level}.
+- La carte doit permettre de retrouver rapidement l'architecture et les idées essentielles de la leçon en un seul regard.
 
-## 2. STRUCTURE — INSPIRATION TONY BUZAN
-- Structure radiale partant du centre.
-- Illustration centrale forte représentant le thème.
-- Entre 3 et 7 branches principales selon la richesse du contenu.
-- Branches organiques, courbes et connectées.
-- Branches secondaires plus fines, avec un mot-clé ou une courte expression.
-- Utilise des associations visuelles, symboles, pictogrammes, mini-dessins et flèches.
-- Montre les liens entre notions lorsqu’ils facilitent la compréhension.
+## 2. STRUCTURE HIÉRARCHIQUE — INSPIRATION TONY BUZAN
+- Structure radiale partant du centre, avec une illustration centrale forte représentant le thème.
+- Crée des branches principales correspondant aux grands thèmes ou notions distinctes du cours (généralement 3 à 7, selon le contenu).
+- **Privilégie les sous-branches et sous-sous-branches dès qu'elles clarifient la hiérarchie** : répartis les détails sous la bonne notion au lieu de multiplier les branches principales.
+- Organise chaque branche selon une logique claire : notion → règle ou caractéristique → cas particuliers / exemple bref.
+- Une idée doit apparaître une seule fois, à l'endroit hiérarchique le plus pertinent. Si elle concerne plusieurs notions, indique un lien ou une flèche entre les branches plutôt que de la recopier.
+- Utilise des mots-clés et expressions courtes ; évite les phrases longues, les paragraphes et les répétitions.
+- Les branches sont organiques, courbes et connectées ; les branches secondaires sont plus fines et les niveaux de ramification doivent être visuellement distincts.
+- Utilise associations visuelles, symboles, pictogrammes, mini-dessins et flèches pour expliquer les relations sans dupliquer le texte.
 - Évite les tableaux, les listes rigides et les encadrés d’infographie classique.
 
 ## 3. IDENTITÉ GRAPHIQUE PERMANENTE — PERCKYLINGUA
 Toutes les cartes doivent conserver la même signature visuelle, quelle que soit la leçon.
+
+**Direction artistique principale : illustration pédagogique française classique des années 1960, inspirée de l'esprit de la Méthode Boscher.** Retrouve le charme des anciens manuels scolaires illustrés : dessins simples, chaleureux, immédiatement compréhensibles et expressifs, avec une touche rétro authentique. Il s'agit d'une inspiration esthétique, pas d'une reproduction de planches, personnages, compositions ou illustrations existants de la Méthode Boscher.
 
 Palette de marque et accents :
 - Bleu profond : #072A3F
@@ -82,35 +84,51 @@ Palette de marque et accents :
 - Corail : #E85D75
 - Fond blanc pur obligatoire : #FFFFFF
 
-Style :
-- Dessin manuel soigné, inspiré des cartes mentales de Tony Buzan.
+Style d’illustration :
+- Dessins à l'aspect traditionnel, comme réalisés à la main pour un manuel scolaire illustré des années 1960 : formes simples, volumes légèrement naïfs, proportions douces et expressions lisibles.
+- Contours dessinés à l'encre, nets mais légèrement irréguliers ; aplats de couleurs francs, avec un rendu évoquant la gouache ou les crayons de couleur imprimés.
+- Personnages attachants et expressifs, objets du quotidien, animaux, petites scènes concrètes et mises en situation qui rendent les notions immédiatement compréhensibles.
+- Silhouettes simplifiées, détails limités mais significatifs ; chaque illustration doit expliquer ou mémoriser une idée précise, jamais servir de décoration gratuite.
+- Composition de petites scènes pédagogiques et de vignettes illustrées, dans l'esprit des anciens livres d'apprentissage de la lecture.
+- Palette colorée chaleureuse et légèrement rétro, tout en conservant les couleurs PerckyLingua comme repères dominants. Les couleurs peuvent être nuancées pour évoquer l'impression ancienne, mais doivent rester suffisamment contrastées et lisibles.
+- Typographie des textes claire et très lisible ; les mots-clés peuvent avoir une touche manuscrite scolaire sobre, sans sacrifier la lisibilité ni imiter une police propriétaire.
+- Dessin manuel soigné, associé à une structure radiale et des branches organiques inspirées de Tony Buzan.
 - Fond entièrement blanc pur (#FFFFFF), uniforme, sans texture, sans papier crème, sans ombre, sans dégradé et sans cadre coloré.
-- Aspect naturel, vivant, organique, moderne et légèrement ludique, jamais enfantin.
-- Branches principales épaisses, très colorées et distinctes ; branches secondaires fines, colorées et fluides.
-- Illustrations nombreuses et pédagogiques : un dessin central détaillé et au moins une petite illustration par branche principale, plus des pictogrammes ou mini-dessins sur les ramifications importantes.
-- Utilise des métaphores visuelles, personnages, objets, flèches, bulles, étoiles, symboles et petites scènes pour rendre les notions mémorables.
-- Dessins colorés à la main, expressifs, précis et variés ; ne remplace pas les illustrations par de simples emojis.
-- Composition riche et vivante mais aérée : remplir harmonieusement l’espace blanc, éviter les grandes zones vides et préserver la lisibilité.
-- Conserver la même identité graphique PerckyLingua entre toutes les leçons.
+- Illustrations nombreuses et pédagogiques : un dessin central fort et au moins une illustration par branche principale, plus des mini-scènes ou petits dessins sur les ramifications importantes.
+- Conserver cette même direction artistique rétro-éducative sur toutes les cartes pour créer une identité PerckyLingua reconnaissable.
+
+À ÉVITER ABSOLUMENT :
+- Style 3D, photoréalisme, rendu glossy, effets métalliques ou plastiques.
+- Illustrations vectorielles génériques trop lisses, icônes d'applications modernes, emojis utilisés à la place des dessins.
+- Esthétique futuriste, manga, bande dessinée contemporaine, clipart générique ou design corporate froid.
+- Textures de vieux papier, fond jauni ou crème : le fond reste blanc pur.
+- Surcharge de détails, visages trop complexes, ombres réalistes et dégradés numériques.
 
 ## 4. CODE COULEUR
 Attribue une couleur vive et distincte à chaque branche principale, sans réutiliser la même couleur pour deux branches voisines. Utilise la palette PerckyLingua (bleu, vert, rouge) complétée par orange, jaune, violet, turquoise et corail. Garde une logique stable : bleu pour concepts, vert pour règles, rouge pour exceptions et erreurs, orange/jaune pour exemples, violet/turquoise pour relations et comparaisons. Répète la couleur de la branche sur ses ramifications, mots-clés et illustrations afin de renforcer les associations visuelles. Les couleurs doivent être franches, lumineuses et harmonieuses, jamais ternes.
 
-## 5. CONTENU ET FIDÉLITÉ
-- Rédige les libellés dans la langue choisie pour la carte.
-- Respecte exactement les termes grammaticaux, scientifiques ou techniques.
-- Conserve les exemples utiles et les distinctions importantes.
-- Mets les exceptions en évidence.
-- Évite les répétitions et les détails secondaires.
-- Ne surcharge pas la carte : sélectionne les idées essentielles si le cours est dense.
-- N’ajoute aucun contenu extérieur présenté comme faisant partie du cours.
+## 5. CONTENU, DÉDOUBLONNAGE ET FIDÉLITÉ
+- Rédige les libellés dans la langue choisie pour la carte et respecte exactement les termes grammaticaux, scientifiques ou techniques.
+- Avant de dessiner, analyse l'ensemble du cours et regroupe les informations qui parlent de la même notion.
+- **Chaque notion, règle, définition, exemple ou information ne doit figurer qu'une seule fois dans toute la carte.** Supprime les doublons même si la même idée apparaît dans plusieurs blocs du cours.
+- Ne reformule pas une même information sur une autre branche ; choisis son emplacement le plus logique et crée éventuellement une flèche de renvoi.
+- N'inscris pas les mêmes exemples à plusieurs endroits. Garde seulement l'exemple le plus clair et le plus représentatif.
+- Ne transforme pas les titres de blocs pédagogiques (« À retenir », récapitulatif, rappel, bilan, etc.) en branches. Récupère uniquement les informations nouvelles et utiles qu'ils contiennent, puis intègre-les dans les branches existantes sans répétition.
+- Mets les exceptions en évidence dans la sous-branche de la règle concernée.
+- Écarte les consignes d'activité, questions d'exercice, répétitions, introductions longues et détails secondaires qui n'aident pas à comprendre la leçon.
+- N’ajoute aucun contenu extérieur présenté comme faisant partie du cours ; ne supprime aucune distinction essentielle.
 
-## 6. FORMAT DE SORTIE
-- Format A4 paysage, haute résolution.
+## 6. FORMAT DE SORTIE — OBLIGATOIRE
+- **Page A4 en orientation paysage (horizontal), dimensions exactes : 297 × 210 mm, ratio 1,414:1.**
+- Produis une seule image horizontale adaptée à une impression A4 paysage ; n'utilise jamais le format portrait, carré ou vertical.
+- Fais occuper à la carte mentale toute la surface utile de la page : exploite pleinement la largeur et la hauteur, avec une composition équilibrée d'un bord à l'autre.
+- Répartis les branches principales sur toute la largeur du format paysage, à gauche et à droite du centre ; utilise également l'espace supérieur et inférieur.
+- Évite les grandes zones blanches inutilisées et les éléments regroupés uniquement au centre ; la carte doit remplir visuellement la page sans être surchargée.
+- Garde une marge de sécurité discrète d'environ 5 mm pour éviter que les textes et illustrations soient coupés à l'impression ; aucun élément important ne doit toucher le bord.
 - Fond blanc pur #FFFFFF obligatoire sur toute la surface de l’image.
-- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées.
-- Tous les éléments doivent rester dans les limites de l’image.
-- Textes lisibles à l’écran et après impression.
+- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées dans le style pédagogique rétro défini plus haut.
+- Tous les éléments doivent rester dans les limites de l’image, sans rognage ni déformation.
+- Textes lisibles à l’écran et après impression au format A4 paysage.
 - Pas de signature, filigrane, titre parasite ou décoration sans intérêt pédagogique.
 
 ## 7. RÉSULTAT ATTENDU
