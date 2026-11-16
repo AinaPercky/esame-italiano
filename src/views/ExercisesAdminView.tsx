@@ -75,6 +75,28 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       notStarted
     };
   }, [filteredAttempts]);
+  const performanceSummary = useMemo(() => {
+    const scored = filteredAttempts.filter(row => row.best_score !== null && row.best_score !== undefined && Number(row.max_score) > 0);
+    const percentages = scored.map(row => Number(row.best_score) / Number(row.max_score) * 100);
+    const average = percentages.length ? percentages.reduce((sum, value) => sum + value, 0) / percentages.length : null;
+    return {
+      average,
+      successRate: percentages.length ? percentages.filter(value => value >= 50).length / percentages.length * 100 : null,
+      completionRate: filteredAttempts.length ? filteredAttempts.filter(row => row.status === 'completed').length / filteredAttempts.length * 100 : 0,
+      scoredCount: scored.length,
+      averageAttempts: filteredAttempts.length ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) / filteredAttempts.length : 0
+    };
+  }, [filteredAttempts]);
+  const scoreDistribution = useMemo(() => [
+    { label: '0–20 %', min: 0, max: 20 }, { label: '21–40 %', min: 20, max: 40 },
+    { label: '41–60 %', min: 40, max: 60 }, { label: '61–80 %', min: 60, max: 80 },
+    { label: '81–100 %', min: 80, max: 100.001 }
+  ].map(range => ({ ...range, count: filteredAttempts.filter(row => {
+    if (row.best_score === null || row.best_score === undefined || !(Number(row.max_score) > 0)) return false;
+    const pct = Number(row.best_score) / Number(row.max_score) * 100;
+    return pct >= range.min && pct < range.max;
+  }).length })), [filteredAttempts]);
+
   const questionStats = (selectedExercise?.questions || []).map(question => {
     const responses = filteredAttempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
     return {
@@ -336,6 +358,17 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
               </div>
             </section>
           </div>}
+
+          <section className="space-y-3">
+            <div><h3 className="font-bold text-[#072a3f]">Data Analysis</h3><p className="mt-1 text-xs text-slate-500">Indicateurs calculés à partir de la meilleure tentative terminée de chaque élève.</p></div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Score moyen</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.average === null ? '—' : performanceSummary.average.toFixed(1) + '%'}</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux de réussite</p><p className="mt-2 text-2xl font-black tabular-nums text-emerald-700">{performanceSummary.successRate === null ? '—' : Math.round(performanceSummary.successRate) + '%'}</p><p className="text-[11px] text-slate-400">Seuil : 50 %</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux d’achèvement</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{Math.round(performanceSummary.completionRate)}%</p></article>
+              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Tentatives moyennes</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.averageAttempts.toFixed(1)}</p></article>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h4 className="font-bold text-sm text-[#072a3f]">Répartition des meilleures notes</h4><p className="mt-1 text-xs text-slate-500">Nombre d’élèves par tranche de pourcentage.</p><div className="mt-4 space-y-3">{scoreDistribution.map(bucket => <div key={bucket.label} className="grid grid-cols-[76px_1fr_30px] items-center gap-3 text-xs"><span className="text-slate-500">{bucket.label}</span><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#2fa36b]" style={{width: (performanceSummary.scoredCount ? bucket.count / performanceSummary.scoredCount * 100 : 0) + '%'}}/></div><strong className="text-right tabular-nums text-[#072a3f]">{bucket.count}</strong></div>)}</div></div>
+          </section>
 
           {questionStats.length > 0 && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4"><h3 className="font-bold text-[#072a3f]">Analyse par question</h3><p className="mt-1 text-xs text-slate-500">Réponses des dernières tentatives, selon le filtre sélectionné.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Question</th><th className="p-3">Réponses</th><th className="p-3">Correctes</th><th className="p-3">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="max-w-md p-3 text-slate-700">{row.label}</td><td className="p-3 tabular-nums">{row.responses}</td><td className="p-3 tabular-nums">{row.correct}</td><td className="p-3 font-semibold tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
         </section>
