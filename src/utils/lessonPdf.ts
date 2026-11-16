@@ -351,24 +351,30 @@ export async function createLessonPdf(lesson: Lesson, options: LessonPdfOptions 
   orderedCourseBlocks(lesson.blocks || []).forEach(block => renderBlock(block, numbering));
   if (y <= TOP_CONTENT + 5) addParagraph('Le contenu pédagogique de cette leçon sera bientôt disponible.');
 
+  let mindMapPage: number | null = null;
   if (mindMap) {
-    doc.addPage();
-    y = TOP_CONTENT;
-    addSection('Mind map — Synthèse visuelle', 1);
-    const maxWidth = CONTENT_WIDTH;
-    const maxHeight = PAGE_HEIGHT - TOP_CONTENT - 48;
-    const ratio = Math.min(maxWidth / mindMap.width, maxHeight / mindMap.height);
-    const imageWidth = mindMap.width * ratio;
-    const imageHeight = mindMap.height * ratio;
-    const imageX = (PAGE_WIDTH - imageWidth) / 2;
-    const availableHeight = PAGE_HEIGHT - (TOP_CONTENT + 18) - 25;
-    const imageY = TOP_CONTENT + 18 + Math.max(0, (availableHeight - imageHeight) / 2);
+    // Le mind map dispose de sa propre page A4 paysage, sans en-tête ni pied de page,
+    // afin de maximiser la surface imprimable et de conserver les proportions de l'image.
+    doc.addPage('a4', 'landscape');
+    mindMapPage = doc.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const safeMargin = 3;
+    const maxWidth = pageWidth - safeMargin * 2;
+    const maxHeight = pageHeight - safeMargin * 2;
+    const scale = Math.min(maxWidth / mindMap.width, maxHeight / mindMap.height);
+    const imageWidth = mindMap.width * scale;
+    const imageHeight = mindMap.height * scale;
+    const imageX = (pageWidth - imageWidth) / 2;
+    const imageY = (pageHeight - imageHeight) / 2;
     doc.addImage(mindMap.data, 'PNG', imageX, imageY, imageWidth, imageHeight, undefined, 'FAST');
   }
 
   const pageCount = doc.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
+    // La page du mind map reste entièrement dédiée à l'image en A4 paysage.
+    if (page === mindMapPage) continue;
     // En-tête courant, clair et économe en encre.
     doc.setDrawColor(...BRAND.line); doc.setLineWidth(0.35); doc.line(MARGIN, 16, PAGE_WIDTH - MARGIN, 16);
     font(true); doc.setFontSize(8); doc.setTextColor(...BRAND.navy); doc.text(`Leçon ${(lesson.sort_order || 0) + 1} · ${normalizePdfText(lesson.title_it)}`, MARGIN, 12);
