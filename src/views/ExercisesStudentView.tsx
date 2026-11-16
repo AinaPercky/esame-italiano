@@ -414,6 +414,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
             const completed = exerciseResults.filter(result => result.status === 'completed' && result.max_score > 0);
             const bestResult = [...completed].sort((a, b) => (b.score / b.max_score) - (a.score / a.max_score) || b.score - a.score)[0];
             const bestPercent = bestResult ? Math.round((bestResult.score / bestResult.max_score) * 100) : null;
+            const bestScore20 = bestResult ? (bestResult.score / bestResult.max_score * 20).toFixed(2).replace(/\.00$/, '') : null;
             const hasActiveAttempt = Boolean(item.active_attempt_id);
 
             const statusBadge = hasActiveAttempt ? (
@@ -472,7 +473,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                       value: bestResult ? `${bestResult.score} / ${bestResult.max_score}` : '—',
                       hint:
                         bestPercent !== null
-                          ? `${bestPercent} % · ${completed.length} terminée(s)`
+                          ? `${bestPercent} % · ${(bestScore20 ?? '0')}/20 · ${completed.length} terminée(s)`
                           : 'Aucun résultat terminé',
                       tone: bestResult ? 'success' : 'default'
                     }
@@ -553,7 +554,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
               {best && <div className="flex flex-col gap-2 rounded-2xl border border-[#bfe3ce] bg-[#eef9f3] p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-extrabold text-[#145c3d]"><Award size={14} /> Votre meilleure tentative</p>
-                  <p className="mt-1 text-xs font-semibold tabular-nums text-[#24764e]">{best.score} / {best.max_score} · {Math.round(best.score / best.max_score * 100)} %</p>
+                  <p className="mt-1 text-xs font-semibold tabular-nums text-[#24764e]">{best.score} / {best.max_score} · {Math.round(best.score / best.max_score * 100)} % · {(best.score / best.max_score * 20).toFixed(2).replace(/\.00$/, '')}/20</p>
                 </div>
                 <button type="button" disabled={reviewLoading} onClick={() => void openBestAttempt(historyExerciseId)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-[#248556] disabled:opacity-50">
                   <Eye size={14} />{reviewLoading ? 'Chargement…' : 'Voir les réponses et corrections'}
@@ -581,7 +582,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                         </p>
                         {result.status === 'completed' && (
                           <p className="text-[11px] tabular-nums text-[#607f93]">
-                            {result.max_score > 0 ? Math.round(result.score / result.max_score * 100) : 0} %
+                            {result.max_score > 0 ? Math.round(result.score / result.max_score * 100) : 0} % · {result.max_score > 0 ? (result.score / result.max_score * 20).toFixed(2).replace(/\.00$/, '') : '0'}/20
                           </p>
                         )}
                       </div>
