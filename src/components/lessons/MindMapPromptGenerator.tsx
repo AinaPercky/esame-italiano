@@ -105,12 +105,17 @@ Attribue une couleur vive et distincte à chaque branche principale, sans réuti
 - Ne surcharge pas la carte : sélectionne les idées essentielles si le cours est dense.
 - N’ajoute aucun contenu extérieur présenté comme faisant partie du cours.
 
-## 6. FORMAT DE SORTIE
-- Format A4 paysage, haute résolution.
+## 6. FORMAT DE SORTIE — OBLIGATOIRE
+- **Page A4 en orientation paysage (horizontal), dimensions exactes : 297 × 210 mm, ratio 1,414:1.**
+- Produis une seule image horizontale adaptée à une impression A4 paysage ; n'utilise jamais le format portrait, carré ou vertical.
+- Fais occuper à la carte mentale toute la surface utile de la page : exploite pleinement la largeur et la hauteur, avec une composition équilibrée d'un bord à l'autre.
+- Répartis les branches principales sur toute la largeur du format paysage, à gauche et à droite du centre ; utilise également l'espace supérieur et inférieur.
+- Évite les grandes zones blanches inutilisées et les éléments regroupés uniquement au centre ; la carte doit remplir visuellement la page sans être surchargée.
+- Garde une marge de sécurité discrète d'environ 5 mm pour éviter que les textes et illustrations soient coupés à l'impression ; aucun élément important ne doit toucher le bord.
 - Fond blanc pur #FFFFFF obligatoire sur toute la surface de l’image.
 - Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées.
-- Tous les éléments doivent rester dans les limites de l’image.
-- Textes lisibles à l’écran et après impression.
+- Tous les éléments doivent rester dans les limites de l’image, sans rognage ni déformation.
+- Textes lisibles à l’écran et après impression au format A4 paysage.
 - Pas de signature, filigrane, titre parasite ou décoration sans intérêt pédagogique.
 
 ## 7. RÉSULTAT ATTENDU
