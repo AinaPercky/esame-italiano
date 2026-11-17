@@ -105,6 +105,36 @@ CREATE TABLE public.exam_pass_order (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE public.lesson_progress (
+  user_id uuid NOT NULL,
+  lesson_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'in_progress',
+  discovery_state jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, lesson_id)
+);
+
+CREATE TABLE public.lessons (
+  id uuid PRIMARY KEY,
+  status text NOT NULL
+);
+
+CREATE TABLE public.lesson_blocks (
+  id uuid PRIMARY KEY,
+  lesson_id uuid NOT NULL REFERENCES public.lessons(id),
+  position integer NOT NULL,
+  type text NOT NULL,
+  content jsonb NOT NULL,
+  parent_block_id uuid
+);
+
+-- Exercise tables are included to verify the schema-wide privilege hardening.
+CREATE TABLE public.exercises (id uuid PRIMARY KEY, status text NOT NULL);
+CREATE TABLE public.exercise_versions (id uuid PRIMARY KEY, content jsonb NOT NULL);
+CREATE TABLE public.exercise_class_assignments (exercise_id uuid NOT NULL, class_id uuid NOT NULL);
+CREATE TABLE public.exercise_attempts (id uuid PRIMARY KEY, student_id uuid NOT NULL);
+CREATE TABLE public.exercise_answers (id uuid PRIMARY KEY, attempt_id uuid NOT NULL, answer jsonb);
+
 CREATE OR REPLACE FUNCTION public.class_enrollment_is_teacher()
 RETURNS boolean LANGUAGE sql STABLE
 AS $$
@@ -145,7 +175,41 @@ CREATE POLICY "Exam pass order full access" ON public.exam_pass_order FOR ALL TO
 CREATE POLICY class_enrollments_read_own_or_teacher ON public.class_enrollments FOR SELECT TO authenticated
   USING (public.class_enrollment_is_teacher() OR student_id = public.class_enrollment_current_student_id());
 
+CREATE POLICY "Managers can manage lessons" ON public.lessons FOR ALL TO authenticated
+  USING (public.class_enrollment_is_teacher())
+  WITH CHECK (public.class_enrollment_is_teacher());
+CREATE POLICY "Published lessons are readable" ON public.lessons FOR SELECT TO anon, authenticated
+  USING (status = 'published');
+CREATE POLICY "Managers can manage lesson blocks" ON public.lesson_blocks FOR ALL TO authenticated
+  USING (public.class_enrollment_is_teacher())
+  WITH CHECK (public.class_enrollment_is_teacher());
+CREATE POLICY "Published lesson blocks are readable" ON public.lesson_blocks FOR SELECT TO anon, authenticated
+  USING (EXISTS (SELECT 1 FROM public.lessons l WHERE l.id = lesson_blocks.lesson_id AND l.status = 'published'));
+CREATE POLICY "Managers read lesson progress" ON public.lesson_progress FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Students manage own lesson progress" ON public.lesson_progress FOR ALL TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+ALTER TABLE public.lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercise_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercise_class_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercise_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercise_answers ENABLE ROW LEVEL SECURITY;
+
 GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES, TRIGGER, TRUNCATE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+
+INSERT INTO public.lessons (id,status) VALUES
+('70000000-0000-4000-8000-000000000001','published'),
+('70000000-0000-4000-8000-000000000002','draft');
+INSERT INTO public.lesson_blocks (id,lesson_id,position,type,content) VALUES
+('71000000-0000-4000-8000-000000000001','70000000-0000-4000-8000-000000000001',1,'text','{"text":"Public lesson"}'),
+('71000000-0000-4000-8000-000000000002','70000000-0000-4000-8000-000000000002',1,'text','{"text":"Draft lesson"}');
+INSERT INTO public.lesson_progress (user_id,lesson_id,status,discovery_state) VALUES
+('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','70000000-0000-4000-8000-000000000001','completed','{}'),
+('dddddddd-dddd-4ddd-8ddd-dddddddddddd','70000000-0000-4000-8000-000000000001','in_progress','{}');
 
 INSERT INTO public.classes (id,name,enrollment_mode,archived_at) VALUES
 ('00000000-0000-4000-8000-000000000001','IUM-L2','approval',NULL),
