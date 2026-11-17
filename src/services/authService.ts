@@ -349,15 +349,20 @@ export const authService = {
       return { success: false, error: 'Le mot de passe doit comporter au moins 4 caractères.' };
     }
 
-    const studentId = params.existingStudentId || (
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
-    );
-
     if (supabaseService.isConfigured()) {
       try {
-        const sessionCreated = await supabaseService.registerStudentAuth(email, password, studentId);
+        // Le navigateur ne lit ni n'écrit directement le registre scolaire.
+        // La RPC crée un profil en attente ou associe un dossier existant après
+        // vérification du nom et, si fourni, du matricule.
+        const profile = await supabaseService.prepareStudentRegistration({
+          firstName,
+          lastName,
+          gender,
+          studentNumber,
+          classId,
+          email
+        });
+        const sessionCreated = await supabaseService.registerStudentAuth(email, password, profile.id);
         if (!sessionCreated) {
           return {
             success: true,
@@ -365,16 +370,17 @@ export const authService = {
           };
         }
 
+        await supabaseService.finalizeStudentRegistration();
         const user: AuthUser = {
-          id: `session_${studentId}`,
+          id: `session_${profile.id}`,
           email,
-          name: `${firstName} ${lastName}`,
-          gender,
+          name: `${profile.first_name} ${profile.last_name}`,
+          gender: profile.gender || gender,
           role: 'student',
-          student_id: studentId,
-          student_number: studentNumber || null,
-          class_id: classId,
-          class_name: params.className || 'Classe',
+          student_id: profile.id,
+          student_number: profile.student_number || null,
+          class_id: profile.class_id,
+          class_name: profile.class_name || params.className || 'Classe',
           loginAt: new Date().toISOString()
         };
         currentUser = user;

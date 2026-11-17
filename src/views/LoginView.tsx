@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { dataService } from '../services/dataService';
-import { supabaseService } from '../services/supabaseService';
 import { ClassRoom } from '../types';
 
 interface LoginViewProps {
@@ -105,29 +104,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setSuccessMessage(null);
     setIsLoading(true);
     try {
-      let rosterStudent = dataService.getStudentByEmail(regEmail);
-      const targetClass = classes.find(c => c.id === (rosterStudent?.class_id || regClassId));
-
-      if (!rosterStudent && supabaseService.isConfigured()) {
-        rosterStudent = await dataService.createStudent(
-          regFirstName, regLastName, regClassId, regEmail, regStudentNumber, undefined, undefined, regGender
-        );
-      }
-
-      if (rosterStudent) {
-        rosterStudent = await dataService.updateStudent(rosterStudent.id, { gender: regGender });
-      }
-
+      const targetClass = classes.find(c => c.id === regClassId);
       const result = await authService.registerStudent({
-        firstName: rosterStudent?.first_name || regFirstName,
-        lastName: rosterStudent?.last_name || regLastName,
+        firstName: regFirstName,
+        lastName: regLastName,
         gender: regGender,
-        studentNumber: rosterStudent?.student_number || regStudentNumber,
-        classId: rosterStudent?.class_id || regClassId,
+        studentNumber: regStudentNumber,
+        classId: regClassId,
         className: targetClass?.name,
         email: regEmail,
-        password: regPassword,
-        existingStudentId: rosterStudent?.id
+        password: regPassword
       });
 
       if (!result.success) {
@@ -140,13 +126,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setViewMode('login');
         setSuccessMessage('Compte créé. Confirmez votre adresse e-mail avec le lien reçu, puis connectez-vous.');
         return;
-      }
-
-      const createdStudentId = result.user?.student_id || rosterStudent?.id;
-      if (!rosterStudent && createdStudentId) {
-        await dataService.createStudent(regFirstName, regLastName, regClassId, regEmail, regStudentNumber, createdStudentId, undefined, regGender);
-      } else if (rosterStudent) {
-        await dataService.updateStudent(rosterStudent.id, { validation_status: 'pending' });
       }
 
       authService.logout();

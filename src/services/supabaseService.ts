@@ -288,6 +288,92 @@ class SupabaseService {
     return { ...student, class_name: classroom?.name, class_ids: (activeEnrollments || []).map(item => item.class_id) } as Student;
   }
 
+  public async prepareStudentRegistration(params: {
+    firstName: string;
+    lastName: string;
+    gender: 'homme' | 'femme';
+    studentNumber: string;
+    classId: string;
+    email: string;
+  }): Promise<{
+    id: string;
+    class_id: string;
+    class_name?: string;
+    first_name: string;
+    last_name: string;
+    gender: 'homme' | 'femme';
+    student_number?: string | null;
+    validation_status?: 'pending' | 'approved' | 'rejected';
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { data, error } = await client.rpc('prepare_student_registration', {
+      p_first_name: params.firstName,
+      p_last_name: params.lastName,
+      p_gender: params.gender,
+      p_student_number: params.studentNumber || null,
+      p_class_id: params.classId,
+      p_email: params.email.trim().toLowerCase()
+    });
+    if (error) throw new Error(`Préparation de l’inscription impossible : ${error.message}`);
+    if (!data?.id || !data?.class_id) throw new Error('Supabase n’a pas retourné de fiche élève valide.');
+    return data;
+  }
+
+  public async updateOwnStudentProfile(student: Student): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { error } = await client.rpc('update_own_student_profile', {
+      p_student_id: student.id,
+      p_first_name: student.first_name,
+      p_last_name: student.last_name,
+      p_student_number: student.student_number || null,
+      p_gender: student.gender || 'homme',
+      p_avatar_url: student.avatar_url || null
+    });
+    if (error) throw new Error(`Mise à jour du profil étudiant impossible : ${error.message}`);
+  }
+
+  public async finalizeStudentRegistration(): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { error } = await client.rpc('finalize_student_registration');
+    if (error) throw new Error(`Validation de l’inscription impossible : ${error.message}`);
+  }
+
+  public async getPublicOralReport(
+    examId?: string,
+    studentId?: string,
+    lookup?: string
+  ): Promise<{ student: Student; exam: Exam; evaluation: Evaluation } | null> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { data, error } = await client.rpc('get_public_oral_report', {
+      p_exam_id: examId || null,
+      p_student_id: studentId || null,
+      p_lookup: lookup?.trim() || null
+    });
+    if (error) throw new Error(`Chargement du rapport oral impossible : ${error.message}`);
+    if (!data?.student || !data?.exam || !data?.evaluation) return null;
+
+    const student: Student = {
+      ...data.student,
+      email: '',
+      created_at: '',
+      updated_at: ''
+    };
+    const exam: Exam = {
+      ...data.exam,
+      rubrics: Array.isArray(data.rubrics) ? data.rubrics : []
+    };
+    const evaluation: Evaluation = {
+      ...data.evaluation,
+      total_score: Number(data.evaluation.total_score) || 0,
+      details: Array.isArray(data.evaluation.details) ? data.evaluation.details : []
+    };
+    return { student, exam, evaluation };
+  }
+
   public async registerStudentAuth(email: string, password: string, studentId: string): Promise<boolean> {
     const client = this.getClient();
     if (!client) throw new Error('La connexion Supabase est indisponible.');
@@ -644,7 +730,7 @@ class SupabaseService {
     if (avatarError) console.warn('Supabase deleteStudent avatar cleanup warning:', avatarError);
   }
 
-  public async saveStudentAvatar(studentId: string, imageDataUrl: string | null): Promise<string | null> {
+  public async saveStudentAvatar(studentId: string, imageDataUrl: string | null, updateOwnProfile = false): Promise<string | null> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase n'est pas configuré.");
     if (!isUUID(studentId)) throw new Error("La fiche élève n'a pas d'identifiant Supabase valide.");
@@ -691,18 +777,28 @@ class SupabaseService {
       }
     }
 
-    const { data: updatedStudent, error: updateError } = await client
-      .from('students')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', studentId)
-      .select('id')
-      .maybeSingle();
+    if (updateOwnProfile) {
+      const { error: updateError } = await client.rpc('update_own_student_avatar', {
+        p_student_id: studentId,
+        p_avatar_url: avatarUrl
+      });
+      if (updateError) {
+        throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
+      }
+    } else {
+      const { data: updatedStudent, error: updateError } = await client
+        .from('students')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', studentId)
+        .select('id')
+        .maybeSingle();
 
-    if (updateError) {
-      throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
-    }
-    if (!updatedStudent) {
-      throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
+      if (updateError) {
+        throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
+      }
+      if (!updatedStudent) {
+        throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
+      }
     }
 
     const pathsToRemove = imageDataUrl ? obsoleteAvatarPaths : avatarStoragePaths;
@@ -1515,9 +1611,24 @@ class SupabaseService {
           : isAuthenticated
             ? client.rpc('get_student_quiz_catalog')
             : client.rpc('get_public_quiz_catalog');
+      const emptyRequest = Promise.resolve({ data: [], error: null });
+      const classesRequest = client.from('classes').select('*');
+      // Anonymous clients must not query private school tables at all.
+      // RLS remains the second line of defense for authenticated student requests.
+      const studentsRequest = isAuthenticated ? client.from('students').select('*') : emptyRequest;
+      const examsRequest = isAuthenticated ? client.from('exams').select('*') : emptyRequest;
+      const rubricsRequest = isAuthenticated ? client.from('exam_rubrics').select('*') : emptyRequest;
+      const evaluationsRequest = isAuthenticated ? client.from('evaluations').select('*') : emptyRequest;
+      const detailsRequest = isAuthenticated ? client.from('evaluation_details').select('*') : emptyRequest;
+      const passOrderRequest = isAuthenticated ? client.from('exam_pass_order').select('*') : emptyRequest;
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('*')
-        : Promise.resolve({ data: [], error: null });
+        : emptyRequest;
+      // The student roster RPC exposes only classmate names and identifiers,
+      // never e-mail addresses or private profile fields.
+      const classRosterRequest = isAuthenticated && !isTeacher
+        ? client.rpc('get_student_class_roster')
+        : emptyRequest;
       // Les élèves ne peuvent lire que leurs copies complètes via RLS.
       // Cette RPC ne renvoie que les notes de référence et métadonnées publiques
       // des élèves actifs de leurs propres classes (jamais les réponses/corrections).
@@ -1540,41 +1651,55 @@ class SupabaseService {
         { data: quizzesData, error: errQ },
         { data: quizSubmissionsData, error: errQS },
         { data: classLeaderboardData, error: errClassLeaderboard },
-        { data: enrollmentsData, error: errEnrollments }
+        { data: enrollmentsData, error: errEnrollments },
+        { data: classRosterData, error: errClassRoster }
       ] = await Promise.all([
-        client.from('classes').select('*'),
-        client.from('students').select('*'),
-        client.from('exams').select('*'),
-        client.from('exam_rubrics').select('*'),
-        client.from('evaluations').select('*'),
-        client.from('evaluation_details').select('*'),
-        client.from('exam_pass_order').select('*'),
+        classesRequest,
+        studentsRequest,
+        examsRequest,
+        rubricsRequest,
+        evaluationsRequest,
+        detailsRequest,
+        passOrderRequest,
         quizzesRequest,
         quizSubmissionsRequest,
         classLeaderboardRequest,
-        enrollmentsRequest
+        enrollmentsRequest,
+        classRosterRequest
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errR) throw new Error(`Grilles d’examen: ${errR.message}`);
+      if (errEv) throw new Error(`Évaluations: ${errEv.message}`);
+      if (errD) throw new Error(`Détails d’évaluation: ${errD.message}`);
+      if (errPO) throw new Error(`Ordre de passage: ${errPO.message}`);
+      const noStudentContextError = (error: any) =>
+        /Aucune fiche étudiant|Profil étudiant approuvé introuvable|Session étudiant authentifiée requise|réservée aux comptes étudiants|réservée aux élèves/i
+          .test(error?.message || '');
+
       if (errClassLeaderboard) {
-        const noStudentContext =
-          /Aucune fiche étudiant associée|Session étudiant authentifiée requise|réservée aux comptes étudiants/i
-            .test(errClassLeaderboard.message || '');
-        if (isSupabaseMissingRpcError(errClassLeaderboard) || noStudentContext) {
+        if (isSupabaseMissingRpcError(errClassLeaderboard) || noStudentContextError(errClassLeaderboard)) {
           console.warn('[Supabase] Classement de classe agrégé indisponible :', errClassLeaderboard.message);
         } else {
           throw new Error(`Classement de classe : ${errClassLeaderboard.message}`);
         }
       }
+      if (errClassRoster) {
+        if (isSupabaseMissingRpcError(errClassRoster) || noStudentContextError(errClassRoster)) {
+          console.warn('[Supabase] Répertoire de classe agrégé indisponible :', errClassRoster.message);
+        } else {
+          throw new Error(`Répertoire de classe : ${errClassRoster.message}`);
+        }
+      }
 
       let safeQuizzesData = quizzesData;
       if (errQ) {
-        if (!isTeacher && isSupabaseMissingRpcError(errQ)) {
-          missingQuizSecurityRpc = true;
+        if (!isTeacher && (isSupabaseMissingRpcError(errQ) || noStudentContextError(errQ))) {
+          missingQuizSecurityRpc = isSupabaseMissingRpcError(errQ);
           safeQuizzesData = [];
-          console.warn('[Supabase] RPC catalogue quiz absente (migration SQL requise) :', errQ.message);
+          console.warn('[Supabase] Catalogue quiz indisponible pour cette session :', errQ.message);
         } else {
           throw new Error(`Quiz (migration requise si la table est absente) : ${errQ.message}`);
         }
@@ -1584,7 +1709,6 @@ class SupabaseService {
       }
 
       if (errQS) throw new Error(`Résultats des quiz (migration requise si la table est absente) : ${errQS.message}`);
-      if (errClassLeaderboard) throw new Error(`Classement de classe (migration requise) : ${errClassLeaderboard.message}`);
       if (errEnrollments) throw new Error(`Inscriptions aux classes : ${errEnrollments.message}`);
 
       const classes: ClassRoom[] = (classesData || []).map(c => ({
@@ -1602,14 +1726,30 @@ class SupabaseService {
         activeClassIdsByStudent.set(item.student_id, ids);
       });
 
-      const students: Student[] = (studentsData || []).map(s => ({
+      const rosterStudents: Student[] = (classRosterData || []).map((s: any) => ({
         id: s.id,
         class_id: s.class_id,
-        // Pour les sessions sans rôle professeur Supabase, conserver la classe
-        // principale issue de students.class_id sans exposer les inscriptions privées.
-        class_ids: activeClassIdsByStudent.get(s.id) || (s.class_id ? [s.class_id] : []),
+        class_ids: Array.isArray(s.class_ids) ? s.class_ids : (s.class_id ? [s.class_id] : []),
         first_name: s.first_name,
         last_name: s.last_name,
+        gender: s.gender || 'homme',
+        // E-mail intentionally omitted for classmates; the authenticated
+        // student's own row below supplies their own e-mail address.
+        email: '',
+        student_number: s.student_number || null,
+        avatar_url: s.avatar_url || null,
+        validation_status: s.validation_status || 'approved',
+        created_at: s.created_at,
+        updated_at: s.updated_at
+      }));
+      const rosterById = new Map(rosterStudents.map(student => [student.id, student]));
+      const mappedStudents: Student[] = (studentsData || []).map(s => ({
+        id: s.id,
+        class_id: s.class_id,
+        class_ids: activeClassIdsByStudent.get(s.id) || rosterById.get(s.id)?.class_ids || (s.class_id ? [s.class_id] : []),
+        first_name: s.first_name,
+        last_name: s.last_name,
+        gender: s.gender || 'homme',
         email: s.email,
         student_number: s.student_number,
         avatar_url: s.avatar_url || null,
@@ -1617,6 +1757,10 @@ class SupabaseService {
         created_at: s.created_at,
         updated_at: s.updated_at
       }));
+      const studentsById = new Map<string, Student>();
+      rosterStudents.forEach(student => studentsById.set(student.id, student));
+      mappedStudents.forEach(student => studentsById.set(student.id, student));
+      const students: Student[] = Array.from(studentsById.values());
 
       const rubricsList: ExamRubric[] = (rubricsData || []).map(r => ({
         id: r.id,
@@ -1749,7 +1893,7 @@ class SupabaseService {
 
       return {
         success: true,
-        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} élèves, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.${isTeacher ? '' : ' Les inscriptions multi-classes n’ont pas été chargées : une session professeur Supabase est nécessaire ; la classe principale enregistrée dans Supabase est conservée.'}`,
+        message: `Import Supabase réussi : ${classes.length} classes, ${students.length} profils visibles, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.${isTeacher ? '' : isAuthenticated ? ' Les données élèves sont limitées au profil et aux classes autorisées.' : ' Aucune donnée scolaire privée n’a été chargée.'}`,
         state: {
           classes,
           students,

@@ -120,7 +120,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     // Vérifier qu'il n'y a qu'un seul select('*') sur quizzes et qu'il est réservé au professeur
     const quizTableSelectMatches = importSection.match(/from\('quizzes'\)\.select\(/g) || [];
     assert.equal(quizTableSelectMatches.length, 1);
-    assert.ok(importSection.includes('if (!isTeacher && isSupabaseMissingRpcError(errQ))'));
+    assert.ok(importSection.includes('if (!isTeacher && (isSupabaseMissingRpcError(errQ) || noStudentContextError(errQ)))'));
     assert.ok(importSection.includes('if (isTeacher && orphanedStudentIds.length > 0)'));
   });
 });

@@ -913,7 +913,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       if (avatarChanged) {
         savedAvatar = (await supabaseService.saveStudentAvatar(
           studentId,
-          editAvatar || null
+          editAvatar || null,
+          true
         )) || '';
       }
 
