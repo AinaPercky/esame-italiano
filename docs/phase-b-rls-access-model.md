@@ -56,6 +56,12 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 - Retourne uniquement le rapport correspondant à cette paire examen/élève.
 - N'expose pas l'e-mail, le statut d'inscription ni les autres fiches de la classe.
 
+### `update_own_student_profile` et `update_own_student_avatar`
+
+- Permettent à un élève authentifié de modifier uniquement son propre prénom, nom, matricule, genre et avatar.
+- L'identité est résolue depuis le JWT ; l'identifiant fourni doit correspondre à la fiche de la session.
+- La classe, l'e-mail et le statut de validation ne sont jamais modifiables par ces RPC.
+
 ### `get_student_class_roster`
 
 - Réservée aux élèves authentifiés et approuvés.
@@ -68,6 +74,7 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 - Les élèves authentifiés récupèrent leur propre fiche, les examens de leurs classes et leurs évaluations via RLS.
 - Un RPC séparé fournit un répertoire minimal de camarades pour préserver le classement.
 - Les progrès de leçons sont lisibles uniquement par leur propriétaire et le professeur ; l'ancienne politique de lecture globale est remplacée.
+- La modification du profil élève et de sa photo passe par des RPC propriétaires, sans rétablir un droit UPDATE global sur la table `students`.
 - Les modules Exercices et Quiz gardent leurs RPC existantes, mais les privilèges structurels qui contournaient RLS sont retirés.
 - Les professeurs conservent le chargement complet, limité par les politiques RLS au compte enseignant.
 - Le rapport QR est chargé directement par sa RPC dédiée, sans dépendre de l'état global de l'application.
