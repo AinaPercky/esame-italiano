@@ -85,8 +85,8 @@ BEGIN
         s.id::text = v_student_id
         OR EXISTS (
           SELECT 1
-          FROM unnest(coalesce(v_class_ids, ARRAY[]::text[])) AS class_id
-          WHERE class_id = ANY(coalesce(memberships.class_ids, ARRAY[]::text[]))
+          FROM unnest(coalesce(v_class_ids, ARRAY[]::text[])) AS class_ids(class_id)
+          WHERE class_ids.class_id = ANY(coalesce(memberships.class_ids, ARRAY[]::text[]))
         )
       )
   );
