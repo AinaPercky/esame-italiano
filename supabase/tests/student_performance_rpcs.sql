@@ -195,6 +195,6 @@ BEGIN
     END IF;
   END;
 END;
-$;
+$$;
 
 RESET ROLE;
