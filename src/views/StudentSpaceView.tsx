@@ -907,6 +907,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     processQuestionProgression(updated, true);
   };
 
+  // Référence stable pour que le composant mémorisé ne soit pas invalidé par les ticks.
+  const handleAnswerAndNextRef = useRef<() => void>(() => undefined);
+
   // L'élève valide sa réponse pour la question courante et passe à la suite
   const handleAnswerAndNext = () => {
     if (!activeQuiz) return;
@@ -922,6 +925,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setIncompletePhraseConfirmation(null);
     processQuestionProgression(quizAnswersRef.current, false);
   };
+  handleAnswerAndNextRef.current = handleAnswerAndNext;
+  const stableHandleAnswerAndNext = React.useCallback(
+    () => handleAnswerAndNextRef.current(),
+    []
+  );
 
   const finishTutorialQuiz = (answers: Record<string, string>) => {
     if (!activeQuiz || !isPracticeMode || quizSubmissionLockRef.current) return;
@@ -1754,7 +1762,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
                   customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
                   onAnswerChange={updateQuizAnswer}
-                  onEnterPress={handleAnswerAndNext}
+                  onEnterPress={stableHandleAnswerAndNext}
                 />
               ) : null}
             </AssessmentShell>
