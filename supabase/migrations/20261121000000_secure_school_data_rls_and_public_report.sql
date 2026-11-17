@@ -126,12 +126,12 @@ CREATE POLICY "Managers read lesson progress"
   USING (public.class_enrollment_is_teacher());
 
 -- PostgreSQL's implicit default is EXECUTE for PUBLIC. Remove that global
--- default for functions created by the two migration owners; schema-specific
--- grants to anon/authenticated remain explicit and are managed below.
+-- default and any inherited authenticated default for functions created by
+-- the two migration owners. Client RPC grants must be explicit per function.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres
-  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
-  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, authenticated;
 
 -- Harden defaults as well as existing grants. Supabase currently grants
 -- ALL on newly-created public tables and EXECUTE on new functions to anon.
@@ -144,7 +144,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE ALL ON SEQUENCES FROM anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  REVOKE EXECUTE ON FUNCTIONS FROM anon;
+  REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
   REVOKE ALL ON TABLES FROM anon;
@@ -153,7 +153,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
   REVOKE ALL ON SEQUENCES FROM anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
-  REVOKE EXECUTE ON FUNCTIONS FROM anon;
+  REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
 
 -- Remove direct anonymous table access across the entire exposed public schema.
 -- Public lesson content and active class names remain available through SELECT;
