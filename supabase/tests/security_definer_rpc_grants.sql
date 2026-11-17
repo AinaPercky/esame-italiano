@@ -10,12 +10,25 @@ DECLARE
     'public.evaluate_public_quiz_question(text,text,text)'
   ];
 BEGIN
-  -- Every installed public-practice RPC must remain callable by anon.
+  -- Every installed public-practice RPC must remain callable by anon, but must
+  -- not inherit EXECUTE from PUBLIC (only the explicit anon/auth grants).
   FOREACH v_signature IN ARRAY v_public_rpc_signatures LOOP
     v_function_oid := to_regprocedure(v_signature);
-    IF v_function_oid IS NOT NULL
-       AND NOT has_function_privilege('anon', v_function_oid, 'EXECUTE') THEN
-      RAISE EXCEPTION 'Required public practice RPC is not executable by anon: %', v_signature;
+    IF v_function_oid IS NOT NULL THEN
+      IF NOT has_function_privilege('anon', v_function_oid, 'EXECUTE') THEN
+        RAISE EXCEPTION 'Required public practice RPC is not executable by anon: %', v_signature;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM pg_proc p,
+             aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+        WHERE p.oid = v_function_oid::oid
+          AND a.grantee = 0
+          AND a.privilege_type = 'EXECUTE'
+      ) THEN
+        RAISE EXCEPTION 'Public practice RPC still grants EXECUTE to PUBLIC: %', v_signature;
+      END IF;
     END IF;
   END LOOP;
 
@@ -79,9 +92,25 @@ BEGIN
     END IF;
   END IF;
 
-  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL
-     AND has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
+  -- The standard quiz submission RPC remains available to authenticated
+  -- students. Its implementation resolves the student from auth.uid()/JWT,
+  -- not from the browser-supplied student_id.
+  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL THEN
+    IF has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
+    END IF;
+    IF NOT has_function_privilege('authenticated', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Authenticated students cannot submit standard quiz results.';
+    END IF;
+  END IF;
+
+  IF to_regprocedure('public.submit_quiz_presence_submission(jsonb)') IS NOT NULL THEN
+    IF has_function_privilege('anon', 'public.submit_quiz_presence_submission(jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous users can submit attendance-controlled quiz results.';
+    END IF;
+    IF NOT has_function_privilege('authenticated', 'public.submit_quiz_presence_submission(jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Authenticated students cannot submit attendance-controlled quiz results.';
+    END IF;
   END IF;
 END
 $test$;
