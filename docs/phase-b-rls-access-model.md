@@ -31,6 +31,7 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 - Tous les privilèges anonymes directs sont retirés sur les tables du schéma public.
 - Seules les tables de classes actives, leçons publiées et blocs de leçons publiés conservent un SELECT anonyme.
 - Les rôles clients `anon` et `authenticated` perdent `TRUNCATE`, `REFERENCES` et `TRIGGER` sur toutes les tables publiques. Ces privilèges ne sont pas filtrés par RLS ; leur retrait évite qu'un utilisateur connecté contourne les politiques de lignes.
+- Les privilèges par défaut de `postgres` et `supabase_admin` sont également corrigés pour que les futures tables et fonctions ne réintroduisent pas automatiquement les droits anonymes.
 - Le rôle backend `service_role` conserve ses privilèges opérationnels.
 
 ## RPC introduites
