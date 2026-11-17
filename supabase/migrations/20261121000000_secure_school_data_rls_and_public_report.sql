@@ -125,6 +125,14 @@ CREATE POLICY "Managers read lesson progress"
   ON public.lesson_progress FOR SELECT TO authenticated
   USING (public.class_enrollment_is_teacher());
 
+-- PostgreSQL's implicit default is EXECUTE for PUBLIC. Remove that global
+-- default for functions created by the two migration owners; schema-specific
+-- grants to anon/authenticated remain explicit and are managed below.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
 -- Harden defaults as well as existing grants. Supabase currently grants
 -- ALL on newly-created public tables and EXECUTE on new functions to anon.
 -- Apply to both common migration owners so the exposure is not reintroduced
