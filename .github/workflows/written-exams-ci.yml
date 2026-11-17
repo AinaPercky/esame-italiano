@@ -88,6 +88,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql
       - name: Enable hybrid automatic and manual grading
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117000000_hybrid_written_exam_grading.sql
+      - name: Optimize written-exam result retrieval indexes
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117170000_optimize_written_exam_result_queries.sql
       - name: Reproduce legacy anonymous RPC grants from the live project
         run: |
@@ -98,7 +99,6 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117180000_restrict_anonymous_security_definer_rpcs.sql
       - name: Verify SECURITY DEFINER RPC privileges
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security_definer_rpc_grants.sql
-      - name: Optimize written-exam result retrieval indexes
       - name: Enable published student exam copies
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000000_enable_published_student_exam_copies.sql
       - name: Enforce one current definition per written exam
