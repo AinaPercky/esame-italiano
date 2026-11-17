@@ -8,9 +8,11 @@ type RpcCall = { name: string; args: Record<string, unknown> };
 const originalGetClient = supabaseService.getClient;
 let calls: RpcCall[] = [];
 let responses: Record<string, unknown> = {};
+let tableCalls: Array<{table:string;columns:string;filters:Array<[string,string]>;limit:number|null}> = [];
 
 function installSupabaseRpcFake() {
   calls = [];
+  tableCalls = [];
   responses = {
     save_written_exam_definition: { exam_id: 'exam-1', version_id: 'version-1' },
     save_written_exam_question_time_limits: null,
@@ -35,6 +37,14 @@ function installSupabaseRpcFake() {
     }]
   };
   const fakeClient = {
+    from: (table: string) => {
+      const query = { table, columns: '', filters: [] as Array<[string,string]>, rowLimit: null as number | null,
+        select(columns: string) { this.columns = columns; return this; },
+        eq(column: string, value: string) { this.filters.push([column, value]); return this; },
+        limit(count: number) { this.rowLimit = count; tableCalls.push({ table: this.table, columns: this.columns, filters: this.filters, limit: this.rowLimit }); return Promise.resolve({ data: responses.__written_exam_attempts || [], error: null }); }
+      };
+      return query;
+    },
     rpc: async (name: string, args: Record<string, unknown> = {}) => {
       calls.push({ name, args });
       if (!(name in responses)) return { data: null, error: { message: 'RPC inattendu: ' + name } };
@@ -120,4 +130,18 @@ test('une erreur Supabase de publication est remontée au professeur', async () 
   installSupabaseRpcFake();
   responses.publish_written_exam_results = new Error('Publication refusée: copie non corrigée');
   await assert.rejects(writtenExamService.publishResults('exam-1'), /copie non corrigée/);
+});
+
+
+test('professeur : vérifie le verrouillage sans charger les copies complètes', async () => {
+  installSupabaseRpcFake();
+  responses.__written_exam_attempts = [{ id: 'attempt-1' }];
+  assert.equal(await writtenExamService.hasAttempts('exam-1'), true);
+  assert.deepEqual(tableCalls, [{
+    table: 'written_exam_attempts', columns: 'id', filters: [['exam_id', 'exam-1']], limit: 1
+  }]);
+  tableCalls = [];
+  responses.__written_exam_attempts = [];
+  assert.equal(await writtenExamService.hasAttempts('exam-2'), false);
+  assert.equal(tableCalls[0].limit, 1);
 });
