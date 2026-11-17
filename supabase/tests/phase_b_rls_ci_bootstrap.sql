@@ -135,6 +135,14 @@ CREATE TABLE public.exercise_class_assignments (exercise_id uuid NOT NULL, class
 CREATE TABLE public.exercise_attempts (id uuid PRIMARY KEY, student_id uuid NOT NULL);
 CREATE TABLE public.exercise_answers (id uuid PRIMARY KEY, attempt_id uuid NOT NULL, answer jsonb);
 
+CREATE TABLE public.quiz_submissions (id uuid PRIMARY KEY);
+CREATE TABLE public.quiz_attempts (id uuid PRIMARY KEY);
+CREATE TABLE public.quiz_launches (id uuid PRIMARY KEY);
+CREATE TABLE public.quiz_participants (id uuid PRIMARY KEY);
+CREATE TABLE public.quiz_retry_grants (id uuid PRIMARY KEY);
+CREATE TABLE public.quizzes (id uuid PRIMARY KEY);
+CREATE TABLE public.class_enrollment_requests (id uuid PRIMARY KEY);
+
 CREATE OR REPLACE FUNCTION public.class_enrollment_is_teacher()
 RETURNS boolean LANGUAGE sql STABLE
 AS $$
@@ -198,6 +206,13 @@ ALTER TABLE public.exercise_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exercise_class_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exercise_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exercise_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_launches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quiz_retry_grants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_enrollment_requests ENABLE ROW LEVEL SECURITY;
 
 GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES, TRIGGER, TRUNCATE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 
