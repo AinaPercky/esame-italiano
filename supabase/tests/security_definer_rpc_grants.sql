@@ -2,6 +2,7 @@
 DO $test$
 DECLARE
   v_function record;
+  v_public_rpc_name text;
   v_public_rpc_names text[] := ARRAY[
     'get_public_quiz_catalog',
     'get_public_quiz',
@@ -51,20 +52,20 @@ BEGIN
     RAISE EXCEPTION 'Unexpected anon-executable SECURITY DEFINER function: %', v_function.signature;
   END LOOP;
 
-  FOREACH v_function.proname IN ARRAY v_public_rpc_names LOOP
+  FOREACH v_public_rpc_name IN ARRAY v_public_rpc_names LOOP
     -- Some isolated CI schemas do not install the quiz module. When present,
     -- the public quiz RPCs must remain available to anonymous learners.
-    IF v_function.proname = 'get_public_quiz_catalog'
+    IF v_public_rpc_name = 'get_public_quiz_catalog'
        AND to_regprocedure('public.get_public_quiz_catalog()') IS NOT NULL
        AND NOT has_function_privilege('anon', 'public.get_public_quiz_catalog()', 'EXECUTE') THEN
       RAISE EXCEPTION 'Public quiz catalogue was accidentally closed.';
     END IF;
-    IF v_function.proname = 'get_public_quiz'
+    IF v_public_rpc_name = 'get_public_quiz'
        AND to_regprocedure('public.get_public_quiz(text)') IS NOT NULL
        AND NOT has_function_privilege('anon', 'public.get_public_quiz(text)', 'EXECUTE') THEN
       RAISE EXCEPTION 'Public quiz retrieval was accidentally closed.';
     END IF;
-    IF v_function.proname = 'evaluate_public_quiz_question'
+    IF v_public_rpc_name = 'evaluate_public_quiz_question'
        AND to_regprocedure('public.evaluate_public_quiz_question(text,text,text)') IS NOT NULL
        AND NOT has_function_privilege('anon', 'public.evaluate_public_quiz_question(text,text,text)', 'EXECUTE') THEN
       RAISE EXCEPTION 'Public quiz correction was accidentally closed.';
