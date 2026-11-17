@@ -1,29 +1,72 @@
--- Regression test for anonymous access to privileged SECURITY DEFINER functions.
+-- Regression tests for anonymous access to privileged SECURITY DEFINER functions.
 DO $test$
 DECLARE
   v_function record;
-  v_public_rpc_name text;
-  v_public_rpc_names text[] := ARRAY[
-    'get_public_quiz_catalog',
-    'get_public_quiz',
-    'evaluate_public_quiz_question',
-    'prepare_student_registration',
-    'get_public_oral_report'
+  v_signature text;
+  v_function_oid regprocedure;
+  v_public_rpc_signatures text[] := ARRAY[
+    'public.get_public_quiz_catalog()',
+    'public.get_public_quiz(text)',
+    'public.evaluate_public_quiz_question(text,text,text)'
   ];
 BEGIN
-  IF to_regprocedure('public.written_exam_auto_question_score(uuid,jsonb)') IS NOT NULL THEN
-    IF has_function_privilege('anon', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
-       OR has_function_privilege('authenticated', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Private written-exam scorer is still executable by a client role.';
+  -- Every installed public-practice RPC must remain callable by anon.
+  FOREACH v_signature IN ARRAY v_public_rpc_signatures LOOP
+    v_function_oid := to_regprocedure(v_signature);
+    IF v_function_oid IS NOT NULL
+       AND NOT has_function_privilege('anon', v_function_oid, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Required public practice RPC is not executable by anon: %', v_signature;
     END IF;
+  END LOOP;
+
+  -- No other SECURITY DEFINER function in public may be executable by anon.
+  FOR v_function IN
+    SELECT p.oid::regprocedure AS signature
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prosecdef
+      AND has_function_privilege('anon', p.oid, 'EXECUTE')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM unnest(v_public_rpc_signatures) AS allowed(signature)
+        WHERE to_regprocedure(allowed.signature)::oid = p.oid
+      )
+  LOOP
+    RAISE EXCEPTION 'Unexpected anon-executable SECURITY DEFINER function: %', v_function.signature;
+  END LOOP;
+
+  -- Trigger functions are not client-callable; their triggers remain installed.
+  FOR v_function IN
+    SELECT p.oid::regprocedure AS signature
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prorettype = 'trigger'::regtype
+      AND (
+        has_function_privilege('anon', p.oid, 'EXECUTE')
+        OR has_function_privilege('authenticated', p.oid, 'EXECUTE')
+      )
+  LOOP
+    RAISE EXCEPTION 'Trigger function remains client-executable: %', v_function.signature;
+  END LOOP;
+
+  -- Private scorer must not be exposed to either client role.
+  IF to_regprocedure('public.written_exam_auto_question_score(uuid,jsonb)') IS NOT NULL
+     AND (
+       has_function_privilege('anon', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
+       OR has_function_privilege('authenticated', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
+     ) THEN
+    RAISE EXCEPTION 'Private written-exam scorer is still executable by a client role.';
   END IF;
 
+  -- Teacher grading remains available to authenticated callers but not anon.
   IF to_regprocedure('public.grade_written_exam_attempt(uuid,jsonb)') IS NOT NULL THEN
     IF has_function_privilege('anon', 'public.grade_written_exam_attempt(uuid,jsonb)', 'EXECUTE') THEN
       RAISE EXCEPTION 'Anonymous users can execute teacher grading.';
     END IF;
     IF NOT has_function_privilege('authenticated', 'public.grade_written_exam_attempt(uuid,jsonb)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Authenticated teacher RPC grant was not preserved.';
+      RAISE EXCEPTION 'Authenticated teacher grading grant was not preserved.';
     END IF;
   END IF;
 
@@ -36,43 +79,9 @@ BEGIN
     END IF;
   END IF;
 
-  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL THEN
-    IF has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
-    END IF;
+  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL
+     AND has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
   END IF;
-
-  FOR v_function IN
-    SELECT p.oid::regprocedure AS signature, p.proname
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public'
-      AND p.prosecdef
-      AND has_function_privilege('anon', p.oid, 'EXECUTE')
-      AND NOT (p.proname = ANY(v_public_rpc_names))
-  LOOP
-    RAISE EXCEPTION 'Unexpected anon-executable SECURITY DEFINER function: %', v_function.signature;
-  END LOOP;
-
-  FOREACH v_public_rpc_name IN ARRAY v_public_rpc_names LOOP
-    -- Some isolated CI schemas do not install the quiz module. When present,
-    -- the public quiz RPCs must remain available to anonymous learners.
-    IF v_public_rpc_name = 'get_public_quiz_catalog'
-       AND to_regprocedure('public.get_public_quiz_catalog()') IS NOT NULL THEN
-      IF NOT has_function_privilege('anon', 'public.get_public_quiz_catalog()', 'EXECUTE') THEN
-        RAISE EXCEPTION 'Public quiz catalogue was accidentally closed.';
-      END IF;
-    ELSIF v_public_rpc_name = 'get_public_quiz'
-       AND to_regprocedure('public.get_public_quiz(text)') IS NOT NULL THEN
-      IF NOT has_function_privilege('anon', 'public.get_public_quiz(text)', 'EXECUTE') THEN
-        RAISE EXCEPTION 'Public quiz retrieval was accidentally closed.';
-      END IF;
-    ELSIF v_public_rpc_name = 'evaluate_public_quiz_question'
-       AND to_regprocedure('public.evaluate_public_quiz_question(text,text,text)') IS NOT NULL THEN
-      IF NOT has_function_privilege('anon', 'public.evaluate_public_quiz_question(text,text,text)', 'EXECUTE') THEN
-        RAISE EXCEPTION 'Public quiz correction was accidentally closed.';
-      END IF;
-    END IF;
-  END LOOP;
 END
 $test$;
