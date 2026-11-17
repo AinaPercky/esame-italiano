@@ -37,7 +37,9 @@ VALUES
    'Mia AutreClasse', 'B003', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Classe B',
    now(), '{}', 20, 20, 20, 'submitted', '{}', 1, true);
 
-DO $$
+SET ROLE authenticated;
+
+DO $
 DECLARE
   roster jsonb;
   leaderboard jsonb;
