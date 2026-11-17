@@ -5,6 +5,10 @@
 CREATE INDEX IF NOT EXISTS idx_written_exam_attempts_exam_started
   ON public.written_exam_attempts (exam_id, started_at DESC);
 
+-- Cover the composite (exam_id, version_id) foreign key to written_exam_versions.
+CREATE INDEX IF NOT EXISTS idx_written_exam_attempts_exam_version
+  ON public.written_exam_attempts (exam_id, version_id);
+
 -- Foreign-key lookup and version-scoped attempt maintenance.
 CREATE INDEX IF NOT EXISTS idx_written_exam_attempts_version
   ON public.written_exam_attempts (version_id);
