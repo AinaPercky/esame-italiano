@@ -167,6 +167,8 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'v_student_id := public.quiz_current_student_id();',
       "ce.status = 'active'",
       "coalesce(s.validation_status, 'approved') = 'approved'",
+      'AS class_ids(class_id)',
+      'class_ids.class_id = ANY(coalesce(memberships.class_ids, ARRAY[]::text[]))',
       "CASE WHEN s.id::text = v_student_id THEN s.email ELSE '' END",
       'REVOKE ALL ON FUNCTION public.get_student_class_roster() FROM PUBLIC, anon;',
       'GRANT EXECUTE ON FUNCTION public.get_student_class_roster() TO authenticated;'
