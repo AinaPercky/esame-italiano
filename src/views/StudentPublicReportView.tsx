@@ -20,8 +20,8 @@ import {
   Check,
   AlertCircle
 } from 'lucide-react';
-import { dataService } from '../services/dataService';
-import { Exam, Student, Evaluation, ClassRoom, ExamRubric } from '../types';
+import { supabaseService } from '../services/supabaseService';
+import { Exam, Student, Evaluation, ExamRubric } from '../types';
 
 interface StudentPublicReportViewProps {
   examId?: string;
@@ -36,68 +36,81 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   lockedStudentId,
   onBackToApp
 }) => {
-  const allExams = dataService.getExams();
-  const studentExams = lockedStudentId
-    ? allExams.filter(exam => dataService.getEvaluations(exam.id, undefined, lockedStudentId).length > 0)
-    : allExams;
-  const allStudents = dataService.getStudents();
-  const allClasses = dataService.getClasses();
-
-  // Examen actif
-  const [selectedExamId, setSelectedExamId] = useState<string>(() => {
-    if (initialExamId && studentExams.some(e => e.id === initialExamId)) {
-      return initialExamId;
-    }
-    return studentExams[0]?.id || '';
-  });
-
-  // Élève sélectionné pour consultation
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(() => {
-    if (initialStudentId && allStudents.some(s => s.id === initialStudentId)) {
-      return initialStudentId;
-    }
-    return '';
-  });
-
-  // Champ de recherche par adresse e-mail uniquement
+  const isLockedReport = Boolean(lockedStudentId || initialStudentId);
+  const [report, setReport] = useState<{ student: Student; exam: Exam; evaluation: Evaluation } | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(initialExamId && isLockedReport));
 
-  const currentExam = dataService.getExamById(selectedExamId) || studentExams[0];
-  const examClassStudents = currentExam 
-    ? allStudents.filter(s => s.class_ids ? s.class_ids.includes(currentExam.class_id) : s.class_id === currentExam.class_id)
-    : allStudents;
-
-  const effectiveStudentId = lockedStudentId || selectedStudentId;
-  const currentStudent = effectiveStudentId ? dataService.getStudentById(effectiveStudentId) : null;
-  const evals = currentExam && currentStudent 
-    ? dataService.getEvaluations(currentExam.id, undefined, currentStudent.id) 
-    : [];
-  const evaluation: Evaluation | undefined = evals[0];
-
+  const currentExam = report?.exam;
+  const currentStudent = report?.student;
+  const evaluation = report?.evaluation;
   const rubrics: ExamRubric[] = currentExam?.rubrics || [];
   const maxScore = rubrics.reduce((sum, r) => sum + (Number(r.points) || 1), 0) || 10;
   const currentScore = evaluation ? evaluation.total_score : 0;
   const percentage = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
 
-  // Recherche de l'élève par adresse e-mail uniquement
-  const handleSearchStudent = (e?: React.FormEvent) => {
+  // Le rapport QR est chargé par une RPC dédiée : aucune liste générale
+  // d'élèves, d'examens ou de notes n'est téléchargée dans le navigateur.
+  useEffect(() => {
+    const targetStudentId = lockedStudentId || initialStudentId;
+    if (!initialExamId || !targetStudentId) {
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setSearchError(null);
+    supabaseService.getPublicOralReport(initialExamId, targetStudentId)
+      .then(result => {
+        if (cancelled) return;
+        setReport(result);
+        if (!result) setSearchError('Cette fiche d’examen oral est indisponible.');
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setReport(null);
+          setSearchError(error instanceof Error ? error.message : 'Chargement du rapport impossible.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialExamId, initialStudentId, lockedStudentId]);
+
+  const handleSearchStudent = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSearchError(null);
 
-    const query = searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim();
     if (!query) {
       setSearchError('Veuillez saisir votre adresse e-mail.');
       return;
     }
+    if (!initialExamId) {
+      setSearchError('Le lien QR ne précise pas l’examen à consulter. Demandez un nouveau QR code à votre professeur.');
+      return;
+    }
 
-    const found = examClassStudents.find(s => s.email.toLowerCase() === query);
-
-    if (found) {
-      setSelectedStudentId(found.id);
+    setIsLoading(true);
+    setReport(null);
+    try {
+      const result = await supabaseService.getPublicOralReport(initialExamId, undefined, query);
+      if (!result) {
+        setSearchError('Aucun rapport correspondant à ces informations pour cet examen.');
+        return;
+      }
+      setReport(result);
       setSearchError(null);
-    } else {
-      setSearchError(`Aucun élève trouvé avec l’adresse e-mail "${searchQuery}".`);
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : 'Consultation du rapport impossible.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -118,20 +131,26 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
 
   const appreciation = getAppreciation(currentScore, maxScore);
 
-  if (lockedStudentId && !currentStudent) {
+  if (isLoading && isLockedReport) {
     return (
-      <div className="bg-white p-5 rounded-xl border border-amber-200 text-sm text-slate-700">
-        Votre fiche d'examen oral est indisponible. Contactez votre professeur pour vérifier votre compte.
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
+        <p className="text-sm font-semibold">Chargement sécurisé de votre fiche d’examen oral…</p>
       </div>
     );
   }
 
-  if (lockedStudentId && (!currentExam || !evaluation)) {
-    return null;
+  if (isLockedReport && !report) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
+        <div className="max-w-lg rounded-xl border border-amber-200 bg-white p-5 text-sm text-slate-700">
+          {searchError || 'Votre fiche d’examen oral est indisponible. Contactez votre professeur pour vérifier votre compte.'}
+        </div>
+      </div>
+    );
   }
 
-  // Vue 1 : L'élève a scanné le Code QR commun et doit saisir son adresse e-mail
-  if (!currentStudent || (!lockedStudentId && !selectedStudentId)) {
+  // Vue 1 : Le QR commun demande l'adresse e-mail associée au dossier scolaire.
+  if (!report || !currentStudent || !currentExam || !evaluation) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
         <div className="max-w-xl mx-auto w-full pt-6 sm:pt-12 space-y-6">
@@ -232,14 +251,14 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs font-bold text-slate-800">
-              {lockedStudentId ? 'Votre fiche d’examen oral en lecture seule' : 'Fiche officielle en lecture seule (Consultation Code QR)'}
+              {isLockedReport ? 'Votre fiche d’examen oral en lecture seule' : 'Fiche officielle en lecture seule (Consultation Code QR)'}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {!lockedStudentId && (
+            {!isLockedReport && (
               <button
-                onClick={() => setSelectedStudentId('')}
+                onClick={() => { setReport(null); setSearchQuery(''); setSearchError(null); }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 title="Consulter l’examen par adresse e-mail"
               >
