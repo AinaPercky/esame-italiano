@@ -13,19 +13,31 @@ BEGIN
      OR has_table_privilege('anon','public.exam_rubrics','SELECT')
      OR has_table_privilege('anon','public.evaluations','SELECT')
      OR has_table_privilege('anon','public.evaluation_details','SELECT')
-     OR has_table_privilege('anon','public.exam_pass_order','SELECT') THEN
-    RAISE EXCEPTION 'Anonymous role still has direct read access to private school tables.';
+     OR has_table_privilege('anon','public.exam_pass_order','SELECT')
+     OR has_table_privilege('anon','public.lesson_progress','SELECT')
+     OR has_table_privilege('anon','public.exercise_answers','SELECT')
+     OR has_table_privilege('anon','public.exercise_attempts','SELECT')
+     OR has_table_privilege('anon','public.exercise_class_assignments','SELECT')
+     OR has_table_privilege('anon','public.exercise_versions','SELECT')
+     OR has_table_privilege('anon','public.exercises','SELECT') THEN
+    RAISE EXCEPTION 'Anonymous role still has direct read access to private school, exercise or progress tables.';
   END IF;
 
   IF NOT has_table_privilege('anon','public.classes','SELECT')
+     OR NOT has_table_privilege('anon','public.lessons','SELECT')
+     OR NOT has_table_privilege('anon','public.lesson_blocks','SELECT')
      OR has_table_privilege('anon','public.classes','INSERT')
      OR has_table_privilege('anon','public.classes','UPDATE')
-     OR has_table_privilege('anon','public.classes','DELETE') THEN
-    RAISE EXCEPTION 'Anonymous class access is not read-only.';
+     OR has_table_privilege('anon','public.classes','DELETE')
+     OR has_table_privilege('anon','public.lessons','TRUNCATE')
+     OR has_table_privilege('anon','public.lesson_blocks','TRIGGER') THEN
+    RAISE EXCEPTION 'Anonymous public content access is not read-only.';
   END IF;
 
-  IF (SELECT count(*) FROM public.classes) <> 2 THEN
-    RAISE EXCEPTION 'Anonymous class listing must hide archived classes.';
+  IF (SELECT count(*) FROM public.classes) <> 2
+     OR (SELECT count(*) FROM public.lessons) <> 1
+     OR (SELECT count(*) FROM public.lesson_blocks) <> 1 THEN
+    RAISE EXCEPTION 'Anonymous listing must expose only active classes and published lesson content.';
   END IF;
 
   IF NOT has_function_privilege('anon','public.get_public_oral_report(uuid,uuid,text)','EXECUTE')
@@ -93,6 +105,20 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM public.students WHERE id='10000000-0000-4000-8000-000000000001') THEN
     RAISE EXCEPTION 'Student can read another profile or cannot read their own.';
   END IF;
+  IF has_table_privilege('authenticated','public.students','TRUNCATE')
+     OR has_table_privilege('authenticated','public.class_enrollments','TRUNCATE')
+     OR has_table_privilege('authenticated','public.lesson_progress','TRUNCATE')
+     OR has_table_privilege('authenticated','public.exercise_attempts','TRUNCATE')
+     OR has_table_privilege('authenticated','public.exercise_answers','TRUNCATE') THEN
+    RAISE EXCEPTION 'Authenticated client roles still have a TRUNCATE privilege that bypasses RLS.';
+  END IF;
+  IF (SELECT count(*) FROM public.lesson_progress) <> 1
+     OR NOT EXISTS (
+       SELECT 1 FROM public.lesson_progress
+       WHERE user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+     ) THEN
+    RAISE EXCEPTION 'Student can read another learner lesson progress.';
+  END IF;
   IF (SELECT count(*) FROM public.exams) <> 1
      OR NOT EXISTS (SELECT 1 FROM public.exams WHERE id='20000000-0000-4000-8000-000000000001') THEN
     RAISE EXCEPTION 'Student exam access is not restricted to enrolled classes.';
@@ -118,6 +144,12 @@ BEGIN
   IF v_rows <> 0 THEN
     RAISE EXCEPTION 'Student was able to update a classmate profile.';
   END IF;
+  UPDATE public.lesson_progress SET status='completed'
+  WHERE user_id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'Student was able to update another learner lesson progress.';
+  END IF;
 END
 $test$;
 
@@ -139,6 +171,9 @@ BEGIN
      OR (SELECT count(*) FROM public.exams) <> 2
      OR (SELECT count(*) FROM public.evaluations) <> 3 THEN
     RAISE EXCEPTION 'Teacher access to complete school records was not preserved.';
+  END IF;
+  IF (SELECT count(*) FROM public.lesson_progress) <> 2 THEN
+    RAISE EXCEPTION 'Teacher must retain read access to all lesson progress.';
   END IF;
 
   UPDATE public.students SET gender='femme'
