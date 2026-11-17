@@ -1515,6 +1515,14 @@ class SupabaseService {
           : isAuthenticated
             ? client.rpc('get_student_quiz_catalog')
             : client.rpc('get_public_quiz_catalog');
+      const emptyRows = Promise.resolve({ data: [], error: null });
+      // Les élèves ne téléchargent plus la table students entière :
+      // la RPC renvoie leur fiche et un roster minimal limité à leurs classes actives.
+      const studentsRequest = isTeacher
+        ? client.from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')
+        : isAuthenticated
+          ? client.rpc('get_student_class_roster')
+          : emptyRows;
       const quizSubmissionsRequest = isAuthenticated
         ? client.from('quiz_submissions').select('id,quiz_id,quiz_title,student_id,student_name,student_number,class_id,class_name,started_at,submitted_at,answers,score,max_score,score_20,status,feedback,date,attempt_number,launch_id,attendance_status,retry_grant_id,is_counted')
         : Promise.resolve({ data: [], error: null });
@@ -1533,7 +1541,6 @@ class SupabaseService {
       // Ne pas télécharger les examens oraux, grilles, évaluations et ordres de passage
       // de toutes les classes dans son état global.
       const isStudentSession = isAuthenticated && !isTeacher;
-      const emptyRows = Promise.resolve({ data: [], error: null });
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1548,7 +1555,7 @@ class SupabaseService {
         { data: enrollmentsData, error: errEnrollments }
       ] = await Promise.all([
         client.from('classes').select('id,name,enrollment_mode,archived_at,created_at'),
-        client.from('students').select('id,class_id,first_name,last_name,email,student_number,avatar_url,validation_status,created_at,updated_at'),
+        studentsRequest,
         isStudentSession ? emptyRows : client.from('exams').select('id,class_id,title,description,level,exam_date,status,created_at'),
         isStudentSession ? emptyRows : client.from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position'),
         isStudentSession ? emptyRows : client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at'),
@@ -1607,20 +1614,22 @@ class SupabaseService {
         activeClassIdsByStudent.set(item.student_id, ids);
       });
 
-      const students: Student[] = (studentsData || []).map(s => ({
+      const students: Student[] = (studentsData || []).map((s: any) => ({
         id: s.id,
-        class_id: s.class_id,
-        // Pour les sessions sans rôle professeur Supabase, conserver la classe
-        // principale issue de students.class_id sans exposer les inscriptions privées.
-        class_ids: activeClassIdsByStudent.get(s.id) || (s.class_id ? [s.class_id] : []),
-        first_name: s.first_name,
-        last_name: s.last_name,
-        email: s.email,
-        student_number: s.student_number,
+        class_id: s.class_id || '',
+        // La RPC élève ne renvoie que ses classes actives et un profil réduit des camarades.
+        class_ids: Array.isArray(s.class_ids)
+          ? s.class_ids
+          : activeClassIdsByStudent.get(s.id) || (s.class_id ? [s.class_id] : []),
+        first_name: s.first_name || '',
+        last_name: s.last_name || '',
+        gender: s.gender || undefined,
+        email: s.email || '',
+        student_number: s.student_number || null,
         avatar_url: s.avatar_url || null,
-        validation_status: s.validation_status || 'pending',
-        created_at: s.created_at,
-        updated_at: s.updated_at
+        validation_status: s.validation_status || 'approved',
+        created_at: s.created_at || '',
+        updated_at: s.updated_at || ''
       }));
 
       const rubricsList: ExamRubric[] = (rubricsData || []).map(r => ({
