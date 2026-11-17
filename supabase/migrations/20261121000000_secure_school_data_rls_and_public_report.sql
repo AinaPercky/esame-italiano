@@ -118,19 +118,40 @@ CREATE POLICY exam_pass_order_student_read_own
   ON public.exam_pass_order FOR SELECT TO authenticated
   USING (student_id = public.class_enrollment_current_student_id());
 
--- Anonymous clients no longer receive direct access to private school records.
-REVOKE ALL ON TABLE
-  public.students,
-  public.exams,
-  public.exam_rubrics,
-  public.evaluations,
-  public.evaluation_details,
-  public.exam_pass_order
-FROM anon;
+-- Lesson progress is private to its owner and the teacher. The previous
+-- manager policy was accidentally readable by every authenticated student.
+DROP POLICY IF EXISTS "Managers read lesson progress" ON public.lesson_progress;
+CREATE POLICY "Managers read lesson progress"
+  ON public.lesson_progress FOR SELECT TO authenticated
+  USING (public.class_enrollment_is_teacher());
 
--- Anonymous clients may list only active class names for the registration form.
-REVOKE ALL ON TABLE public.classes FROM anon;
-GRANT SELECT ON TABLE public.classes TO anon;
+-- Remove direct anonymous table access across the entire exposed public schema.
+-- Public lesson content and active class names remain available through SELECT;
+-- private exercises, progress, quiz data, student records and evaluations do not.
+DO $privileges$
+DECLARE
+  v_table record;
+BEGIN
+  FOR v_table IN
+    SELECT tablename
+    FROM pg_catalog.pg_tables
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL ON TABLE public.%I FROM anon',
+      v_table.tablename
+    );
+    -- RLS does not apply to TRUNCATE. Remove structural privileges from both
+    -- client roles on every public table; backend/service_role retains them.
+    EXECUTE format(
+      'REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLE public.%I FROM anon, authenticated',
+      v_table.tablename
+    );
+  END LOOP;
+END
+$privileges$;
+
+GRANT SELECT ON TABLE public.classes, public.lessons, public.lesson_blocks TO anon;
 
 -- The student identity helper must reject unapproved profiles even when called by
 -- a SECURITY DEFINER quiz RPC.
