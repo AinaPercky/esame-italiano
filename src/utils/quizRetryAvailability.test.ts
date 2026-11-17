@@ -74,3 +74,29 @@ describe('quiz lock and teacher-authorized retry', () => {
     assert.equal(confirmationFunction.includes('SET used_at ='), false);
   });
 });
+
+
+describe('unified participant and retry lifecycle migration', () => {
+  it('repairs a missing participant for an approved student with an active class enrollment', async () => {
+    const { QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL } = await import('../data/quizParticipantLifecycleMigration');
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /s\.validation_status = 'approved'/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /ce\.status = 'active'/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /ON CONFLICT \(quiz_id, student_id\)/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /get_student_active_launch/);
+  });
+
+  it('does not expose a previous attempt without a live teacher retry grant', async () => {
+    const { QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL } = await import('../data/quizParticipantLifecycleMigration');
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /v_has_history/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /v_has_terminal_participation/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /g\.used_at IS NULL/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /g\.revoked_at IS NULL/);
+  });
+
+  it('consumes retry attempts only on submission and respects max_attempts', async () => {
+    const { QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL } = await import('../data/quizParticipantLifecycleMigration');
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /used_attempts = used_attempts \+ 1/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /used_attempts \+ 1 >= max_attempts/);
+    assert.match(QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL, /Presence confirmation must not consume retry grants/);
+  });
+});
