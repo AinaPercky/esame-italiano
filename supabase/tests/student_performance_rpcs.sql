@@ -37,6 +37,12 @@ VALUES
    'Mia AutreClasse', 'B003', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Classe B',
    now(), '{}', 20, 20, 20, 'submitted', '{}', 1, true);
 
+UPDATE public.quizzes
+SET questions = '[{"id":"question-1","expected":"a"},{"id":"question-2","expected":"b"}]'::jsonb,
+    attendance_mode = 'open',
+    status = 'launched'
+WHERE id = 'quiz-a';
+
 SET ROLE authenticated;
 
 DO $$
@@ -130,12 +136,6 @@ BEGIN
 
   PERFORM set_config('test.is_teacher', 'false', false);
   PERFORM set_config('test.student_id', '11111111-1111-1111-1111-111111111111', false);
-  UPDATE public.quizzes
-  SET questions = '[{"id":"question-1","expected":"a"},{"id":"question-2","expected":"b"}]'::jsonb,
-      attendance_mode = 'open',
-      status = 'launched'
-  WHERE id = 'quiz-a';
-
   IF NOT EXISTS (
     SELECT 1 FROM pg_indexes
     WHERE schemaname = 'public'
