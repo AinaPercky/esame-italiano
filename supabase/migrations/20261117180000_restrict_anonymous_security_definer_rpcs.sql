@@ -5,12 +5,21 @@
 DO $migration$
 DECLARE
   v_function record;
+  v_service_role_oid oid;
 BEGIN
+  SELECT oid INTO v_service_role_oid
+  FROM pg_roles
+  WHERE rolname = 'service_role';
+
   FOR v_function IN
     SELECT
       p.oid::regprocedure AS signature,
       has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authenticated_can_execute,
-      has_function_privilege('service_role', p.oid, 'EXECUTE') AS service_role_can_execute
+      CASE
+        WHEN v_service_role_oid IS NOT NULL
+          THEN has_function_privilege(v_service_role_oid, p.oid, 'EXECUTE')
+        ELSE FALSE
+      END AS service_role_can_execute
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
@@ -40,7 +49,7 @@ BEGIN
       );
     END IF;
 
-    IF v_function.service_role_can_execute THEN
+    IF v_service_role_oid IS NOT NULL AND v_function.service_role_can_execute THEN
       EXECUTE format(
         'GRANT EXECUTE ON FUNCTION %s TO service_role',
         v_function.signature
