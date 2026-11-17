@@ -995,4 +995,15 @@ GRANT EXECUTE ON FUNCTION public.submit_quiz_submission(JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.submit_quiz_presence_submission(JSONB) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+-- Student quiz catalog lookup indexes (kept in sync with the additive migration).
+CREATE INDEX IF NOT EXISTS idx_students_catalog_email_created_approved
+  ON public.students (lower(email), created_at DESC)
+  WHERE coalesce(validation_status, 'approved') = 'approved';
+
+CREATE INDEX IF NOT EXISTS idx_class_enrollments_catalog_student_status_class
+  ON public.class_enrollments (student_id, status, class_id);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_submissions_catalog_quiz_student
+  ON public.quiz_submissions (quiz_id, student_id);
 `;
