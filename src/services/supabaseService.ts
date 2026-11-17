@@ -1529,6 +1529,11 @@ class SupabaseService {
       const enrollmentsRequest = isTeacher
         ? client.from('class_enrollments').select('student_id,class_id,status')
         : Promise.resolve({ data: [], error: null });
+      // L’espace élève utilise ses RPC dédiées pour les examens écrits et le rapport oral.
+      // Ne pas télécharger les examens oraux, grilles, évaluations et ordres de passage
+      // de toutes les classes dans son état global.
+      const isStudentSession = isAuthenticated && !isTeacher;
+      const emptyRows = Promise.resolve({ data: [], error: null });
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1544,11 +1549,11 @@ class SupabaseService {
       ] = await Promise.all([
         client.from('classes').select('id,name,enrollment_mode,archived_at,created_at'),
         client.from('students').select('id,class_id,first_name,last_name,email,student_number,avatar_url,validation_status,created_at,updated_at'),
-        client.from('exams').select('id,class_id,title,description,level,exam_date,status,created_at'),
-        client.from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position'),
-        client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at'),
-        client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note'),
-        client.from('exam_pass_order').select('id,exam_id,student_id,position,status,created_at'),
+        isStudentSession ? emptyRows : client.from('exams').select('id,class_id,title,description,level,exam_date,status,created_at'),
+        isStudentSession ? emptyRows : client.from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position'),
+        isStudentSession ? emptyRows : client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at'),
+        isStudentSession ? emptyRows : client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note'),
+        isStudentSession ? emptyRows : client.from('exam_pass_order').select('id,exam_id,student_id,position,status,created_at'),
         quizzesRequest,
         quizSubmissionsRequest,
         classLeaderboardRequest,
