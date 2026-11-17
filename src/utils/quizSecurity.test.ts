@@ -145,7 +145,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
 
     for (const [table, requestName] of protectedDatasets) {
       const requestPattern = new RegExp(
-        String.raw`const ${requestName} = isStudentSession \\? emptyRows : isAuthenticated \\? client\\.from\\('${table}'\\)\\.select\\('[^']+'\\) : emptyRows;`
+        String.raw`const ${requestName} = isStudentSession \? emptyRows : isAuthenticated \? client\.from\('${table}'\)\.select\('[^']+'\) : emptyRows;`
       );
       assert.match(
         importSection,
