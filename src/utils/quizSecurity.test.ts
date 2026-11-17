@@ -125,6 +125,22 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     assert.ok(importSection.includes('if (isTeacher && orphanedStudentIds.length > 0)'));
   });
 
+  it('évite de charger les datasets professeur pendant une session élève', () => {
+    const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
+    const source = fs.readFileSync(servicePath, 'utf8');
+    const importSectionStart = source.indexOf('public async importFromSupabase()');
+    assert.notEqual(importSectionStart, -1);
+    const importSection = source.slice(importSectionStart);
+
+    assert.ok(importSection.includes('const isStudentSession = isAuthenticated && !isTeacher;'));
+    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exams')"));
+    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exam_rubrics')"));
+    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('evaluations')"));
+    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('evaluation_details')"));
+    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exam_pass_order')"));
+    assert.ok(importSection.includes('const classLeaderboardRequest = isAuthenticated && !isTeacher'));
+  });
+
   it('limite les colonnes téléchargées pendant l’import Supabase', () => {
     const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
     const source = fs.readFileSync(servicePath, 'utf8');
