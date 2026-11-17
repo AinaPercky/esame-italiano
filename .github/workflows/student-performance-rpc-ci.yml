@@ -1,0 +1,44 @@
+name: Student performance RPC CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  student-performance-rpcs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: student_performance_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d student_performance_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: student_performance_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap isolated PostgreSQL schema
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_performance_rpc_bootstrap.sql
+      - name: Apply minimal student roster RPC migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117130000_student_class_roster_rpc.sql
+      - name: Apply optimized class leaderboard migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117140000_optimize_class_quiz_leaderboard.sql
+      - name: Test roster isolation, leaderboard output and privileges
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_performance_rpcs.sql
