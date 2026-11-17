@@ -19,7 +19,14 @@ BEGIN
      OR has_table_privilege('anon','public.exercise_attempts','SELECT')
      OR has_table_privilege('anon','public.exercise_class_assignments','SELECT')
      OR has_table_privilege('anon','public.exercise_versions','SELECT')
-     OR has_table_privilege('anon','public.exercises','SELECT') THEN
+     OR has_table_privilege('anon','public.exercises','SELECT')
+     OR has_table_privilege('anon','public.quiz_submissions','SELECT')
+     OR has_table_privilege('anon','public.quiz_attempts','SELECT')
+     OR has_table_privilege('anon','public.quiz_launches','SELECT')
+     OR has_table_privilege('anon','public.quiz_participants','SELECT')
+     OR has_table_privilege('anon','public.quiz_retry_grants','SELECT')
+     OR has_table_privilege('anon','public.quizzes','SELECT')
+     OR has_table_privilege('anon','public.class_enrollment_requests','SELECT') THEN
     RAISE EXCEPTION 'Anonymous role still has direct read access to private school, exercise or progress tables.';
   END IF;
 
@@ -109,7 +116,14 @@ BEGIN
      OR has_table_privilege('authenticated','public.class_enrollments','TRUNCATE')
      OR has_table_privilege('authenticated','public.lesson_progress','TRUNCATE')
      OR has_table_privilege('authenticated','public.exercise_attempts','TRUNCATE')
-     OR has_table_privilege('authenticated','public.exercise_answers','TRUNCATE') THEN
+     OR has_table_privilege('authenticated','public.exercise_answers','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quiz_submissions','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quiz_attempts','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quiz_launches','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quiz_participants','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quiz_retry_grants','TRUNCATE')
+     OR has_table_privilege('authenticated','public.quizzes','TRUNCATE')
+     OR has_table_privilege('authenticated','public.class_enrollment_requests','TRUNCATE') THEN
     RAISE EXCEPTION 'Authenticated client roles still have a TRUNCATE privilege that bypasses RLS.';
   END IF;
   IF (SELECT count(*) FROM public.lesson_progress) <> 1
