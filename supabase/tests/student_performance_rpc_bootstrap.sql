@@ -96,3 +96,57 @@ STABLE
 AS $$
   SELECT nullif(current_setting('test.student_id', true), '');
 $$;
+
+
+ALTER TABLE public.quizzes
+  ADD COLUMN status text DEFAULT 'launched',
+  ADD COLUMN attendance_mode text DEFAULT 'open',
+  ADD COLUMN is_public boolean DEFAULT false,
+  ADD COLUMN questions jsonb DEFAULT '[]'::jsonb;
+
+CREATE TABLE public.quiz_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id text NOT NULL,
+  student_id text NOT NULL,
+  attempt_number integer NOT NULL DEFAULT 1
+);
+
+CREATE TABLE public.quiz_launches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id text NOT NULL,
+  status text NOT NULL,
+  launched_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.quiz_participants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  launch_id uuid NOT NULL,
+  student_id text NOT NULL,
+  presence_status text NOT NULL,
+  presence_deadline_at timestamptz
+);
+
+CREATE TABLE public.quiz_question_evaluations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id text NOT NULL,
+  student_id text NOT NULL,
+  attempt_number integer NOT NULL,
+  question_id text NOT NULL,
+  answer text NOT NULL DEFAULT '',
+  feedback jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (quiz_id, student_id, attempt_number, question_id)
+);
+
+CREATE OR REPLACE FUNCTION public.quiz_grade_question(question jsonb, answer text)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT jsonb_build_object(
+    'correct', coalesce(question ->> 'expected', '') = coalesce(answer, ''),
+    'points', CASE WHEN coalesce(question ->> 'expected', '') = coalesce(answer, '') THEN 1 ELSE 0 END,
+    'maxPoints', 1,
+    'expected', question ->> 'expected'
+  );
+$$;
