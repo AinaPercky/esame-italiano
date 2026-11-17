@@ -9,12 +9,11 @@ DECLARE
     'evaluate_public_quiz_question'
   ];
 BEGIN
-  IF to_regprocedure('public.written_exam_auto_question_score(uuid,jsonb)') IS NOT NULL
-     AND (
-       has_function_privilege('anon', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
-       OR has_function_privilege('authenticated', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
-     ) THEN
-    RAISE EXCEPTION 'Private written-exam scorer is still executable by a client role.';
+  IF to_regprocedure('public.written_exam_auto_question_score(uuid,jsonb)') IS NOT NULL THEN
+    IF has_function_privilege('anon', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE')
+       OR has_function_privilege('authenticated', 'public.written_exam_auto_question_score(uuid,jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Private written-exam scorer is still executable by a client role.';
+    END IF;
   END IF;
 
   IF to_regprocedure('public.grade_written_exam_attempt(uuid,jsonb)') IS NOT NULL THEN
@@ -35,9 +34,10 @@ BEGIN
     END IF;
   END IF;
 
-  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL
-     AND has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
+  IF to_regprocedure('public.submit_quiz_submission(jsonb)') IS NOT NULL THEN
+    IF has_function_privilege('anon', 'public.submit_quiz_submission(jsonb)', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous users can submit quiz results using a caller-supplied student ID.';
+    END IF;
   END IF;
 
   FOR v_function IN
@@ -56,19 +56,20 @@ BEGIN
     -- Some isolated CI schemas do not install the quiz module. When present,
     -- the public quiz RPCs must remain available to anonymous learners.
     IF v_public_rpc_name = 'get_public_quiz_catalog'
-       AND to_regprocedure('public.get_public_quiz_catalog()') IS NOT NULL
-       AND NOT has_function_privilege('anon', 'public.get_public_quiz_catalog()', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Public quiz catalogue was accidentally closed.';
-    END IF;
-    IF v_public_rpc_name = 'get_public_quiz'
-       AND to_regprocedure('public.get_public_quiz(text)') IS NOT NULL
-       AND NOT has_function_privilege('anon', 'public.get_public_quiz(text)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Public quiz retrieval was accidentally closed.';
-    END IF;
-    IF v_public_rpc_name = 'evaluate_public_quiz_question'
-       AND to_regprocedure('public.evaluate_public_quiz_question(text,text,text)') IS NOT NULL
-       AND NOT has_function_privilege('anon', 'public.evaluate_public_quiz_question(text,text,text)', 'EXECUTE') THEN
-      RAISE EXCEPTION 'Public quiz correction was accidentally closed.';
+       AND to_regprocedure('public.get_public_quiz_catalog()') IS NOT NULL THEN
+      IF NOT has_function_privilege('anon', 'public.get_public_quiz_catalog()', 'EXECUTE') THEN
+        RAISE EXCEPTION 'Public quiz catalogue was accidentally closed.';
+      END IF;
+    ELSIF v_public_rpc_name = 'get_public_quiz'
+       AND to_regprocedure('public.get_public_quiz(text)') IS NOT NULL THEN
+      IF NOT has_function_privilege('anon', 'public.get_public_quiz(text)', 'EXECUTE') THEN
+        RAISE EXCEPTION 'Public quiz retrieval was accidentally closed.';
+      END IF;
+    ELSIF v_public_rpc_name = 'evaluate_public_quiz_question'
+       AND to_regprocedure('public.evaluate_public_quiz_question(text,text,text)') IS NOT NULL THEN
+      IF NOT has_function_privilege('anon', 'public.evaluate_public_quiz_question(text,text,text)', 'EXECUTE') THEN
+        RAISE EXCEPTION 'Public quiz correction was accidentally closed.';
+      END IF;
     END IF;
   END LOOP;
 END
