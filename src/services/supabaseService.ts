@@ -328,14 +328,14 @@ class SupabaseService {
   }
 
   public async getPublicOralReport(
-    examId: string,
+    examId?: string,
     studentId?: string,
     lookup?: string
   ): Promise<{ student: Student; exam: Exam; evaluation: Evaluation } | null> {
     const client = this.getClient();
     if (!client) throw new Error('La connexion Supabase est indisponible.');
     const { data, error } = await client.rpc('get_public_oral_report', {
-      p_exam_id: examId,
+      p_exam_id: examId || null,
       p_student_id: studentId || null,
       p_lookup: lookup?.trim() || null
     });
