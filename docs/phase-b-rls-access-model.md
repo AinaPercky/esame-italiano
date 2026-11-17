@@ -21,7 +21,17 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 | Détails d'évaluation | Aucun accès direct | Détails de ses évaluations | Tous les détails |
 | Ordre de passage | Aucun accès direct | Sa propre position | Ordre complet |
 | Rapport oral QR | RPC ciblée | RPC ciblée | RPC ciblée ou vues privées |
+| Leçons publiées | Lecture du contenu publié | Lecture du contenu publié | Gestion complète |
+| Progression des leçons | Aucun accès | Sa propre progression | Lecture de toutes les progressions |
+| Exercices | Aucun accès direct | Exercices attribués et RPC de tentative | Gestion complète |
 | Inscription | RPC limitée | RPC limitée | Gestion complète |
+
+## Privilèges SQL non contournables par RLS
+
+- Tous les privilèges anonymes directs sont retirés sur les tables du schéma public.
+- Seules les tables de classes actives, leçons publiées et blocs de leçons publiés conservent un SELECT anonyme.
+- Les rôles clients `anon` et `authenticated` perdent `TRUNCATE`, `REFERENCES` et `TRIGGER` sur toutes les tables publiques. Ces privilèges ne sont pas filtrés par RLS ; leur retrait évite qu'un utilisateur connecté contourne les politiques de lignes.
+- Le rôle backend `service_role` conserve ses privilèges opérationnels.
 
 ## RPC introduites
 
@@ -57,6 +67,8 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 - Les visiteurs anonymes ne déclenchent plus de SELECT sur les tables scolaires privées.
 - Les élèves authentifiés récupèrent leur propre fiche, les examens de leurs classes et leurs évaluations via RLS.
 - Un RPC séparé fournit un répertoire minimal de camarades pour préserver le classement.
+- Les progrès de leçons sont lisibles uniquement par leur propriétaire et le professeur ; l'ancienne politique de lecture globale est remplacée.
+- Les modules Exercices et Quiz gardent leurs RPC existantes, mais les privilèges structurels qui contournaient RLS sont retirés.
 - Les professeurs conservent le chargement complet, limité par les politiques RLS au compte enseignant.
 - Le rapport QR est chargé directement par sa RPC dédiée, sans dépendre de l'état global de l'application.
 
