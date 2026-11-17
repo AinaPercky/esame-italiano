@@ -133,11 +133,26 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     const importSection = source.slice(importSectionStart);
 
     assert.ok(importSection.includes('const isStudentSession = isAuthenticated && !isTeacher;'));
-    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exams')"));
-    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exam_rubrics')"));
-    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('evaluations')"));
-    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('evaluation_details')"));
-    assert.ok(importSection.includes("isStudentSession ? emptyRows : client.from('exam_pass_order')"));
+    // Chaque dataset doit être ignoré pour un élève et un client anonyme,
+    // et chargé avec une projection explicite uniquement pour un professeur authentifié.
+    const protectedDatasets = [
+      ['exams', 'examsRequest'],
+      ['exam_rubrics', 'rubricsRequest'],
+      ['evaluations', 'evaluationsRequest'],
+      ['evaluation_details', 'detailsRequest'],
+      ['exam_pass_order', 'passOrderRequest']
+    ] as const;
+
+    for (const [table, requestName] of protectedDatasets) {
+      const requestPattern = new RegExp(
+        String.raw`const ${requestName} = isStudentSession \\? emptyRows : isAuthenticated \\? client\\.from\\('${table}'\\)\\.select\\('[^']+'\\) : emptyRows;`
+      );
+      assert.match(
+        importSection,
+        requestPattern,
+        `${table} doit être chargé uniquement pour un professeur authentifié`
+      );
+    }
     assert.ok(importSection.includes('const classLeaderboardRequest = isAuthenticated && !isTeacher'));
   });
 
