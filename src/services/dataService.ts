@@ -355,8 +355,14 @@ export const dataService = {
       email: normalizedEmail,
       updated_at: new Date().toISOString()
     };
-    await supabaseService.assertStudentEmailAvailable(normalizedEmail, id);
-    await supabaseService.saveStudent(updatedStudent);
+    const currentUser = authService.getCurrentUser();
+    if (currentUser?.role === 'student' && currentUser.student_id === id) {
+      // Student self-service is restricted to editable profile fields in a dedicated RPC.
+      await supabaseService.updateOwnStudentProfile(updatedStudent);
+    } else {
+      await supabaseService.assertStudentEmailAvailable(normalizedEmail, id);
+      await supabaseService.saveStudent(updatedStudent);
+    }
     state.students[idx] = updatedStudent;
     persistState();
     notifySubscribers();
