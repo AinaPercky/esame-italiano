@@ -338,7 +338,7 @@ BEGIN
 
   IF nullif(btrim(coalesce(p_first_name, '')), '') IS NULL
      OR nullif(btrim(coalesce(p_last_name, '')), '') IS NULL
-     OR p_gender NOT IN ('homme', 'femme') THEN
+     OR coalesce(p_gender, '') NOT IN ('homme', 'femme') THEN
     RAISE EXCEPTION 'Les informations du profil sont invalides.';
   END IF;
 
