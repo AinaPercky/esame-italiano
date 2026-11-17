@@ -51,6 +51,10 @@ BEGIN
      OR NOT has_function_privilege('anon','public.prepare_student_registration(text,text,text,text,uuid,text)','EXECUTE') THEN
     RAISE EXCEPTION 'Required public QR or registration RPC is not executable by anon.';
   END IF;
+  IF has_function_privilege('anon','public.update_own_student_profile(uuid,text,text,text,text,text)','EXECUTE')
+     OR has_function_privilege('anon','public.update_own_student_avatar(uuid,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous users must not be able to call authenticated student profile updates.';
+  END IF;
 
   IF public.get_public_oral_report(NULL, '10000000-0000-4000-8000-000000000001', NULL) IS NOT NULL THEN
     RAISE EXCEPTION 'Anonymous users must not be able to request the latest private student report.';
@@ -117,6 +121,10 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM public.students WHERE id='10000000-0000-4000-8000-000000000001') THEN
     RAISE EXCEPTION 'Student can read another profile or cannot read their own.';
   END IF;
+  IF NOT has_function_privilege('authenticated','public.update_own_student_profile(uuid,text,text,text,text,text)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.update_own_student_avatar(uuid,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated students cannot call their own-profile update RPCs.';
+  END IF;
   IF has_table_privilege('authenticated','public.students','TRUNCATE')
      OR has_table_privilege('authenticated','public.class_enrollments','TRUNCATE')
      OR has_table_privilege('authenticated','public.lesson_progress','TRUNCATE')
@@ -166,6 +174,48 @@ BEGIN
   IF v_roster::text LIKE '%student.one@example.com%' OR v_roster::text LIKE '%student.two@example.com%' THEN
     RAISE EXCEPTION 'Student class roster must not expose e-mail addresses.';
   END IF;
+
+  PERFORM public.update_own_student_profile(
+    '10000000-0000-4000-8000-000000000001',
+    'Aina Updated',
+    'One',
+    'STU-001-UPDATED',
+    'femme',
+    NULL
+  );
+  PERFORM public.update_own_student_avatar(
+    '10000000-0000-4000-8000-000000000001',
+    'https://cdn.example.test/student-one.png'
+  );
+  IF NOT EXISTS (
+    SELECT 1 FROM public.students
+    WHERE id='10000000-0000-4000-8000-000000000001'
+      AND first_name='Aina Updated'
+      AND student_number='STU-001-UPDATED'
+      AND avatar_url='https://cdn.example.test/student-one.png'
+  ) THEN
+    RAISE EXCEPTION 'Own student profile/avatar update did not persist.';
+  END IF;
+
+  BEGIN
+    PERFORM public.update_own_student_profile(
+      '10000000-0000-4000-8000-000000000002',
+      'Bako',
+      'Two',
+      'STU-002',
+      'homme',
+      NULL
+    );
+    RAISE EXCEPTION 'Student was able to target another student profile.';
+  EXCEPTION WHEN raise_exception THEN
+    IF EXISTS (
+      SELECT 1 FROM public.students
+      WHERE id='10000000-0000-4000-8000-000000000002'
+        AND first_name <> 'Bako'
+    ) THEN
+      RAISE EXCEPTION 'Rejected profile update changed another student record.';
+    END IF;
+  END;
 
   UPDATE public.students SET validation_status='approved'
   WHERE id='10000000-0000-4000-8000-000000000002';
