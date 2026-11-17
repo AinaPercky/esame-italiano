@@ -116,6 +116,7 @@ DECLARE
   v_roster jsonb;
   v_report jsonb;
   v_rows integer;
+  v_spoof_rejected boolean := false;
 BEGIN
   IF (SELECT count(*) FROM public.students) <> 1
      OR NOT EXISTS (SELECT 1 FROM public.students WHERE id='10000000-0000-4000-8000-000000000001') THEN
@@ -206,16 +207,19 @@ BEGIN
       'homme',
       NULL
     );
-    RAISE EXCEPTION 'Student was able to target another student profile.';
   EXCEPTION WHEN raise_exception THEN
-    IF EXISTS (
-      SELECT 1 FROM public.students
-      WHERE id='10000000-0000-4000-8000-000000000002'
-        AND first_name <> 'Bako'
-    ) THEN
-      RAISE EXCEPTION 'Rejected profile update changed another student record.';
-    END IF;
+    v_spoof_rejected := true;
   END;
+  IF NOT v_spoof_rejected THEN
+    RAISE EXCEPTION 'Student was able to target another student profile.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.students
+    WHERE id='10000000-0000-4000-8000-000000000002'
+      AND first_name <> 'Bako'
+  ) THEN
+    RAISE EXCEPTION 'Rejected profile update changed another student record.';
+  END IF;
 
   UPDATE public.students SET validation_status='approved'
   WHERE id='10000000-0000-4000-8000-000000000002';
