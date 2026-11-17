@@ -16,7 +16,7 @@ CREATE POLICY classes_read_available
   ON public.classes FOR SELECT TO anon, authenticated
   USING (archived_at IS NULL OR public.class_enrollment_is_teacher());
 
--- Teacher access remains complete; students can only read their own approved profile.
+-- Teacher access remains complete; students can read only their own profile, including its approval state.
 DROP POLICY IF EXISTS "Students full access" ON public.students;
 DROP POLICY IF EXISTS students_teacher_manage ON public.students;
 DROP POLICY IF EXISTS students_self_read ON public.students;
@@ -29,7 +29,6 @@ CREATE POLICY students_self_read
   USING (
     auth.uid() IS NOT NULL
     AND lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-    AND coalesce(validation_status, 'approved') = 'approved'
   );
 
 -- Students can read only exams assigned to an active class enrollment.
