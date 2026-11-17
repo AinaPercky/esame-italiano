@@ -42,7 +42,11 @@ BEGIN
     SELECT coalesce(jsonb_agg(
       jsonb_build_object(
         'id', s.id,
-        'class_id', CASE\n          WHEN s.id::text = v_student_id THEN s.class_id\n          WHEN s.class_id::text = ANY(coalesce(memberships.class_ids, ARRAY[]::text[])) THEN s.class_id\n          ELSE memberships.class_ids[1]\n        END,
+        'class_id', CASE
+          WHEN s.id::text = v_student_id THEN s.class_id
+          WHEN s.class_id::text = ANY(coalesce(memberships.class_ids, ARRAY[]::text[])) THEN s.class_id
+          ELSE memberships.class_ids[1]
+        END,
         'class_ids', coalesce(memberships.class_ids, ARRAY[]::text[]),
         'first_name', s.first_name,
         'last_name', s.last_name,
