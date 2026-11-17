@@ -80,6 +80,16 @@ Supprimer l'accès anonyme direct aux tables scolaires sans casser :
 - Les professeurs conservent le chargement complet, limité par les politiques RLS au compte enseignant.
 - Le rapport QR est chargé directement par sa RPC dédiée, sans dépendre de l'état global de l'application.
 
+## Confidentialité des rapports QR — limite connue à résoudre avant production
+
+Le rapport public est limité à un seul élève et un seul examen, mais les mécanismes d'accès actuels ne constituent pas une authentification forte :
+
+- Le QR individuel embarque `exam` et l'UUID de l'élève dans l'URL. Il fonctionne comme un lien porteur : toute personne qui possède ou reçoit cette URL peut demander le rapport correspondant.
+- Le QR commun embarque l'identifiant d'examen puis demande l'adresse e-mail de l'élève. Une adresse e-mail est une information d'identification, pas un secret d'accès ; sa connaissance ne prouve pas que le demandeur est l'élève.
+- La RPC ne retourne qu'un rapport et n'expose pas l'e-mail ni le registre complet, ce qui réduit l'étendue de l'exposition, mais ne remplace pas un contrôle d'accès.
+
+La présente phase conserve volontairement le comportement QR existant pour éviter de casser les supports déjà distribués. Avant une mise en production avec des résultats considérés comme confidentiels, concevoir un accès par jeton opaque aléatoire (au moins 128 bits), stocké sous forme hachée, limité au rapport concerné, révocable/renouvelable et non dérivé de l'UUID élève ou de l'e-mail. Ajouter une limitation de débit et des tests de non-énumération. Ne pas considérer le QR actuel comme une preuve d'identité.
+
 ## Précautions de déploiement
 
 - Cette migration ne doit pas être appliquée directement à la base active avant réconciliation de l'historique des migrations.
