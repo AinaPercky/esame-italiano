@@ -30,7 +30,9 @@ BEGIN
         FROM (VALUES
           ('public.get_public_quiz_catalog()'),
           ('public.get_public_quiz(text)'),
-          ('public.evaluate_public_quiz_question(text,text,text)')
+          ('public.evaluate_public_quiz_question(text,text,text)'),
+          ('public.prepare_student_registration(text,text,text,text,uuid,text)'),
+          ('public.get_public_oral_report(uuid,uuid,text)')
         ) AS allowed(signature)
         WHERE to_regprocedure(allowed.signature)::oid = p.oid
       )
@@ -59,7 +61,7 @@ BEGIN
 END
 $migration$;
 
--- Explicitly retain the three public practice-quiz endpoints, if installed.
+-- Explicitly retain the public endpoints needed by the existing quiz and QR flows, if installed.
 DO $public_quiz$
 DECLARE
   v_signature text;
@@ -68,7 +70,9 @@ BEGIN
   FOREACH v_signature IN ARRAY ARRAY[
     'public.get_public_quiz_catalog()',
     'public.get_public_quiz(text)',
-    'public.evaluate_public_quiz_question(text,text,text)'
+    'public.evaluate_public_quiz_question(text,text,text)',
+    'public.prepare_student_registration(text,text,text,text,uuid,text)',
+    'public.get_public_oral_report(uuid,uuid,text)'
   ]
   LOOP
     v_function := to_regprocedure(v_signature);
