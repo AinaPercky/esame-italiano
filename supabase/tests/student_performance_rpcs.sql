@@ -127,7 +127,80 @@ BEGIN
       RAISE;
     END IF;
   END;
+
+  PERFORM set_config('test.is_teacher', 'false', false);
+  PERFORM set_config('test.student_id', '11111111-1111-1111-1111-111111111111', false);
+  UPDATE public.quizzes
+  SET questions = '[{"id":"question-1","expected":"a"},{"id":"question-2","expected":"b"}]'::jsonb,
+      attendance_mode = 'open',
+      status = 'launched'
+  WHERE id = 'quiz-a';
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_class_enrollments_student_text_active'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_students_id_text_class_lookup'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_quiz_attempts_quiz_student_attempt'
+  ) THEN
+    RAISE EXCEPTION 'One or more grading lookup indexes are missing';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'public.evaluate_quiz_question(text,text,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated must execute evaluate_quiz_question';
+  END IF;
+  IF has_function_privilege(
+    'anon',
+    'public.evaluate_quiz_question(text,text,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'anon must not execute evaluate_quiz_question';
+  END IF;
+
+  IF public.evaluate_quiz_question('quiz-a', 'question-1', 'a')->>'correct' <> 'true' THEN
+    RAISE EXCEPTION 'question 1 grading returned an unexpected result';
+  END IF;
+  IF public.evaluate_quiz_question('quiz-a', 'question-2', 'b')->>'correct' <> 'true' THEN
+    RAISE EXCEPTION 'question 2 grading returned an unexpected result';
+  END IF;
+  IF (
+    SELECT count(DISTINCT attempt_number)
+    FROM public.quiz_question_evaluations
+    WHERE quiz_id = 'quiz-a'
+      AND student_id = '11111111-1111-1111-1111-111111111111'
+  ) <> 1 THEN
+    RAISE EXCEPTION 'answers in the same quiz attempt must share one attempt number';
+  END IF;
+  IF (
+    SELECT count(*)
+    FROM public.quiz_question_evaluations
+    WHERE quiz_id = 'quiz-a'
+      AND student_id = '11111111-1111-1111-1111-111111111111'
+  ) <> 2 THEN
+    RAISE EXCEPTION 'both question answers must be persisted';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', '', false);
+  BEGIN
+    PERFORM public.evaluate_quiz_question('quiz-a', 'question-1', 'a');
+    RAISE EXCEPTION 'unauthenticated user unexpectedly evaluated a question';
+  EXCEPTION WHEN raise_exception THEN
+    GET STACKED DIAGNOSTICS error_message = MESSAGE_TEXT;
+    IF error_message <> 'Session étudiant authentifiée requise.' THEN
+      RAISE;
+    END IF;
+  END;
 END;
-$$;
+$;
 
 RESET ROLE;
