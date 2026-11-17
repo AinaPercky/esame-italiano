@@ -43,8 +43,8 @@ BEGIN
       jsonb_build_object(
         'id', s.id,
         'class_id', CASE
-          WHEN s.id::text = v_student_id THEN s.class_id
-          WHEN s.class_id::text = ANY(coalesce(memberships.class_ids, ARRAY[]::text[])) THEN s.class_id
+          WHEN s.id::text = v_student_id THEN s.class_id::text
+          WHEN s.class_id::text = ANY(coalesce(memberships.class_ids, ARRAY[]::text[])) THEN s.class_id::text
           ELSE memberships.class_ids[1]
         END,
         'class_ids', coalesce(memberships.class_ids, ARRAY[]::text[]),
