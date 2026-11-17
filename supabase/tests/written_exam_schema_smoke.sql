@@ -75,5 +75,17 @@ begin
   if not exists(select 1 from pg_trigger where tgname='written_exam_verbes_trous_score' and not tgisinternal) then
     raise exception 'Verb-bank attempt scoring trigger is missing';
   end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_attempts_exam_started') then
+    raise exception 'Exam attempt listing index is missing';
+  end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_attempts_version') then
+    raise exception 'Attempt version foreign-key index is missing';
+  end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_section_results_section') then
+    raise exception 'Section result foreign-key index is missing';
+  end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_integrity_events_attempt_occurred') then
+    raise exception 'Integrity event retrieval index is missing';
+  end if;
 end
 $written$;
