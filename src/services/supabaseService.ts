@@ -1647,6 +1647,10 @@ class SupabaseService {
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errR) throw new Error(`Grilles d’examen: ${errR.message}`);
+      if (errEv) throw new Error(`Évaluations: ${errEv.message}`);
+      if (errD) throw new Error(`Détails d’évaluation: ${errD.message}`);
+      if (errPO) throw new Error(`Ordre de passage: ${errPO.message}`);
       const noStudentContextError = (error: any) =>
         /Aucune fiche étudiant|Profil étudiant approuvé introuvable|Session étudiant authentifiée requise|réservée aux comptes étudiants/i
           .test(error?.message || '');
