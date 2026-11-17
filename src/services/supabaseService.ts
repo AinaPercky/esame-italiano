@@ -1652,7 +1652,7 @@ class SupabaseService {
       if (errD) throw new Error(`Détails d’évaluation: ${errD.message}`);
       if (errPO) throw new Error(`Ordre de passage: ${errPO.message}`);
       const noStudentContextError = (error: any) =>
-        /Aucune fiche étudiant|Profil étudiant approuvé introuvable|Session étudiant authentifiée requise|réservée aux comptes étudiants/i
+        /Aucune fiche étudiant|Profil étudiant approuvé introuvable|Session étudiant authentifiée requise|réservée aux comptes étudiants|réservée aux élèves/i
           .test(error?.message || '');
 
       if (errClassLeaderboard) {
