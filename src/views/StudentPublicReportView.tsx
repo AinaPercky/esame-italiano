@@ -40,7 +40,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   const [report, setReport] = useState<{ student: Student; exam: Exam; evaluation: Evaluation } | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(initialExamId && isLockedReport));
+  const [isLoading, setIsLoading] = useState<boolean>(isLockedReport);
 
   const currentExam = report?.exam;
   const currentStudent = report?.student;
@@ -54,7 +54,7 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
   // d'élèves, d'examens ou de notes n'est téléchargée dans le navigateur.
   useEffect(() => {
     const targetStudentId = lockedStudentId || initialStudentId;
-    if (!initialExamId || !targetStudentId) {
+    if (!targetStudentId || (!initialExamId && !isLockedReport)) {
       setIsLoading(false);
       return;
     }
@@ -62,7 +62,12 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     let cancelled = false;
     setIsLoading(true);
     setSearchError(null);
-    supabaseService.getPublicOralReport(initialExamId, targetStudentId)
+    // When the student opens their own space, omit the exam and student IDs:
+    // the RPC resolves the latest report from the authenticated JWT identity.
+    const reportRequest = initialExamId
+      ? supabaseService.getPublicOralReport(initialExamId, targetStudentId)
+      : supabaseService.getPublicOralReport();
+    reportRequest
       .then(result => {
         if (cancelled) return;
         setReport(result);
