@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, edited]
     branches: [main]
   push:
-    branches: [feat/written-composite-exams]
+    branches: [feat/written-composite-exams, fix/pre-merge-security-validation]
 
 permissions:
   contents: read
