@@ -309,6 +309,82 @@ BEGIN
 END;
 $function$;
 
+-- Students may update only their own editable profile fields through this RPC.
+-- They cannot change their class, e-mail, approval status or other students.
+CREATE OR REPLACE FUNCTION public.update_own_student_profile(
+  p_student_id uuid,
+  p_first_name text,
+  p_last_name text,
+  p_student_number text,
+  p_gender text,
+  p_avatar_url text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_student_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Session étudiant authentifiée requise.';
+  END IF;
+
+  v_student_id := public.class_enrollment_current_student_id();
+  IF v_student_id IS NULL OR v_student_id <> p_student_id THEN
+    RAISE EXCEPTION 'Vous ne pouvez modifier que votre propre profil étudiant.';
+  END IF;
+
+  IF nullif(btrim(coalesce(p_first_name, '')), '') IS NULL
+     OR nullif(btrim(coalesce(p_last_name, '')), '') IS NULL
+     OR p_gender NOT IN ('homme', 'femme') THEN
+    RAISE EXCEPTION 'Les informations du profil sont invalides.';
+  END IF;
+
+  UPDATE public.students
+  SET first_name = btrim(p_first_name),
+      last_name = btrim(p_last_name),
+      student_number = nullif(btrim(coalesce(p_student_number, '')), ''),
+      gender = p_gender,
+      avatar_url = p_avatar_url,
+      updated_at = now()
+  WHERE id = v_student_id;
+
+  RETURN v_student_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_own_student_avatar(
+  p_student_id uuid,
+  p_avatar_url text
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+DECLARE
+  v_student_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Session étudiant authentifiée requise.';
+  END IF;
+
+  v_student_id := public.class_enrollment_current_student_id();
+  IF v_student_id IS NULL OR v_student_id <> p_student_id THEN
+    RAISE EXCEPTION 'Vous ne pouvez modifier que votre propre photo de profil.';
+  END IF;
+
+  UPDATE public.students
+  SET avatar_url = p_avatar_url,
+      updated_at = now()
+  WHERE id = v_student_id;
+
+  RETURN v_student_id;
+END;
+$function$;
+
 -- A student receives a minimal class roster (no email addresses or private
 -- student metadata) so the existing class leaderboard can still show classmates.
 CREATE OR REPLACE FUNCTION public.get_student_class_roster()
@@ -531,6 +607,12 @@ GRANT EXECUTE ON FUNCTION public.finalize_student_registration() TO authenticate
 
 REVOKE ALL ON FUNCTION public.get_student_class_roster() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_student_class_roster() TO authenticated;
+
+REVOKE ALL ON FUNCTION public.update_own_student_profile(uuid,text,text,text,text,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_own_student_profile(uuid,text,text,text,text,text) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.update_own_student_avatar(uuid,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_own_student_avatar(uuid,text) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.get_public_oral_report(uuid,uuid,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_public_oral_report(uuid,uuid,text) TO anon, authenticated;
