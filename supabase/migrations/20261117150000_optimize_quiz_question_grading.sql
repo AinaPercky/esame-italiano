@@ -25,7 +25,13 @@ SET search_path = public, auth, pg_temp
 AS $function$
 DECLARE
   sid TEXT := public.quiz_current_student_id();
-  q public.quizzes%ROWTYPE;
+  v_quiz_id TEXT;
+  v_quiz_status TEXT;
+  v_class_id TEXT;
+  v_class_ids TEXT[];
+  v_attendance_mode TEXT;
+  v_is_public BOOLEAN;
+  v_questions JSONB;
   cids TEXT[];
   question JSONB;
   l public.quiz_launches%ROWTYPE;
@@ -41,12 +47,12 @@ BEGIN
   END IF;
 
   -- Fetch only fields used by the grading path, not the full quiz row.
-  SELECT id, status, class_id, class_ids, attendance_mode, is_public, questions
-  INTO q
+  SELECT id, status, class_id::text, class_ids, attendance_mode, is_public, questions
+  INTO v_quiz_id, v_quiz_status, v_class_id, v_class_ids, v_attendance_mode, v_is_public, v_questions
   FROM public.quizzes
   WHERE id = p_quiz_id;
 
-  IF NOT FOUND OR q.status <> 'launched' THEN
+  IF NOT FOUND OR v_quiz_status <> 'launched' THEN
     RAISE EXCEPTION 'Quiz non disponible.';
   END IF;
 
@@ -63,15 +69,15 @@ BEGIN
   END IF;
 
   IF NOT (coalesce(cids, ARRAY[]::text[])
-          && coalesce(nullif(q.class_ids, ARRAY[]::text[]), ARRAY[q.class_id])) THEN
+          && coalesce(nullif(v_class_ids, ARRAY[]::text[]), ARRAY[v_class_id])) THEN
     RAISE EXCEPTION 'Accès refusé.';
   END IF;
 
-  IF q.attendance_mode = 'strict_presence' AND NOT coalesce(q.is_public, FALSE) THEN
+  IF v_attendance_mode = 'strict_presence' AND NOT coalesce(v_is_public, FALSE) THEN
     SELECT *
     INTO l
     FROM public.quiz_launches
-    WHERE quiz_id = q.id AND status = 'launched'
+    WHERE quiz_id = v_quiz_id AND status = 'launched'
     ORDER BY launched_at DESC
     LIMIT 1;
 
@@ -96,7 +102,7 @@ BEGIN
 
   SELECT value
   INTO question
-  FROM jsonb_array_elements(coalesce(q.questions, '[]'::jsonb))
+  FROM jsonb_array_elements(coalesce(v_questions, '[]'::jsonb))
   WHERE value ->> 'id' = p_question_id
   LIMIT 1;
 
@@ -108,12 +114,12 @@ BEGIN
     coalesce((
       SELECT max(a.attempt_number)
       FROM public.quiz_attempts a
-      WHERE a.quiz_id = q.id AND a.student_id = sid
+      WHERE a.quiz_id = v_quiz_id AND a.student_id = sid
     ), 0),
     coalesce((
       SELECT max(s.attempt_number)
       FROM public.quiz_submissions s
-      WHERE s.quiz_id = q.id AND s.student_id = sid
+      WHERE s.quiz_id = v_quiz_id AND s.student_id = sid
     ), 0)
   ) + 1
   INTO attempt_no;
@@ -124,14 +130,14 @@ BEGIN
     quiz_id, student_id, attempt_number, question_id, answer, feedback
   )
   VALUES (
-    q.id, sid, attempt_no, p_question_id, coalesce(p_answer, ''), result
+    v_quiz_id, sid, attempt_no, p_question_id, coalesce(p_answer, ''), result
   )
   ON CONFLICT (quiz_id, student_id, attempt_number, question_id) DO NOTHING;
 
   SELECT feedback
   INTO result
   FROM public.quiz_question_evaluations
-  WHERE quiz_id = q.id
+  WHERE quiz_id = v_quiz_id
     AND student_id = sid
     AND attempt_number = attempt_no
     AND question_id = p_question_id;
