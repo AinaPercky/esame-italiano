@@ -1,0 +1,57 @@
+name: Security migrations integration (Phase A + B)
+
+on:
+  pull_request:
+    branches: [fix/audit-security-definer-rpcs]
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [fix/pre-merge-security-validation]
+
+permissions:
+  contents: read
+
+jobs:
+  ordered-database-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: security_migrations_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d security_migrations_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: security_migrations_test
+    steps:
+      - name: Checkout Phase A candidate
+        uses: actions/checkout@v4
+      - name: Checkout Phase B candidate
+        uses: actions/checkout@v4
+        with:
+          ref: fix/phase-b-rls-data-access
+          path: phase-b
+      - name: Bootstrap isolated Phase B schema and fixtures
+        run: psql -v ON_ERROR_STOP=1 -f phase-b/supabase/tests/phase_b_rls_ci_bootstrap.sql
+      - name: Create Phase A RPC and trigger fixtures
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security_phase_integration_prerequisites.sql
+      - name: Apply Phase A RPC hardening first
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117180000_restrict_anonymous_security_definer_rpcs.sql
+      - name: Verify Phase A grants before Phase B replaces the QR RPCs
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security_definer_rpc_grants.sql
+      - name: Apply Phase B RLS and scoped RPC migration second
+        run: psql -v ON_ERROR_STOP=1 -f phase-b/supabase/migrations/20261121000000_secure_school_data_rls_and_public_report.sql
+      - name: Verify anonymous, student, teacher and QR access
+        run: psql -v ON_ERROR_STOP=1 -f phase-b/supabase/tests/phase_b_rls_access.sql
+      - name: Verify cumulative RPC, service-role, trigger and PUBLIC grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security_migrations_integration.sql

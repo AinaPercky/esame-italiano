@@ -7,7 +7,9 @@ DECLARE
   v_public_rpc_signatures text[] := ARRAY[
     'public.get_public_quiz_catalog()',
     'public.get_public_quiz(text)',
-    'public.evaluate_public_quiz_question(text,text,text)'
+    'public.evaluate_public_quiz_question(text,text,text)',
+    'public.prepare_student_registration(text,text,text,text,uuid,text)',
+    'public.get_public_oral_report(uuid,uuid,text)'
   ];
 BEGIN
   -- Every installed public-practice RPC must remain callable by anon, but must
@@ -28,6 +30,29 @@ BEGIN
           AND a.privilege_type = 'EXECUTE'
       ) THEN
         RAISE EXCEPTION 'Public practice RPC still grants EXECUTE to PUBLIC: %', v_signature;
+      END IF;
+    END IF;
+  END LOOP;
+
+  -- The QR and registration RPCs are intentionally public but return only scoped data.
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.prepare_student_registration(text,text,text,text,uuid,text)',
+    'public.get_public_oral_report(uuid,uuid,text)'
+  ] LOOP
+    v_function_oid := to_regprocedure(v_signature);
+    IF v_function_oid IS NOT NULL THEN
+      IF NOT has_function_privilege('anon', v_function_oid, 'EXECUTE') THEN
+        RAISE EXCEPTION 'Required public registration/QR RPC is not executable by anon: %', v_signature;
+      END IF;
+      IF EXISTS (
+        SELECT 1
+        FROM pg_proc p,
+             aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+        WHERE p.oid = v_function_oid::oid
+          AND a.grantee = 0
+          AND a.privilege_type = 'EXECUTE'
+      ) THEN
+        RAISE EXCEPTION 'Registration/QR RPC still grants EXECUTE to PUBLIC: %', v_signature;
       END IF;
     END IF;
   END LOOP;
