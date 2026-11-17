@@ -73,6 +73,28 @@ BEGIN
     RAISE EXCEPTION 'leaderboard partial index was not created';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_students_catalog_email_created_approved'
+  ) THEN
+    RAISE EXCEPTION 'student catalog identity index was not created';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_class_enrollments_catalog_student_status_class'
+  ) THEN
+    RAISE EXCEPTION 'student catalog membership index was not created';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_quiz_submissions_catalog_quiz_student'
+  ) THEN
+    RAISE EXCEPTION 'student catalog submission index was not created';
+  END IF;
+
   PERFORM set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', false);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', false);
   PERFORM set_config('test.student_id', '11111111-1111-1111-1111-111111111111', false);
