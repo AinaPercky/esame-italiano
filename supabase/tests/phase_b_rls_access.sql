@@ -27,7 +27,13 @@ BEGIN
      OR has_function_privilege('anon','public.future_default_privilege_probe_admin_fn()','EXECUTE')
      OR has_table_privilege('authenticated','public.future_default_privilege_probe','TRUNCATE')
      OR has_table_privilege('authenticated','public.future_default_privilege_probe_admin','TRUNCATE') THEN
-    RAISE EXCEPTION 'Default privileges reintroduced anonymous access or RLS-bypassing table privileges.';
+    RAISE EXCEPTION 'Default ACL probe: anon table postgres=%, anon table supabase_admin=%, anon function postgres=%, anon function supabase_admin=%, authenticated truncate postgres=%, authenticated truncate supabase_admin=%',
+      has_table_privilege('anon','public.future_default_privilege_probe','SELECT'),
+      has_table_privilege('anon','public.future_default_privilege_probe_admin','SELECT'),
+      has_function_privilege('anon','public.future_default_privilege_probe_fn()','EXECUTE'),
+      has_function_privilege('anon','public.future_default_privilege_probe_admin_fn()','EXECUTE'),
+      has_table_privilege('authenticated','public.future_default_privilege_probe','TRUNCATE'),
+      has_table_privilege('authenticated','public.future_default_privilege_probe_admin','TRUNCATE');
   END IF;
 
   IF has_table_privilege('anon','public.students','SELECT')
