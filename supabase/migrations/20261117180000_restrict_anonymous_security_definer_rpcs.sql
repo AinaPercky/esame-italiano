@@ -29,7 +29,9 @@ BEGIN
       AND p.proname NOT IN (
         'get_public_quiz_catalog',
         'get_public_quiz',
-        'evaluate_public_quiz_question'
+        'evaluate_public_quiz_question',
+        'prepare_student_registration',
+        'get_public_oral_report'
       )
   LOOP
     EXECUTE format(
