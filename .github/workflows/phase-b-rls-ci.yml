@@ -1,0 +1,62 @@
+name: Phase B RLS CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+  push:
+    branches: [fix/phase-b-rls-data-access]
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: phase_b_rls_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d phase_b_rls_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: phase_b_rls_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap isolated school schema and fixtures
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/phase_b_rls_ci_bootstrap.sql
+      - name: Apply role-scoped school data RLS migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121000000_secure_school_data_rls_and_public_report.sql
+      - name: Verify anonymous, student, teacher and QR report access
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/phase_b_rls_access.sql
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Type check
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
