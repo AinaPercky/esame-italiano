@@ -88,6 +88,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql
       - name: Enable hybrid automatic and manual grading
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117000000_hybrid_written_exam_grading.sql
+      - name: Optimize written-exam result retrieval indexes
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117170000_optimize_written_exam_result_queries.sql
       - name: Reproduce legacy anonymous RPC grants from the live project
         run: |
           psql -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.written_exam_auto_question_score(uuid,jsonb) TO anon, authenticated"

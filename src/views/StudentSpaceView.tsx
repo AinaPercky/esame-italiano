@@ -101,6 +101,80 @@ interface PresenceInitializationState {
   retryAuthorized?: boolean;
 }
 
+interface ActiveQuizQuestionProps {
+  question: QuizQuestion;
+  questionNumber: number;
+  answer: string;
+  prompt: string;
+  customSentence?: string;
+  onAnswerChange: (questionId: string, answer: string) => void;
+  onEnterPress: () => void;
+}
+
+/**
+ * Isoler le contenu de la question du parent qui gère les chronomètres.
+ * Les ticks du timer ne doivent pas redessiner les champs de réponse,
+ * la liste de réorganisation ou les choix QCM.
+ */
+const ActiveQuizQuestion = React.memo<ActiveQuizQuestionProps>(({
+  question,
+  questionNumber,
+  answer,
+  prompt,
+  customSentence,
+  onAnswerChange,
+  onEnterPress
+}) => (
+  <div className="space-y-5">
+    <AssessmentQuestionHeader
+      questionNumber={questionNumber}
+      type={question.type}
+      points={question.points}
+      prompt={prompt}
+    />
+
+    <div>
+      {question.type === 'qcm' && (
+        <AssessmentQcmOptions
+          options={(question.options || []).map((opt) => ({ value: opt, label: opt }))}
+          selectedValue={answer}
+          onSelect={(option) => onAnswerChange(question.id, option)}
+        />
+      )}
+
+      {question.type === 'reorder' && (
+        <QuizReorderList
+          question={question}
+          answer={answer}
+          onChange={(newOrderJson) => onAnswerChange(question.id, newOrderJson)}
+          theme="navy"
+        />
+      )}
+
+      {question.type === 'verbes_trous' && question.verbes_trous && (
+        <VerbesTrousQuestion
+          definition={question.verbes_trous}
+          answer={answer}
+          onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
+          onEnterPress={onEnterPress}
+          showCorrection={false}
+        />
+      )}
+
+      {question.type === 'text' && (
+        <QuizClozeInput
+          question={question}
+          customSentence={customSentence}
+          answer={answer}
+          onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
+          theme="navy"
+          onEnterPress={onEnterPress}
+        />
+      )}
+    </div>
+  </div>
+));
+
 export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
@@ -273,12 +347,17 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }
   };
 
-  const updateQuizAnswer = (questionId: string, answer: string) => {
+  const updateQuizAnswer = React.useCallback((questionId: string, answer: string) => {
     const updatedAnswers = { ...quizAnswersRef.current, [questionId]: answer };
     quizAnswersRef.current = updatedAnswers;
     setQuizAnswers(updatedAnswers);
-    if (activeQuiz) { try { localStorage.setItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers)); } catch { /* stockage local indisponible */ } }
-  };
+    if (activeQuiz) {
+      const studentId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
+      try {
+        localStorage.setItem('student_quiz_draft_' + studentId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers));
+      } catch { /* stockage local indisponible */ }
+    }
+  }, [activeQuiz, currentUser.id, currentUser.student_id, studentRecord?.id]);
 
   const loadData = () => {
     // Synchroniser avec dataService
@@ -316,12 +395,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   useEffect(() => {
     loadData();
     const unsub = dataService.subscribe(loadData);
-    const interval = setInterval(loadData, 10000);
+    // Pendant une épreuve, éviter le rafraîchissement global périodique :
+    // les données du quiz sont déjà en mémoire et le brouillon est sauvegardé localement.
+    const interval = activeQuiz?.id
+      ? null
+      : window.setInterval(loadData, 10000);
     return () => {
       unsub();
-      clearInterval(interval);
+      if (interval !== null) window.clearInterval(interval);
     };
-  }, [currentUser, activeEnrollmentClassIds, classEnrollmentsLoaded]);
+  }, [currentUser, activeEnrollmentClassIds, classEnrollmentsLoaded, activeQuiz?.id]);
 
   // Inclure aussi les quiz déjà soumis : une seconde chance peut rouvrir un quiz clôturé.
   const strictPresenceQuizIdsKey = quizzes
@@ -337,34 +420,51 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       return;
     }
 
+    // L'état des secondes chances n'a pas besoin d'être interrogé pendant une épreuve.
+    // Il sera actualisé dès la sortie du quiz ou au retour sur l'onglet.
+    if (activeQuiz?.id) return;
+
     let cancelled = false;
+    let inFlight = false;
     const refreshRetryAuthorizations = async () => {
-      const resolvedAuthorizations = new Map<string, boolean>();
-      await Promise.all(quizIds.map(async quizId => {
-        try {
-          const active = await supabaseService.getStudentActiveLaunch(quizId);
-          resolvedAuthorizations.set(quizId, isRetryAuthorizedParticipant(active?.participant.presence_status));
-        } catch (error) {
-          console.warn('Vérification de seconde chance indisponible:', error);
-        }
-      }));
-      if (!cancelled) setRetryAuthorizedQuizIds(previous => {
-        const next = new Set(previous);
-        resolvedAuthorizations.forEach((isAuthorized, quizId) => {
-          if (isAuthorized) next.add(quizId);
-          else next.delete(quizId);
+      if (cancelled || document.hidden || inFlight) return;
+      inFlight = true;
+      try {
+        const resolvedAuthorizations = new Map<string, boolean>();
+        await Promise.all(quizIds.map(async quizId => {
+          try {
+            const active = await supabaseService.getStudentActiveLaunch(quizId);
+            resolvedAuthorizations.set(quizId, isRetryAuthorizedParticipant(active?.participant.presence_status));
+          } catch (error) {
+            console.warn('Vérification de seconde chance indisponible:', error);
+          }
+        }));
+        if (!cancelled) setRetryAuthorizedQuizIds(previous => {
+          const next = new Set(previous);
+          resolvedAuthorizations.forEach((isAuthorized, quizId) => {
+            if (isAuthorized) next.add(quizId);
+            else next.delete(quizId);
+          });
+          return next;
         });
-        return next;
-      });
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void refreshRetryAuthorizations();
     };
 
     void refreshRetryAuthorizations();
-    const interval = window.setInterval(() => void refreshRetryAuthorizations(), 5000);
+    const interval = window.setInterval(() => void refreshRetryAuthorizations(), 30000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [strictPresenceQuizIdsKey]);
+  }, [strictPresenceQuizIdsKey, activeQuiz?.id]);
 
   useEffect(() => {
     if (!supabaseService.isConfigured()) return;
@@ -807,6 +907,9 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     processQuestionProgression(updated, true);
   };
 
+  // Référence stable pour que le composant mémorisé ne soit pas invalidé par les ticks.
+  const handleAnswerAndNextRef = useRef<() => void>(() => undefined);
+
   // L'élève valide sa réponse pour la question courante et passe à la suite
   const handleAnswerAndNext = () => {
     if (!activeQuiz) return;
@@ -822,6 +925,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setIncompletePhraseConfirmation(null);
     processQuestionProgression(quizAnswersRef.current, false);
   };
+  handleAnswerAndNextRef.current = handleAnswerAndNext;
+  const stableHandleAnswerAndNext = React.useCallback(
+    () => handleAnswerAndNextRef.current(),
+    []
+  );
 
   const finishTutorialQuiz = (answers: Record<string, string>) => {
     if (!activeQuiz || !isPracticeMode || quizSubmissionLockRef.current) return;
@@ -1647,54 +1755,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               }
             >
               {currentQ ? (
-                <div key={`${activeQuiz.id}-${safeIndex}-${currentQ.id}`} className="space-y-5">
-                  <AssessmentQuestionHeader
-                    questionNumber={safeIndex + 1}
-                    type={currentQ.type}
-                    points={currentQ.points}
-                    prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
-                  />
-
-                  <div>
-                    {currentQ.type === 'qcm' && (
-                      <AssessmentQcmOptions
-                        options={(currentQ.options || []).map((opt) => ({ value: opt, label: opt }))}
-                        selectedValue={currentAnswer}
-                        onSelect={(opt) => updateQuizAnswer(currentQ.id, opt)}
-                      />
-                    )}
-
-                    {currentQ.type === 'reorder' && (
-                      <QuizReorderList
-                        question={currentQ}
-                        answer={currentAnswer}
-                        onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
-                        theme="navy"
-                      />
-                    )}
-
-                    {currentQ.type === 'verbes_trous' && currentQ.verbes_trous && (
-                      <VerbesTrousQuestion
-                        definition={currentQ.verbes_trous}
-                        answer={currentAnswer}
-                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                        onEnterPress={handleAnswerAndNext}
-                        showCorrection={false}
-                      />
-                    )}
-
-                    {currentQ.type === 'text' && (
-                      <QuizClozeInput
-                        question={currentQ}
-                        customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
-                        answer={currentAnswer}
-                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                        theme="navy"
-                        onEnterPress={handleAnswerAndNext}
-                      />
-                    )}
-                  </div>
-                </div>
+                <ActiveQuizQuestion
+                  key={`${activeQuiz.id}-${safeIndex}-${currentQ.id}`}
+                  question={currentQ}
+                  questionNumber={safeIndex + 1}
+                  answer={currentAnswer}
+                  prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
+                  customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
+                  onAnswerChange={updateQuizAnswer}
+                  onEnterPress={stableHandleAnswerAndNext}
+                />
               ) : null}
             </AssessmentShell>
           );
