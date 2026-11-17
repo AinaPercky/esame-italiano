@@ -124,3 +124,57 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     assert.ok(importSection.includes('if (isTeacher && orphanedStudentIds.length > 0)'));
   });
 });
+
+describe('non-régression des parcours de quiz publics et authentifiés', () => {
+  const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
+  const publicViewPath = path.resolve(process.cwd(), 'src/views/PublicQuizView.tsx');
+  const rpcMigrationPath = path.resolve(
+    process.cwd(),
+    'supabase/migrations/20261117180000_restrict_anonymous_security_definer_rpcs.sql'
+  );
+  const rpcTestPath = path.resolve(
+    process.cwd(),
+    'supabase/tests/security_definer_rpc_grants.sql'
+  );
+
+  const serviceSource = fs.readFileSync(servicePath, 'utf8');
+  const publicViewSource = fs.readFileSync(publicViewPath, 'utf8');
+  const rpcMigration = fs.readFileSync(rpcMigrationPath, 'utf8');
+  const rpcTests = fs.readFileSync(rpcTestPath, 'utf8');
+
+  it('conserve les trois RPC strictement nécessaires au quiz public', () => {
+    for (const signature of [
+      'public.get_public_quiz_catalog()',
+      'public.get_public_quiz(text)',
+      'public.evaluate_public_quiz_question(text,text,text)'
+    ]) {
+      assert.ok(rpcMigration.includes(`'${signature}'`), `RPC publique absente de la liste blanche : ${signature}`);
+    }
+
+    assert.ok(serviceSource.includes("client.rpc('get_public_quiz_catalog'"));
+    assert.ok(serviceSource.includes("client.rpc('get_public_quiz'"));
+    assert.ok(serviceSource.includes("client.rpc('evaluate_public_quiz_question'"));
+  });
+
+  it('ne fait pas enregistrer de soumission nominative depuis le parcours de quiz public', () => {
+    assert.ok(publicViewSource.includes('supabaseService.fetchPublicQuiz'));
+    assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizQuestion'));
+    assert.doesNotMatch(publicViewSource, /submitQuizSubmissionAtomically|submitQuizPresenceSubmission|saveQuizSubmission/);
+    assert.doesNotMatch(
+      rpcMigration,
+      /'public\.submit_quiz_submission\(jsonb\)'/
+    );
+  });
+
+  it('préserve les soumissions de quiz des élèves authentifiés', () => {
+    assert.ok(serviceSource.includes("client.rpc('submit_quiz_submission'"));
+    assert.ok(serviceSource.includes("client.rpc('submit_quiz_presence_submission'"));
+    assert.match(rpcTests, /Authenticated students cannot submit standard quiz results/);
+    assert.match(rpcTests, /Authenticated students cannot submit attendance-controlled quiz results/);
+  });
+
+  it('interdit les soumissions anonymes avec un student_id fourni par le navigateur', () => {
+    assert.match(rpcTests, /Anonymous users can submit quiz results using a caller-supplied student ID/);
+    assert.match(rpcTests, /has_function_privilege\('anon', 'public\.submit_quiz_submission\(jsonb\)', 'EXECUTE'\)/);
+  });
+});
