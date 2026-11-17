@@ -316,12 +316,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   useEffect(() => {
     loadData();
     const unsub = dataService.subscribe(loadData);
-    const interval = setInterval(loadData, 10000);
+    // Pendant une épreuve, éviter le rafraîchissement global périodique :
+    // les données du quiz sont déjà en mémoire et le brouillon est sauvegardé localement.
+    const interval = activeQuiz?.id
+      ? null
+      : window.setInterval(loadData, 10000);
     return () => {
       unsub();
-      clearInterval(interval);
+      if (interval !== null) window.clearInterval(interval);
     };
-  }, [currentUser, activeEnrollmentClassIds, classEnrollmentsLoaded]);
+  }, [currentUser, activeEnrollmentClassIds, classEnrollmentsLoaded, activeQuiz?.id]);
 
   // Inclure aussi les quiz déjà soumis : une seconde chance peut rouvrir un quiz clôturé.
   const strictPresenceQuizIdsKey = quizzes
@@ -337,34 +341,51 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       return;
     }
 
+    // L'état des secondes chances n'a pas besoin d'être interrogé pendant une épreuve.
+    // Il sera actualisé dès la sortie du quiz ou au retour sur l'onglet.
+    if (activeQuiz?.id) return;
+
     let cancelled = false;
+    let inFlight = false;
     const refreshRetryAuthorizations = async () => {
-      const resolvedAuthorizations = new Map<string, boolean>();
-      await Promise.all(quizIds.map(async quizId => {
-        try {
-          const active = await supabaseService.getStudentActiveLaunch(quizId);
-          resolvedAuthorizations.set(quizId, isRetryAuthorizedParticipant(active?.participant.presence_status));
-        } catch (error) {
-          console.warn('Vérification de seconde chance indisponible:', error);
-        }
-      }));
-      if (!cancelled) setRetryAuthorizedQuizIds(previous => {
-        const next = new Set(previous);
-        resolvedAuthorizations.forEach((isAuthorized, quizId) => {
-          if (isAuthorized) next.add(quizId);
-          else next.delete(quizId);
+      if (cancelled || document.hidden || inFlight) return;
+      inFlight = true;
+      try {
+        const resolvedAuthorizations = new Map<string, boolean>();
+        await Promise.all(quizIds.map(async quizId => {
+          try {
+            const active = await supabaseService.getStudentActiveLaunch(quizId);
+            resolvedAuthorizations.set(quizId, isRetryAuthorizedParticipant(active?.participant.presence_status));
+          } catch (error) {
+            console.warn('Vérification de seconde chance indisponible:', error);
+          }
+        }));
+        if (!cancelled) setRetryAuthorizedQuizIds(previous => {
+          const next = new Set(previous);
+          resolvedAuthorizations.forEach((isAuthorized, quizId) => {
+            if (isAuthorized) next.add(quizId);
+            else next.delete(quizId);
+          });
+          return next;
         });
-        return next;
-      });
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void refreshRetryAuthorizations();
     };
 
     void refreshRetryAuthorizations();
-    const interval = window.setInterval(() => void refreshRetryAuthorizations(), 5000);
+    const interval = window.setInterval(() => void refreshRetryAuthorizations(), 30000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [strictPresenceQuizIdsKey]);
+  }, [strictPresenceQuizIdsKey, activeQuiz?.id]);
 
   useEffect(() => {
     if (!supabaseService.isConfigured()) return;
