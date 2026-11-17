@@ -42,5 +42,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117140000_optimize_class_quiz_leaderboard.sql
       - name: Apply optimized per-question grading migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117150000_optimize_quiz_question_grading.sql
+      - name: Apply optimized student quiz catalog indexes
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117160000_optimize_student_quiz_catalog.sql
       - name: Test roster isolation, leaderboard output and privileges
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_performance_rpcs.sql
