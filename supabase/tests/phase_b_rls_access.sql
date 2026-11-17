@@ -52,6 +52,10 @@ BEGIN
     RAISE EXCEPTION 'Required public QR or registration RPC is not executable by anon.';
   END IF;
 
+  IF public.get_public_oral_report(NULL, '10000000-0000-4000-8000-000000000001', NULL) IS NOT NULL THEN
+    RAISE EXCEPTION 'Anonymous users must not be able to request the latest private student report.';
+  END IF;
+
   v_report := public.get_public_oral_report(
     '20000000-0000-4000-8000-000000000001',
     '10000000-0000-4000-8000-000000000001',
@@ -106,6 +110,7 @@ SELECT set_config('request.jwt.claim.sub','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 DO $test$
 DECLARE
   v_roster jsonb;
+  v_report jsonb;
   v_rows integer;
 BEGIN
   IF (SELECT count(*) FROM public.students) <> 1
@@ -142,6 +147,16 @@ BEGIN
      OR (SELECT count(*) FROM public.evaluation_details) <> 1
      OR (SELECT count(*) FROM public.exam_pass_order) <> 1 THEN
     RAISE EXCEPTION 'Student evaluation, rubric or pass-order access is not scoped to their own record.';
+  END IF;
+
+  v_report := public.get_public_oral_report(
+    NULL,
+    '10000000-0000-4000-8000-000000000002',
+    NULL
+  );
+  IF v_report IS NULL
+     OR v_report->'student'->>'id' <> '10000000-0000-4000-8000-000000000001' THEN
+    RAISE EXCEPTION 'Student-space report must resolve from the JWT and ignore a spoofed student ID.';
   END IF;
 
   v_roster := public.get_student_class_roster();
