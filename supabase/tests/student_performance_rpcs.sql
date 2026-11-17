@@ -173,20 +173,14 @@ BEGIN
   IF public.evaluate_quiz_question('quiz-a', 'question-2', 'b')->>'correct' <> 'true' THEN
     RAISE EXCEPTION 'question 2 grading returned an unexpected result';
   END IF;
-  IF (
-    SELECT count(DISTINCT attempt_number)
-    FROM public.quiz_question_evaluations
-    WHERE quiz_id = 'quiz-a'
-      AND student_id = '11111111-1111-1111-1111-111111111111'
-  ) <> 1 THEN
+  IF (public.test_question_evaluation_counts(
+    'quiz-a', '11111111-1111-1111-1111-111111111111'
+  )->>'attempts')::integer <> 1 THEN
     RAISE EXCEPTION 'answers in the same quiz attempt must share one attempt number';
   END IF;
-  IF (
-    SELECT count(*)
-    FROM public.quiz_question_evaluations
-    WHERE quiz_id = 'quiz-a'
-      AND student_id = '11111111-1111-1111-1111-111111111111'
-  ) <> 2 THEN
+  IF (public.test_question_evaluation_counts(
+    'quiz-a', '11111111-1111-1111-1111-111111111111'
+  )->>'total')::integer <> 2 THEN
     RAISE EXCEPTION 'both question answers must be persisted';
   END IF;
 
