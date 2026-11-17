@@ -101,6 +101,80 @@ interface PresenceInitializationState {
   retryAuthorized?: boolean;
 }
 
+interface ActiveQuizQuestionProps {
+  question: QuizQuestion;
+  questionNumber: number;
+  answer: string;
+  prompt: string;
+  customSentence?: string;
+  onAnswerChange: (questionId: string, answer: string) => void;
+  onEnterPress: () => void;
+}
+
+/**
+ * Isoler le contenu de la question du parent qui gère les chronomètres.
+ * Les ticks du timer ne doivent pas redessiner les champs de réponse,
+ * la liste de réorganisation ou les choix QCM.
+ */
+const ActiveQuizQuestion = React.memo<ActiveQuizQuestionProps>(({
+  question,
+  questionNumber,
+  answer,
+  prompt,
+  customSentence,
+  onAnswerChange,
+  onEnterPress
+}) => (
+  <div className="space-y-5">
+    <AssessmentQuestionHeader
+      questionNumber={questionNumber}
+      type={question.type}
+      points={question.points}
+      prompt={prompt}
+    />
+
+    <div>
+      {question.type === 'qcm' && (
+        <AssessmentQcmOptions
+          options={(question.options || []).map((opt) => ({ value: opt, label: opt }))}
+          selectedValue={answer}
+          onSelect={(option) => onAnswerChange(question.id, option)}
+        />
+      )}
+
+      {question.type === 'reorder' && (
+        <QuizReorderList
+          question={question}
+          answer={answer}
+          onChange={(newOrderJson) => onAnswerChange(question.id, newOrderJson)}
+          theme="navy"
+        />
+      )}
+
+      {question.type === 'verbes_trous' && question.verbes_trous && (
+        <VerbesTrousQuestion
+          definition={question.verbes_trous}
+          answer={answer}
+          onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
+          onEnterPress={onEnterPress}
+          showCorrection={false}
+        />
+      )}
+
+      {question.type === 'text' && (
+        <QuizClozeInput
+          question={question}
+          customSentence={customSentence}
+          answer={answer}
+          onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
+          theme="navy"
+          onEnterPress={onEnterPress}
+        />
+      )}
+    </div>
+  </div>
+));
+
 export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   currentUser,
   onLogout
@@ -273,12 +347,17 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     }
   };
 
-  const updateQuizAnswer = (questionId: string, answer: string) => {
+  const updateQuizAnswer = React.useCallback((questionId: string, answer: string) => {
     const updatedAnswers = { ...quizAnswersRef.current, [questionId]: answer };
     quizAnswersRef.current = updatedAnswers;
     setQuizAnswers(updatedAnswers);
-    if (activeQuiz) { try { localStorage.setItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers)); } catch { /* stockage local indisponible */ } }
-  };
+    if (activeQuiz) {
+      const studentId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
+      try {
+        localStorage.setItem('student_quiz_draft_' + studentId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers));
+      } catch { /* stockage local indisponible */ }
+    }
+  }, [activeQuiz, currentUser.id, currentUser.student_id, studentRecord?.id]);
 
   const loadData = () => {
     // Synchroniser avec dataService
@@ -1667,54 +1746,16 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               }
             >
               {currentQ ? (
-                <div key={`${activeQuiz.id}-${safeIndex}-${currentQ.id}`} className="space-y-5">
-                  <AssessmentQuestionHeader
-                    questionNumber={safeIndex + 1}
-                    type={currentQ.type}
-                    points={currentQ.points}
-                    prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
-                  />
-
-                  <div>
-                    {currentQ.type === 'qcm' && (
-                      <AssessmentQcmOptions
-                        options={(currentQ.options || []).map((opt) => ({ value: opt, label: opt }))}
-                        selectedValue={currentAnswer}
-                        onSelect={(opt) => updateQuizAnswer(currentQ.id, opt)}
-                      />
-                    )}
-
-                    {currentQ.type === 'reorder' && (
-                      <QuizReorderList
-                        question={currentQ}
-                        answer={currentAnswer}
-                        onChange={(newOrderJson) => updateQuizAnswer(currentQ.id, newOrderJson)}
-                        theme="navy"
-                      />
-                    )}
-
-                    {currentQ.type === 'verbes_trous' && currentQ.verbes_trous && (
-                      <VerbesTrousQuestion
-                        definition={currentQ.verbes_trous}
-                        answer={currentAnswer}
-                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                        onEnterPress={handleAnswerAndNext}
-                        showCorrection={false}
-                      />
-                    )}
-
-                    {currentQ.type === 'text' && (
-                      <QuizClozeInput
-                        question={currentQ}
-                        customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
-                        answer={currentAnswer}
-                        onChange={(newAnswer) => updateQuizAnswer(currentQ.id, newAnswer)}
-                        theme="navy"
-                        onEnterPress={handleAnswerAndNext}
-                      />
-                    )}
-                  </div>
-                </div>
+                <ActiveQuizQuestion
+                  key={`${activeQuiz.id}-${safeIndex}-${currentQ.id}`}
+                  question={currentQ}
+                  questionNumber={safeIndex + 1}
+                  answer={currentAnswer}
+                  prompt={clozeInfo?.hasBlanks ? clozeInfo.prompt : currentQ.question}
+                  customSentence={clozeInfo?.hasBlanks ? clozeInfo.sentence : undefined}
+                  onAnswerChange={updateQuizAnswer}
+                  onEnterPress={handleAnswerAndNext}
+                />
               ) : null}
             </AssessmentShell>
           );
