@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, reopened, edited]
     branches: [main]
   push:
-    branches: [feat/written-composite-exams]
+    branches: [feat/written-composite-exams, fix/pre-merge-security-validation]
 
 permissions:
   contents: read
@@ -88,6 +88,15 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261116000000_written_exam_integrity_disqualification.sql
       - name: Enable hybrid automatic and manual grading
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117000000_hybrid_written_exam_grading.sql
+      - name: Reproduce legacy anonymous RPC grants from the live project
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.written_exam_auto_question_score(uuid,jsonb) TO anon, authenticated"
+          psql -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.grade_written_exam_attempt(uuid,jsonb) TO anon"
+          psql -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.grade_written_exam_expression_writing(uuid,numeric) TO anon"
+      - name: Restrict anonymous SECURITY DEFINER RPC execution
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261117180000_restrict_anonymous_security_definer_rpcs.sql
+      - name: Verify SECURITY DEFINER RPC privileges
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security_definer_rpc_grants.sql
       - name: Enable published student exam copies
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261118000000_enable_published_student_exam_copies.sql
       - name: Enforce one current definition per written exam
