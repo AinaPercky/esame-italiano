@@ -178,6 +178,33 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     }
   });
 
+  it('optimise le classement élève sans changer son périmètre de sécurité', () => {
+    const migrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261117140000_optimize_class_quiz_leaderboard.sql'
+    );
+    const migration = fs.readFileSync(migrationPath, 'utf8');
+    const requiredSql = [
+      'CREATE INDEX IF NOT EXISTS idx_quiz_submissions_leaderboard',
+      'WHERE is_counted = TRUE',
+      'CREATE OR REPLACE FUNCTION public.get_class_quiz_leaderboard()',
+      'WITH eligible_memberships AS',
+      'JOIN eligible_memberships member',
+      'SELECT DISTINCT ON (candidate.quiz_id, candidate.student_id, candidate.class_id)',
+      "CASE WHEN candidate.status = 'missed' THEN 1 ELSE 0 END ASC",
+      'candidate.submitted_at DESC NULLS LAST',
+      'candidate.attempt_number DESC',
+      'REVOKE ALL ON FUNCTION public.get_class_quiz_leaderboard() FROM PUBLIC, anon;',
+      'GRANT EXECUTE ON FUNCTION public.get_class_quiz_leaderboard() TO authenticated;'
+    ];
+    for (const snippet of requiredSql) {
+      assert.ok(migration.includes(snippet), `Optimisation classement incomplète : ${snippet}`);
+    }
+    assert.ok(!migration.includes('JOIN LATERAL'));
+    assert.ok(migration.includes('AND (sub.class_id IS NULL OR sub.class_id = member.class_id)'));
+    assert.ok(migration.includes("coalesce(nullif(q.class_ids, ARRAY[]::text[]), ARRAY[q.class_id])"));
+  });
+
   it('limite les colonnes téléchargées pendant l’import Supabase', () => {
     const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
     const source = fs.readFileSync(servicePath, 'utf8');
