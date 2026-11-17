@@ -171,7 +171,7 @@ BEGIN
   -- A first attempt is allowed only without a previous result/absence.
   -- A later attempt requires a live teacher-issued grant.
   IF v_has_retry OR (NOT v_has_history AND NOT v_has_terminal_participation) THEN
-    INSERT INTO public.quiz_participants (
+    INSERT INTO public.quiz_participants AS existing_participant (
       quiz_id, student_id, launch_id, class_id, presence_status,
       presence_confirmed_at, attendance_locked_at, presence_deadline_at,
       final_status, final_score, updated_at
@@ -192,10 +192,10 @@ BEGIN
       final_status = NULL,
       final_score = NULL,
       updated_at = clock_timestamp()
-    WHERE public.quiz_participants.launch_id IS DISTINCT FROM EXCLUDED.launch_id
+    WHERE existing_participant.launch_id IS DISTINCT FROM EXCLUDED.launch_id
        OR (
          EXCLUDED.presence_status = 'retry_authorized'
-         AND public.quiz_participants.presence_status <> 'retry_authorized'
+         AND existing_participant.presence_status <> 'retry_authorized'
        );
   END IF;
 
