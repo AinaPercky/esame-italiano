@@ -129,9 +129,9 @@ CREATE POLICY "Managers read lesson progress"
 -- default and any inherited authenticated default for functions created by
 -- the two migration owners. Client RPC grants must be explicit per function.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres
-  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, authenticated;
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
-  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, authenticated;
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 -- Harden defaults as well as existing grants. Supabase currently grants
 -- ALL on newly-created public tables and EXECUTE on new functions to anon.
