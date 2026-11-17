@@ -78,6 +78,9 @@ begin
   if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_attempts_exam_started') then
     raise exception 'Exam attempt listing index is missing';
   end if;
+  if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_attempts_exam_version') then
+    raise exception 'Attempt composite exam/version foreign-key index is missing';
+  end if;
   if not exists(select 1 from pg_indexes where schemaname='public' and indexname='idx_written_exam_attempts_version') then
     raise exception 'Attempt version foreign-key index is missing';
   end if;
