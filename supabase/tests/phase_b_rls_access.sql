@@ -1,5 +1,18 @@
 BEGIN;
 
+-- Verify that the hardened default ACLs also protect objects created after this migration.
+CREATE TABLE public.future_default_privilege_probe (id uuid PRIMARY KEY);
+CREATE FUNCTION public.future_default_privilege_probe_fn()
+RETURNS integer LANGUAGE sql SECURITY DEFINER
+AS $ SELECT 1 $;
+
+SET ROLE supabase_admin;
+CREATE TABLE public.future_default_privilege_probe_admin (id uuid PRIMARY KEY);
+CREATE FUNCTION public.future_default_privilege_probe_admin_fn()
+RETURNS integer LANGUAGE sql SECURITY DEFINER
+AS $ SELECT 1 $;
+RESET ROLE;
+
 -- Anonymous clients have no direct table privileges except SELECT on active classes.
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -8,6 +21,15 @@ DECLARE
   v_report jsonb;
   v_registration jsonb;
 BEGIN
+  IF has_table_privilege('anon','public.future_default_privilege_probe','SELECT')
+     OR has_table_privilege('anon','public.future_default_privilege_probe_admin','SELECT')
+     OR has_function_privilege('anon','public.future_default_privilege_probe_fn()','EXECUTE')
+     OR has_function_privilege('anon','public.future_default_privilege_probe_admin_fn()','EXECUTE')
+     OR has_table_privilege('authenticated','public.future_default_privilege_probe','TRUNCATE')
+     OR has_table_privilege('authenticated','public.future_default_privilege_probe_admin','TRUNCATE') THEN
+    RAISE EXCEPTION 'Default privileges reintroduced anonymous access or RLS-bypassing table privileges.';
+  END IF;
+
   IF has_table_privilege('anon','public.students','SELECT')
      OR has_table_privilege('anon','public.exams','SELECT')
      OR has_table_privilege('anon','public.exam_rubrics','SELECT')
