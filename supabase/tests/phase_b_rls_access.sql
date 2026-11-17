@@ -10,7 +10,7 @@ SET ROLE supabase_admin;
 CREATE TABLE public.future_default_privilege_probe_admin (id uuid PRIMARY KEY);
 CREATE FUNCTION public.future_default_privilege_probe_admin_fn()
 RETURNS integer LANGUAGE sql SECURITY DEFINER
-AS $ SELECT 1 $;
+AS 'SELECT 1';
 RESET ROLE;
 
 -- Anonymous clients have no direct table privileges except SELECT on active classes.
