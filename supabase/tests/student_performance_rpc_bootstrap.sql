@@ -150,3 +150,18 @@ AS $$
     'expected', question ->> 'expected'
   );
 $$;
+
+
+CREATE OR REPLACE FUNCTION public.test_question_evaluation_counts(p_quiz_id text, p_student_id text)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'total', count(*),
+    'attempts', count(DISTINCT attempt_number)
+  )
+  FROM public.quiz_question_evaluations
+  WHERE quiz_id = p_quiz_id AND student_id = p_student_id;
+$$;
