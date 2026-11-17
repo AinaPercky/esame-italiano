@@ -1,6 +1,6 @@
 -- Restrict anonymous execution of privileged SECURITY DEFINER RPCs.
 -- Public practice quizzes remain available through the three explicitly whitelisted RPCs.
--- This also removes explicit anon grants left by older migrations; REVOKE FROM PUBLIC alone
+-- This removes explicit anon grants left by older migrations; REVOKE FROM PUBLIC alone
 -- is not sufficient when anon was granted EXECUTE directly.
 
 DO $migration$
@@ -61,15 +61,28 @@ REVOKE EXECUTE ON FUNCTION public.written_exam_auto_question_score(uuid, jsonb)
   FROM PUBLIC, anon, authenticated;
 
 -- Trigger functions are invoked by PostgreSQL triggers, not by clients.
-REVOKE EXECUTE ON FUNCTION public.apply_verbes_trous_attempt_score()
-  FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.delete_student_quiz_submissions()
-  FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.guard_written_exam_expression_writing_publication()
-  FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.snapshot_written_exam_expression_writing()
-  FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.validate_verbes_trous_published_version()
-  FROM PUBLIC, anon, authenticated;
+DO $triggers$
+DECLARE
+  v_signature text;
+  v_regprocedure regprocedure;
+BEGIN
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.apply_verbes_trous_attempt_score()',
+    'public.delete_student_quiz_submissions()',
+    'public.guard_written_exam_expression_writing_publication()',
+    'public.snapshot_written_exam_expression_writing()',
+    'public.validate_verbes_trous_published_version()'
+  ]
+  LOOP
+    v_regprocedure := to_regprocedure(v_signature);
+    IF v_regprocedure IS NOT NULL THEN
+      EXECUTE format(
+        'REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated',
+        v_regprocedure
+      );
+    END IF;
+  END LOOP;
+END
+$triggers$;
 
 NOTIFY pgrst, 'reload schema';
