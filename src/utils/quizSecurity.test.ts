@@ -156,6 +156,16 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
     assert.ok(serviceSource.includes("client.rpc('evaluate_public_quiz_question'"));
   });
 
+  it('préserve les RPC publiques d’inscription et de rapport QR avec des signatures exactes', () => {
+    for (const signature of [
+      'public.prepare_student_registration(text,text,text,text,uuid,text)',
+      'public.get_public_oral_report(uuid,uuid,text)'
+    ]) {
+      assert.ok(rpcMigration.includes(`'${signature}'`), `RPC publique absente de la liste blanche : ${signature}`);
+      assert.ok(rpcTests.includes(signature), `Test SQL absent pour : ${signature}`);
+    }
+  });
+
   it('ne fait pas enregistrer de soumission nominative depuis le parcours de quiz public', () => {
     assert.ok(publicViewSource.includes('supabaseService.fetchPublicQuiz'));
     assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizQuestion'));
