@@ -147,5 +147,4 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       assert.ok(importSection.includes(projection), `Projection manquante : ${projection}`);
     }
   });
-  });
 });
