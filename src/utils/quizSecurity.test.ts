@@ -141,6 +141,41 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     assert.ok(importSection.includes('const classLeaderboardRequest = isAuthenticated && !isTeacher'));
   });
 
+  it('charge un roster élève minimal et limité aux classes actives', () => {
+    const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
+    const service = fs.readFileSync(servicePath, 'utf8');
+    const importStart = service.indexOf('public async importFromSupabase()');
+    assert.notEqual(importStart, -1);
+    const importSection = service.slice(importStart);
+
+    assert.ok(importSection.includes("client.rpc('get_student_class_roster')"));
+    assert.ok(importSection.includes("client.from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')"));
+    assert.ok(importSection.includes("const studentsRequest = isTeacher"));
+    assert.ok(importSection.includes(": isAuthenticated\n          ? client.rpc('get_student_class_roster')"));
+    assert.ok(importSection.includes("email: s.email || ''"));
+    assert.ok(importSection.includes("class_ids: Array.isArray(s.class_ids)"));
+
+    const migrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261117130000_student_class_roster_rpc.sql'
+    );
+    const migration = fs.readFileSync(migrationPath, 'utf8');
+    const requiredSql = [
+      'CREATE OR REPLACE FUNCTION public.get_student_class_roster()',
+      'IF auth.uid() IS NULL THEN',
+      'IF public.quiz_is_teacher() THEN',
+      'v_student_id := public.quiz_current_student_id();',
+      "ce.status = 'active'",
+      "coalesce(s.validation_status, 'approved') = 'approved'",
+      "CASE WHEN s.id::text = v_student_id THEN s.email ELSE '' END",
+      'REVOKE ALL ON FUNCTION public.get_student_class_roster() FROM PUBLIC, anon;',
+      'GRANT EXECUTE ON FUNCTION public.get_student_class_roster() TO authenticated;'
+    ];
+    for (const snippet of requiredSql) {
+      assert.ok(migration.includes(snippet), `SQL du roster incomplet : ${snippet}`);
+    }
+  });
+
   it('limite les colonnes téléchargées pendant l’import Supabase', () => {
     const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
     const source = fs.readFileSync(servicePath, 'utf8');
