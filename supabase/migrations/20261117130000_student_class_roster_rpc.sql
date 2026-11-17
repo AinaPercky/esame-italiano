@@ -42,7 +42,7 @@ BEGIN
     SELECT coalesce(jsonb_agg(
       jsonb_build_object(
         'id', s.id,
-        'class_id', s.class_id,
+        'class_id', CASE\n          WHEN s.id::text = v_student_id THEN s.class_id\n          WHEN s.class_id::text = ANY(coalesce(memberships.class_ids, ARRAY[]::text[])) THEN s.class_id\n          ELSE memberships.class_ids[1]\n        END,
         'class_ids', coalesce(memberships.class_ids, ARRAY[]::text[]),
         'first_name', s.first_name,
         'last_name', s.last_name,
@@ -64,9 +64,11 @@ BEGIN
         FROM public.class_enrollments ce
         WHERE ce.student_id = s.id
           AND ce.status = 'active'
+          AND ce.class_id::text = ANY(coalesce(v_class_ids, ARRAY[]::text[]))
         UNION
         SELECT s.class_id::text
         WHERE s.class_id IS NOT NULL
+          AND s.class_id::text = ANY(coalesce(v_class_ids, ARRAY[]::text[]))
           AND NOT EXISTS (
             SELECT 1
             FROM public.class_enrollments any_enrollment
