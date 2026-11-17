@@ -408,9 +408,25 @@ SET search_path TO ''
 AS $function$
 DECLARE
   v_result jsonb;
+  v_target_student_id uuid;
 BEGIN
-  IF p_exam_id IS NULL OR (p_student_id IS NULL AND nullif(btrim(coalesce(p_lookup, '')), '') IS NULL) THEN
-    RETURN NULL;
+  -- Public QR links must specify an exam and either a student UUID or e-mail.
+  -- The authenticated student-space view may omit the exam; in that case the
+  -- function ignores every client-supplied student identifier and uses the JWT.
+  IF p_exam_id IS NULL THEN
+    IF auth.uid() IS NULL THEN
+      RETURN NULL;
+    END IF;
+    v_target_student_id := public.class_enrollment_current_student_id();
+    IF v_target_student_id IS NULL THEN
+      RETURN NULL;
+    END IF;
+  ELSE
+    v_target_student_id := p_student_id;
+    IF v_target_student_id IS NULL
+       AND nullif(btrim(coalesce(p_lookup, '')), '') IS NULL THEN
+      RETURN NULL;
+    END IF;
   END IF;
 
   SELECT pg_catalog.jsonb_build_object(
@@ -479,11 +495,13 @@ BEGIN
   JOIN public.students s ON s.id = ev.student_id
   JOIN public.exams e ON e.id = ev.exam_id
   JOIN public.classes c ON c.id = e.class_id
-  WHERE ev.exam_id = p_exam_id
+  WHERE (p_exam_id IS NULL OR ev.exam_id = p_exam_id)
     AND (
-      (p_student_id IS NOT NULL AND s.id = p_student_id)
+      (v_target_student_id IS NOT NULL AND s.id = v_target_student_id)
       OR (
-        p_student_id IS NULL
+        v_target_student_id IS NULL
+        AND p_exam_id IS NOT NULL
+        AND p_student_id IS NULL
         AND nullif(btrim(coalesce(p_lookup, '')), '') IS NOT NULL
         AND lower(btrim(s.email)) = lower(btrim(p_lookup))
       )
