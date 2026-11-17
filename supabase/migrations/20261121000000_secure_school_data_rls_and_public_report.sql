@@ -125,6 +125,28 @@ CREATE POLICY "Managers read lesson progress"
   ON public.lesson_progress FOR SELECT TO authenticated
   USING (public.class_enrollment_is_teacher());
 
+-- Harden defaults as well as existing grants. Supabase currently grants
+-- ALL on newly-created public tables and EXECUTE on new functions to anon.
+-- Apply to both common migration owners so the exposure is not reintroduced
+-- by the next schema change.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON SEQUENCES FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM anon;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  REVOKE ALL ON SEQUENCES FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM anon;
+
 -- Remove direct anonymous table access across the entire exposed public schema.
 -- Public lesson content and active class names remain available through SELECT;
 -- private exercises, progress, quiz data, student records and evaluations do not.
