@@ -39,7 +39,7 @@ VALUES
 
 SET ROLE authenticated;
 
-DO $
+DO $$
 DECLARE
   roster jsonb;
   leaderboard jsonb;
