@@ -320,6 +320,20 @@ class SupabaseService {
     return data;
   }
 
+  public async updateOwnStudentProfile(student: Student): Promise<void> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { error } = await client.rpc('update_own_student_profile', {
+      p_student_id: student.id,
+      p_first_name: student.first_name,
+      p_last_name: student.last_name,
+      p_student_number: student.student_number || null,
+      p_gender: student.gender || 'homme',
+      p_avatar_url: student.avatar_url || null
+    });
+    if (error) throw new Error(`Mise à jour du profil étudiant impossible : ${error.message}`);
+  }
+
   public async finalizeStudentRegistration(): Promise<void> {
     const client = this.getClient();
     if (!client) throw new Error('La connexion Supabase est indisponible.');
@@ -716,7 +730,7 @@ class SupabaseService {
     if (avatarError) console.warn('Supabase deleteStudent avatar cleanup warning:', avatarError);
   }
 
-  public async saveStudentAvatar(studentId: string, imageDataUrl: string | null): Promise<string | null> {
+  public async saveStudentAvatar(studentId: string, imageDataUrl: string | null, updateOwnProfile = false): Promise<string | null> {
     const client = this.getClient();
     if (!client) throw new Error("Supabase n'est pas configuré.");
     if (!isUUID(studentId)) throw new Error("La fiche élève n'a pas d'identifiant Supabase valide.");
@@ -763,18 +777,28 @@ class SupabaseService {
       }
     }
 
-    const { data: updatedStudent, error: updateError } = await client
-      .from('students')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', studentId)
-      .select('id')
-      .maybeSingle();
+    if (updateOwnProfile) {
+      const { error: updateError } = await client.rpc('update_own_student_avatar', {
+        p_student_id: studentId,
+        p_avatar_url: avatarUrl
+      });
+      if (updateError) {
+        throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
+      }
+    } else {
+      const { data: updatedStudent, error: updateError } = await client
+        .from('students')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', studentId)
+        .select('id')
+        .maybeSingle();
 
-    if (updateError) {
-      throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
-    }
-    if (!updatedStudent) {
-      throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
+      if (updateError) {
+        throw new Error(`Enregistrement de la photo sur la fiche élève impossible : ${updateError.message}`);
+      }
+      if (!updatedStudent) {
+        throw new Error("Aucune fiche élève correspondante n'a été trouvée dans Supabase.");
+      }
     }
 
     const pathsToRemove = imageDataUrl ? obsoleteAvatarPaths : avatarStoragePaths;
