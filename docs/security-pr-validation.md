@@ -28,7 +28,7 @@ Les fonctions d'inscription et de rapport QR sont autorisées par signature exac
 
 ## Privilèges par défaut
 
-La Phase B retire les privilèges EXECUTE par défaut de PUBLIC, anon et authenticated pour les fonctions créées par postgres et supabase_admin dans le schéma public. Les RPC nécessaires doivent recevoir des grants explicites. Les tests créent des fonctions probes sous les deux propriétaires et vérifient les deux rôles client.
+La Phase B retire le privilège EXECUTE global par défaut de PUBLIC, puis retire les privilèges par défaut anon et authenticated au niveau du seul schéma public pour les fonctions créées par postgres et supabase_admin. Cette portée évite de modifier les defaults d'autres schémas. Les RPC nécessaires doivent recevoir des grants explicites. Les tests créent des fonctions probes sous les deux propriétaires et vérifient les deux rôles client.
 
 ## Limite de confidentialité QR identifiée
 
