@@ -1,0 +1,51 @@
+name: Selenium - cours, exercices et accès examens
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - 'src/views/**'
+      - 'src/components/lessons/**'
+      - 'scripts/selenium-student-learning-modules.mjs'
+      - 'package.json'
+      - '.github/workflows/selenium-student-learning-modules.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier la syntaxe du test Selenium
+        run: node --check scripts/selenium-student-learning-modules.mjs
+  student-modules:
+    needs: validate
+    if: ${{ vars.E2E_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: browser-actions/setup-chrome@v1
+      - name: Installer les dépendances
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Exécuter les parcours étudiant sur l’environnement de recette
+        run: npm run test:e2e:student-modules
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
+          E2E_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          E2E_TIMEOUT_MS: 30000
+      - name: Captures en cas d’échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-student-modules-failure
+          path: |
+            student-modules-failure.png
+            student-modules-failure.html
+          if-no-files-found: ignore
