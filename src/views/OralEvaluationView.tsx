@@ -114,6 +114,8 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   // Formulaire de saisie d'erreur par rubrique { [rubric_id]: string }
   const [errorNotes, setErrorNotes] = useState<Record<string, string>>({});
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   // 
   const [isQRModalOpen, setIsQRModalOpen] = useState<boolean>(false);
@@ -356,30 +358,44 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   const percentage = maxScore > 0 ? Math.round((liveScore / maxScore) * 100) : 0;
 
   // Enregistrement de l'évaluation (Section 5.2 & 5.3)
-  const handleSaveEvaluation = () => {
-    if (!selectedExamId || !selectedStudentId) return;
-
-    dataService.saveEvaluation(
-      selectedExamId, 
-      selectedStudentId, 
-      validatedRubrics, 
-      {
-        duration_used_seconds: timingData.durationUsedSeconds,
-        max_duration_seconds: timingData.maxDurationSeconds,
-        timer_status: timingData.timerStatus
-      },
-      errorNotes
-    );
-    setIsSaved(true);
-    const m = Math.floor(timingData.durationUsedSeconds / 60);
-    const s = timingData.durationUsedSeconds % 60;
-    const timeFormatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Temps : ${timeFormatted}`);
-    onEvaluationSaved();
-
-    setTimeout(() => {
+  const handleSaveEvaluation = async () => {
+    if (!selectedExamId || !selectedStudentId || isSaving) return;
+    if (rubrics.length === 0) {
+      setSaveErrorMessage('Aucun critère n’est configuré pour cet examen. Enregistrez d’abord une grille d’évaluation.');
       setSaveSuccessMessage(null);
-    }, 4500);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveErrorMessage(null);
+    setSaveSuccessMessage(null);
+    try {
+      await dataService.saveEvaluation(
+        selectedExamId,
+        selectedStudentId,
+        validatedRubrics,
+        {
+          duration_used_seconds: timingData.durationUsedSeconds,
+          max_duration_seconds: timingData.maxDurationSeconds,
+          timer_status: timingData.timerStatus
+        },
+        errorNotes
+      );
+
+      setIsSaved(true);
+      const m = Math.floor(timingData.durationUsedSeconds / 60);
+      const s = timingData.durationUsedSeconds % 60;
+      const timeFormatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      setSaveSuccessMessage(`Évaluation enregistrée : ${liveScore} / ${maxScore} points (${percentage} %) · Temps : ${timeFormatted}`);
+      onEvaluationSaved();
+
+      setTimeout(() => setSaveSuccessMessage(null), 4500);
+    } catch (error) {
+      setIsSaved(false);
+      setSaveErrorMessage(error instanceof Error ? error.message : 'Échec de l’enregistrement de l’évaluation.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Calcul de l'index de l'élève actuel dans l'ordre de passage
@@ -630,6 +646,12 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       )}
 
       {/* Confirmation Banner */}
+      {saveErrorMessage && (
+        <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-md text-rose-900 text-xs font-semibold flex items-start gap-2 animate-fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+          <span>{saveErrorMessage}</span>
+        </div>
+      )}
       {saveSuccessMessage && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-900 text-xs font-semibold flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-2">
@@ -873,11 +895,13 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={handleSaveEvaluation}
-              className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 rounded-lg shadow-sm transition-all min-h-[44px]"
+              disabled={isSaving || rubrics.length === 0}
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all min-h-[44px]"
             >
               <Save className="w-4 h-4 shrink-0" />
-              <span>{isSaved ? 'Mettre à jour' : 'Enregistrer'}</span>
+              <span>{isSaving ? 'Enregistrement…' : isSaved ? 'Mettre à jour' : 'Enregistrer'}</span>
             </button>
 
             <button
