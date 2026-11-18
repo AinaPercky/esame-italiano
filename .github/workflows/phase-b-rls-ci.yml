@@ -42,6 +42,10 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121000000_secure_school_data_rls_and_public_report.sql
       - name: Verify anonymous, student, teacher and QR report access
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/phase_b_rls_access.sql
+      - name: Add authenticated student oral session history RPC
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261122000000_student_oral_exam_sessions.sql
+      - name: Verify authenticated oral session history, class isolation and draft exclusion
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_oral_exam_sessions.sql
 
   frontend:
     runs-on: ubuntu-latest

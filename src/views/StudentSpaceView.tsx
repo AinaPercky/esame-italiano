@@ -32,7 +32,7 @@ import { AuthUser, authService } from '../services/authService';
 import { dataService } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
 import { Quiz, QuizQuestion, QuizSubmission, DailyGrade, Student, Exam, ClassRoom } from '../types';
-import { StudentPublicReportView } from './StudentPublicReportView';
+import { StudentOralExamsView } from './StudentOralExamsView';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
@@ -1843,22 +1843,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           </div>
         )}
 
-        {/* TAB 3: EXAMEN ORAL OFFICIEL (GRILLE DE RUBRIQUES) */}
+        {/* TAB: SUIVI DES SESSIONS D'EXAMEN ORAL */}
         {activeTab === 'oral_exam' && (
-          <div className="space-y-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 text-xs text-slate-500">
-              Consultation de votre note d'examen oral et de votre fiche personnelle.
-            </div>
-            {studentRecord?.id ? (
-              <StudentPublicReportView
-                studentId={studentRecord.id}
-                lockedStudentId={studentRecord.id}
-              />
-            ) : (
-              <div className="bg-white p-5 rounded-xl border border-amber-200 text-sm text-slate-700">
-                Votre compte n'est pas associé à une fiche élève unique. Contactez votre professeur pour vérifier votre numéro d'étudiant.
-              </div>
-            )}
+          <div className="mx-auto w-full max-w-6xl space-y-5">
+            <StudentOralExamsView />
           </div>
         )}
 

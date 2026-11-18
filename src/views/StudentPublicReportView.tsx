@@ -1,27 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Award, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Calendar, 
-  User, 
-  BookOpen, 
-  Printer, 
-  ShieldCheck,
-  Sparkles,
-  School,
-  FileCheck2,
-  ExternalLink,
-  Search,
+import React, { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowLeft,
   ArrowRight,
-  RotateCcw,
-  Smartphone,
-  Check,
-  AlertCircle
+  Clock3,
+  FileText,
+  Loader2,
+  MessageSquareText,
+  Printer,
+  Search,
+  UserRound
 } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { Exam, Student, Evaluation, ExamRubric } from '../types';
+import { normalizeOralScoreTo20 } from '../utils/oralExamProgress';
+import { StatusBadge } from '../components/LearningCard';
 
 interface StudentPublicReportViewProps {
   examId?: string;
@@ -29,6 +22,14 @@ interface StudentPublicReportViewProps {
   lockedStudentId?: string;
   onBackToApp?: () => void;
 }
+
+const formatDate = (value?: string) => {
+  if (!value) return 'Date non renseignée';
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+};
 
 export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = ({
   examId: initialExamId,
@@ -38,20 +39,18 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
 }) => {
   const isLockedReport = Boolean(lockedStudentId || initialStudentId);
   const [report, setReport] = useState<{ student: Student; exam: Exam; evaluation: Evaluation } | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(isLockedReport);
+  const [isLoading, setIsLoading] = useState(isLockedReport);
 
   const currentExam = report?.exam;
   const currentStudent = report?.student;
   const evaluation = report?.evaluation;
   const rubrics: ExamRubric[] = currentExam?.rubrics || [];
-  const maxScore = rubrics.reduce((sum, r) => sum + (Number(r.points) || 1), 0) || 10;
-  const currentScore = evaluation ? evaluation.total_score : 0;
-  const percentage = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
+  const maxScore = Number(evaluation?.max_score) || rubrics.reduce((sum, rubric) => sum + Number(rubric.points || 0), 0) || 10;
+  const rawScore = Number(evaluation?.total_score) || 0;
+  const normalizedScore = normalizeOralScoreTo20(rawScore, maxScore);
 
-  // Le rapport QR est chargé par une RPC dédiée : aucune liste générale
-  // d'élèves, d'examens ou de notes n'est téléchargée dans le navigateur.
   useEffect(() => {
     const targetStudentId = lockedStudentId || initialStudentId;
     if (!targetStudentId || (!initialExamId && !isLockedReport)) {
@@ -62,21 +61,20 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     let cancelled = false;
     setIsLoading(true);
     setSearchError(null);
-    // When the student opens their own space, omit the exam and student IDs:
-    // the RPC resolves the latest report from the authenticated JWT identity.
     const reportRequest = initialExamId
       ? supabaseService.getPublicOralReport(initialExamId, targetStudentId)
       : supabaseService.getPublicOralReport();
+
     reportRequest
       .then(result => {
         if (cancelled) return;
         setReport(result);
-        if (!result) setSearchError('Cette fiche d’examen oral est indisponible.');
+        if (!result) setSearchError('Cette session orale est indisponible.');
       })
       .catch(error => {
         if (!cancelled) {
           setReport(null);
-          setSearchError(error instanceof Error ? error.message : 'Chargement du rapport impossible.');
+          setSearchError(error instanceof Error ? error.message : 'Chargement de la session impossible.');
         }
       })
       .finally(() => {
@@ -86,19 +84,19 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     return () => {
       cancelled = true;
     };
-  }, [initialExamId, initialStudentId, lockedStudentId]);
+  }, [initialExamId, initialStudentId, lockedStudentId, isLockedReport]);
 
-  const handleSearchStudent = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSearchStudent = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     setSearchError(null);
-
     const query = searchQuery.trim();
+
     if (!query) {
       setSearchError('Veuillez saisir votre adresse e-mail.');
       return;
     }
     if (!initialExamId) {
-      setSearchError('Le lien QR ne précise pas l’examen à consulter. Demandez un nouveau QR code à votre professeur.');
+      setSearchError('Le lien QR ne précise pas la session à consulter. Demandez un nouveau QR code à votre professeur.');
       return;
     }
 
@@ -107,390 +105,189 @@ export const StudentPublicReportView: React.FC<StudentPublicReportViewProps> = (
     try {
       const result = await supabaseService.getPublicOralReport(initialExamId, undefined, query);
       if (!result) {
-        setSearchError('Aucun rapport correspondant à ces informations pour cet examen.');
+        setSearchError('Aucun résultat correspondant à ces informations pour cette session.');
         return;
       }
       setReport(result);
-      setSearchError(null);
     } catch (error) {
-      setSearchError(error instanceof Error ? error.message : 'Consultation du rapport impossible.');
+      setSearchError(error instanceof Error ? error.message : 'Consultation de la session impossible.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
-  // Titre d'appréciation en italien
-  const getAppreciation = (score: number, max: number) => {
-    const ratio = max > 0 ? score / max : 0;
-    if (ratio >= 0.9) return { label: 'Eccellente (90-100%)', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
-    if (ratio >= 0.8) return { label: 'Ottimo (80-89%)', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
-    if (ratio >= 0.7) return { label: 'Molto Bene (70-79%)', color: 'text-blue-700 bg-blue-50 border-blue-200' };
-    if (ratio >= 0.6) return { label: 'Bene / Discreto (60-69%)', color: 'text-amber-800 bg-amber-50 border-amber-200' };
-    if (ratio >= 0.5) return { label: 'Sufficiente (50-59%)', color: 'text-amber-700 bg-amber-50 border-amber-200' };
-    return { label: 'In via di acquisizione (< 50%)', color: 'text-rose-700 bg-rose-50 border-rose-200' };
-  };
-
-  const appreciation = getAppreciation(currentScore, maxScore);
-
-  if (isLoading && isLockedReport) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
-        <p className="text-sm font-semibold">Chargement sécurisé de votre fiche d’examen oral…</p>
+      <div className="flex min-h-64 items-center justify-center gap-3 rounded-2xl border border-[#d8e6ee] bg-white p-6 text-sm font-semibold text-[#46657a]">
+        <Loader2 className="h-5 w-5 animate-spin text-[#0b3c5d]" />
+        Chargement de la session orale…
       </div>
     );
   }
 
   if (isLockedReport && !report) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <div className="max-w-lg rounded-xl border border-amber-200 bg-white p-5 text-sm text-slate-700">
-          {searchError || 'Votre fiche d’examen oral est indisponible. Contactez votre professeur pour vérifier votre compte.'}
-        </div>
+      <div className="mx-auto flex min-h-64 max-w-xl items-center gap-3 rounded-2xl border border-amber-200 bg-white p-6 text-sm text-[#46657a]">
+        <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+        <span>{searchError || 'Votre session orale est indisponible. Contactez votre professeur pour vérifier votre compte.'}</span>
       </div>
     );
   }
 
-  // Vue 1 : Le QR commun demande l'adresse e-mail associée au dossier scolaire.
   if (!report || !currentStudent || !currentExam || !evaluation) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
-        <div className="max-w-xl mx-auto w-full pt-6 sm:pt-12 space-y-6">
-          
-          {/* Header Banner */}
-          <div className="text-center space-y-2">
-            <img
-              src="/percky-lingua-logo.webp"
-              alt="PerckyLingua"
-              className="w-20 h-20 mx-auto rounded-2xl object-contain bg-white shadow-lg"
+      <div className="mx-auto w-full max-w-xl space-y-5 rounded-2xl border border-[#d8e6ee] bg-white p-5 shadow-sm sm:p-7">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#e6f0f7] text-[#0b3c5d]">
+            <Search className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#2fa36b]">PERCKYLINGUA · RÉSULTATS</p>
+            <h1 className="font-display text-xl font-black text-[#072a3f]">Consulter une session orale</h1>
+            <p className="mt-1 text-xs text-[#607f93]">Accédez au résultat de votre session.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSearchStudent} className="space-y-3">
+          <label htmlFor="oral-session-email" className="block text-xs font-bold text-[#24485e]">Adresse e-mail de votre compte</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="oral-session-email"
+              type="email"
+              value={searchQuery}
+              onChange={event => {
+                setSearchQuery(event.target.value);
+                if (searchError) setSearchError(null);
+              }}
+              placeholder="eleve@exemple.fr"
+              autoComplete="email"
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-[#cbdde8] bg-[#f7fafc] px-3.5 text-sm text-[#072a3f] outline-none transition focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10"
             />
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Portail Élève • Consultation Examen Oral</span>
-            </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              PerckyLingua • Esame orale di italiano
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300">
-              {currentExam ? `${currentExam.title} (${currentExam.class_name || 'Classe'})` : 'Épreuve orale'}
+            <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-5 text-sm font-bold text-white transition hover:bg-[#0b3c5d]">
+              Afficher <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+          {searchError && (
+            <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {searchError}
             </p>
-          </div>
-
-          {/* Saisie de l'adresse e-mail */}
-          <div className="bg-white text-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5">
-            <div className="space-y-1 text-center sm:text-left">
-              <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-                <Smartphone className="w-4 h-4 text-amber-700" />
-                <span>Identification de l'élève</span>
-              </div>
-              <h2 className="text-lg font-extrabold text-slate-900">
-                Entrez votre adresse e-mail
-              </h2>
-              <p className="text-xs text-slate-500">
-                Saisissez l'adresse e-mail associée à votre compte pour afficher les détails de votre examen oral.
-              </p>
-            </div>
-
-            <form onSubmit={handleSearchStudent} className="space-y-3">
-              <div className="relative">
-                <User className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (searchError) setSearchError(null);
-                  }}
-                  placeholder="eleve@exemple.fr"
-                  autoFocus
-                  className="w-full pl-11 pr-28 py-3.5 bg-slate-50 border-2 border-slate-300 focus:border-amber-700 rounded-xl text-base font-bold text-slate-900 placeholder:text-slate-400 focus:outline-hidden transition-all shadow-inner"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-amber-800 hover:bg-amber-900 active:bg-amber-950 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer inline-flex items-center gap-1"
-                >
-                  <span>Afficher</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {searchError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2 animate-fade-in">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <span>{searchError}</span>
-                </div>
-              )}
-            </form>
-
-          </div>
-
-          {onBackToApp && (
-            <div className="text-center">
-              <button
-                onClick={onBackToApp}
-                className="text-xs text-slate-400 hover:text-white transition-colors underline cursor-pointer"
-              >
-                Retour à l'application enseignant
-              </button>
-            </div>
           )}
-        </div>
-
-        <div className="text-center text-[11px] text-slate-500 pt-8 pb-4">
-          PerckyLingua • Portail officiel de consultation
-        </div>
+        </form>
+        {onBackToApp && (
+          <button type="button" onClick={onBackToApp} className="text-xs font-semibold text-[#0b3c5d] underline underline-offset-2">
+            Retour à l'espace enseignant
+          </button>
+        )}
       </div>
     );
   }
 
-  // Vue 2 : Fiche officielle complète en lecture seule
   return (
-    <div className="min-h-screen bg-slate-100 py-6 sm:py-10 px-3 sm:px-6 lg:px-8 text-slate-900">
-      <div className="max-w-3xl mx-auto space-y-6">
-        
-        {/* Top Control Bar (No Print) */}
-        <div className="flex items-center justify-between no-print bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold text-slate-800">
-              {isLockedReport ? 'Votre fiche d’examen oral en lecture seule' : 'Fiche officielle en lecture seule (Consultation Code QR)'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!isLockedReport && (
-              <button
-                onClick={() => { setReport(null); setSearchQuery(''); setSearchError(null); }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                title="Consulter l’examen par adresse e-mail"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Changer d'élève</span>
-              </button>
-            )}
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg transition-colors cursor-pointer"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimer / PDF</span>
+    <div className="mx-auto w-full max-w-3xl space-y-5 text-[#072a3f]">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d8e6ee] bg-white p-3.5">
+        <div>
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#2fa36b]">PERCKYLINGUA · SUIVI ORAL</p>
+          <p className="text-xs font-bold text-[#24485e]">Résultat individuel de la session</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isLockedReport && (
+            <button type="button" onClick={() => { setReport(null); setSearchQuery(''); setSearchError(null); }} className="rounded-lg border border-[#d8e6ee] px-3 py-2 text-xs font-bold text-[#46657a] hover:bg-[#f2f7fa]">
+              Changer d'élève
             </button>
-            {onBackToApp && (
-              <button
-                onClick={onBackToApp}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors cursor-pointer"
-              >
-                <span>Accès Enseignant</span>
-              </button>
-            )}
-          </div>
+          )}
+          <button type="button" onClick={handlePrint} className="inline-flex items-center gap-1.5 rounded-lg bg-[#072a3f] px-3 py-2 text-xs font-bold text-white hover:bg-[#0b3c5d]">
+            <Printer className="h-3.5 w-3.5" /> Imprimer / PDF
+          </button>
+          {onBackToApp && (
+            <button type="button" onClick={onBackToApp} className="inline-flex items-center gap-1.5 rounded-lg border border-[#d8e6ee] px-3 py-2 text-xs font-bold text-[#46657a] hover:bg-[#f2f7fa]">
+              <ArrowLeft className="h-3.5 w-3.5" /> Retour
+            </button>
+          )}
         </div>
-
-        {/* Official Printable Exam Sheet */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-10 space-y-6 print:shadow-none print:border-0 print:p-0">
-          
-          {/* Official Banner Header */}
-          <div className="border-b-2 border-amber-800 pb-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-900">
-                  <span className="inline-block w-3 h-3 rounded-xs bg-emerald-600" />
-                  <span className="inline-block w-3 h-3 rounded-xs bg-white border border-slate-300" />
-                  <span className="inline-block w-3 h-3 rounded-xs bg-rose-600" />
-                  <span>Repubblica Italiana • Lingua e Cultura Italiana</span>
-                </div>
-                <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  Scheda di Valutazione Orale
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                  {currentExam ? currentExam.title : 'Épreuve Orale'} • {currentExam?.class_name || 'Classe d\'Italien'}
-                </p>
-              </div>
-
-              {/* Status Stamp */}
-              <div className="flex flex-col items-start sm:items-end">
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300/80 font-mono">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Document Certifié</span>
-                </span>
-                <span className="text-[11px] text-slate-400 mt-1 font-mono">
-                  Épreuve du {currentExam?.exam_date || '2026-09-27'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Candidate, exam subject and speaking time */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Candidate Identity */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div className="text-[10px] uppercase font-bold text-slate-400 mb-1 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-slate-500" />
-                <span>Candidat(e)</span>
-              </div>
-              <h2 className="text-lg font-bold text-slate-900 truncate">
-                {currentStudent.first_name} {currentStudent.last_name}
-              </h2>
-              <p className="text-xs text-slate-500 font-mono mt-0.5">
-                {currentStudent.student_number ? `Matricule : ${currentStudent.student_number}` : 'Matricule non renseigné'}
-              </p>
-            </div>
-
-            {/* Exam subject and instructions */}
-            <div className="bg-amber-50/80 p-4 rounded-xl border border-amber-200/90">
-              <div className="text-[10px] uppercase font-bold text-amber-800 mb-1 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-700" />
-                <span>Sujet de l'épreuve</span>
-              </div>
-              <h3 className="text-lg font-bold text-amber-950">
-                {currentExam?.title || evaluation?.exam_title || 'Examen oral'}
-              </h3>
-              <p className="text-xs text-amber-800/80 font-medium mt-0.5">
-                {currentExam?.description || 'Consignes de l’épreuve définies par l’enseignant.'}
-              </p>
-            </div>
-
-            {/* Speaking Time / Timing */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div className="text-[10px] uppercase font-bold text-slate-400 mb-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-slate-500" />
-                <span>Temps de parole</span>
-              </div>
-              <div className="text-lg font-bold text-slate-900 font-mono">
-                {evaluation?.duration_used_seconds 
-                  ? `${Math.floor(evaluation.duration_used_seconds / 60)}m ${evaluation.duration_used_seconds % 60}s`
-                  : 'Non renseignée'}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Durée prévue : {evaluation?.max_duration_seconds ? `${Math.floor(evaluation.max_duration_seconds / 60)}m ${evaluation.max_duration_seconds % 60}s` : 'non renseignée'}
-              </p>
-            </div>
-          </div>
-
-          {/* Final Score Showcase Box */}
-          <div className="bg-gradient-to-r from-amber-900 to-amber-950 text-white rounded-2xl p-6 shadow-inner flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="space-y-1 text-center sm:text-left">
-              <div className="text-xs uppercase font-bold tracking-wider text-amber-300">
-                Résultat Global de l'Épreuve Orale
-              </div>
-              <div className="text-sm text-slate-300">
-                Grille d'évaluation personnalisée de l'épreuve
-              </div>
-              <div className="pt-2">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold border ${appreciation.color}`}>
-                  {appreciation.label}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-baseline gap-2 bg-black/30 px-6 py-4 rounded-xl border border-white/10 shrink-0">
-              <span className="font-display text-4xl sm:text-5xl font-extrabold text-amber-300 font-mono">
-                {currentScore}
-              </span>
-              <span className="text-xl sm:text-2xl font-bold text-slate-400 font-mono">
-                / {maxScore}
-              </span>
-              <span className="text-xs font-semibold text-amber-200 ml-1 font-mono">
-                ({percentage}%)
-              </span>
-            </div>
-          </div>
-
-          {/* Detailed Rubric Breakdown */}
-          <div className="space-y-3">
-            <h3 className="font-display font-bold text-slate-900 text-base flex items-center gap-2 border-b border-slate-200 pb-2">
-              <FileCheck2 className="w-4 h-4 text-amber-800" />
-              <span>Détail des rubriques d'évaluation & Remarques</span>
-            </h3>
-
-            {rubrics.length > 0 ? (
-              <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
-                {rubrics.map((r, idx) => {
-                  const detail = evaluation?.details?.find(d => d.rubric_id === r.id);
-                  const isValidated = detail ? detail.is_validated : false;
-                  const errorNote = detail?.error_note;
-
-                  return (
-                    <div key={r.id} className="p-3.5 hover:bg-slate-50/60 transition-colors space-y-1.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2.5">
-                          <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 font-mono mt-0.5">
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <p className="text-xs sm:text-sm font-bold text-slate-900">
-                              {r.title}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {r.question}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 flex items-center gap-2">
-                          {isValidated ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Validé (+{r.points} pt)</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                              <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                              <span>0 pt</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Example phrase context */}
-                      {r.example_sentence && (
-                        <p className="text-[11px] text-slate-500 italic pl-8.5">
-                          « {r.example_sentence} »
-                        </p>
-                      )}
-
-                      {/* Teacher Error / Advice Note */}
-                      {errorNote && errorNote.trim().length > 0 && (
-                        <div className="ml-8.5 mt-1 p-2 bg-rose-50/80 border border-rose-200/80 rounded-lg text-xs text-rose-900">
-                          <span className="font-semibold text-rose-950">Remarque de l'examinateur : </span>
-                          <span>{errorNote}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-4 bg-slate-50 rounded-xl text-center text-slate-500 text-xs">
-                Aucun critère d'évaluation enregistré pour cette épreuve.
-              </div>
-            )}
-          </div>
-
-          {/* Teacher Signature & Official Seal Stamp */}
-          <div className="pt-6 border-t-2 border-dashed border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-            <div className="space-y-1 text-center sm:text-left">
-              <p className="font-bold text-slate-800">Examinateur Agréé :</p>
-              <p className="font-mono text-slate-600">Prof. Ainapercky (ainapercky@gmail.com)</p>
-              <p className="text-[11px] text-slate-400">Épreuve validée et archivée électroniquement</p>
-            </div>
-
-            <div className="p-3 border-2 border-slate-300 border-dashed rounded-xl text-center font-mono text-[10px] text-slate-400 max-w-[200px]">
-              <span className="block font-bold text-slate-700 uppercase">Sceau d'Examen</span>
-              <span>MINISTERO DELL'ISTRUZIONE</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer Note */}
-        <p className="text-center text-xs text-slate-400 no-print pb-8">
-          PerckyLingua • Portail d’évaluation de la langue italienne
-        </p>
       </div>
+
+      <section className="space-y-5 rounded-2xl border border-[#d8e6ee] bg-white p-5 shadow-sm sm:p-8 print:border-0 print:shadow-none">
+        <header className="flex flex-col gap-3 border-b border-[#d8e6ee] pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#2fa36b]">{currentExam.class_name || 'Classe'} · Session orale</p>
+            <h1 className="mt-1 font-display text-2xl font-black tracking-tight text-[#072a3f]">{currentExam.title}</h1>
+            <p className="mt-1 text-sm text-[#607f93]">{formatDate(currentExam.exam_date)}</p>
+          </div>
+          <StatusBadge tone="success">Évaluation terminée</StatusBadge>
+        </header>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] p-4">
+            <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-[#607f93]">
+              <UserRound className="h-3.5 w-3.5" /> Étudiant
+            </div>
+            <p className="mt-1 text-lg font-extrabold text-[#072a3f]">{currentStudent.first_name} {currentStudent.last_name}</p>
+            <p className="mt-1 text-xs text-[#607f93]">{currentStudent.student_number ? `Matricule : ${currentStudent.student_number}` : 'Matricule non renseigné'}</p>
+          </div>
+          <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] p-4">
+            <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-[#607f93]">
+              <Clock3 className="h-3.5 w-3.5" /> Temps de parole
+            </div>
+            <p className="mt-1 text-lg font-extrabold text-[#072a3f]">
+              {evaluation.duration_used_seconds == null ? 'Non renseigné' : `${Math.floor(evaluation.duration_used_seconds / 60)}m ${evaluation.duration_used_seconds % 60}s`}
+            </p>
+            <p className="mt-1 text-xs text-[#607f93]">
+              Durée prévue : {evaluation.max_duration_seconds ? `${Math.floor(evaluation.max_duration_seconds / 60)}m ${evaluation.max_duration_seconds % 60}s` : 'non renseignée'}
+            </p>
+          </div>
+        </div>
+
+        <section className="flex flex-col gap-3 rounded-2xl bg-[#072a3f] p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#a9c9dc]">Note de cette session</p>
+            <p className="mt-1 text-xs text-[#d0e0e9]">Résultat converti sur 20 pour faciliter le suivi entre les sessions.</p>
+          </div>
+          <p className="shrink-0 text-3xl font-black tabular-nums">{normalizedScore === null ? '—' : normalizedScore.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}<span className="ml-1 text-base font-bold text-[#b7d0e0]">/ 20</span></p>
+        </section>
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e5eff5] bg-[#f7fafc] p-3.5">
+          <span className="text-xs font-semibold text-[#607f93]">Note sur le barème de la session</span>
+          <span className="text-sm font-extrabold tabular-nums text-[#072a3f]">{rawScore} / {maxScore}</span>
+        </div>
+
+        <section>
+          <div className="flex items-center gap-2 border-b border-[#d8e6ee] pb-3">
+            <FileText className="h-4 w-4 text-[#0b3c5d]" />
+            <h2 className="font-display text-base font-extrabold text-[#072a3f]">Détail de l'évaluation</h2>
+          </div>
+          {rubrics.length > 0 ? (
+            <div className="divide-y divide-[#edf3f7]">
+              {rubrics.map((rubric, index) => {
+                const detail = evaluation.details?.find(item => item.rubric_id === rubric.id);
+                return (
+                  <article key={rubric.id} className="space-y-2 py-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#6b8799]">Critère {index + 1}</p>
+                        <h3 className="mt-0.5 font-bold text-[#072a3f]">{rubric.title}</h3>
+                        {rubric.question && <p className="mt-1 text-sm leading-relaxed text-[#46657a]">{rubric.question}</p>}
+                      </div>
+                      <StatusBadge tone={detail?.is_validated ? 'success' : 'neutral'}>
+                        {detail?.awarded_points ?? 0} / {rubric.points} pts
+                      </StatusBadge>
+                    </div>
+                    {detail?.error_note && (
+                      <div className="flex items-start gap-2 rounded-xl bg-[#f7fafc] p-3 text-xs leading-relaxed text-[#46657a]">
+                        <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-[#0b3c5d]" />
+                        <span>{detail.error_note}</span>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-[#607f93]">Aucun critère détaillé n'est disponible pour cette session.</p>
+          )}
+        </section>
+      </section>
     </div>
   );
 };

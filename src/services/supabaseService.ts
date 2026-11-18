@@ -5,6 +5,7 @@ import {
   Student,
   ExamRubric,
   Evaluation,
+  StudentOralExamSession,
   PassOrderItem,
   Quiz,
   QuizSubmission,
@@ -372,6 +373,38 @@ class SupabaseService {
       details: Array.isArray(data.evaluation.details) ? data.evaluation.details : []
     };
     return { student, exam, evaluation };
+  }
+
+  public async getStudentOralExamSessions(): Promise<StudentOralExamSession[]> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { data, error } = await client.rpc('get_student_oral_exam_sessions');
+    if (error) throw new Error(`Chargement des sessions orales impossible : ${error.message}`);
+    if (!Array.isArray(data)) return [];
+
+    return data
+      .filter(item => item?.class?.id && item?.exam?.id && item?.evaluation?.id)
+      .map(item => {
+        const rubrics = Array.isArray(item.rubrics) ? item.rubrics : [];
+        const exam: Exam = {
+          ...item.exam,
+          rubrics
+        };
+        const evaluation: Evaluation = {
+          ...item.evaluation,
+          total_score: Number(item.evaluation.total_score) || 0,
+          max_score: Number(item.evaluation.max_score) || rubrics.reduce(
+            (sum: number, rubric: ExamRubric) => sum + (Number(rubric.points) || 0),
+            0
+          ),
+          details: Array.isArray(item.evaluation.details) ? item.evaluation.details : []
+        };
+        return {
+          class: { id: String(item.class.id), name: String(item.class.name || 'Classe') },
+          exam,
+          evaluation
+        };
+      });
   }
 
   public async registerStudentAuth(email: string, password: string, studentId: string): Promise<boolean> {

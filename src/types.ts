@@ -93,6 +93,12 @@ export interface Evaluation {
   total_rubrics_count?: number;
 }
 
+export interface StudentOralExamSession {
+  class: Pick<ClassRoom, 'id' | 'name'>;
+  exam: Exam;
+  evaluation: Evaluation;
+}
+
 export interface PassOrderItem {
   id: string;
   exam_id: string;
