@@ -584,7 +584,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <p className="text-slate-500">Aucune donnée disponible pour cet examen.</p>
         </div>
       )}
-    </div>
       {showQuizAnalytics && (
         <QuizAnalyticsDashboard
           initialClassId={classes[0]?.id || ''}
@@ -596,5 +595,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClose={() => setShowQuizAnalytics(false)}
         />
       )}
+    </div>
   );
 };
