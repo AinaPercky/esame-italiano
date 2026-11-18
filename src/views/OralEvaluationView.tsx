@@ -17,12 +17,10 @@ import {
   Shuffle,
   AlertCircle,
   UserX,
-  QrCode
 } from 'lucide-react';
 import { ClassRoom, Exam, Student, ExamRubric, Evaluation } from '../types';
 import { dataService } from '../services/dataService';
 import { SpeechTimer } from '../components/SpeechTimer';
-import { StudentQRCodeModal } from '../components/StudentQRCodeModal';
 
 
 interface OralEvaluationViewProps {
@@ -118,7 +116,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   // 
-  const [isQRModalOpen, setIsQRModalOpen] = useState<boolean>(false);
 
   // Gestion du temps de parole (Section 5.3)
   const [initialElapsedSeconds, setInitialElapsedSeconds] = useState<number>(0);
@@ -226,9 +223,9 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       setInitialElapsedSeconds(usedSecs);
       setTimingData({
         durationUsedSeconds: usedSecs,
-        maxDurationSeconds: existing.max_duration_seconds || 180,
+        maxDurationSeconds: existing.max_duration_seconds || currentExam?.duration_seconds || 180,
         timerStatus: existing.timer_status || (usedSecs > 0 ? 'stopped_manually' : 'not_timed'),
-        isExpired: usedSecs >= (existing.max_duration_seconds || 180)
+        isExpired: usedSecs >= (existing.max_duration_seconds || currentExam?.duration_seconds || 180)
       });
     } else {
       // Nouvelle évaluation : tout décoché par défaut et formulaires d'erreurs vierges
@@ -244,13 +241,13 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       setInitialElapsedSeconds(0);
       setTimingData({
         durationUsedSeconds: 0,
-        maxDurationSeconds: 180,
+        maxDurationSeconds: currentExam?.duration_seconds || 180,
         timerStatus: 'not_timed',
         isExpired: false
       });
     }
     setSaveSuccessMessage(null);
-  }, [selectedExamId, selectedStudentId]);
+  }, [selectedExamId, selectedStudentId, currentExam?.duration_seconds]);
 
   // Saisie d'une erreur dans le formulaire de la rubrique
   // RÈGLE DEMANDÉE : Dès que ce formulaire est rempli, la rubrique n'est PAS validée (décochée)
@@ -632,17 +629,19 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                 {currentExam.description || 'Consignes définies par l’enseignant.'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsQRModalOpen(true)}
-              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#072a3f] px-3 py-2 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#0b3c5d]"
-              title="Afficher et imprimer le Code QR de cet élève"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Code QR</span>
-            </button>
+
           </div>
         </div>
+      )}
+
+      {/* Chronomètre propre à cet examen, réinitialisé pour chaque candidat */}
+      {currentStudent && currentExam && (
+        <SpeechTimer
+          key={`${selectedExamId}:${selectedStudentId}:${initialElapsedSeconds}:${timingData.maxDurationSeconds}`}
+          maxSeconds={timingData.maxDurationSeconds || currentExam.duration_seconds || 180}
+          initialElapsedSeconds={initialElapsedSeconds}
+          onTimeChange={setTimingData}
+        />
       )}
 
       {/* Confirmation Banner */}
@@ -880,6 +879,10 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                 {Math.floor(timingData.durationUsedSeconds / 60).toString().padStart(2, '0')}:{(timingData.durationUsedSeconds % 60).toString().padStart(2, '0')}
               </span>
             </div>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] sm:text-xs font-mono font-semibold ${Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) <= 10 ? 'bg-rose-100 text-rose-800' : 'bg-[#e6f0f7] text-[#072a3f]'}`} title="Temps restant pour cet étudiant">
+              <Timer className="w-3 h-3 shrink-0" />
+              <span>{Math.floor(Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) / 60).toString().padStart(2, '0')}:{(Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) % 60).toString().padStart(2, '0')}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -916,16 +919,6 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
         </div>
       </div>
 
-      {/* Modal Code QR de l'Élève */}
-      {currentStudent && currentExam && (
-        <StudentQRCodeModal
-          isOpen={isQRModalOpen}
-          onClose={() => setIsQRModalOpen(false)}
-          student={currentStudent}
-          exam={currentExam}
-          evaluation={dataService.getEvaluations(selectedExamId, undefined, selectedStudentId)[0]}
-        />
-      )}
     </div>
   );
 };

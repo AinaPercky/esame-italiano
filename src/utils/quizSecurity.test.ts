@@ -232,7 +232,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     const requiredProjections = [
       "from('classes').select('id,name,enrollment_mode,archived_at,created_at')",
       "from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')",
-      "from('exams').select('id,class_id,title,description,level,exam_date,status,created_at')",
+      "from('exams').select('id,class_id,title,description,level,exam_date,duration_seconds,status,created_at')",
       "from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position')",
       "from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at')",
       "from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note')",
