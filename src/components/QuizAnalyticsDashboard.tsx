@@ -91,7 +91,8 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const classSubmissions = useMemo(() => submissions.filter(submission =>
     submission.class_id === classId &&
     classStudentIds.has(submission.student_id) &&
-    visibleQuizIds.has(submission.quiz_id)
+    visibleQuizIds.has(submission.quiz_id) &&
+    submission.is_counted !== false
   ), [submissions, classId, classStudentIds, visibleQuizIds]);
   const selectedStudent = classStudents.find(student => student.id === studentId);
   const scopedSubmissions = studentId
