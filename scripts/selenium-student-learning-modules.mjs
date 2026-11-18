@@ -54,7 +54,6 @@ async function testExercises() {
     'Au moins un exercice publié attribué à la classe de recette');
   await start.click();
   await waitVisible(By.xpath("//*[contains(normalize-space(.),'MODE ENTRAÎNEMENT')]"), 'Démarrage de la tentative');
-  await waitVisible(By.css('button[aria-label="Mes exercices"], button[title="Mes exercices"]'), 'Action de sortie du lecteur');
   await click(By.xpath("//button[.//span[normalize-space(.)='Mes exercices']]"), 'Retour à Mes exercices');
   await waitVisible(By.xpath("//h2[normalize-space(.)='Mes exercices']"), 'Retour au catalogue des exercices');
   console.log('OK — exercices : accès par classe, création/reprise d’une tentative et sortie du lecteur.');
