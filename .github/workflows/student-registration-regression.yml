@@ -1,0 +1,67 @@
+name: Student registration regression tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [fix/student-registration-rpc-missing]
+  push:
+    branches: [test/student-registration-regression-suite]
+
+permissions:
+  contents: read
+
+jobs:
+  registration-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: student_registration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d student_registration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: student_registration_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap isolated school schema and fixtures
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/phase_b_rls_ci_bootstrap.sql
+      - name: Apply production registration RPC migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261118070000_restore_student_registration_rpc.sql
+      - name: Test registration RPC before Phase B
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_registration_regression.sql
+      - name: Apply school RLS and scoped RPC migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121000000_secure_school_data_rls_and_public_report.sql
+      - name: Test registration behavior after Phase B and grants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/student_registration_regression.sql
+
+  frontend-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run unit and regression tests
+        run: npm test
+      - name: TypeScript validation
+        run: npm run lint
+      - name: Production build
+        run: npm run build
