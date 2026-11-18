@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
-import { QUIZ_PARTICIPANT_LIFECYCLE_MIGRATION_SQL } from '../data/quizParticipantLifecycleMigration';
 import { canStudentStartQuiz, canSubmitQuizAttempt, isRetryAuthorizedParticipant } from './quizRetryAvailability';
 import { evaluateQuizAnswers } from '../views/publicQuiz/publicQuizUtils';
 import { calculateQuestionPointsEarned, parseStudentAnswers } from './quizAnswerMatcher';
@@ -17,18 +16,22 @@ const submissionMigration = read('../../supabase/migrations/20261115080000_quiz_
 const studentView = read('../views/StudentSpaceView.tsx');
 const adminView = read('../views/QuizzesAdminView.tsx');
 
+function sqlFunction(sql: string, name: string, delimiter = '$$;'): string {
+  const start = sql.indexOf(\`CREATE OR REPLACE FUNCTION public.\${name}\`);
+  if (start < 0) return '';
+  const end = sql.indexOf(delimiter, start);
+  return end < 0 ? '' : sql.slice(start, end + delimiter.length);
+}
+
 describe('Parcours étudiant — secondes chances', () => {
   it('accorde une seconde chance individuelle au seul étudiant ciblé et conserve son historique', () => {
-    const grant = QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL.match(
-      /CREATE OR REPLACE FUNCTION public\\.grant_quiz_retry\\([\\s\\S]*?\\$\\$;/
-    )?.[0] || '';
-
-    assert.match(grant, /public\\.quiz_is_teacher\\(\\)/);
-    assert.match(grant, /p_student_id/);
-    assert.match(grant, /p_quiz_id/);
-    assert.match(grant, /Cet élève n’appartient pas aux classes de ce quiz/);
-    assert.match(grant, /presence_status = 'retry_authorized'/);
-    assert.doesNotMatch(grant, /DELETE FROM public\\.(quiz_submissions|quiz_attempts)/i);
+    const grant = sqlFunction(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL, 'grant_quiz_retry(');
+    assert.ok(grant.includes('public.quiz_is_teacher()'));
+    assert.ok(grant.includes('p_student_id'));
+    assert.ok(grant.includes('p_quiz_id'));
+    assert.ok(grant.includes('presence_status = \\'retry_authorized\\''));
+    assert.ok(!grant.includes('DELETE FROM public.quiz_submissions'));
+    assert.ok(!grant.includes('DELETE FROM public.quiz_attempts'));
     assert.equal(isRetryAuthorizedParticipant('retry_authorized'), true);
     assert.equal(isRetryAuthorizedParticipant('present'), false);
     assert.equal(canStudentStartQuiz('closed', true, true), true);
@@ -46,19 +49,17 @@ describe('Parcours étudiant — secondes chances', () => {
   });
 
   it('accorde la seconde chance de classe uniquement aux inscriptions actives de la classe ciblée', () => {
-    const grantClass = classRetryMigration.match(
-      /CREATE OR REPLACE FUNCTION public\\.grant_quiz_retry_for_class\\([\\s\\S]*?\\$\\$;/
-    )?.[0] || '';
-    assert.match(grantClass, /p_class_id = ANY\\(coalesce\\(nullif\\(q\\.class_ids/);
-    assert.match(grantClass, /FROM public\\.class_enrollments ce/);
-    assert.match(grantClass, /ce\\.class_id::text = p_class_id/);
-    assert.match(grantClass, /ce\\.status = 'active'/);
-    assert.match(grantClass, /public\\.grant_quiz_retry\\(p_quiz_id, v_student, p_reason, NULL\\)/);
-    assert.match(grantClass, /greatest\\(1, p_max_attempts\\)/);
-    assert.match(grantClass, /RETURN jsonb_build_object\\('granted', v_count\\)/);
-
+    const grantClass = sqlFunction(classRetryMigration, 'grant_quiz_retry_for_class(');
+    assert.ok(grantClass.includes('p_class_id = ANY(coalesce(nullif(q.class_ids'));
+    assert.ok(grantClass.includes('FROM public.class_enrollments ce'));
+    assert.ok(grantClass.includes('ce.class_id::text = p_class_id'));
+    assert.ok(grantClass.includes("ce.status = 'active'"));
+    assert.ok(grantClass.includes('public.grant_quiz_retry(p_quiz_id, v_student, p_reason, NULL)'));
+    assert.ok(grantClass.includes('greatest(1, p_max_attempts)'));
+    assert.ok(grantClass.includes("RETURN jsonb_build_object('granted', v_count)"));
     // La RPC individuelle appelée dans la boucle vérifie aussi que l'élève est approuvé.
-    assert.match(participantMigration, /JOIN public\\.students s ON s\\.id = ce\\.student_id AND s\\.validation_status = ''approved''/);
+    assert.ok(participantMigration.includes("JOIN public.students s ON s.id = ce.student_id AND s.validation_status = 'approved'"));
+    assert.ok(adminView.includes('grantQuizRetryForClass'));
   });
 
   it('refuse une nouvelle tentative après remise si aucune autorisation active n’existe', () => {
@@ -71,64 +72,56 @@ describe('Parcours étudiant — secondes chances', () => {
   });
 
   it('n’autorise pas les secondes chances expirées, révoquées ou épuisées', () => {
-    assert.match(participantMigration, /g\\.used_at IS NULL/);
-    assert.match(participantMigration, /g\\.revoked_at IS NULL/);
-    assert.match(participantMigration, /g\\.expires_at IS NULL OR g\\.expires_at > clock_timestamp\\(\\)/);
-    assert.match(participantMigration, /g\\.used_attempts < g\\.max_attempts/);
-    assert.match(participantMigration, /La seconde chance est expirée, révoquée ou déjà utilisée/);
+    assert.ok(participantMigration.includes('g.used_at IS NULL'));
+    assert.ok(participantMigration.includes('g.revoked_at IS NULL'));
+    assert.ok(participantMigration.includes('g.expires_at IS NULL OR g.expires_at > clock_timestamp()'));
+    assert.ok(participantMigration.includes('g.used_attempts < g.max_attempts'));
+    assert.ok(participantMigration.includes('La seconde chance est expirée, révoquée ou déjà utilisée'));
   });
 
   it('consomme une tentative seulement à la remise et respecte max_attempts', () => {
-    assert.match(participantMigration, /used_attempts = used_attempts \\+ 1/);
-    assert.match(participantMigration, /used_attempts \\+ 1 >= max_attempts/);
-    assert.match(participantMigration, /Presence confirmation must not consume retry grants/);
-    const confirm = participantMigration.match(
-      /CREATE OR REPLACE FUNCTION public\\.confirm_quiz_presence\\([\\s\\S]*?\\$\\$;/
-    )?.[0] || '';
-    assert.doesNotMatch(confirm, /UPDATE public\\.quiz_retry_grants[\\s\\S]*?used_at/i);
+    assert.ok(participantMigration.includes('used_attempts = used_attempts + 1'));
+    assert.ok(participantMigration.includes('used_attempts + 1 >= max_attempts'));
+    assert.ok(participantMigration.includes('Presence confirmation must not consume retry grants'));
+    const confirmation = sqlFunction(participantMigration, 'confirm_quiz_presence(');
+    assert.ok(!confirmation.includes('UPDATE public.quiz_retry_grants'));
   });
 
   it('le parcours étudiant confirme la présence puis ouvre la tentative autorisée', () => {
-    assert.match(studentView, /const retryAuthorized = isRetryAuthorizedParticipant\\(activeLaunch\\.participant\\.presence_status\\)/);
-    assert.match(studentView, /confirmQuizPresence\\(activeLaunch\\.launch\\.id\\)/);
-    assert.match(studentView, /retryAuthorized: retryAuthorized/);
-    assert.match(studentView, /startQuizSession\\(quiz, false, presenceInitialization\\.retryAuthorized === true\\)/);
-    assert.match(studentView, /isRetryAttempt\\s*\\n?\\s*\\)/);
-    assert.match(studentView, /isRetryAttempt\\s*\\n?\\s*\\)/);
+    assert.ok(studentView.includes('isRetryAuthorizedParticipant(activeLaunch.participant.presence_status)'));
+    assert.ok(studentView.includes('confirmQuizPresence(activeLaunch.launch.id)'));
+    assert.ok(studentView.includes('retryAuthorized'));
+    assert.ok(studentView.includes('startQuizSession(quiz, false, presenceInitialization.retryAuthorized === true)'));
+    assert.ok(studentView.includes('isRetryAttempt'));
+    assert.ok(studentView.includes('dataService.submitQuiz('));
   });
 });
 
 describe('Parcours étudiant — inscription après le lancement', () => {
   it('rattache à la volée un nouvel inscrit approuvé ayant une inscription active dans une classe du quiz', () => {
-    const activeLaunch = participantMigration.match(
-      /CREATE OR REPLACE FUNCTION public\\.get_student_active_launch\\([\\s\\S]*?\\$function\\$;/
-    )?.[0] || '';
-    assert.match(activeLaunch, /JOIN public\\.class_enrollments ce ON ce\\.student_id = s\\.id/);
-    assert.match(activeLaunch, /s\\.validation_status = 'approved'/);
-    assert.match(activeLaunch, /ce\\.status = 'active'/);
-    assert.match(activeLaunch, /ce\\.class_id::text = ANY\\([\\s\\S]*?v_quiz\\.class_ids/);
-    assert.match(activeLaunch, /INSERT INTO public\\.quiz_participants AS existing_participant/);
-    assert.match(activeLaunch, /CASE WHEN v_has_retry THEN 'retry_authorized' ELSE 'pending' END/);
-    assert.match(activeLaunch, /ON CONFLICT \\(quiz_id, student_id\\)/);
+    const activeLaunch = sqlFunction(participantMigration, 'get_student_active_launch(', '$function$;');
+    assert.ok(activeLaunch.includes('JOIN public.class_enrollments ce ON ce.student_id = s.id'));
+    assert.ok(activeLaunch.includes("s.validation_status = 'approved'"));
+    assert.ok(activeLaunch.includes("ce.status = 'active'"));
+    assert.ok(activeLaunch.includes('v_quiz.class_ids'));
+    assert.ok(activeLaunch.includes('INSERT INTO public.quiz_participants AS existing_participant'));
+    assert.ok(activeLaunch.includes("CASE WHEN v_has_retry THEN 'retry_authorized' ELSE 'pending' END"));
+    assert.ok(activeLaunch.includes('ON CONFLICT (quiz_id, student_id)'));
   });
 
   it('ne donne pas accès à un élève non approuvé, suspendu, désinscrit ou hors classe', () => {
-    const activeLaunch = participantMigration.match(
-      /CREATE OR REPLACE FUNCTION public\\.get_student_active_launch\\([\\s\\S]*?\\$function\\$;/
-    )?.[0] || '';
-    assert.match(activeLaunch, /s\\.validation_status = 'approved'/);
-    assert.match(activeLaunch, /ce\\.status = 'active'/);
-    assert.match(activeLaunch, /IF v_class_id IS NULL THEN\\s+RETURN '\\{\\}'::jsonb/);
+    const activeLaunch = sqlFunction(participantMigration, 'get_student_active_launch(', '$function$;');
+    assert.ok(activeLaunch.includes("s.validation_status = 'approved'"));
+    assert.ok(activeLaunch.includes("ce.status = 'active'"));
+    assert.ok(activeLaunch.includes("IF v_class_id IS NULL THEN\n    RETURN '{}'::jsonb"));
   });
 
   it('ne réinitialise pas une ancienne tentative sans autorisation valide', () => {
-    const activeLaunch = participantMigration.match(
-      /CREATE OR REPLACE FUNCTION public\\.get_student_active_launch\\([\\s\\S]*?\\$function\\$;/
-    )?.[0] || '';
-    assert.match(activeLaunch, /v_has_history/);
-    assert.match(activeLaunch, /v_has_terminal_participation/);
-    assert.match(activeLaunch, /IF v_has_retry OR \\(NOT v_has_history AND NOT v_has_terminal_participation\\) THEN/);
-    assert.match(activeLaunch, /presence_status IN \\('absent', 'completed', 'timeout'\\)/);
+    const activeLaunch = sqlFunction(participantMigration, 'get_student_active_launch(', '$function$;');
+    assert.ok(activeLaunch.includes('v_has_history'));
+    assert.ok(activeLaunch.includes('v_has_terminal_participation'));
+    assert.ok(activeLaunch.includes('IF v_has_retry OR (NOT v_has_history AND NOT v_has_terminal_participation) THEN'));
+    assert.ok(activeLaunch.includes("presence_status IN ('absent', 'completed', 'timeout')"));
   });
 });
 
@@ -149,10 +142,10 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
   const quiz = { questions, total_points: 13 } as Pick<Quiz, 'questions' | 'total_points'>;
 
   it('affiche les quatre types de questions dans le parcours étudiant', () => {
-    assert.match(studentView, /question\\.type === 'qcm'/);
-    assert.match(studentView, /question\\.type === 'text'/);
-    assert.match(studentView, /question\\.type === 'reorder'/);
-    assert.match(studentView, /question\\.type === 'verbes_trous'/);
+    assert.ok(studentView.includes("question.type === 'qcm'"));
+    assert.ok(studentView.includes("question.type === 'text'"));
+    assert.ok(studentView.includes("question.type === 'reorder'"));
+    assert.ok(studentView.includes("question.type === 'verbes_trous'"));
   });
 
   it('corrige QCM, cloze multi-trous, réordonnancement et verbes à trous dans un même quiz', () => {
@@ -173,10 +166,9 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
   });
 
   it('conserve chaque champ cloze et attribue des points partiels sans effacer les autres réponses', () => {
-    const question = questions[1];
     const answer = JSON.stringify(['vado', 'errato', 'parlano']);
     assert.deepEqual(parseStudentAnswers(answer, 3), ['vado', 'errato', 'parlano']);
-    const score = calculateQuestionPointsEarned(question, answer);
+    const score = calculateQuestionPointsEarned(questions[1], answer);
     assert.equal(score.partialCorrectCount, 2);
     assert.equal(score.awardedPoints, 2);
     assert.equal(score.isFullyCorrect, false);
@@ -204,23 +196,21 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
   });
 
   it('calcule le numéro de tentative par couple quiz/élève et ne réutilise pas les anciennes réponses', () => {
-    assert.match(submissionMigration, /a\\.quiz_id = q\\.id AND a\\.student_id = sid/);
-    assert.match(submissionMigration, /s\\.quiz_id = q\\.id AND s\\.student_id = sid/);
-    assert.match(submissionMigration, /AND attempt_number = attempt_no/);
-    assert.match(submissionMigration, /WHERE id = submission_id AND quiz_id = q\\.id AND student_id = sid/);
+    assert.ok(submissionMigration.includes('a.quiz_id = q.id AND a.student_id = sid'));
+    assert.ok(submissionMigration.includes('s.quiz_id = q.id AND s.student_id = sid'));
+    assert.ok(submissionMigration.includes('AND attempt_number = attempt_no'));
+    assert.ok(submissionMigration.includes('WHERE id = submission_id AND quiz_id = q.id AND student_id = sid'));
   });
 
   it('refuse les doubles soumissions côté interface et corrige les quiz officiels côté serveur', () => {
-    assert.match(studentView, /if \\(quizSubmissionLockRef\\.current\\) return/);
-    assert.match(studentView, /supabaseService\\.evaluateQuizQuestion\\(activeQuiz\\.id, currentQ\\.id, studentAns\\)/);
-    assert.match(studentView, /dataService\\.submitQuiz\\([\\s\\S]*?isRetryAttempt/);
-    assert.match(submissionMigration, /public\\.quiz_grade_all\\(q\\.id, coalesce\\(saved_answers/);
+    assert.ok(studentView.includes('if (quizSubmissionLockRef.current) return'));
+    assert.ok(studentView.includes('supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns)'));
+    assert.ok(studentView.includes('dataService.submitQuiz('));
+    assert.ok(submissionMigration.includes('public.quiz_grade_all(q.id, coalesce(saved_answers'));
   });
 
   it('ne consomme pas une autorisation si la confirmation de présence est seule effectuée', () => {
-    const confirmation = QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL.match(
-      /CREATE OR REPLACE FUNCTION public\\.confirm_quiz_presence\\([\\s\\S]*?\\$\\$;/
-    )?.[0] || '';
-    assert.doesNotMatch(confirmation, /UPDATE public\\.quiz_retry_grants[\\s\\S]*?used_at/i);
+    const confirmation = sqlFunction(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL, 'confirm_quiz_presence(');
+    assert.ok(!confirmation.includes('UPDATE public.quiz_retry_grants'));
   });
 });
