@@ -21,6 +21,7 @@ interface SpeechTimerProps {
     maxDurationSeconds: number;
     timerStatus: 'completed' | 'stopped_manually' | 'not_timed';
     isExpired: boolean;
+    hasStarted: boolean;
   }) => void;
 }
 
@@ -190,14 +191,15 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
     if (!onTimeChange) return;
     const timerStatus: 'completed' | 'stopped_manually' | 'not_timed' =
       isExpired ? 'completed' : hasStarted ? 'stopped_manually' : 'not_timed';
-    const signature = `${elapsedSeconds}:${safeMaxSeconds}:${timerStatus}`;
+    const signature = `${elapsedSeconds}:${safeMaxSeconds}:${timerStatus}:${hasStarted}`;
     if (lastReportedRef.current === signature) return;
     lastReportedRef.current = signature;
     onTimeChange({
       durationUsedSeconds: elapsedSeconds,
       maxDurationSeconds: safeMaxSeconds,
       timerStatus,
-      isExpired
+      isExpired,
+      hasStarted
     });
   }, [elapsedSeconds, safeMaxSeconds, isExpired, hasStarted, onTimeChange]);
 
