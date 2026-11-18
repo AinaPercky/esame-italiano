@@ -4,10 +4,7 @@ BEGIN;
 
 -- Create one additional session in the student's primary class and one in a
 -- second actively enrolled class. Also add a draft evaluation that must not count.
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims',
-  '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","email":"ainapercky@gmail.com","role":"authenticated"}', true);
-SELECT set_config('request.jwt.claim.sub','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',true);
+SET LOCAL ROLE postgres;
 
 INSERT INTO public.exams (id,class_id,title,exam_date,status) VALUES
 ('20000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000001','Deuxième session IUM-L2','2026-11-18','completed');
