@@ -49,6 +49,8 @@ export interface Exam {
   description?: string;
   level?: CEFRLevel | null;
   exam_date: string;
+  /** Durée maximale de parole par candidat, en secondes. */
+  duration_seconds?: number;
   status: 'draft' | 'in_progress' | 'completed';
   created_at: string;
   class_name?: string;
