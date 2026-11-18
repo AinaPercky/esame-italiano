@@ -637,7 +637,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       {/* Chronomètre propre à cet examen, réinitialisé pour chaque candidat */}
       {currentStudent && currentExam && (
         <SpeechTimer
-          key={`${selectedExamId}:${selectedStudentId}`}
+          key={`${selectedExamId}:${selectedStudentId}:${initialElapsedSeconds}:${timingData.maxDurationSeconds}`}
           maxSeconds={timingData.maxDurationSeconds || currentExam.duration_seconds || 180}
           initialElapsedSeconds={initialElapsedSeconds}
           onTimeChange={setTimingData}
@@ -878,6 +878,10 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
               <span>
                 {Math.floor(timingData.durationUsedSeconds / 60).toString().padStart(2, '0')}:{(timingData.durationUsedSeconds % 60).toString().padStart(2, '0')}
               </span>
+            </div>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] sm:text-xs font-mono font-semibold ${Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) <= 10 ? 'bg-rose-100 text-rose-800' : 'bg-[#e6f0f7] text-[#072a3f]'}`} title="Temps restant pour cet étudiant">
+              <Timer className="w-3 h-3 shrink-0" />
+              <span>{Math.floor(Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) / 60).toString().padStart(2, '0')}:{(Math.max(0, timingData.maxDurationSeconds - timingData.durationUsedSeconds) % 60).toString().padStart(2, '0')}</span>
             </div>
           </div>
 
