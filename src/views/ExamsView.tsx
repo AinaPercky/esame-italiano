@@ -204,7 +204,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             </div>
 
             <LearningCardMetrics
-              columns={4}
+              columns={3}
               items={[
                 { label: 'Date', value: exam.exam_date },
                 { label: 'Durée / candidat', value: `${Math.floor((Number(exam.duration_seconds) || 180) / 60)} min` },
