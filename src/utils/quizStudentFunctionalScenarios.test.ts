@@ -7,7 +7,7 @@ import { canStudentStartQuiz, canSubmitQuizAttempt, isRetryAuthorizedParticipant
 import { evaluateQuizAnswers } from '../views/publicQuiz/publicQuizUtils';
 import { calculateQuestionPointsEarned, parseStudentAnswers } from './quizAnswerMatcher';
 import { noterQuiz } from './verbesTrous';
-import { markBestQuizAttempt } from './quizBestAttempt';
+import { markBestQuizAttempt, type QuizAttemptScore } from './quizBestAttempt';
 import type { Quiz, QuizQuestion } from '../types';
 
 const read = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
@@ -188,11 +188,12 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
   });
 
   it('conserve toutes les copies mais ne compte que la meilleure note', () => {
-    const result = markBestQuizAttempt([
+    const attempts: QuizAttemptScore[] = [
       { id: 'attempt-1', attempt_number: 1, score_20: 9 },
       { id: 'attempt-2', attempt_number: 2, score_20: 17 },
       { id: 'attempt-3', attempt_number: 3, score_20: 12 }
-    ]);
+    ];
+    const result = markBestQuizAttempt(attempts);
     assert.equal(result.length, 3);
     assert.equal(result.filter(row => row.is_counted).length, 1);
     assert.equal(result.find(row => row.is_counted)?.id, 'attempt-2');
