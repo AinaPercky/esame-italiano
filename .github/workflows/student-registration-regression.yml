@@ -3,7 +3,7 @@ name: Student registration regression tests
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [main]
+    branches: [fix/student-registration-rpc-missing]
   push:
     branches: [test/student-registration-regression-suite]
 
