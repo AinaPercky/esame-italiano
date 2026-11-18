@@ -47,7 +47,7 @@ BEGIN
     '00000000-0000-4000-8000-000000000001'::uuid,
     'registration-test-001@example.invalid'
   );
-  IF v_repeat ->> 'id' <> v_new ->> 'id' THEN
+  IF (v_repeat ->> 'id') <> (v_new ->> 'id') THEN
     RAISE EXCEPTION 'Repeated registration created a duplicate student row';
   END IF;
 
