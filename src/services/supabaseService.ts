@@ -999,27 +999,38 @@ class SupabaseService {
 
     // Stage 1: mark as draft. If any later request fails, this evaluation cannot
     // appear as a completed session with missing/inconsistent criterion details.
-    const { error: headerError } = await client.from('evaluations').upsert({
+    const { data: headerRows, error: headerError } = await client.from('evaluations').upsert({
       ...evaluationHeader,
       status: 'draft'
-    }, { onConflict: 'id' });
+    }, { onConflict: 'id' }).select('id');
     if (headerError) throw new Error(`Enregistrement de la note impossible : ${headerError.message}`);
+    if (!headerRows || headerRows.length !== 1) {
+      throw new Error('La note n’a pas été créée ou mise à jour dans Supabase (droits insuffisants ou ligne inaccessible).');
+    }
 
     // Stage 2: persist every criterion, including zero-point criteria.
-    const { error: detailsError } = await client
+    const { data: savedDetails, error: detailsError } = await client
       .from('evaluation_details')
-      .upsert(detailsPayload, { onConflict: 'evaluation_id,rubric_id' });
+      .upsert(detailsPayload, { onConflict: 'evaluation_id,rubric_id' })
+      .select('rubric_id');
     if (detailsError) {
       throw new Error(`Enregistrement des critères impossible. L’évaluation reste en brouillon : ${detailsError.message}`);
     }
+    if (!savedDetails || savedDetails.length !== detailsPayload.length) {
+      throw new Error('Tous les critères n’ont pas été confirmés par Supabase. L’évaluation reste en brouillon.');
+    }
 
     // Stage 3: only expose the result to student reports after all details are saved.
-    const { error: completionError } = await client
+    const { data: completedRows, error: completionError } = await client
       .from('evaluations')
       .update({ ...evaluationHeader, status: 'completed' })
-      .eq('id', ev.id);
+      .eq('id', ev.id)
+      .select('id');
     if (completionError) {
       throw new Error(`Les critères sont enregistrés, mais la validation finale a échoué. L’évaluation reste en brouillon : ${completionError.message}`);
+    }
+    if (!completedRows || completedRows.length !== 1) {
+      throw new Error('Les critères sont enregistrés, mais Supabase n’a pas confirmé la validation finale. Vérifiez les droits UPDATE/SELECT sur evaluations.');
     }
   }
 
