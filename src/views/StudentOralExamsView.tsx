@@ -13,7 +13,7 @@ import {
   RefreshCw,
   TrendingUp
 } from 'lucide-react';
-import { StudentOralExamSession } from '../types';
+import type { StudentOralExamSession } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import {
   calculateOralClassAverage,
@@ -21,9 +21,7 @@ import {
 } from '../utils/oralExamProgress';
 import {
   LearningCard,
-  LearningCardFooter,
   LearningCardHeader,
-  LearningCardMetrics,
   LearningModuleHeader,
   StatusBadge
 } from '../components/LearningCard';
