@@ -860,6 +860,7 @@ class SupabaseService {
         level: exam.level ?? null,
         description: exam.description || null,
         exam_date: exam.exam_date || new Date().toISOString().split('T')[0],
+        duration_seconds: Math.max(15, Math.round(Number(exam.duration_seconds) || 180)),
         status: exam.status || 'in_progress',
         created_at: exam.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
@@ -1549,6 +1550,7 @@ class SupabaseService {
             title: e.title,
             description: e.description || null,
             exam_date: e.exam_date || new Date().toISOString().split('T')[0],
+            duration_seconds: Math.max(15, Math.round(Number(e.duration_seconds) || 180)),
             status: e.status || 'in_progress',
             created_at: e.created_at || new Date().toISOString()
           }));
@@ -1724,7 +1726,7 @@ class SupabaseService {
         : isAuthenticated
           ? client.from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')
           : emptyRows;
-      const examsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exams').select('id,class_id,title,description,level,exam_date,status,created_at') : emptyRows;
+      const examsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exams').select('id,class_id,title,description,level,exam_date,duration_seconds,status,created_at') : emptyRows;
       const rubricsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position') : emptyRows;
       const evaluationsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at') : emptyRows;
       const detailsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note') : emptyRows;
@@ -1887,6 +1889,7 @@ class SupabaseService {
         description: e.description,
         level: e.level ?? null,
         exam_date: e.exam_date,
+        duration_seconds: Number(e.duration_seconds) || 180,
         status: e.status,
         created_at: e.created_at,
         rubrics: rubricsList.filter(r => r.exam_id === e.id)
