@@ -222,13 +222,15 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       setErrorNotes(eMap);
       setIsSaved(true);
       const usedSecs = existing.duration_used_seconds || 0;
+      const maxDurationSecs = existing.max_duration_seconds || currentExam?.duration_seconds || 180;
       setInitialElapsedSeconds(usedSecs);
       setTimingData({
         durationUsedSeconds: usedSecs,
-        maxDurationSeconds: existing.max_duration_seconds || currentExam?.duration_seconds || 180,
-        timerStatus: existing.timer_status || (usedSecs > 0 ? 'stopped_manually' : 'not_timed'),
-        isExpired: usedSecs >= (existing.max_duration_seconds || currentExam?.duration_seconds || 180),
-        hasStarted: usedSecs > 0
+        maxDurationSeconds: maxDurationSecs,
+        timerStatus: usedSecs >= maxDurationSecs ? 'completed' : 'not_timed',
+        isExpired: usedSecs >= maxDurationSecs,
+        // Un temps restauré ne déverrouille jamais la grille : le professeur doit relancer le chrono.
+        hasStarted: usedSecs >= maxDurationSecs
       });
     } else {
       // Nouvelle évaluation : tout décoché par défaut et formulaires d'erreurs vierges
@@ -715,7 +717,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             <button
               onClick={handleResetAll}
               disabled={!timingData.hasStarted}
-              className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
             >
               Tout décocher
             </button>
@@ -725,7 +727,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                 <button
                   onClick={handleClearAllErrors}
                   disabled={!timingData.hasStarted}
-                  className="px-2.5 py-1 text-rose-700 hover:text-rose-900 hover:bg-rose-50 rounded font-medium transition-colors cursor-pointer"
+                  className="px-2.5 py-1 text-rose-700 hover:text-rose-900 hover:bg-rose-50 rounded font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                   title="Effacer le texte d'erreur sur toutes les rubriques"
                 >
                   Effacer les {errorsCount} erreur(s)
