@@ -21,6 +21,7 @@ import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextA
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
+import { normalizeOralExamDurationSeconds } from '../utils/oralExamTiming';
 import { isCountedQuizSubmission, markBestQuizAttempt } from '../utils/quizBestAttempt';
 
 interface AppState {
@@ -573,7 +574,7 @@ export const dataService = {
       description: description.trim(),
       level: level || null,
       exam_date: examDate || new Date().toISOString().split('T')[0],
-      duration_seconds: Math.max(15, Math.round(Number(durationSeconds) || 180)),
+      duration_seconds: normalizeOralExamDurationSeconds(durationSeconds),
       status: 'in_progress',
       created_at: new Date().toISOString()
     };
