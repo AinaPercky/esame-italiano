@@ -126,7 +126,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     isExpired: boolean;
   }>({
     durationUsedSeconds: 0,
-    maxDurationSeconds: currentExam?.duration_seconds || 180,
+    maxDurationSeconds: 180,
     timerStatus: 'not_timed',
     isExpired: false
   });
