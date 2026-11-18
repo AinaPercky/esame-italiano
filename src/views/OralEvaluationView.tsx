@@ -684,6 +684,15 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
       {/* 3. The 10 Rubrics Assessment Checklist (Heart of App) */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
+        {!timingData.hasStarted && (
+          <div role="status" className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
+            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <p className="text-sm font-bold">Évaluation verrouillée</p>
+              <p className="mt-0.5 text-xs text-amber-900">Démarrez le chronomètre ci-dessus pour activer la grille, noter les 10 rubriques et saisir les erreurs.</p>
+            </div>
+          </div>
+        )}
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/75">
           <div>
             <h4 className="font-semibold text-slate-900 text-sm">
@@ -698,7 +707,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             <button
               onClick={handleValidateAll}
               disabled={!timingData.hasStarted}
-              className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer"
+              className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
             >
               Tout valider
             </button>
