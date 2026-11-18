@@ -37,7 +37,7 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
     Math.min(safeMaxSeconds, Math.max(0, Math.floor(initialElapsedSeconds)))
   );
   const [isRunning, setIsRunning] = useState(false);
-  const [hasStarted, setHasStarted] = useState(initialElapsedSeconds > 0);
+  const [hasStarted, setHasStarted] = useState(initialElapsedSeconds >= safeMaxSeconds);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeAlert, setActiveAlert] = useState<string | null>(
     initialElapsedSeconds >= safeMaxSeconds ? 'Temps imparti déjà écoulé pour cette évaluation.' : null
