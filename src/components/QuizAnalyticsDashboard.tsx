@@ -129,6 +129,31 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
     ? (assessedStudentCount / classStudents.length) * 100
     : null;
 
+  const categoryPerformance = useMemo(() => {
+    const groups = new Map<string, { scores: number[]; quizIds: Set<string> }>();
+    visibleQuizzes.forEach(quiz => {
+      const rows = scopedSubmissions.filter(submission =>
+        submission.quiz_id === quiz.id &&
+        (submission.status === 'completed' || submission.status === 'timeout')
+      );
+      if (!rows.length) return;
+      const category = quiz.category || 'Autre';
+      const group = groups.get(category) || { scores: [], quizIds: new Set<string>() };
+      group.scores.push(...rows.map(scoreOf));
+      group.quizIds.add(quiz.id);
+      groups.set(category, group);
+    });
+    return Array.from(groups.entries()).map(([category, group]) => ({
+      category,
+      quizCount: group.quizIds.size,
+      copyCount: group.scores.length,
+      average: mean(group.scores) ?? 0,
+      passRate: group.scores.length
+        ? (group.scores.filter(score => score >= 10).length / group.scores.length) * 100
+        : 0
+    })).sort((left, right) => left.average - right.average);
+  }, [visibleQuizzes, scopedSubmissions]);
+
   const questionAnalyses = useMemo(() => {
     const rows: QuestionAnalysis[] = [];
     visibleQuizzes.forEach(quiz => {
@@ -260,7 +285,7 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
             <Kpi label="Participation" value={participationRate === null ? '—' : `${Math.round(participationRate)}%`} detail={`${assessedStudentCount} élève(s) avec résultat sur ${classStudents.length}`} />
           </div>
 
-          {!scopedSubmissions.length ? (
+          {!gradedSubmissions.length ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
               <BookOpen className="mx-auto h-8 w-8 text-slate-300" />
               <h3 className="mt-3 text-sm font-bold text-slate-800">Aucun résultat pour cette sélection</h3>
@@ -268,6 +293,28 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
             </div>
           ) : (
             <>
+              {categoryPerformance.length > 0 && (
+                <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-bold text-slate-900">Performance par domaine</h3>
+                    <p className="mt-1 text-[11px] text-slate-500">Moyenne sur 20 et taux de copies à 10/20 ou plus, hors absences.</p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {categoryPerformance.map(item => (
+                      <div key={item.category} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-800">{item.category}</span>
+                          <span className="text-sm font-black text-[#0b3c5d]">{item.average.toFixed(1)}/20</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                          <div className="h-full rounded-full bg-[#2fa36b]" style={{ width: `${Math.max(0, Math.min(100, item.passRate))}%` }} />
+                        </div>
+                        <p className="mt-2 text-[10px] text-slate-500">{item.passRate.toFixed(0)}% de réussite · {item.copyCount} copie(s) · {item.quizCount} quiz</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div><h3 className="flex items-center gap-2 text-sm font-bold text-slate-900"><TrendingUp className="h-4 w-4 text-indigo-700" /> Tendance des résultats</h3><p className="mt-1 text-[11px] text-slate-500">Moyenne par quiz, sur les six évaluations les plus récentes.</p></div>
