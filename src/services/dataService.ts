@@ -564,7 +564,7 @@ export const dataService = {
     };
   },
 
-  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false, level?: Exam['level']): Promise<Exam> {
+  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false, level?: Exam['level'], durationSeconds: number = 180): Promise<Exam> {
     if (!title.trim() || !classId) throw new Error('Titre et classe obligatoires');
     const newExam: Exam = {
       id: generateUUID(),
@@ -573,6 +573,7 @@ export const dataService = {
       description: description.trim(),
       level: level || null,
       exam_date: examDate || new Date().toISOString().split('T')[0],
+      duration_seconds: Math.max(15, Math.round(Number(durationSeconds) || 180)),
       status: 'in_progress',
       created_at: new Date().toISOString()
     };
@@ -587,15 +588,14 @@ export const dataService = {
     return this.getExamById(newExam.id)!;
   },
 
-  updateExam(id: string, updates: Partial<Exam>): Exam {
+  async updateExam(id: string, updates: Partial<Exam>): Promise<Exam> {
     const idx = state.exams.findIndex(e => e.id === id);
     if (idx === -1) throw new Error('Examen introuvable');
-    state.exams[idx] = { ...state.exams[idx], ...updates };
+    const updatedExam = { ...state.exams[idx], ...updates };
+    await supabaseService.saveExam(updatedExam);
+    state.exams[idx] = updatedExam;
     persistState();
     notifySubscribers();
-
-    // Persistance Cloud Supabase
-    supabaseService.saveExam(state.exams[idx]).catch(err => console.error('Cloud updateExam error:', err));
     return this.getExamById(id)!;
   },
 
