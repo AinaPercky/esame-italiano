@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { formatOralExamTime, getOralExamCheckpoint, normalizeOralExamDurationSeconds } from '../utils/oralExamTiming';
 import {
   Play,
   Pause,
@@ -30,7 +31,7 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
   initialElapsedSeconds = 0,
   onTimeChange
 }) => {
-  const safeMaxSeconds = Math.max(1, Math.round(Number(maxSeconds) || 180));
+  const safeMaxSeconds = normalizeOralExamDurationSeconds(maxSeconds);
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.min(safeMaxSeconds, Math.max(0, Math.floor(initialElapsedSeconds)))
   );
@@ -97,12 +98,6 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
       oscillator.stop(now + start + duration);
     });
   }, [getAudioContext, soundEnabled]);
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const rest = seconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
-  };
 
   const handleStart = () => {
     if (isExpired || isRunning) return;
@@ -175,12 +170,13 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
   // Alertes sonores à 1 minute, 30 secondes et 10 secondes restantes.
   useEffect(() => {
     if (!isRunning) return;
-    if ([60, 30, 10].includes(remainingSeconds) && !alertedCheckpointsRef.current.has(remainingSeconds)) {
-      alertedCheckpointsRef.current.add(remainingSeconds);
-      if (remainingSeconds === 60) {
+    const checkpoint = getOralExamCheckpoint(remainingSeconds);
+    if (checkpoint !== null && !alertedCheckpointsRef.current.has(checkpoint)) {
+      alertedCheckpointsRef.current.add(checkpoint);
+      if (checkpoint === 60) {
         setActiveAlert('Attention : il reste une minute.');
         playBeep('warning');
-      } else if (remainingSeconds === 30) {
+      } else if (checkpoint === 30) {
         setActiveAlert('Attention : il reste 30 secondes.');
         playBeep('warning');
       } else {
@@ -223,7 +219,7 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
           <Clock className={`h-5 w-5 ${isRunning ? 'text-emerald-700' : 'text-[#0b3c5d]'}`} />
           <div>
             <h3 className="text-sm font-bold text-[#072a3f]">Chronomètre de l’épreuve</h3>
-            <p className="text-[11px] text-slate-500">Durée prévue pour cet examen : {formatTime(safeMaxSeconds)}</p>
+            <p className="text-[11px] text-slate-500">Durée prévue pour cet examen : {formatOralExamTime(safeMaxSeconds)}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -257,17 +253,17 @@ export const SpeechTimer: React.FC<SpeechTimerProps> = ({
       <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-[#f5f9fc] p-3 text-center sm:grid-cols-4">
         <div>
           <span className="block text-[11px] text-slate-500">Temps écoulé</span>
-          <strong className="font-mono text-xl text-[#072a3f]">{formatTime(elapsedSeconds)}</strong>
+          <strong className="font-mono text-xl text-[#072a3f]">{formatOralExamTime(elapsedSeconds)}</strong>
         </div>
         <div>
           <span className="block text-[11px] text-slate-500">Temps restant</span>
           <strong aria-live="off" className={`font-mono text-xl ${remainingSeconds <= 10 ? 'animate-pulse text-rose-700' : remainingSeconds <= 30 ? 'text-orange-700' : 'text-[#072a3f]'}`}>
-            {formatTime(remainingSeconds)}
+            {formatOralExamTime(remainingSeconds)}
           </strong>
         </div>
         <div>
           <span className="block text-[11px] text-slate-500">Durée maximale</span>
-          <strong className="font-mono text-xl text-[#072a3f]">{formatTime(safeMaxSeconds)}</strong>
+          <strong className="font-mono text-xl text-[#072a3f]">{formatOralExamTime(safeMaxSeconds)}</strong>
         </div>
         <div>
           <span className="block text-[11px] text-slate-500">Progression</span>
