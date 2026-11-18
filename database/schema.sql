@@ -44,6 +44,7 @@ CREATE TABLE exams (
     title TEXT NOT NULL,
     description TEXT,
     exam_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    duration_seconds INTEGER NOT NULL DEFAULT 180 CHECK (duration_seconds BETWEEN 60 AND 7200),
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'completed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
