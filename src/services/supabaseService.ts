@@ -850,7 +850,8 @@ class SupabaseService {
   // --- EXAMS & RUBRICS ---
   public async saveExam(exam: Exam, rubrics?: ExamRubric[]): Promise<void> {
     const client = this.getClient();
-    if (!client || !isUUID(exam.id) || !isUUID(exam.class_id)) return;
+    if (!client) throw new Error('Supabase n’est pas configuré : examen non enregistré.');
+    if (!isUUID(exam.id) || !isUUID(exam.class_id)) throw new Error('Identifiants de l’examen invalides.');
     try {
       const { error } = await client.from('exams').upsert({
         id: exam.id,
@@ -864,9 +865,9 @@ class SupabaseService {
       }, { onConflict: 'id' });
       if (error) throw new Error(`Enregistrement de l'examen impossible : ${error.message}`);
 
-      if (rubrics && rubrics.length > 0) {
-        await this.saveRubrics(rubrics);
-      }
+      // If a rubric list is supplied, persist it (including an intentionally empty list).
+      // Evaluation saving independently verifies that the persisted rubric set is complete.
+      if (rubrics !== undefined) await this.saveRubrics(rubrics, exam.id);
     } catch (e) {
       console.error('Supabase saveExam error:', e);
       throw e instanceof Error ? e : new Error('Enregistrement de l’examen impossible.');
@@ -885,7 +886,8 @@ class SupabaseService {
 
   public async saveRubrics(rubrics: ExamRubric[], targetExamId?: string): Promise<void> {
     const client = this.getClient();
-    if (!client || (rubrics.length === 0 && !targetExamId)) return;
+    if (!client) throw new Error('Supabase n’est pas configuré : grille non enregistrée.');
+    if (rubrics.length === 0 && !targetExamId) throw new Error('Identifiant de l’examen requis pour enregistrer une grille vide.');
 
     const examId = targetExamId || rubrics[0]?.exam_id;
     if (!examId || !isUUID(examId)) throw new Error('Identifiant de l’examen invalide.');
@@ -926,42 +928,109 @@ class SupabaseService {
   // --- EVALUATIONS & DETAILS ---
   public async saveEvaluation(ev: Evaluation): Promise<void> {
     const client = this.getClient();
-    if (!client || !isUUID(ev.id) || !isUUID(ev.exam_id) || !isUUID(ev.student_id)) return;
-    try {
-      // 1. Sauvegarde l'en-tête de l'évaluation
-      await client.from('evaluations').upsert({
-        id: ev.id,
-        exam_id: ev.exam_id,
-        student_id: ev.student_id,
-        total_score: ev.total_score,
-        status: ev.status || 'completed',
-        max_duration_seconds: ev.max_duration_seconds || 180,
-        duration_used_seconds: ev.duration_used_seconds || 0,
-        timer_status: ev.timer_status || 'stopped_manually',
-        created_at: ev.created_at || new Date().toISOString(),
-        updated_at: ev.updated_at || new Date().toISOString()
-      }, { onConflict: 'id' });
+    if (!client) throw new Error('Supabase n’est pas configuré : évaluation non enregistrée.');
+    if (!isUUID(ev.id) || !isUUID(ev.exam_id) || !isUUID(ev.student_id)) {
+      throw new Error('Identifiants invalides : évaluation non enregistrée.');
+    }
 
-      // 2. Sauvegarde les détails de chaque critère/rubrique
-      if (ev.details && ev.details.length > 0) {
-        const detailsPayload = ev.details
-          .filter(d => isUUID(d.rubric_id))
-          .map(d => ({
-            evaluation_id: ev.id,
-            rubric_id: d.rubric_id,
-            is_validated: Boolean(d.is_validated),
-            awarded_points: Number(d.awarded_points) || 0,
-            error_note: d.error_note || null
-          }));
+    // Always validate against the authoritative rubric set stored in Supabase.
+    const { data: rubricRows, error: rubricError } = await client
+      .from('exam_rubrics')
+      .select('id,points')
+      .eq('exam_id', ev.exam_id);
+    if (rubricError) throw new Error(`Vérification de la grille impossible : ${rubricError.message}`);
+    const persistedRubrics = (rubricRows || []) as Array<{ id: string; points: number }>;
+    if (persistedRubrics.length === 0) {
+      throw new Error('Cette session ne possède aucun critère enregistré. Enregistrez sa grille d’évaluation avant de noter les élèves.');
+    }
 
-        if (detailsPayload.length > 0) {
-          await client.from('evaluation_details').upsert(detailsPayload, { 
-            onConflict: 'evaluation_id,rubric_id' 
-          });
-        }
+    const details = ev.details || [];
+    if (details.length !== persistedRubrics.length) {
+      throw new Error(`Évaluation incomplète : ${persistedRubrics.length} critères attendus, ${details.length} reçus. Aucun résultat n’a été validé.`);
+    }
+
+    const rubricPoints = new Map(persistedRubrics.map(rubric => [rubric.id, Number(rubric.points)]));
+    const seenRubrics = new Set<string>();
+    const detailsPayload = details.map((detail, index) => {
+      if (!isUUID(detail.rubric_id) || !rubricPoints.has(detail.rubric_id)) {
+        throw new Error(`Critère ${index + 1} inconnu ou invalide : évaluation non enregistrée.`);
       }
-    } catch (e) {
-      console.error('Supabase saveEvaluation error:', e);
+      if (seenRubrics.has(detail.rubric_id)) {
+        throw new Error('Un même critère apparaît plusieurs fois dans cette évaluation.');
+      }
+      seenRubrics.add(detail.rubric_id);
+
+      const maxPoints = rubricPoints.get(detail.rubric_id)!;
+      const awardedPoints = Number(detail.awarded_points);
+      const errorNote = (detail.error_note || '').trim();
+      if (!Number.isFinite(maxPoints) || maxPoints <= 0 ||
+          !Number.isFinite(awardedPoints) || awardedPoints < 0 || awardedPoints > maxPoints) {
+        throw new Error('Barème ou points attribués invalides : évaluation non enregistrée.');
+      }
+      if ((detail.is_validated && (errorNote.length > 0 || Math.abs(awardedPoints - maxPoints) > 0.001)) ||
+          (!detail.is_validated && awardedPoints !== 0)) {
+        throw new Error('Incohérence entre validation du critère, remarque et points attribués.');
+      }
+      return {
+        evaluation_id: ev.id,
+        rubric_id: detail.rubric_id,
+        is_validated: Boolean(detail.is_validated),
+        awarded_points: awardedPoints,
+        error_note: errorNote || null
+      };
+    });
+
+    const calculatedTotal = detailsPayload.reduce((sum, detail) => sum + detail.awarded_points, 0);
+    if (!Number.isFinite(Number(ev.total_score)) || Math.abs(calculatedTotal - Number(ev.total_score)) > 0.001) {
+      throw new Error(`Note incohérente : la somme des critères (${calculatedTotal}) ne correspond pas au total (${ev.total_score}).`);
+    }
+
+    const evaluationHeader = {
+      id: ev.id,
+      exam_id: ev.exam_id,
+      student_id: ev.student_id,
+      total_score: calculatedTotal,
+      max_duration_seconds: ev.max_duration_seconds || 180,
+      duration_used_seconds: ev.duration_used_seconds || 0,
+      timer_status: ev.timer_status || 'stopped_manually',
+      created_at: ev.created_at || new Date().toISOString(),
+      updated_at: ev.updated_at || new Date().toISOString()
+    };
+
+    // Stage 1: mark as draft. If any later request fails, this evaluation cannot
+    // appear as a completed session with missing/inconsistent criterion details.
+    const { data: headerRows, error: headerError } = await client.from('evaluations').upsert({
+      ...evaluationHeader,
+      status: 'draft'
+    }, { onConflict: 'id' }).select('id');
+    if (headerError) throw new Error(`Enregistrement de la note impossible : ${headerError.message}`);
+    if (!headerRows || headerRows.length !== 1) {
+      throw new Error('La note n’a pas été créée ou mise à jour dans Supabase (droits insuffisants ou ligne inaccessible).');
+    }
+
+    // Stage 2: persist every criterion, including zero-point criteria.
+    const { data: savedDetails, error: detailsError } = await client
+      .from('evaluation_details')
+      .upsert(detailsPayload, { onConflict: 'evaluation_id,rubric_id' })
+      .select('rubric_id');
+    if (detailsError) {
+      throw new Error(`Enregistrement des critères impossible. L’évaluation reste en brouillon : ${detailsError.message}`);
+    }
+    if (!savedDetails || savedDetails.length !== detailsPayload.length) {
+      throw new Error('Tous les critères n’ont pas été confirmés par Supabase. L’évaluation reste en brouillon.');
+    }
+
+    // Stage 3: only expose the result to student reports after all details are saved.
+    const { data: completedRows, error: completionError } = await client
+      .from('evaluations')
+      .update({ ...evaluationHeader, status: 'completed' })
+      .eq('id', ev.id)
+      .select('id');
+    if (completionError) {
+      throw new Error(`Les critères sont enregistrés, mais la validation finale a échoué. L’évaluation reste en brouillon : ${completionError.message}`);
+    }
+    if (!completedRows || completedRows.length !== 1) {
+      throw new Error('Les critères sont enregistrés, mais Supabase n’a pas confirmé la validation finale. Vérifiez les droits UPDATE/SELECT sur evaluations.');
     }
   }
 
