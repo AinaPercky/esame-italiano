@@ -1,69 +1,263 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Upload, Plus, Save, FileText, BarChart3, ArrowLeftRight, RefreshCw, Users, CheckCircle2, Clock3, CircleDashed, Filter } from 'lucide-react';
-import type { ClassRoom, ExerciseDefinition, Quiz } from '../types';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Archive,
+  ArrowLeft,
+  ArrowLeftRight,
+  BarChart3,
+  CheckCircle2,
+  CircleDashed,
+  Clock3,
+  Download,
+  Edit3,
+  FileText,
+  FolderOpen,
+  PenSquare,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  Send,
+  SlidersHorizontal,
+  Upload,
+  Users,
+  X
+} from 'lucide-react';
+import {
+  CEFR_LEVELS,
+  QUIZ_CATEGORIES,
+  type CEFRLevel,
+  type ClassRoom,
+  type ExerciseDefinition,
+  type ExerciseStatus,
+  type Quiz
+} from '../types';
 import { dataService } from '../services/dataService';
-import { exerciseService, convertQuizToExercise, parseExerciseJson } from '../services/exerciseService';
+import {
+  exerciseService,
+  parseExerciseJson
+} from '../services/exerciseService';
 import { StudentAvatar } from '../components/StudentAvatar';
+import {
+  ExerciseQuizConverterPanel,
+  type ConverterDirection
+} from '../components/ExerciseQuizConverterPanel';
 import {
   LearningCard,
   LearningCardFooter,
   LearningCardHeader,
   LearningCardMetrics,
+  LearningModuleHeader,
   StatusBadge
 } from '../components/LearningCard';
+import {
+  DEFAULT_ATTEMPT_FILTERS,
+  DEFAULT_EXERCISE_CATALOG_FILTERS,
+  countActiveAttemptFilters,
+  countActiveExerciseFilters,
+  filterAndSortAttempts,
+  filterAndSortExercises,
+  formatExerciseTotalDuration,
+  getAttemptPercentage,
+  getDistinctExerciseCategories,
+  type AttemptFilters,
+  type AttemptProgressFilter,
+  type AttemptScoreBandFilter,
+  type AttemptSortOption,
+  type ExerciseCatalogFilters,
+  type ExerciseSortOption,
+  type TeacherExerciseAttemptRow
+} from '../utils/exerciseAdminFilters';
 
-interface Props { classes: ClassRoom[]; }
+interface Props {
+  classes: ClassRoom[];
+}
 
-const EMPTY_JSON = JSON.stringify({
-  schema: 'perckylingua.exercise',
-  schema_version: 1,
-  metadata: { title: 'Nuovo exercice', description: '', category: 'Grammaire', level: 'A1' },
-  questions: [{
-    id: 'q1', type: 'qcm', question: 'Scegli la risposta corretta.',
-    options: ['A', 'B', 'C'], correct_answer: 'A', points: 1,
-    time_limit_seconds: 20, explanation: ''
-  }]
-}, null, 2);
+type WorkspaceMode = 'catalog' | 'editor' | 'converter' | 'attempts';
+
+const EMPTY_JSON = JSON.stringify(
+  {
+    schema: 'perckylingua.exercise',
+    schema_version: 1,
+    metadata: {
+      title: 'Nouvel exercice',
+      description: '',
+      category: 'Grammaire',
+      level: 'A1'
+    },
+    questions: [
+      {
+        id: 'q1',
+        type: 'qcm',
+        question: 'Scegli la risposta corretta.',
+        options: ['A', 'B', 'C'],
+        correct_answer: 'A',
+        points: 1,
+        time_limit_seconds: 20,
+        explanation: ''
+      }
+    ]
+  },
+  null,
+  2
+);
+
+function formatShortDate(iso?: string | null): string {
+  if (!iso) return '—';
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function formatDateTime(iso?: string | null): string {
+  if (!iso) return 'Aucune activité';
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return 'Aucune activité';
+  return parsed.toLocaleString('fr-FR', {
+    dateStyle: 'short',
+    timeStyle: 'short'
+  });
+}
+
+function getExerciseStatusBadge(status: ExerciseStatus) {
+  if (status === 'published') {
+    return <StatusBadge tone="success">Publié</StatusBadge>;
+  }
+  if (status === 'archived') {
+    return <StatusBadge tone="neutral">Archivé</StatusBadge>;
+  }
+  return <StatusBadge tone="warning">Brouillon</StatusBadge>;
+}
 
 export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('catalog');
   const [items, setItems] = useState<ExerciseDefinition[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+
+  // CRUD editor state
   const [selectedId, setSelectedId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Autre');
+  const [category, setCategory] = useState('Grammaire');
   const [level, setLevel] = useState('');
-  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [status, setStatus] = useState<ExerciseStatus>('draft');
   const [classIds, setClassIds] = useState<string[]>([]);
   const [json, setJson] = useState(EMPTY_JSON);
+
+  // Feedback & loading
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [attempts, setAttempts] = useState<any[]>([]);
-  const [showAttempts, setShowAttempts] = useState(false);
-  const [attemptClassFilter, setAttemptClassFilter] = useState('all');
-  const [reviewStudent, setReviewStudent] = useState<any | null>(null);
 
-  const refresh = async () => {
+  // Catalog multi-criteria filters
+  const [catalogFilters, setCatalogFilters] = useState<ExerciseCatalogFilters>(
+    DEFAULT_EXERCISE_CATALOG_FILTERS
+  );
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+
+  // Converter workspace state
+  const [converterDirection, setConverterDirection] =
+    useState<ConverterDirection>('quiz_to_exercise');
+  const [converterExerciseId, setConverterExerciseId] = useState('');
+  const [converterAutoOpenModal, setConverterAutoOpenModal] = useState(false);
+
+  // Attempts & analytics state
+  const [attemptsExerciseId, setAttemptsExerciseId] = useState('');
+  const [attempts, setAttempts] = useState<TeacherExerciseAttemptRow[]>([]);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [attemptFilters, setAttemptFilters] = useState<AttemptFilters>(DEFAULT_ATTEMPT_FILTERS);
+  const [reviewStudent, setReviewStudent] = useState<TeacherExerciseAttemptRow | null>(null);
+
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await exerciseService.listTeacherExercises());
+      const loaded = await exerciseService.listTeacherExercises();
+      setItems(loaded);
       setQuizzes(dataService.getQuizzes());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chargement impossible.');
-    } finally { setLoading(false); }
-  };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
-  const parsed = useMemo(() => {
-    try { return parseExerciseJson(json); } catch { return null; }
+  const jsonValidation = useMemo(() => {
+    try {
+      return { doc: parseExerciseJson(json), error: null as string | null };
+    } catch (e) {
+      return {
+        doc: null,
+        error: e instanceof Error ? e.message : 'Le JSON est invalide.'
+      };
+    }
   }, [json]);
-  const selectedExercise = items.find(item => item.id === selectedId);
-  const filteredAttempts = useMemo(() => {
-    if (attemptClassFilter === 'all') return attempts;
-    return attempts.filter(row => row.class_id === attemptClassFilter);
-  }, [attempts, attemptClassFilter]);
+
+  const parsed = jsonValidation.doc;
+
+  const classMap = useMemo(() => new Map(classes.map(c => [c.id, c.name])), [classes]);
+
+  const distinctCategories = useMemo(() => {
+    const set = new Set<string>([...QUIZ_CATEGORIES, ...getDistinctExerciseCategories(items)]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'));
+  }, [items]);
+
+  const catalogStats = useMemo(() => {
+    const published = items.filter(i => i.status === 'published').length;
+    const draft = items.filter(i => i.status === 'draft').length;
+    const archived = items.filter(i => i.status === 'archived').length;
+    return { total: items.length, published, draft, archived };
+  }, [items]);
+
+  const filteredExercises = useMemo(
+    () => filterAndSortExercises(items, classes, catalogFilters),
+    [items, classes, catalogFilters]
+  );
+
+  const activeCatalogFilterCount = useMemo(
+    () => countActiveExerciseFilters(catalogFilters),
+    [catalogFilters]
+  );
+
+  const activeAttemptsExercise = useMemo(
+    () => items.find(item => item.id === attemptsExerciseId) || null,
+    [items, attemptsExerciseId]
+  );
+
+  const availableAttemptClasses = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of classes) {
+      if (activeAttemptsExercise?.class_ids?.includes(c.id)) {
+        seen.set(c.id, c.name);
+      }
+    }
+    for (const row of attempts) {
+      if (row.class_id && row.class_name && !seen.has(row.class_id)) {
+        seen.set(row.class_id, row.class_name);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }, [classes, activeAttemptsExercise, attempts]);
+
+  const filteredAttempts = useMemo(
+    () => filterAndSortAttempts(attempts, attemptFilters),
+    [attempts, attemptFilters]
+  );
+
+  const activeAttemptFilterCount = useMemo(
+    () => countActiveAttemptFilters(attemptFilters),
+    [attemptFilters]
+  );
+
   const attemptSummary = useMemo(() => {
     const completed = filteredAttempts.filter(row => row.status === 'completed').length;
     const inProgress = filteredAttempts.filter(row => row.status === 'in_progress').length;
@@ -75,56 +269,72 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       notStarted
     };
   }, [filteredAttempts]);
+
   const performanceSummary = useMemo(() => {
-    const scored = filteredAttempts.filter(row => row.best_score !== null && row.best_score !== undefined && Number(row.max_score) > 0);
-    const percentages = scored.map(row => Number(row.best_score) / Number(row.max_score) * 100);
-    const average = percentages.length ? percentages.reduce((sum, value) => sum + value, 0) / percentages.length : null;
+    const scored = filteredAttempts.filter(row => getAttemptPercentage(row) !== null);
+    const percentages = scored
+      .map(row => getAttemptPercentage(row))
+      .filter((v): v is number => v !== null);
+    const average = percentages.length
+      ? percentages.reduce((sum, value) => sum + value, 0) / percentages.length
+      : null;
     return {
       average,
-      successRate: percentages.length ? percentages.filter(value => value >= 50).length / percentages.length * 100 : null,
-      completionRate: filteredAttempts.length ? filteredAttempts.filter(row => row.status === 'completed').length / filteredAttempts.length * 100 : 0,
+      successRate: percentages.length
+        ? (percentages.filter(value => value >= 50).length / percentages.length) * 100
+        : null,
+      completionRate: filteredAttempts.length
+        ? (filteredAttempts.filter(row => row.status === 'completed').length /
+            filteredAttempts.length) *
+          100
+        : 0,
       scoredCount: scored.length,
-      averageAttempts: filteredAttempts.length ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) / filteredAttempts.length : 0
+      averageAttempts: filteredAttempts.length
+        ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) /
+          filteredAttempts.length
+        : 0
     };
   }, [filteredAttempts]);
-  const scoreDistribution = useMemo(() => [
-    { label: '0–20 %', min: 0, max: 20 }, { label: '21–40 %', min: 20, max: 40 },
-    { label: '41–60 %', min: 40, max: 60 }, { label: '61–80 %', min: 60, max: 80 },
-    { label: '81–100 %', min: 80, max: 100.001 }
-  ].map(range => ({ ...range, count: filteredAttempts.filter(row => {
-    if (row.best_score === null || row.best_score === undefined || !(Number(row.max_score) > 0)) return false;
-    const pct = Number(row.best_score) / Number(row.max_score) * 100;
-    return pct >= range.min && pct < range.max;
-  }).length })), [filteredAttempts]);
 
-  const questionStats = (selectedExercise?.questions || []).map(question => {
-    const responses = filteredAttempts.flatMap(row => row.details || []).filter((detail: any) => detail.question_id === question.id);
-    return {
-      id: question.id,
-      label: question.question,
-      responses: responses.length,
-      correct: responses.filter((detail: any) => detail.correct).length,
-      points: responses.reduce((sum: number, detail: any) => sum + Number(detail.points || 0), 0),
-      maxPoints: responses.reduce((sum: number, detail: any) => sum + Number(detail.max_points || 0), 0)
-    };
-  });
+  const scoreDistribution = useMemo(
+    () =>
+      [
+        { label: '0–20 %', min: 0, max: 20 },
+        { label: '21–40 %', min: 20, max: 40 },
+        { label: '41–60 %', min: 40, max: 60 },
+        { label: '61–80 %', min: 60, max: 80 },
+        { label: '81–100 %', min: 80, max: 100.001 }
+      ].map(range => ({
+        ...range,
+        count: filteredAttempts.filter(row => {
+          const pct = getAttemptPercentage(row);
+          return pct !== null && pct >= range.min && pct < range.max;
+        }).length
+      })),
+    [filteredAttempts]
+  );
 
-  const resetEditor = () => {
-    setSelectedId('');
-    setTitle('');
-    setDescription('');
-    setCategory('Autre');
-    setLevel('');
-    setStatus('draft');
-    setClassIds([]);
-    setJson(EMPTY_JSON);
-    setError('');
-    setMessage('');
-    setAttempts([]);
-    setShowAttempts(false);
-  };
+  const questionStats = useMemo(
+    () =>
+      (activeAttemptsExercise?.questions || []).map(question => {
+        const responses = filteredAttempts
+          .flatMap(row => row.details || [])
+          .filter(detail => detail.question_id === question.id);
+        const correct = responses.filter(detail => detail.correct).length;
+        return {
+          id: question.id,
+          label: question.question,
+          responses: responses.length,
+          correct,
+          rate: responses.length > 0 ? Math.round((correct / responses.length) * 100) : null,
+          points: responses.reduce((sum, detail) => sum + Number(detail.points || 0), 0),
+          maxPoints: responses.reduce((sum, detail) => sum + Number(detail.max_points || 0), 0)
+        };
+      }),
+    [activeAttemptsExercise, filteredAttempts]
+  );
 
-  const loadExercise = (item: ExerciseDefinition) => {
+  const populateEditorFromItem = (item: ExerciseDefinition) => {
     setSelectedId(item.id);
     setTitle(item.title);
     setDescription(item.description || '');
@@ -132,19 +342,88 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     setLevel(item.level || '');
     setStatus(item.status);
     setClassIds(item.class_ids || []);
-    setJson(JSON.stringify({
-      schema: 'perckylingua.exercise',
-      schema_version: 1,
-      metadata: { title: item.title, description: item.description || '', category: item.category, level: item.level || null },
-      questions: item.questions
-    }, null, 2));
+    setJson(
+      JSON.stringify(
+        {
+          schema: 'perckylingua.exercise',
+          schema_version: 1,
+          metadata: {
+            title: item.title,
+            description: item.description || '',
+            category: item.category,
+            level: item.level || null
+          },
+          questions: item.questions
+        },
+        null,
+        2
+      )
+    );
     setError('');
     setMessage('');
-    setShowAttempts(false);
+    setWorkspaceMode('editor');
   };
 
-  const persistExercise = async (targetStatus: 'draft' | 'published' | 'archived') => {
-    setError(''); setMessage('');
+  const resetEditor = () => {
+    setSelectedId('');
+    setTitle('');
+    setDescription('');
+    setCategory('Grammaire');
+    setLevel('');
+    setStatus('draft');
+    setClassIds([]);
+    setJson(EMPTY_JSON);
+    setError('');
+    setMessage('');
+    setWorkspaceMode('editor');
+  };
+
+  const loadAttemptsForExercise = useCallback(async (exerciseId: string, resetFilters = true) => {
+    if (!exerciseId) {
+      setAttempts([]);
+      return;
+    }
+    setError('');
+    setReviewStudent(null);
+    if (resetFilters) {
+      setAttemptFilters(DEFAULT_ATTEMPT_FILTERS);
+    }
+    setAttemptsExerciseId(exerciseId);
+    setAttemptsLoading(true);
+    try {
+      const data = await exerciseService.listTeacherAttempts(exerciseId);
+      setAttempts(data as TeacherExerciseAttemptRow[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Résultats indisponibles.');
+      setAttempts([]);
+    } finally {
+      setAttemptsLoading(false);
+    }
+  }, []);
+
+  const openAttemptsForExercise = async (item: ExerciseDefinition) => {
+    setMessage('');
+    setWorkspaceMode('attempts');
+    await loadAttemptsForExercise(item.id, true);
+  };
+
+  const openAttemptsWorkspace = async () => {
+    setMessage('');
+    setWorkspaceMode('attempts');
+    const targetId =
+      attemptsExerciseId && items.some(i => i.id === attemptsExerciseId)
+        ? attemptsExerciseId
+        : selectedId && items.some(i => i.id === selectedId)
+        ? selectedId
+        : items.find(i => i.status === 'published')?.id || items[0]?.id || '';
+    if (targetId && (targetId !== attemptsExerciseId || attempts.length === 0)) {
+      await loadAttemptsForExercise(targetId, true);
+    }
+  };
+
+  const persistExercise = async (targetStatus: ExerciseStatus) => {
+    setError('');
+    setMessage('');
     try {
       const document = parseExerciseJson(json);
       const finalTitle = title.trim() || document.metadata.title;
@@ -153,11 +432,15 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         throw new Error('Attribuez au moins une classe avant de publier.');
       }
       setLoading(true);
-      // Save the latest content first. Publication is a separate server-side
-      // operation that rechecks classes, version and question timers.
       const id = await exerciseService.saveDefinition({
         id: selectedId || null,
-        metadata: { title: finalTitle, description, category, level: level || null, status: targetStatus === 'published' ? 'draft' : targetStatus },
+        metadata: {
+          title: finalTitle,
+          description,
+          category,
+          level: level || null,
+          status: targetStatus === 'published' ? 'draft' : targetStatus
+        },
         questions: document.questions,
         classIds
       });
@@ -166,26 +449,71 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       }
       setSelectedId(id);
       setStatus(targetStatus);
-      setMessage(targetStatus === 'published'
-        ? 'Exercice publié et attribué aux classes sélectionnées.'
-        : targetStatus === 'archived'
+      setMessage(
+        targetStatus === 'published'
+          ? 'Exercice publié et attribué aux classes sélectionnées.'
+          : targetStatus === 'archived'
           ? 'Exercice archivé.'
-          : 'Exercice enregistré en brouillon.');
+          : 'Exercice enregistré en brouillon.'
+      );
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Enregistrement impossible.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = async () => persistExercise(status);
-  const handlePublish = async () => persistExercise('published');
+  const handleQuickLifecycleChange = async (
+    item: ExerciseDefinition,
+    targetStatus: ExerciseStatus
+  ) => {
+    setError('');
+    setMessage('');
+    if (targetStatus === 'published' && item.class_ids.length === 0) {
+      populateEditorFromItem(item);
+      setError('Attribuez au moins une classe à cet exercice avant de le publier.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const id = await exerciseService.saveDefinition({
+        id: item.id,
+        metadata: {
+          title: item.title,
+          description: item.description || '',
+          category: item.category,
+          level: item.level || null,
+          status: targetStatus === 'published' ? 'draft' : targetStatus
+        },
+        questions: item.questions,
+        classIds: item.class_ids
+      });
+      if (targetStatus === 'published') {
+        await exerciseService.publishExercise(id);
+      }
+      setMessage(
+        targetStatus === 'published'
+          ? `« ${item.title} » est désormais publié.`
+          : targetStatus === 'archived'
+          ? `« ${item.title} » a été archivé.`
+          : `« ${item.title} » est repassé en brouillon.`
+      );
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Mise à jour du statut impossible.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleQuestionTimerChange = (questionId: string, seconds: number) => {
     try {
       const document = parseExerciseJson(json);
-      const questions = document.questions.map(question => question.id === questionId
-        ? { ...question, time_limit_seconds: Math.max(1, Math.floor(seconds)) }
-        : question);
+      const safeSeconds = Number.isFinite(seconds) ? Math.max(1, Math.min(3600, Math.floor(seconds))) : 1;
+      const questions = document.questions.map(question =>
+        question.id === questionId ? { ...question, time_limit_seconds: safeSeconds } : question
+      );
       setJson(JSON.stringify({ ...document, questions }, null, 2));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Modification du chronomètre impossible.');
@@ -198,246 +526,1712 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     try {
       const text = await file.text();
       const doc = parseExerciseJson(text);
-      setTitle(doc.metadata.title); setDescription(doc.metadata.description);
-      setCategory(doc.metadata.category); setLevel(doc.metadata.level || '');
+      setTitle(doc.metadata.title);
+      setDescription(doc.metadata.description);
+      setCategory(doc.metadata.category);
+      setLevel(doc.metadata.level || '');
       setJson(JSON.stringify(doc, null, 2));
       setSelectedId('');
       setClassIds([]);
       setStatus('draft');
-      setMessage('Fichier validé. Vérifiez le contenu et choisissez les classes avant enregistrement.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Import JSON impossible.'); }
+      setMessage(
+        'Fichier validé. Vérifiez le contenu et choisissez les classes avant enregistrement.'
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import JSON impossible.');
+    }
   };
 
-  const handleConvertQuiz = (quizId: string) => {
-    const quiz = quizzes.find(q => q.id === quizId);
-    if (!quiz) return;
-    try {
-      const doc = convertQuizToExercise(quiz);
-      setSelectedId('');
-      setTitle(doc.metadata.title + ' — Exercice');
-      setDescription(doc.metadata.description);
-      setCategory(doc.metadata.category);
-      setLevel(doc.metadata.level || '');
-      setClassIds([]);
-      setStatus('draft');
-      setJson(JSON.stringify({ ...doc, metadata: { ...doc.metadata, title: doc.metadata.title + ' — Exercice' } }, null, 2));
-      setMessage('Conversion préparée : vérifiez les durées de chaque question et confirmez les classes avant de créer l’exercice. Le quiz original reste inchangé.');
-      setError('');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Conversion impossible.'); }
-  };
-
-  const handleConvertBack = () => {
-    try {
-      if (!parsed) throw new Error('Corrigez d’abord le JSON de l’exercice.');
-      if (classIds.length === 0) throw new Error('Sélectionnez au moins une classe pour le nouveau quiz.');
-      const classId = classIds[0];
-      const quiz = dataService.createQuiz({
-        title: (title || parsed.metadata.title) + ' — Quiz',
-        description: description || parsed.metadata.description,
-        category: parsed.metadata.category as any,
-        level: parsed.metadata.level as any,
-        class_id: classId,
-        class_ids: classIds,
-        duration_minutes: Math.max(1, Math.ceil(parsed.questions.reduce((sum, q) => sum + Number(q.time_limit_seconds || 0), 0) / 60)),
-        questions: parsed.questions
-      });
-      setMessage('Nouveau quiz créé : ' + quiz.title + '. L’exercice et ses tentatives restent inchangés.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Conversion vers quiz impossible.'); }
+  const openConverterWorkspace = (
+    direction: ConverterDirection = 'quiz_to_exercise',
+    exerciseId = '',
+    autoOpenModal = false
+  ) => {
+    setError('');
+    setMessage('');
+    setConverterDirection(direction);
+    setConverterExerciseId(exerciseId);
+    setConverterAutoOpenModal(autoOpenModal);
+    setWorkspaceMode('converter');
   };
 
   const exportJson = () => {
     try {
       const doc = parseExerciseJson(json);
-      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json;charset=utf-8' });
+      const blob = new Blob([JSON.stringify(doc, null, 2)], {
+        type: 'application/json;charset=utf-8'
+      });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = (title || doc.metadata.title || 'exercice').toLowerCase().replace(/[^a-z0-9-]+/g, '-') + '.json';
+      anchor.download =
+        (title || doc.metadata.title || 'exercice')
+          .toLowerCase()
+          .replace(/[^a-z0-9-]+/g, '-') + '.json';
       anchor.click();
       URL.revokeObjectURL(url);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Export impossible.'); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export impossible.');
+    }
   };
 
-  const showResults = async (item: ExerciseDefinition) => {
-    setError(''); setMessage('');
-    try {
-      setSelectedId(item.id);
-      setAttemptClassFilter('all');
-      setAttempts(await exerciseService.listTeacherAttempts(item.id));
-      setShowAttempts(true);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Résultats indisponibles.'); }
-  };
+  const totalEditorSeconds = useMemo(
+    () =>
+      parsed
+        ? parsed.questions.reduce((sum, q) => sum + Number(q.time_limit_seconds || 0), 0)
+        : 0,
+    [parsed]
+  );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Entraînement autonome</p><h1 className="text-2xl font-black text-[#072a3f]">Module Exercices</h1><p className="mt-1 text-sm text-slate-500">Des exercices indépendants des notes et des quiz évaluatifs.</p></div>
-        <button type="button" onClick={resetEditor} className="inline-flex items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/> Nouvel exercice</button>
-      </header>
-
-      {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
-      {message && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</div>}
-
-      {showAttempts ? (
-        <section className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-[#072a3f] to-[#0b3c5d] p-5 text-white shadow-sm">
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Suivi pédagogique</p>
-              <h2 className="mt-1 text-xl font-black">{selectedExercise?.title || 'Tentatives des élèves'}</h2>
-              <p className="mt-1 text-sm text-white/70">Suivi de tous les étudiants des classes attribuées</p>
-            </div>
-            <button type="button" onClick={() => { setShowAttempts(false); setAttemptClassFilter('all'); }} className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">Retour aux exercices</button>
+    <div className="mx-auto max-w-6xl space-y-5 pb-10">
+      <LearningModuleHeader
+        kicker="Entraînement autonome"
+        title="Module Exercices"
+        description="Gérez la création et la publication de vos exercices (CRUD), puis analysez les tentatives et la progression des élèves."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-white px-3.5 py-2 text-xs font-bold text-[#0b3c5d] transition hover:bg-[#f5f9fc] disabled:opacity-50 sm:text-sm"
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              Actualiser
+            </button>
+            <button
+              type="button"
+              onClick={resetEditor}
+              className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-[#072a3f] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0b3c5d] sm:text-sm"
+            >
+              <Plus size={16} />
+              Nouvel exercice
+            </button>
           </div>
+        }
+      />
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-bold text-[#072a3f]"><Filter size={16}/> Filtrer les résultats</div>
-            <select aria-label="Filtrer les tentatives par classe" value={attemptClassFilter} onChange={e => setAttemptClassFilter(e.target.value)} className="min-w-[210px] rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2fa36b] focus:ring-2 focus:ring-emerald-100">
-              <option value="all">Toutes les classes</option>
-              {classes.filter(c => selectedExercise?.class_ids.includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+      {/* Segmented Workspace Navigation: CRUD, Conversion & Tentatives */}
+      <nav
+        aria-label="Espaces du module exercices"
+        role="tablist"
+        className="grid grid-cols-1 gap-2 rounded-2xl border border-[#d8e6ee] bg-white p-1.5 shadow-[0_4px_14px_rgba(7,42,63,0.03)] sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workspaceMode === 'catalog'}
+          onClick={() => setWorkspaceMode('catalog')}
+          className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition ${
+            workspaceMode === 'catalog'
+              ? 'bg-[#072a3f] text-white'
+              : 'text-[#46657a] hover:bg-[#f3f8fb] hover:text-[#072a3f]'
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            <FolderOpen size={17} className="shrink-0" />
+            <span className="truncate text-sm font-bold">Catalogue & Gestion</span>
+          </span>
+          <span
+            className={`shrink-0 text-xs font-extrabold tabular-nums ${
+              workspaceMode === 'catalog' ? 'text-emerald-300' : 'text-[#607f93]'
+            }`}
+          >
+            {items.length}
+          </span>
+        </button>
 
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workspaceMode === 'editor'}
+          onClick={() => setWorkspaceMode('editor')}
+          className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition ${
+            workspaceMode === 'editor'
+              ? 'bg-[#072a3f] text-white'
+              : 'text-[#46657a] hover:bg-[#f3f8fb] hover:text-[#072a3f]'
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            <PenSquare size={17} className="shrink-0" />
+            <span className="truncate text-sm font-bold">Éditeur CRUD</span>
+          </span>
+          <span
+            className={`shrink-0 text-[11px] font-bold whitespace-nowrap ${
+              workspaceMode === 'editor' ? 'text-emerald-300' : 'text-[#607f93]'
+            }`}
+          >
+            {selectedId ? 'Édition' : 'Création'}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workspaceMode === 'converter'}
+          onClick={() => openConverterWorkspace(converterDirection, selectedId || '')}
+          className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition ${
+            workspaceMode === 'converter'
+              ? 'bg-[#072a3f] text-white'
+              : 'text-[#46657a] hover:bg-[#f3f8fb] hover:text-[#072a3f]'
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            <ArrowLeftRight size={17} className="shrink-0" />
+            <span className="truncate text-sm font-bold">Passerelle Quiz ↔ Ex.</span>
+          </span>
+          <span
+            className={`shrink-0 text-[11px] font-bold whitespace-nowrap ${
+              workspaceMode === 'converter' ? 'text-emerald-300' : 'text-[#607f93]'
+            }`}
+          >
+            {quizzes.length} quiz
+          </span>
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={workspaceMode === 'attempts'}
+          onClick={() => void openAttemptsWorkspace()}
+          className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition ${
+            workspaceMode === 'attempts'
+              ? 'bg-[#072a3f] text-white'
+              : 'text-[#46657a] hover:bg-[#f3f8fb] hover:text-[#072a3f]'
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
+            <BarChart3 size={17} className="shrink-0" />
+            <span className="truncate text-sm font-bold">Tentatives & Suivi</span>
+          </span>
+          <span
+            className={`shrink-0 text-[11px] font-bold whitespace-nowrap ${
+              workspaceMode === 'attempts' ? 'text-emerald-300' : 'text-[#607f93]'
+            }`}
+          >
+            {activeAttemptsExercise ? `${attempts.length} élève(s)` : 'Analyse'}
+          </span>
+        </button>
+      </nav>
+
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            aria-label="Fermer l’alerte"
+            onClick={() => setError('')}
+            className="shrink-0 rounded-lg p-1 text-rose-600 hover:bg-rose-100"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {message && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+          <span>{message}</span>
+          <button
+            type="button"
+            aria-label="Fermer le message"
+            onClick={() => setMessage('')}
+            className="shrink-0 rounded-lg p-1 text-emerald-700 hover:bg-emerald-100"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODE 1: CATALOGUE & GESTION (READ / SEARCH / FILTER / LIFECYCLE CRUD) */}
+      {/* ===================================================================== */}
+      {workspaceMode === 'catalog' && (
+        <section className="space-y-4">
+          {/* Compact KPI Strip */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between text-slate-500"><span className="text-xs font-semibold">Étudiants concernés</span><Users size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{attemptSummary.total}</p></article>
-            <article className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"><div className="flex items-center justify-between text-emerald-700"><span className="text-xs font-semibold">Terminés</span><CheckCircle2 size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-emerald-800">{attemptSummary.completed}</p></article>
-            <article className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4"><div className="flex items-center justify-between text-amber-700"><span className="text-xs font-semibold">En cours</span><Clock3 size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-amber-800">{attemptSummary.inProgress}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-center justify-between text-slate-500"><span className="text-xs font-semibold">Non commencés</span><CircleDashed size={17}/></div><p className="mt-2 text-2xl font-black tabular-nums text-slate-700">{attemptSummary.notStarted}</p></article>
+            <div className="rounded-2xl border border-[#d8e6ee] bg-white px-4 py-3.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#607f93]">
+                Total exercices
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-[#072a3f]">
+                {catalogStats.total}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#bfe3ce] bg-[#eef9f3]/70 px-4 py-3.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#17613e]">
+                Publiés
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-[#145c3d]">
+                {catalogStats.published}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#eed9aa] bg-[#fef9ec]/70 px-4 py-3.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#8a5108]">
+                Brouillons
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-[#8a5108]">
+                {catalogStats.draft}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#dde7ee] bg-[#f5f8fa] px-4 py-3.5">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#4c697c]">
+                Archivés
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-[#4c697c]">
+                {catalogStats.archived}
+              </p>
+            </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-4">
-              <div><h3 className="font-bold text-[#072a3f]">Progression des étudiants</h3><p className="mt-0.5 text-xs text-slate-500">La meilleure note est conservée pour faciliter le suivi.</p></div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{attemptSummary.total} étudiant(s)</span>
+          {/* Multi-Criteria Search & Filters */}
+          <div className="space-y-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.03)] sm:p-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="relative block sm:col-span-2 lg:col-span-1">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                  Recherche
+                </span>
+                <div className="relative">
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#607f93]"
+                  />
+                  <input
+                    type="search"
+                    value={catalogFilters.search}
+                    onChange={e =>
+                      setCatalogFilters(prev => ({ ...prev, search: e.target.value }))
+                    }
+                    placeholder="Titre, question, classe…"
+                    className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] py-2 pl-9 pr-3 text-sm text-[#072a3f] placeholder:text-[#89a8bb]"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                  Statut
+                </span>
+                <select
+                  aria-label="Filtrer par statut"
+                  value={catalogFilters.status}
+                  onChange={e =>
+                    setCatalogFilters(prev => ({
+                      ...prev,
+                      status: e.target.value as ExerciseCatalogFilters['status']
+                    }))
+                  }
+                  className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                >
+                  <option value="all">Tous les statuts</option>
+                  <option value="published">Publiés</option>
+                  <option value="draft">Brouillons</option>
+                  <option value="archived">Archivés</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                  Classe attribuée
+                </span>
+                <select
+                  aria-label="Filtrer par classe"
+                  value={catalogFilters.classId}
+                  onChange={e =>
+                    setCatalogFilters(prev => ({ ...prev, classId: e.target.value }))
+                  }
+                  className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                >
+                  <option value="all">Toutes les classes</option>
+                  <option value="unassigned">Sans classe attribuée</option>
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                  Niveau CECRL
+                </span>
+                <select
+                  aria-label="Filtrer par niveau CECRL"
+                  value={catalogFilters.level}
+                  onChange={e =>
+                    setCatalogFilters(prev => ({
+                      ...prev,
+                      level: e.target.value as ExerciseCatalogFilters['level']
+                    }))
+                  }
+                  className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                >
+                  <option value="all">Tous les niveaux</option>
+                  {CEFR_LEVELS.map(lvl => (
+                    <option key={lvl} value={lvl}>
+                      {lvl}
+                    </option>
+                  ))}
+                  <option value="none">Non précisé</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                  Trier par
+                </span>
+                <select
+                  aria-label="Trier les exercices"
+                  value={catalogFilters.sortBy}
+                  onChange={e =>
+                    setCatalogFilters(prev => ({
+                      ...prev,
+                      sortBy: e.target.value as ExerciseSortOption
+                    }))
+                  }
+                  className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                >
+                  <option value="updated_desc">Plus récents</option>
+                  <option value="title_asc">Titre (A–Z)</option>
+                  <option value="questions_desc">Nombre de questions</option>
+                  <option value="classes_desc">Classes attribuées</option>
+                </select>
+              </label>
             </div>
-            {filteredAttempts.length === 0 ? <div className="p-8 text-center"><Users className="mx-auto mb-2 text-slate-300" size={30}/><p className="font-semibold text-slate-600">Aucun étudiant dans cette sélection</p><p className="mt-1 text-xs text-slate-400">Vérifiez les classes attribuées à cet exercice.</p></div> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Étudiant</th><th className="px-4 py-3">Classe</th><th className="px-4 py-3">Progression</th><th className="px-4 py-3">Meilleure note</th><th className="px-4 py-3">Tentatives</th><th className="px-4 py-3">Actions</th><th className="px-4 py-3">Dernière activité</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredAttempts.map((row, index) => {
-                      const done = row.status === 'completed';
-                      const running = row.status === 'in_progress';
-                      const score = row.best_score;
-                      const scoreMax = row.max_score;
-                      const percentage = score !== null && score !== undefined && scoreMax > 0 ? Math.round((score / scoreMax) * 100) : null;
-                      const score20 = score !== null && score !== undefined && scoreMax > 0 ? (score / scoreMax * 20).toFixed(2).replace(/\.00$/, '') : null;
-                      return <tr key={row.student_id} className="transition hover:bg-slate-50/80">
-                        <td className="px-4 py-3"><div className="flex items-center gap-3"><StudentAvatar name={row.student_name || 'Élève'} src={row.avatar_url || undefined} className="h-9 w-9 border border-[#d8e6ee] text-xs"/><div><p className="font-bold text-[#072a3f]">{row.student_name}</p>{row.student_number && <p className="text-[11px] text-slate-400">N° {row.student_number}</p>}</div></div></td>
-                        <td className="px-4 py-3 text-slate-600">{row.class_name}</td>
-                        <td className="px-4 py-3"><span className={'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ' + (done ? 'bg-emerald-50 text-emerald-700' : running ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={'h-1.5 w-1.5 rounded-full ' + (done ? 'bg-emerald-500' : running ? 'bg-amber-500' : 'bg-slate-400')}/>{done ? 'Terminé' : running && score !== null && score !== undefined ? 'Nouvelle tentative' : running ? 'En cours' : 'Non commencé'}</span></td>
-                        <td className="px-4 py-3"><div className="font-bold tabular-nums text-[#072a3f]">{score !== null && score !== undefined && scoreMax > 0 ? <>{score} <span className="font-medium text-slate-400">/ {scoreMax}</span></> : <span className="font-medium text-slate-400">—</span>}</div>{percentage !== null && <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#46657a]">{percentage} % · {score20}/20</p>}</td>
-                        <td className="px-4 py-3 tabular-nums text-slate-600">{row.attempt_count}</td>
-                        <td className="px-4 py-3 text-xs text-slate-500">{row.started_at ? new Date(row.started_at).toLocaleString() : 'Aucune activité'}</td>
-                        <td className="px-4 py-3">{row.best_attempt_id ? <button type="button" onClick={() => setReviewStudent(row)} className="whitespace-nowrap rounded-lg border border-[#cfe0ea] bg-[#f5f9fc] px-3 py-2 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-emerald-50">Voir les réponses</button> : <span className="text-xs text-slate-400">Aucune tentative terminée</span>}</td>
-                      </tr>;
-                    })}
-                  </tbody>
-                </table>
+
+            {advancedFiltersOpen && (
+              <div className="grid grid-cols-1 gap-3 border-t border-[#eaf1f6] pt-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                    Catégorie
+                  </span>
+                  <select
+                    aria-label="Filtrer par catégorie"
+                    value={catalogFilters.category}
+                    onChange={e =>
+                      setCatalogFilters(prev => ({ ...prev, category: e.target.value }))
+                    }
+                    className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                  >
+                    <option value="all">Toutes les catégories</option>
+                    {distinctCategories.map(cat => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                    Questions minimum
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={catalogFilters.minQuestions}
+                    onChange={e =>
+                      setCatalogFilters(prev => ({ ...prev, minQuestions: e.target.value }))
+                    }
+                    placeholder="Ex. 3"
+                    className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm tabular-nums text-[#072a3f]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                    Questions maximum
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={catalogFilters.maxQuestions}
+                    onChange={e =>
+                      setCatalogFilters(prev => ({ ...prev, maxQuestions: e.target.value }))
+                    }
+                    placeholder="Ex. 20"
+                    className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm tabular-nums text-[#072a3f]"
+                  />
+                </label>
               </div>
             )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eaf1f6] pt-3">
+              <p className="text-xs font-semibold tabular-nums text-[#46657a]" aria-live="polite">
+                {filteredExercises.length} exercice{filteredExercises.length === 1 ? '' : 's'} affiché
+                {filteredExercises.length === 1 ? '' : 's'} sur {items.length}
+                {activeCatalogFilterCount > 0 && ` · ${activeCatalogFilterCount} filtre(s) actif(s)`}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  aria-expanded={advancedFiltersOpen}
+                  onClick={() => setAdvancedFiltersOpen(open => !open)}
+                  className={`inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                    advancedFiltersOpen
+                      ? 'border-[#0b3c5d] bg-[#edf5fa] text-[#072a3f]'
+                      : 'border-[#cfe1ec] bg-white text-[#46657a] hover:bg-[#f5f9fc]'
+                  }`}
+                >
+                  <SlidersHorizontal size={14} />
+                  Filtres avancés
+                </button>
+                {activeCatalogFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogFilters(DEFAULT_EXERCISE_CATALOG_FILTERS)}
+                    className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold text-[#0b3c5d] underline decoration-[#b3cad9] underline-offset-2 hover:text-[#072a3f]"
+                  >
+                    <RotateCcw size={13} />
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {reviewStudent && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Réponses de la meilleure tentative">
-            <section className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
-                <div><p className="text-xs font-bold uppercase tracking-wider text-[#2fa36b]">Meilleure tentative</p><h3 className="mt-1 text-lg font-black text-[#072a3f]">{reviewStudent.student_name}</h3><p className="mt-1 text-sm text-slate-500">{reviewStudent.class_name} · {reviewStudent.best_score} / {reviewStudent.max_score} points</p></div>
-                <button type="button" onClick={() => setReviewStudent(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Fermer</button>
-              </header>
-              <div className="space-y-3 overflow-y-auto p-5">
-                {(reviewStudent.best_details || []).map((detail: any, index: number) => {
-                  const question = selectedExercise?.questions.find(item => item.id === detail.question_id);
-                  const expected = question?.answers?.join(' / ') || question?.correct_answer || question?.verbes_trous?.phrases?.map((phrase: any) => phrase.reponses?.join(' / ')).join(' · ') || 'Correction non disponible';
-                  return <article key={detail.question_id} className="rounded-xl border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2"><h4 className="font-bold text-[#072a3f]">Question {index + 1} — {question?.question || detail.question_id}</h4><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${detail.correct ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{detail.correct ? 'Correcte' : detail.timed_out ? 'Temps écoulé' : 'À corriger'}</span></div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-lg bg-slate-50 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Réponse de l’élève</p><p className="mt-1 break-words text-sm font-medium text-slate-800">{detail.answer == null ? 'Aucune réponse' : typeof detail.answer === 'string' ? detail.answer : JSON.stringify(detail.answer)}</p></div><div className="rounded-lg bg-emerald-50/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Réponse attendue</p><p className="mt-1 break-words text-sm font-medium text-slate-800">{typeof expected === 'string' ? expected : JSON.stringify(expected)}</p></div></div>
-                    <p className="mt-2 text-xs font-semibold text-slate-600">Points : {detail.points ?? 0} / {detail.max_points ?? question?.points ?? 0}</p>
-                    {question?.explanation && <p className="mt-2 text-xs leading-relaxed text-slate-500">{question.explanation}</p>}
-                  </article>;
-                })}
-                {(!reviewStudent.best_details || reviewStudent.best_details.length === 0) && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Aucun détail de réponse n’a été enregistré pour cette tentative.</p>}
-              </div>
-            </section>
-          </div>}
-
-          <section className="space-y-3">
-            <div><h3 className="font-bold text-[#072a3f]">Data Analysis</h3><p className="mt-1 text-xs text-slate-500">Indicateurs calculés à partir de la meilleure tentative terminée de chaque élève.</p></div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Score moyen</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.average === null ? '—' : performanceSummary.average.toFixed(1) + '%'}</p></article>
-              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux de réussite</p><p className="mt-2 text-2xl font-black tabular-nums text-emerald-700">{performanceSummary.successRate === null ? '—' : Math.round(performanceSummary.successRate) + '%'}</p><p className="text-[11px] text-slate-400">Seuil : 50 %</p></article>
-              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Taux d’achèvement</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{Math.round(performanceSummary.completionRate)}%</p></article>
-              <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold text-slate-500">Tentatives moyennes</p><p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{performanceSummary.averageAttempts.toFixed(1)}</p></article>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h4 className="font-bold text-sm text-[#072a3f]">Répartition des meilleures notes</h4><p className="mt-1 text-xs text-slate-500">Nombre d’élèves par tranche de pourcentage.</p><div className="mt-4 space-y-3">{scoreDistribution.map(bucket => <div key={bucket.label} className="grid grid-cols-[76px_1fr_30px] items-center gap-3 text-xs"><span className="text-slate-500">{bucket.label}</span><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#2fa36b]" style={{width: (performanceSummary.scoredCount ? bucket.count / performanceSummary.scoredCount * 100 : 0) + '%'}}/></div><strong className="text-right tabular-nums text-[#072a3f]">{bucket.count}</strong></div>)}</div></div>
-          </section>
-
-          {questionStats.length > 0 && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-4 py-4"><h3 className="font-bold text-[#072a3f]">Analyse par question</h3><p className="mt-1 text-xs text-slate-500">Réponses des dernières tentatives, selon le filtre sélectionné.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[560px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Question</th><th className="p-3">Réponses</th><th className="p-3">Correctes</th><th className="p-3">Points obtenus</th></tr></thead><tbody>{questionStats.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="max-w-md p-3 text-slate-700">{row.label}</td><td className="p-3 tabular-nums">{row.responses}</td><td className="p-3 tabular-nums">{row.correct}</td><td className="p-3 font-semibold tabular-nums">{row.points} / {row.maxPoints}</td></tr>)}</tbody></table></div></div>}
-        </section>
-      ) : (
-        <>
-          <section className="rounded-[22px] border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.04)] sm:p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-base font-extrabold text-[#072a3f]"><FileText size={18} className="text-[#0b3c5d]"/> Exercices enregistrés</h2>
-            {loading && <p className="text-sm text-[#607f93]">Chargement…</p>}
-            {!loading && items.length === 0 && <p className="text-sm text-[#607f93]">Aucun exercice pour le moment.</p>}
+          {/* Catalog Results */}
+          {loading && items.length === 0 ? (
             <div className="grid gap-4 md:grid-cols-2">
-              {items.map(item => {
+              {[1, 2, 3, 4].map(skeleton => (
+                <div
+                  key={skeleton}
+                  className="h-56 animate-pulse rounded-[22px] border border-[#d8e6ee] bg-white p-5"
+                >
+                  <div className="h-3 w-36 rounded bg-[#e6f0f7]" />
+                  <div className="mt-4 h-5 w-2/3 rounded bg-[#e6f0f7]" />
+                  <div className="mt-6 h-14 rounded-xl bg-[#f3f8fb]" />
+                </div>
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-2xl border border-[#d8e6ee] bg-white p-10 text-center">
+              <FileText size={32} className="mx-auto text-[#89a8bb]" />
+              <h2 className="mt-3 text-base font-extrabold text-[#072a3f]">
+                Aucun exercice enregistré
+              </h2>
+              <p className="mt-1 text-sm text-[#607f93]">
+                Créez votre premier exercice ou convertissez un quiz existant depuis l’éditeur CRUD.
+              </p>
+              <button
+                type="button"
+                onClick={resetEditor}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0b3c5d]"
+              >
+                <Plus size={16} />
+                Créer un exercice
+              </button>
+            </div>
+          ) : filteredExercises.length === 0 ? (
+            <div className="rounded-2xl border border-[#d8e6ee] bg-white p-10 text-center">
+              <Search size={30} className="mx-auto text-[#89a8bb]" />
+              <h2 className="mt-3 text-base font-extrabold text-[#072a3f]">
+                Aucun exercice ne correspond aux critères sélectionnés
+              </h2>
+              <p className="mt-1 text-sm text-[#607f93]">
+                Ajustez votre recherche ou réinitialisez les filtres actifs.
+              </p>
+              <button
+                type="button"
+                onClick={() => setCatalogFilters(DEFAULT_EXERCISE_CATALOG_FILTERS)}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-4 py-2 text-sm font-bold text-[#0b3c5d] hover:bg-[#e6f0f7]"
+              >
+                <RotateCcw size={15} />
+                Réinitialiser les filtres
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {filteredExercises.map(item => {
                 const isPublished = item.status === 'published';
-                const statusBadge = isPublished ? (
-                  <StatusBadge tone="success">Publié</StatusBadge>
-                ) : item.status === 'archived' ? (
-                  <StatusBadge tone="neutral">Archivé</StatusBadge>
-                ) : (
-                  <StatusBadge tone="warning">Brouillon</StatusBadge>
+                const totalSeconds = (item.questions || []).reduce(
+                  (sum, q) => sum + Number(q.time_limit_seconds || 0),
+                  0
                 );
+                const assignedClassNames = (item.class_ids || [])
+                  .map(id => classMap.get(id))
+                  .filter((name): name is string => Boolean(name));
 
                 return (
                   <LearningCard key={item.id} active={isPublished}>
                     <LearningCardHeader
-                      kicker={`${item.category || 'Exercice'}${item.level ? ` · ${item.level}` : ''} · v${item.current_version_number}`}
-                      status={statusBadge}
+                      kicker={`${item.category || 'Autre'}${item.level ? ` · ${item.level}` : ''} · v${item.current_version_number || 1}`}
+                      status={getExerciseStatusBadge(item.status)}
                     />
-                    <div className="min-w-0 space-y-1">
-                      <h3 className="break-words text-base font-extrabold text-[#072a3f]">{item.title}</h3>
+                    <div className="min-w-0 space-y-1.5">
+                      <h3 className="break-words text-base font-extrabold text-[#072a3f]">
+                        {item.title}
+                      </h3>
                       {item.description && (
-                        <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a]">{item.description}</p>
+                        <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a]">
+                          {item.description}
+                        </p>
                       )}
+                      <p className="truncate text-[11px] font-medium text-[#607f93]">
+                        {assignedClassNames.length > 0
+                          ? `Classes : ${assignedClassNames.join(', ')}`
+                          : 'Aucune classe attribuée'}
+                        {' · '}
+                        Mis à jour le {formatShortDate(item.updated_at || item.created_at)}
+                      </p>
                     </div>
+
                     <LearningCardMetrics
-                      columns={2}
+                      columns={3}
                       items={[
                         { label: 'Questions', value: `${item.questions.length}` },
-                        { label: 'Classes', value: `${item.class_ids.length}` }
+                        { label: 'Classes', value: `${item.class_ids.length}` },
+                        {
+                          label: 'Durée',
+                          value: formatExerciseTotalDuration(totalSeconds)
+                        }
                       ]}
                     />
+
                     <LearningCardFooter>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => loadExercise(item)} className="inline-flex min-h-9 items-center justify-center rounded-xl bg-[#072a3f] px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#0b3c5d]">Modifier</button>
-                        <button type="button" onClick={() => void showResults(item)} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-1.5 text-xs font-bold text-[#0b3c5d] transition-colors hover:bg-[#e6f0f7]"><BarChart3 size={13}/> Tentatives</button>
-                        <button type="button" onClick={() => { loadExercise(item); setStatus('archived'); }} className="inline-flex min-h-9 items-center justify-center rounded-xl border border-[#d8e6ee] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#46657a] transition-colors hover:bg-[#f5f9fc]">Archiver</button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => populateEditorFromItem(item)}
+                          className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[#072a3f] px-3.5 py-2 text-xs font-bold text-white transition hover:bg-[#0b3c5d]"
+                        >
+                          <Edit3 size={13} />
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void openAttemptsForExercise(item)}
+                          className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-2 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3]"
+                        >
+                          <BarChart3 size={13} />
+                          Tentatives
+                        </button>
+                        {item.status !== 'published' && (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => void handleQuickLifecycleChange(item, 'published')}
+                            className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#bfe3ce] bg-[#eef9f3] px-3 py-2 text-xs font-bold text-[#17613e] transition hover:bg-[#dff4e8] disabled:opacity-50"
+                          >
+                            <Send size={13} />
+                            Publier
+                          </button>
+                        )}
+                        {item.status !== 'archived' && (
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => void handleQuickLifecycleChange(item, 'archived')}
+                            className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#d8e6ee] bg-white px-3 py-2 text-xs font-semibold text-[#46657a] transition hover:bg-[#f5f9fc] disabled:opacity-50"
+                          >
+                            <Archive size={13} />
+                            Archiver
+                          </button>
+                        )}
                       </div>
                     </LearningCardFooter>
                   </LearningCard>
                 );
               })}
             </div>
-          </section>
+          )}
+        </section>
+      )}
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="font-bold text-[#072a3f]">{selectedId ? 'Modifier l’exercice' : 'Créer un exercice'}</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm font-semibold">Titre<input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" placeholder="Titre de l’exercice"/></label>
-              <label className="space-y-1 text-sm font-semibold">Catégorie<input value={category} onChange={e => setCategory(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 font-normal"/></label>
-              <label className="space-y-1 text-sm font-semibold md:col-span-2">Description<textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 font-normal" rows={2}/></label>
-              <label className="space-y-1 text-sm font-semibold">Niveau<select value={level} onChange={e => setLevel(e.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-2 font-normal"><option value="">Non précisé</option>{['A1','A2','B1','B2','C1','C2'].map(v => <option key={v}>{v}</option>)}</select></label>
-              <label className="space-y-1 text-sm font-semibold">Publication<select value={status} onChange={e => setStatus(e.target.value as any)} className="w-full rounded-xl border border-slate-300 px-3 py-2 font-normal"><option value="draft">Brouillon</option><option value="published">Publier</option><option value="archived">Archiver</option></select></label>
+      {/* ===================================================================== */}
+      {/* MODE 2: ÉDITEUR CRUD (CREATE / UPDATE / IMPORT / CONVERT / TIMERS)    */}
+      {/* ===================================================================== */}
+      {workspaceMode === 'editor' && (
+        <section className="space-y-4">
+          {/* Editor Context Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#d8e6ee] bg-white px-4 py-3.5 sm:px-5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode('catalog')}
+                className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition hover:bg-[#e6f0f7]"
+              >
+                <ArrowLeft size={14} />
+                Catalogue
+              </button>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-base font-extrabold text-[#072a3f]">
+                    {selectedId ? title || 'Modifier l’exercice' : 'Créer un nouvel exercice'}
+                  </h2>
+                  {getExerciseStatusBadge(status)}
+                </div>
+                <p className="text-xs text-[#607f93]">
+                  {selectedId
+                    ? 'Modification d’un exercice existant — les changements créent ou mettent à jour la définition.'
+                    : 'Nouveau brouillon indépendant des quiz évaluatifs.'}
+                </p>
+              </div>
             </div>
-            <div><p className="mb-2 text-sm font-semibold">Classes autorisées</p><div className="flex flex-wrap gap-2">{classes.map(c => <label key={c.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input type="checkbox" checked={classIds.includes(c.id)} onChange={e => setClassIds(old => e.target.checked ? [...old,c.id] : old.filter(id => id !== c.id))}/>{c.name}</label>)}</div></div>
-            <div className="flex flex-wrap items-center justify-between gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Upload size={15}/> Importer JSON<input type="file" accept="application/json,.json" className="hidden" onChange={e => { void handleImportFile(e.target.files?.[0]); e.currentTarget.value=''; }}/></label><select aria-label="Convertir un quiz existant" defaultValue="" onChange={e => { if(e.target.value) handleConvertQuiz(e.target.value); e.currentTarget.value=''; }} className="max-w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"><option value="">Convertir un quiz existant…</option>{quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}</select></div>
-            <label className="block space-y-1 text-sm font-semibold">Contenu JSON — chaque question doit avoir un temps strictement positif<textarea value={json} onChange={e => setJson(e.target.value)} spellCheck={false} className="min-h-[360px] w-full rounded-xl border border-slate-300 bg-slate-950 p-3 font-mono text-xs text-emerald-100" /></label>
-            <p className="text-xs text-slate-500">{parsed ? parsed.questions.length + ' question(s) validée(s), chronométrées.' : 'Le JSON est invalide ou une question ne possède pas de chronomètre valide.'}</p>
-            {parsed && <div className="space-y-2 rounded-xl border border-slate-200 p-3"><h3 className="text-sm font-bold text-[#072a3f]">Chronomètre de chaque question</h3>{parsed.questions.map((question, index) => <div key={question.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 py-2 last:border-0"><span className="min-w-0 flex-1 text-xs text-slate-600">{index + 1}. {question.question}</span><label className="flex items-center gap-2 text-xs font-semibold">Secondes<input type="number" min={1} max={3600} step={1} value={question.time_limit_seconds || 1} onChange={e => handleQuestionTimerChange(question.id, Number(e.target.value))} className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-right tabular-nums"/></label></div>)}</div>}
-            <div className="flex flex-wrap gap-2"><button type="button" disabled={loading || !parsed} onClick={() => void handleSave()} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-[#072a3f] disabled:opacity-40"><Save size={16}/> Enregistrer</button><button type="button" disabled={loading || !parsed || classIds.length === 0} onClick={() => void handlePublish()} className="inline-flex items-center gap-2 rounded-xl bg-[#2fa36b] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Save size={16}/> Publier</button><button type="button" disabled={!parsed} onClick={exportJson} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><Download size={16}/> Exporter JSON</button><button type="button" disabled={!parsed} onClick={handleConvertBack} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><ArrowLeftRight size={16}/> Créer un quiz à partir de cet exercice</button><button type="button" onClick={() => void refresh()} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold"><RefreshCw size={15}/> Actualiser</button></div>
-          </section>
-        </>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = items.find(i => i.id === selectedId);
+                    if (current) {
+                      void openAttemptsForExercise(current);
+                    } else {
+                      setWorkspaceMode('attempts');
+                      void loadAttemptsForExercise(selectedId, true);
+                    }
+                  }}
+                  className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-2 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3]"
+                >
+                  <BarChart3 size={14} />
+                  Voir les tentatives
+                </button>
+              )}
+              {selectedId && (
+                <button
+                  type="button"
+                  onClick={resetEditor}
+                  className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#d8e6ee] bg-white px-3.5 py-2 text-xs font-semibold text-[#46657a] transition hover:bg-[#f5f9fc]"
+                >
+                  <Plus size={14} />
+                  Nouveau brouillon
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 2-Column CRUD Workbench */}
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+            {/* Left column: Metadata, Classes, Import/Convert */}
+            <div className="space-y-4">
+              <div className="space-y-4 rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                  1. Paramètres généraux
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1 text-xs font-bold text-[#315267] sm:col-span-2">
+                    <span>Titre *</span>
+                    <input
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      placeholder="Ex. Passato prossimo — Verbes usuels"
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-sm font-normal text-[#072a3f]"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-xs font-bold text-[#315267]">
+                    <span>Catégorie</span>
+                    <input
+                      list="exercise-category-options"
+                      value={category}
+                      onChange={e => setCategory(e.target.value)}
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-sm font-normal text-[#072a3f]"
+                    />
+                    <datalist id="exercise-category-options">
+                      {distinctCategories.map(cat => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </label>
+
+                  <label className="space-y-1 text-xs font-bold text-[#315267]">
+                    <span>Niveau CECRL</span>
+                    <select
+                      value={level}
+                      onChange={e => setLevel(e.target.value)}
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-sm font-normal text-[#072a3f]"
+                    >
+                      <option value="">Non précisé</option>
+                      {CEFR_LEVELS.map(v => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1 text-xs font-bold text-[#315267] sm:col-span-2">
+                    <span>Statut cible</span>
+                    <select
+                      value={status}
+                      onChange={e => setStatus(e.target.value as ExerciseStatus)}
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-sm font-normal text-[#072a3f]"
+                    >
+                      <option value="draft">Brouillon</option>
+                      <option value="published">Publié</option>
+                      <option value="archived">Archivé</option>
+                    </select>
+                  </label>
+
+                  <label className="space-y-1 text-xs font-bold text-[#315267] sm:col-span-2">
+                    <span>Description / Consigne</span>
+                    <textarea
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      rows={2}
+                      placeholder="Objectif pédagogique ou indications pour les élèves…"
+                      className="w-full rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-sm font-normal text-[#072a3f]"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Class assignments */}
+              <div className="space-y-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                    2. Classes autorisées ({classIds.length})
+                  </h3>
+                  {classes.length > 0 && (
+                    <div className="flex items-center gap-3 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setClassIds(classes.map(c => c.id))}
+                        className="text-[#0b3c5d] underline decoration-[#b3cad9] underline-offset-2 hover:text-[#072a3f]"
+                      >
+                        Tout cocher
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClassIds([])}
+                        className="text-[#607f93] underline decoration-[#d1e1ec] underline-offset-2 hover:text-[#072a3f]"
+                      >
+                        Effacer
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {classes.length === 0 ? (
+                  <p className="text-xs text-[#607f93]">Aucune classe disponible.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {classes.map(c => {
+                      const checked = classIds.includes(c.id);
+                      return (
+                        <label
+                          key={c.id}
+                          className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                            checked
+                              ? 'border-[#2fa36b] bg-[#eef9f3] text-[#145c3d]'
+                              : 'border-[#d8e6ee] bg-[#f7fafc] text-[#315267] hover:border-[#a9c7d9]'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e =>
+                              setClassIds(old =>
+                                e.target.checked
+                                  ? [...old, c.id]
+                                  : old.filter(id => id !== c.id)
+                              )
+                            }
+                          />
+                          <span>{c.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {classIds.length === 0 && (
+                  <p className="text-xs text-amber-800">
+                    Sélectionnez au moins une classe pour pouvoir publier l’exercice.
+                  </p>
+                )}
+              </div>
+
+              {/* Import / Export JSON (CRUD file actions) */}
+              <div className="space-y-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                  3. Import & export JSON
+                </h3>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3 py-2 text-xs font-bold text-[#0b3c5d] transition hover:bg-[#e6f0f7]">
+                    <Upload size={15} />
+                    Importer JSON
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={e => {
+                        void handleImportFile(e.target.files?.[0]);
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={!parsed}
+                    onClick={exportJson}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-white px-3 py-2 text-xs font-bold text-[#0b3c5d] transition hover:bg-[#f5f9fc] disabled:opacity-40"
+                  >
+                    <Download size={15} />
+                    Exporter JSON
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#eaf1f6] pt-3">
+                  <p className="text-xs text-[#607f93]">
+                    Convertir un quiz existant ou transformer cet exercice en quiz :
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openConverterWorkspace(
+                        selectedId ? 'exercise_to_quiz' : 'quiz_to_exercise',
+                        selectedId || '',
+                        Boolean(selectedId)
+                      )
+                    }
+                    className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3]"
+                  >
+                    <ArrowLeftRight size={14} />
+                    Passerelle Quiz ↔ Exercices
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: JSON content & Per-question timers */}
+            <div className="space-y-4">
+              <div className="space-y-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                    4. Contenu JSON & Validation
+                  </h3>
+                  {parsed ? (
+                    <span className="text-xs font-bold tabular-nums text-[#17613e]">
+                      {parsed.questions.length} question(s) ·{' '}
+                      {formatExerciseTotalDuration(totalEditorSeconds)}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-rose-700">JSON invalide</span>
+                  )}
+                </div>
+
+                <label className="block">
+                  <span className="sr-only">Contenu JSON de l’exercice</span>
+                  <textarea
+                    value={json}
+                    onChange={e => setJson(e.target.value)}
+                    spellCheck={false}
+                    className="min-h-[340px] w-full rounded-xl border border-[#cfe1ec] bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-emerald-100"
+                  />
+                </label>
+
+                {jsonValidation.error ? (
+                  <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+                    {jsonValidation.error}
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#607f93]">
+                    Toutes les questions sont valides et disposent d’un chronomètre strictement positif.
+                  </p>
+                )}
+              </div>
+
+              {parsed && (
+                <div className="space-y-2.5 rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                      5. Chronomètre par question
+                    </h3>
+                    <span className="text-xs font-semibold tabular-nums text-[#607f93]">
+                      Total : {formatExerciseTotalDuration(totalEditorSeconds)}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-[#eaf1f6]">
+                    {parsed.questions.map((question, index) => (
+                      <div
+                        key={question.id}
+                        className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-[#072a3f]">
+                            Question {index + 1}{' '}
+                            <span className="font-semibold uppercase text-[#607f93]">
+                              · {question.type}
+                            </span>
+                          </p>
+                          <p className="truncate text-xs text-[#46657a]">{question.question}</p>
+                        </div>
+                        <label className="flex shrink-0 items-center gap-2 text-xs font-bold text-[#315267]">
+                          <span>Sec.</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={3600}
+                            step={1}
+                            value={question.time_limit_seconds || 1}
+                            onChange={e =>
+                              handleQuestionTimerChange(question.id, Number(e.target.value))
+                            }
+                            className="min-h-9 w-20 rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-2.5 py-1 text-right tabular-nums text-[#072a3f]"
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Save / Publish Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.04)]">
+            <button
+              type="button"
+              onClick={() => setWorkspaceMode('catalog')}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e6ee] bg-white px-4 py-2 text-sm font-semibold text-[#46657a] transition hover:bg-[#f5f9fc]"
+            >
+              <ArrowLeft size={15} />
+              Retour au catalogue
+            </button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedId && status !== 'archived' && (
+                <button
+                  type="button"
+                  disabled={loading || !parsed}
+                  onClick={() => void persistExercise('archived')}
+                  className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-[#d8e6ee] bg-white px-4 py-2 text-sm font-semibold text-[#46657a] transition hover:bg-[#f5f9fc] disabled:opacity-40"
+                >
+                  <Archive size={15} />
+                  Archiver
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={loading || !parsed}
+                onClick={() => void persistExercise(status === 'published' ? 'published' : 'draft')}
+                className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-[#072a3f] bg-white px-4 py-2 text-sm font-bold text-[#072a3f] transition hover:bg-[#f5f9fc] disabled:opacity-40"
+              >
+                <Save size={15} />
+                Enregistrer
+              </button>
+              <button
+                type="button"
+                disabled={loading || !parsed || classIds.length === 0}
+                onClick={() => void persistExercise('published')}
+                className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-[#2fa36b] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#268d5b] disabled:opacity-40"
+              >
+                <Send size={15} />
+                Publier
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODE 3: PASSERELLE QUIZ <-> EXERCICES                                 */}
+      {/* ===================================================================== */}
+      {workspaceMode === 'converter' && (
+        <ExerciseQuizConverterPanel
+          classes={classes}
+          quizzes={quizzes}
+          exercises={items}
+          initialDirection={converterDirection}
+          initialExerciseId={converterExerciseId}
+          autoOpenModalForExercise={converterAutoOpenModal}
+          onLoadDraftInEditor={payload => {
+            setSelectedId('');
+            setTitle(payload.title);
+            setDescription(payload.description);
+            setCategory(payload.category);
+            setLevel(payload.level);
+            setStatus('draft');
+            setClassIds(payload.classIds);
+            setJson(payload.json);
+            setError('');
+            setMessage(payload.message);
+            setWorkspaceMode('editor');
+          }}
+          onExerciseCreated={async exerciseId => {
+            setSelectedId(exerciseId);
+            await refresh();
+          }}
+          onQuizCreated={() => {
+            setQuizzes(dataService.getQuizzes());
+          }}
+          onOpenCatalog={() => setWorkspaceMode('catalog')}
+        />
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODE 4: TENTATIVES & SUIVI PÉDAGOGIQUE                               */}
+      {/* ===================================================================== */}
+      {workspaceMode === 'attempts' && (
+        <section className="space-y-5">
+          {/* Exercise Selector & Context Banner */}
+          <div className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-[#072a3f] to-[#0b3c5d] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-emerald-300">
+                Suivi pédagogique & Tentatives
+              </p>
+              <h2 className="break-words text-xl font-black">
+                {activeAttemptsExercise?.title || 'Sélectionnez un exercice'}
+              </h2>
+              <p className="text-xs text-white/75 sm:text-sm">
+                {activeAttemptsExercise
+                  ? `${activeAttemptsExercise.category || 'Autre'}${
+                      activeAttemptsExercise.level ? ` · ${activeAttemptsExercise.level}` : ''
+                    } · ${activeAttemptsExercise.questions.length} question(s) · ${
+                      activeAttemptsExercise.class_ids.length
+                    } classe(s) attribuée(s)`
+                  : 'Choisissez un exercice pour inspecter les tentatives et la progression.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {items.length > 0 && (
+                <select
+                  aria-label="Choisir l’exercice à analyser"
+                  value={attemptsExerciseId}
+                  onChange={e => void loadAttemptsForExercise(e.target.value, true)}
+                  className="min-h-10 min-w-[220px] max-w-full rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold text-white outline-none transition hover:bg-white/15"
+                >
+                  {items.map(ex => (
+                    <option key={ex.id} value={ex.id} className="text-[#072a3f]">
+                      {ex.title} ({ex.status === 'published' ? 'Publié' : ex.status === 'archived' ? 'Archivé' : 'Brouillon'})
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {activeAttemptsExercise && (
+                <button
+                  type="button"
+                  onClick={() => populateEditorFromItem(activeAttemptsExercise)}
+                  className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/25 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-white/10 sm:text-sm"
+                >
+                  <Edit3 size={14} />
+                  Modifier CRUD
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode('catalog')}
+                className="inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/25 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:text-sm"
+              >
+                <ArrowLeft size={14} />
+                Catalogue
+              </button>
+            </div>
+          </div>
+
+          {items.length === 0 ? (
+            <div className="rounded-2xl border border-[#d8e6ee] bg-white p-10 text-center">
+              <BarChart3 size={32} className="mx-auto text-[#89a8bb]" />
+              <h3 className="mt-3 text-base font-extrabold text-[#072a3f]">
+                Aucun exercice disponible
+              </h3>
+              <p className="mt-1 text-sm text-[#607f93]">
+                Créez et publiez un exercice pour suivre les tentatives de vos élèves.
+              </p>
+              <button
+                type="button"
+                onClick={resetEditor}
+                className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2 text-sm font-bold text-white"
+              >
+                <Plus size={16} />
+                Nouvel exercice
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Multi-Criteria Attempt Filter Bar */}
+              <div className="space-y-3 rounded-2xl border border-[#d8e6ee] bg-white p-4 shadow-[0_6px_20px_rgba(7,42,63,0.03)] sm:p-5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <label className="relative block sm:col-span-2 lg:col-span-1">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                      Recherche élève
+                    </span>
+                    <div className="relative">
+                      <Search
+                        size={15}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#607f93]"
+                      />
+                      <input
+                        type="search"
+                        value={attemptFilters.search}
+                        onChange={e =>
+                          setAttemptFilters(prev => ({ ...prev, search: e.target.value }))
+                        }
+                        placeholder="Nom, N°, classe…"
+                        className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] py-2 pl-9 pr-3 text-sm text-[#072a3f] placeholder:text-[#89a8bb]"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                      Classe
+                    </span>
+                    <select
+                      aria-label="Filtrer les tentatives par classe"
+                      value={attemptFilters.classId}
+                      onChange={e =>
+                        setAttemptFilters(prev => ({ ...prev, classId: e.target.value }))
+                      }
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                    >
+                      <option value="all">Toutes les classes</option>
+                      {availableAttemptClasses.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                      Progression
+                    </span>
+                    <select
+                      aria-label="Filtrer par progression"
+                      value={attemptFilters.progress}
+                      onChange={e =>
+                        setAttemptFilters(prev => ({
+                          ...prev,
+                          progress: e.target.value as AttemptProgressFilter
+                        }))
+                      }
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                    >
+                      <option value="all">Tous les statuts</option>
+                      <option value="completed">Terminé</option>
+                      <option value="in_progress">En cours</option>
+                      <option value="not_started">Non commencé</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                      Résultat
+                    </span>
+                    <select
+                      aria-label="Filtrer par tranche de note"
+                      value={attemptFilters.scoreBand}
+                      onChange={e =>
+                        setAttemptFilters(prev => ({
+                          ...prev,
+                          scoreBand: e.target.value as AttemptScoreBandFilter
+                        }))
+                      }
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                    >
+                      <option value="all">Toutes les notes</option>
+                      <option value="passed">Réussi (≥ 50 %)</option>
+                      <option value="needs_review">À consolider (&lt; 50 %)</option>
+                      <option value="unscored">Sans note</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-[#607f93]">
+                      Trier par
+                    </span>
+                    <select
+                      aria-label="Trier les tentatives"
+                      value={attemptFilters.sortBy}
+                      onChange={e =>
+                        setAttemptFilters(prev => ({
+                          ...prev,
+                          sortBy: e.target.value as AttemptSortOption
+                        }))
+                      }
+                      className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
+                    >
+                      <option value="name_asc">Nom (A–Z)</option>
+                      <option value="score_desc">Meilleure note ↓</option>
+                      <option value="score_asc">Meilleure note ↑</option>
+                      <option value="attempts_desc">Tentatives ↓</option>
+                      <option value="activity_desc">Dernière activité</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eaf1f6] pt-3">
+                  <p className="text-xs font-semibold tabular-nums text-[#46657a]" aria-live="polite">
+                    {filteredAttempts.length} élève{filteredAttempts.length === 1 ? '' : 's'} affiché
+                    {filteredAttempts.length === 1 ? '' : 's'} sur {attempts.length}
+                    {activeAttemptFilterCount > 0 && ` · ${activeAttemptFilterCount} filtre(s) actif(s)`}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={attemptsLoading || !attemptsExerciseId}
+                      onClick={() => void loadAttemptsForExercise(attemptsExerciseId, false)}
+                      className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#cfe1ec] bg-white px-3 py-1.5 text-xs font-bold text-[#0b3c5d] hover:bg-[#f5f9fc] disabled:opacity-50"
+                    >
+                      <RefreshCw size={13} className={attemptsLoading ? 'animate-spin' : ''} />
+                      Actualiser les données
+                    </button>
+                    {activeAttemptFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAttemptFilters(DEFAULT_ATTEMPT_FILTERS)}
+                        className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold text-[#0b3c5d] underline decoration-[#b3cad9] underline-offset-2 hover:text-[#072a3f]"
+                      >
+                        <RotateCcw size={13} />
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Summary */}
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                  <div className="flex items-center justify-between text-[#607f93]">
+                    <span className="text-xs font-semibold">Étudiants affichés</span>
+                    <Users size={17} />
+                  </div>
+                  <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
+                    {attemptSummary.total}
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-[#bfe3ce] bg-[#eef9f3]/70 p-4">
+                  <div className="flex items-center justify-between text-[#17613e]">
+                    <span className="text-xs font-semibold">Terminés</span>
+                    <CheckCircle2 size={17} />
+                  </div>
+                  <p className="mt-2 text-2xl font-black tabular-nums text-[#145c3d]">
+                    {attemptSummary.completed}
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-[#eed9aa] bg-[#fef9ec]/70 p-4">
+                  <div className="flex items-center justify-between text-[#8a5108]">
+                    <span className="text-xs font-semibold">En cours</span>
+                    <Clock3 size={17} />
+                  </div>
+                  <p className="mt-2 text-2xl font-black tabular-nums text-[#8a5108]">
+                    {attemptSummary.inProgress}
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-[#dde7ee] bg-[#f5f8fa] p-4">
+                  <div className="flex items-center justify-between text-[#4c697c]">
+                    <span className="text-xs font-semibold">Non commencés</span>
+                    <CircleDashed size={17} />
+                  </div>
+                  <p className="mt-2 text-2xl font-black tabular-nums text-[#4c697c]">
+                    {attemptSummary.notStarted}
+                  </p>
+                </article>
+              </div>
+
+              {/* Student Progression Table (Fixed Header Alignment) */}
+              <div className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-[0_6px_20px_rgba(7,42,63,0.03)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eaf1f6] px-4 py-4">
+                  <div>
+                    <h3 className="font-bold text-[#072a3f]">Progression des étudiants</h3>
+                    <p className="mt-0.5 text-xs text-[#607f93]">
+                      La meilleure note terminée est conservée pour le suivi pédagogique.
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold tabular-nums text-[#46657a]">
+                    {attemptSummary.total} étudiant(s)
+                  </span>
+                </div>
+
+                {attemptsLoading ? (
+                  <div className="space-y-2.5 p-5">
+                    {[1, 2, 3].map(idx => (
+                      <div key={idx} className="h-11 animate-pulse rounded-xl bg-[#f3f8fb]" />
+                    ))}
+                  </div>
+                ) : filteredAttempts.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <Users className="mx-auto mb-2 text-[#89a8bb]" size={30} />
+                    <p className="font-semibold text-[#315267]">
+                      Aucun étudiant dans cette sélection
+                    </p>
+                    <p className="mt-1 text-xs text-[#607f93]">
+                      {attempts.length === 0
+                        ? 'Vérifiez les classes attribuées à cet exercice.'
+                        : 'Modifiez ou réinitialisez vos critères de recherche.'}
+                    </p>
+                    {activeAttemptFilterCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAttemptFilters(DEFAULT_ATTEMPT_FILTERS)}
+                        className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-1.5 text-xs font-bold text-[#0b3c5d]"
+                      >
+                        <RotateCcw size={13} />
+                        Réinitialiser les filtres
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[780px] text-left text-sm">
+                      <thead className="bg-[#f5f9fc] text-[11px] font-bold uppercase tracking-wide text-[#46657a]">
+                        <tr>
+                          <th className="px-4 py-3">Étudiant</th>
+                          <th className="px-4 py-3">Classe</th>
+                          <th className="px-4 py-3">Progression</th>
+                          <th className="px-4 py-3 text-right">Meilleure note</th>
+                          <th className="px-4 py-3 text-right">Tentatives</th>
+                          <th className="px-4 py-3">Dernière activité</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eaf1f6]">
+                        {filteredAttempts.map(row => {
+                          const done = row.status === 'completed';
+                          const running = row.status === 'in_progress';
+                          const score = row.best_score;
+                          const scoreMax = row.max_score;
+                          const percentage = getAttemptPercentage(row);
+                          const score20 =
+                            percentage !== null
+                              ? ((Number(score) / Number(scoreMax)) * 20)
+                                  .toFixed(2)
+                                  .replace(/\.00$/, '')
+                              : null;
+
+                          const progressBadge = done ? (
+                            <StatusBadge tone="success">Terminé</StatusBadge>
+                          ) : running && score !== null && score !== undefined ? (
+                            <StatusBadge tone="warning">Nouvelle tentative</StatusBadge>
+                          ) : running ? (
+                            <StatusBadge tone="warning">En cours</StatusBadge>
+                          ) : (
+                            <StatusBadge tone="neutral">Non commencé</StatusBadge>
+                          );
+
+                          return (
+                            <tr
+                              key={`${row.student_id}-${row.class_id}`}
+                              className="transition hover:bg-[#f7fafc]"
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <StudentAvatar
+                                    name={row.student_name || 'Élève'}
+                                    src={row.avatar_url || undefined}
+                                    className="h-9 w-9 border border-[#d8e6ee] text-xs"
+                                  />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-bold text-[#072a3f]">
+                                      {row.student_name}
+                                    </p>
+                                    {row.student_number && (
+                                      <p className="text-[11px] tabular-nums text-[#607f93]">
+                                        N° {row.student_number}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-[#46657a]">{row.class_name}</td>
+                              <td className="px-4 py-3">{progressBadge}</td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="font-bold tabular-nums text-[#072a3f]">
+                                  {score !== null && score !== undefined && scoreMax > 0 ? (
+                                    <>
+                                      {score}{' '}
+                                      <span className="font-medium text-[#607f93]">
+                                        / {scoreMax}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="font-medium text-[#89a8bb]">—</span>
+                                  )}
+                                </div>
+                                {percentage !== null && (
+                                  <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#46657a]">
+                                    {Math.round(percentage)} % · {score20}/20
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#315267]">
+                                {row.attempt_count}
+                              </td>
+                              <td className="px-4 py-3 text-xs tabular-nums text-[#607f93]">
+                                {formatDateTime(row.completed_at || row.started_at)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {row.best_attempt_id ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setReviewStudent(row)}
+                                    className="inline-flex min-h-9 items-center whitespace-nowrap rounded-xl border border-[#cfe0ea] bg-[#f5f9fc] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3]"
+                                  >
+                                    Voir les réponses
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-[#89a8bb]">Aucune terminée</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Analytics Section */}
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <h3 className="font-bold text-[#072a3f]">Analyse pédagogique</h3>
+                    <p className="mt-0.5 text-xs text-[#607f93]">
+                      Indicateurs calculés sur la meilleure tentative terminée des élèves affichés (
+                      {attemptSummary.total}).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                    <p className="text-xs font-semibold text-[#607f93]">Score moyen</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
+                      {performanceSummary.average === null
+                        ? '—'
+                        : `${performanceSummary.average.toFixed(1)} %`}
+                    </p>
+                  </article>
+                  <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                    <p className="text-xs font-semibold text-[#607f93]">Taux de réussite</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#145c3d]">
+                      {performanceSummary.successRate === null
+                        ? '—'
+                        : `${Math.round(performanceSummary.successRate)} %`}
+                    </p>
+                    <p className="text-[11px] text-[#607f93]">Seuil : 50 %</p>
+                  </article>
+                  <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                    <p className="text-xs font-semibold text-[#607f93]">Taux d’achèvement</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
+                      {Math.round(performanceSummary.completionRate)} %
+                    </p>
+                  </article>
+                  <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                    <p className="text-xs font-semibold text-[#607f93]">Tentatives moyennes</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
+                      {performanceSummary.averageAttempts.toFixed(1)}
+                    </p>
+                  </article>
+                </div>
+
+                <div className="rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                  <h4 className="text-sm font-bold text-[#072a3f]">
+                    Répartition des meilleures notes
+                  </h4>
+                  <p className="mt-0.5 text-xs text-[#607f93]">
+                    Nombre d’élèves par tranche de pourcentage.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {scoreDistribution.map(bucket => (
+                      <div
+                        key={bucket.label}
+                        className="grid grid-cols-[78px_1fr_34px] items-center gap-3 text-xs"
+                      >
+                        <span className="tabular-nums text-[#46657a]">{bucket.label}</span>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-[#e6f0f7]">
+                          <div
+                            className="h-full rounded-full bg-[#2fa36b]"
+                            style={{
+                              width: `${
+                                performanceSummary.scoredCount
+                                  ? (bucket.count / performanceSummary.scoredCount) * 100
+                                  : 0
+                              }%`
+                            }}
+                          />
+                        </div>
+                        <strong className="text-right tabular-nums text-[#072a3f]">
+                          {bucket.count}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {questionStats.length > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white">
+                  <div className="border-b border-[#eaf1f6] px-4 py-4">
+                    <h3 className="font-bold text-[#072a3f]">Analyse par question</h3>
+                    <p className="mt-0.5 text-xs text-[#607f93]">
+                      Réponses des dernières tentatives selon les filtres sélectionnés.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[600px] text-left text-xs">
+                      <thead className="bg-[#f5f9fc] text-[11px] font-bold uppercase tracking-wide text-[#46657a]">
+                        <tr>
+                          <th className="p-3.5">Question</th>
+                          <th className="p-3.5 text-right">Réponses</th>
+                          <th className="p-3.5 text-right">Correctes</th>
+                          <th className="p-3.5 text-right">Réussite</th>
+                          <th className="p-3.5 text-right">Points obtenus</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eaf1f6]">
+                        {questionStats.map((row, index) => (
+                          <tr key={row.id} className="hover:bg-[#f7fafc]">
+                            <td className="max-w-md p-3.5 text-[#315267]">
+                              <span className="font-bold text-[#072a3f]">Q{index + 1}. </span>
+                              {row.label}
+                            </td>
+                            <td className="p-3.5 text-right tabular-nums text-[#46657a]">
+                              {row.responses}
+                            </td>
+                            <td className="p-3.5 text-right tabular-nums text-[#46657a]">
+                              {row.correct}
+                            </td>
+                            <td className="p-3.5 text-right font-semibold tabular-nums text-[#072a3f]">
+                              {row.rate === null ? '—' : `${row.rate} %`}
+                            </td>
+                            <td className="p-3.5 text-right font-semibold tabular-nums text-[#072a3f]">
+                              {row.points} / {row.maxPoints}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Review Best Attempt Modal */}
+          {reviewStudent && (
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Réponses de la meilleure tentative"
+            >
+              <section className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-2xl">
+                <header className="flex items-start justify-between gap-3 border-b border-[#eaf1f6] p-5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <StudentAvatar
+                      name={reviewStudent.student_name || 'Élève'}
+                      src={reviewStudent.avatar_url || undefined}
+                      className="h-11 w-11 border border-[#d8e6ee] text-sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#2fa36b]">
+                        Meilleure tentative
+                      </p>
+                      <h3 className="truncate text-lg font-black text-[#072a3f]">
+                        {reviewStudent.student_name}
+                      </h3>
+                      <p className="text-xs tabular-nums text-[#607f93] sm:text-sm">
+                        {reviewStudent.class_name} · {reviewStudent.best_score} /{' '}
+                        {reviewStudent.max_score} points
+                        {getAttemptPercentage(reviewStudent) !== null &&
+                          ` (${Math.round(getAttemptPercentage(reviewStudent)!)} %)`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReviewStudent(null)}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#d8e6ee] px-3 py-2 text-sm font-semibold text-[#46657a] hover:bg-[#f5f9fc]"
+                  >
+                    <X size={15} />
+                    Fermer
+                  </button>
+                </header>
+
+                <div className="space-y-3 overflow-y-auto p-5">
+                  {(reviewStudent.best_details || []).map((detail, index) => {
+                    const question = activeAttemptsExercise?.questions.find(
+                      item => item.id === detail.question_id
+                    );
+                    const expected =
+                      question?.answers?.join(' / ') ||
+                      question?.correct_answer ||
+                      question?.verbes_trous?.phrases
+                        ?.map(phrase => phrase.reponses?.join(' / '))
+                        .join(' · ') ||
+                      'Correction non disponible';
+
+                    return (
+                      <article
+                        key={detail.question_id}
+                        className="rounded-xl border border-[#d8e6ee] p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <h4 className="font-bold text-[#072a3f]">
+                            Question {index + 1} — {question?.question || detail.question_id}
+                          </h4>
+                          {detail.correct ? (
+                            <StatusBadge tone="success">Correcte</StatusBadge>
+                          ) : detail.timed_out ? (
+                            <StatusBadge tone="warning">Temps écoulé</StatusBadge>
+                          ) : (
+                            <StatusBadge tone="danger">À corriger</StatusBadge>
+                          )}
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div className="rounded-xl bg-[#f5f9fc] p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-[#607f93]">
+                              Réponse de l’élève
+                            </p>
+                            <p className="mt-1 break-words text-sm font-medium text-[#072a3f]">
+                              {detail.answer == null
+                                ? 'Aucune réponse'
+                                : typeof detail.answer === 'string'
+                                ? detail.answer
+                                : JSON.stringify(detail.answer)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-[#eef9f3] p-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-[#17613e]">
+                              Réponse attendue
+                            </p>
+                            <p className="mt-1 break-words text-sm font-medium text-[#072a3f]">
+                              {typeof expected === 'string' ? expected : JSON.stringify(expected)}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold tabular-nums text-[#46657a]">
+                          Points : {detail.points ?? 0} / {detail.max_points ?? question?.points ?? 0}
+                        </p>
+                        {question?.explanation && (
+                          <p className="mt-1.5 text-xs leading-relaxed text-[#607f93]">
+                            {question.explanation}
+                          </p>
+                        )}
+                      </article>
+                    );
+                  })}
+
+                  {(!reviewStudent.best_details || reviewStudent.best_details.length === 0) && (
+                    <p className="rounded-xl bg-[#fef9ec] p-4 text-sm text-[#8a5108]">
+                      Aucun détail de réponse n’a été enregistré pour cette tentative.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
