@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Exam, ClassRoom, Student } from '../types';
 import { dataService } from '../services/dataService';
+import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
 import heroImage from '../assets/images/hero_italian_oral_exam_1790527515781.webp';
 
 interface DashboardViewProps {
@@ -44,6 +45,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectTab 
 }) => {
   const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
+  const [showQuizAnalytics, setShowQuizAnalytics] = useState(false);
 
   const stats = selectedExamId ? dataService.getStatistics(selectedExamId) : null;
   const currentExam = exams.find(e => e.id === selectedExamId);
@@ -246,15 +248,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </button>
               </div>
             </div>
-            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <div className="pt-4 mt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 font-mono">
               <span>Import JSON disponible</span>
-              <button 
-                type="button"
-                onClick={() => navigate('quizzes')}
-                className="text-amber-800 hover:underline font-semibold"
-              >
-                Ouvrir &rarr;
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowQuizAnalytics(true)}
+                  className="text-[#0b3c5d] hover:underline font-semibold"
+                >
+                  Analyser les résultats
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('quizzes')}
+                  className="text-amber-800 hover:underline font-semibold"
+                >
+                  Ouvrir &rarr;
+                </button>
+              </div>
             </div>
           </div>
 
@@ -574,5 +585,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
     </div>
+      {showQuizAnalytics && (
+        <QuizAnalyticsDashboard
+          initialClassId={classes[0]?.id || ''}
+          initialQuizId=""
+          classes={classes}
+          students={students}
+          quizzes={dataService.getQuizzes()}
+          submissions={dataService.getQuizSubmissions()}
+          onClose={() => setShowQuizAnalytics(false)}
+        />
+      )}
   );
 };
