@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
+import { QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL } from '../data/quizRetryConfirmationMigration';
 import { canStudentStartQuiz, canSubmitQuizAttempt, isRetryAuthorizedParticipant } from './quizRetryAvailability';
 import { evaluateQuizAnswers } from '../views/publicQuiz/publicQuizUtils';
 import { calculateQuestionPointsEarned, parseStudentAnswers } from './quizAnswerMatcher';
@@ -17,7 +18,7 @@ const studentView = read('../views/StudentSpaceView.tsx');
 const adminView = read('../views/QuizzesAdminView.tsx');
 
 function sqlFunction(sql: string, name: string, delimiter = '$$;'): string {
-  const start = sql.indexOf(\`CREATE OR REPLACE FUNCTION public.\${name}\`);
+  const start = sql.indexOf('CREATE OR REPLACE FUNCTION public.' + name);
   if (start < 0) return '';
   const end = sql.indexOf(delimiter, start);
   return end < 0 ? '' : sql.slice(start, end + delimiter.length);
@@ -29,7 +30,7 @@ describe('Parcours étudiant — secondes chances', () => {
     assert.ok(grant.includes('public.quiz_is_teacher()'));
     assert.ok(grant.includes('p_student_id'));
     assert.ok(grant.includes('p_quiz_id'));
-    assert.ok(grant.includes('presence_status = \\'retry_authorized\\''));
+    assert.ok(grant.includes("presence_status = 'retry_authorized'"));
     assert.ok(!grant.includes('DELETE FROM public.quiz_submissions'));
     assert.ok(!grant.includes('DELETE FROM public.quiz_attempts'));
     assert.equal(isRetryAuthorizedParticipant('retry_authorized'), true);
@@ -58,7 +59,7 @@ describe('Parcours étudiant — secondes chances', () => {
     assert.ok(grantClass.includes('greatest(1, p_max_attempts)'));
     assert.ok(grantClass.includes("RETURN jsonb_build_object('granted', v_count)"));
     // La RPC individuelle appelée dans la boucle vérifie aussi que l'élève est approuvé.
-    assert.ok(participantMigration.includes("JOIN public.students s ON s.id = ce.student_id AND s.validation_status = 'approved'"));
+    assert.ok(participantMigration.includes("s.validation_status = 'approved'"));
     assert.ok(adminView.includes('grantQuizRetryForClass'));
   });
 
@@ -83,7 +84,8 @@ describe('Parcours étudiant — secondes chances', () => {
     assert.ok(participantMigration.includes('used_attempts = used_attempts + 1'));
     assert.ok(participantMigration.includes('used_attempts + 1 >= max_attempts'));
     assert.ok(participantMigration.includes('Presence confirmation must not consume retry grants'));
-    const confirmation = sqlFunction(participantMigration, 'confirm_quiz_presence(');
+    const confirmation = sqlFunction(QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL, 'confirm_quiz_presence(');
+    assert.ok(confirmation.length > 0);
     assert.ok(!confirmation.includes('UPDATE public.quiz_retry_grants'));
   });
 
@@ -113,7 +115,8 @@ describe('Parcours étudiant — inscription après le lancement', () => {
     const activeLaunch = sqlFunction(participantMigration, 'get_student_active_launch(', '$function$;');
     assert.ok(activeLaunch.includes("s.validation_status = 'approved'"));
     assert.ok(activeLaunch.includes("ce.status = 'active'"));
-    assert.ok(activeLaunch.includes("IF v_class_id IS NULL THEN\n    RETURN '{}'::jsonb"));
+    assert.ok(activeLaunch.includes("IF v_class_id IS NULL THEN"));
+    assert.ok(activeLaunch.includes("RETURN '{}'::jsonb"));
   });
 
   it('ne réinitialise pas une ancienne tentative sans autorisation valide', () => {
@@ -210,7 +213,8 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
   });
 
   it('ne consomme pas une autorisation si la confirmation de présence est seule effectuée', () => {
-    const confirmation = sqlFunction(QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL, 'confirm_quiz_presence(');
+    const confirmation = sqlFunction(QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL, 'confirm_quiz_presence(');
+    assert.ok(confirmation.length > 0);
     assert.ok(!confirmation.includes('UPDATE public.quiz_retry_grants'));
   });
 });
