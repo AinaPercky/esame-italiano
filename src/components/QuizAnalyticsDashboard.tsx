@@ -97,19 +97,27 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const scopedSubmissions = studentId
     ? classSubmissions.filter(submission => submission.student_id === studentId)
     : classSubmissions;
-  const submissionsWithAnswerDetails = scopedSubmissions.filter(submissionHasDetailedAnswerData).length;
-  const submissionsWithoutAnswerDetails = scopedSubmissions.length - submissionsWithAnswerDetails;
+  // Les lignes is_counted=false correspondent à des tentatives historiques/non retenues.
+  // Les absences (missed) ne doivent pas faire baisser la moyenne pédagogique.
+  const countedSubmissions = scopedSubmissions.filter(submission => submission.is_counted !== false);
+  const gradedSubmissions = countedSubmissions.filter(submission =>
+    submission.status === 'completed' || submission.status === 'timeout'
+  );
+  const submissionsWithAnswerDetails = gradedSubmissions.filter(submissionHasDetailedAnswerData).length;
+  const submissionsWithoutAnswerDetails = gradedSubmissions.length - submissionsWithAnswerDetails;
 
   const studentMeans = useMemo(() => {
     const means = new Map<string, number>();
     classStudents.forEach(student => {
-      const scores = classSubmissions.filter(submission => submission.student_id === student.id).map(scoreOf);
+      const scores = classSubmissions
+        .filter(submission => submission.student_id === student.id && (submission.status === 'completed' || submission.status === 'timeout'))
+        .map(scoreOf);
       if (scores.length) means.set(student.id, mean(scores) || 0);
     });
     return means;
   }, [classStudents, classSubmissions]);
   const classAverage = mean(Array.from(studentMeans.values()));
-  const studentScores = scopedSubmissions.map(scoreOf);
+  const studentScores = gradedSubmissions.map(scoreOf);
   const selectedAverage = studentId ? mean(studentScores) : null;
   const primaryAverage = studentId ? selectedAverage : classAverage;
   const successRate = studentScores.length
@@ -153,7 +161,9 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   }, [visibleQuizzes, classSubmissions, studentId]);
 
   const trend = useMemo(() => visibleQuizzes.map(quiz => {
-    const quizSubs = classSubmissions.filter(submission => submission.quiz_id === quiz.id);
+    const quizSubs = classSubmissions.filter(submission =>
+      submission.quiz_id === quiz.id && (submission.status === 'completed' || submission.status === 'timeout')
+    );
     const byStudent = new Map<string, number[]>();
     quizSubs.forEach(submission => {
       const values = byStudent.get(submission.student_id) || [];
@@ -182,7 +192,7 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const selectedName = fullName(selectedStudent, 'cet élève');
   const recommendations: string[] = [];
 
-  if (!scopedSubmissions.length) {
+  if (!gradedSubmissions.length) {
     recommendations.push('Aucun résultat disponible pour cette sélection. Choisissez un autre quiz ou attendez les premières copies avant de tirer une conclusion.');
   } else if (studentId) {
     if (primaryAverage !== null && primaryAverage < 10) {
@@ -244,7 +254,7 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Indicateurs principaux">
             <Kpi label={studentId ? 'Moyenne de l’élève' : 'Moyenne de la classe'} value={formatScore(primaryAverage)} detail={studentId ? selectedName : 'Moyenne des élèves ayant des résultats'} />
-            <Kpi label="Copies analysées" value={String(scopedSubmissions.length)} detail={`${visibleQuizzes.length} quiz dans la sélection`} />
+            <Kpi label="Copies analysées" value={String(gradedSubmissions.length)} detail={`${visibleQuizzes.length} quiz · hors absences`} />
             <Kpi label="Copies ≥ 10/20" value={successRate === null ? '—' : `${Math.round(successRate)}%`} detail="Part des copies au seuil de réussite" />
             <Kpi label="Participation" value={participationRate === null ? '—' : `${Math.round(participationRate)}%`} detail={`${assessedStudentCount} élève(s) avec résultat sur ${classStudents.length}`} />
           </div>
@@ -253,7 +263,7 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
               <BookOpen className="mx-auto h-8 w-8 text-slate-300" />
               <h3 className="mt-3 text-sm font-bold text-slate-800">Aucun résultat pour cette sélection</h3>
-              <p className="mt-1 text-xs text-slate-500">Changez le quiz ou choisissez « Toute la classe » pour consulter d’autres copies.</p>
+              <p className="mt-1 text-xs text-slate-500">Aucune copie terminée ou expirée exploitable. Les absences ne sont pas intégrées aux moyennes.</p>
             </div>
           ) : (
             <>
