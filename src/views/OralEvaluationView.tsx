@@ -124,11 +124,13 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
     maxDurationSeconds: number;
     timerStatus: 'completed' | 'stopped_manually' | 'not_timed';
     isExpired: boolean;
+    hasStarted: boolean;
   }>({
     durationUsedSeconds: 0,
     maxDurationSeconds: 180,
     timerStatus: 'not_timed',
-    isExpired: false
+    isExpired: false,
+    hasStarted: false
   });
 
   // Synchronisation lors de la réception de props initiales (navigation depuis ordre de passage)
@@ -225,7 +227,8 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
         durationUsedSeconds: usedSecs,
         maxDurationSeconds: existing.max_duration_seconds || currentExam?.duration_seconds || 180,
         timerStatus: existing.timer_status || (usedSecs > 0 ? 'stopped_manually' : 'not_timed'),
-        isExpired: usedSecs >= (existing.max_duration_seconds || currentExam?.duration_seconds || 180)
+        isExpired: usedSecs >= (existing.max_duration_seconds || currentExam?.duration_seconds || 180),
+        hasStarted: usedSecs > 0
       });
     } else {
       // Nouvelle évaluation : tout décoché par défaut et formulaires d'erreurs vierges
@@ -243,7 +246,8 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
         durationUsedSeconds: 0,
         maxDurationSeconds: currentExam?.duration_seconds || 180,
         timerStatus: 'not_timed',
-        isExpired: false
+        isExpired: false,
+        hasStarted: false
       });
     }
     setSaveSuccessMessage(null);
@@ -252,6 +256,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   // Saisie d'une erreur dans le formulaire de la rubrique
   // RÈGLE DEMANDÉE : Dès que ce formulaire est rempli, la rubrique n'est PAS validée (décochée)
   const handleErrorNoteChange = (rubricId: string, text: string) => {
+    if (!timingData.hasStarted) return;
     setErrorNotes(prev => ({
       ...prev,
       [rubricId]: text
@@ -270,6 +275,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // Effacer l'erreur d'une rubrique
   const handleClearError = (rubricId: string) => {
+    if (!timingData.hasStarted) return;
     setErrorNotes(prev => ({
       ...prev,
       [rubricId]: ''
@@ -280,6 +286,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // Toggle une rubrique (cocher / décocher)
   const handleToggleRubric = (rubricId: string) => {
+    if (!timingData.hasStarted) return;
     const willBeChecked = !validatedRubrics[rubricId];
 
     if (willBeChecked) {
@@ -302,6 +309,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // Actions de masse
   const handleValidateAll = () => {
+    if (!timingData.hasStarted) return;
     const vMap: Record<string, boolean> = {};
     const eMap: Record<string, string> = {};
     rubrics.forEach(r => {
@@ -314,6 +322,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   };
 
   const handleResetAll = () => {
+    if (!timingData.hasStarted) return;
     const vMap: Record<string, boolean> = {};
     rubrics.forEach(r => {
       vMap[r.id] = false;
@@ -323,6 +332,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
   };
 
   const handleClearAllErrors = () => {
+    if (!timingData.hasStarted) return;
     const eMap: Record<string, string> = {};
     rubrics.forEach(r => {
       eMap[r.id] = '';
@@ -356,6 +366,11 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // Enregistrement de l'évaluation (Section 5.2 & 5.3)
   const handleSaveEvaluation = async () => {
+    if (!timingData.hasStarted) {
+      setSaveErrorMessage('Démarrez le chronomètre avant de remplir ou d’enregistrer la grille d’évaluation.');
+      setSaveSuccessMessage(null);
+      return;
+    }
     if (!selectedExamId || !selectedStudentId || isSaving) return;
     if (rubrics.length === 0) {
       setSaveErrorMessage('Aucun critère n’est configuré pour cet examen. Enregistrez d’abord une grille d’évaluation.');
@@ -640,7 +655,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
           key={`${selectedExamId}:${selectedStudentId}:${initialElapsedSeconds}:${timingData.maxDurationSeconds}`}
           maxSeconds={timingData.maxDurationSeconds || currentExam.duration_seconds || 180}
           initialElapsedSeconds={initialElapsedSeconds}
-          onTimeChange={setTimingData}
+          onTimeChange={(data) => setTimingData(prev => ({ ...prev, ...data, hasStarted: data.hasStarted }))}
         />
       )}
 
@@ -682,6 +697,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
           <div className="flex items-center gap-2 self-start sm:self-auto text-xs flex-wrap">
             <button
               onClick={handleValidateAll}
+              disabled={!timingData.hasStarted}
               className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer"
             >
               Tout valider
@@ -689,6 +705,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             <span className="text-slate-300">|</span>
             <button
               onClick={handleResetAll}
+              disabled={!timingData.hasStarted}
               className="px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded font-medium transition-colors cursor-pointer"
             >
               Tout décocher
@@ -698,6 +715,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                 <span className="text-slate-300">|</span>
                 <button
                   onClick={handleClearAllErrors}
+                  disabled={!timingData.hasStarted}
                   className="px-2.5 py-1 text-rose-700 hover:text-rose-900 hover:bg-rose-50 rounded font-medium transition-colors cursor-pointer"
                   title="Effacer le texte d'erreur sur toutes les rubriques"
                 >
@@ -720,6 +738,8 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
               <div
                 key={rubric.id}
                 onClick={() => handleToggleRubric(rubric.id)}
+                aria-disabled={!timingData.hasStarted}
+                style={{ pointerEvents: timingData.hasStarted ? 'auto' : 'none', opacity: timingData.hasStarted ? 1 : 0.6 }}
                 className={`p-4 transition-colors select-none cursor-pointer ${
                   hasError 
                     ? 'bg-rose-50/30 hover:bg-rose-50/50 border-l-4 border-l-rose-500' 
@@ -822,6 +842,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                       <input
                         type="text"
                         value={errorNotes[rubric.id] || ''}
+                        disabled={!timingData.hasStarted}
                         onChange={(e) => handleErrorNoteChange(rubric.id, e.target.value)}
                         placeholder="Saisir l'erreur commise (ex: oubli de l'auxiliaire, accord grammatical incorrect, vocabulaire erroné...)"
                         className={`w-full px-3 py-1.5 text-xs rounded-lg border transition-all focus:outline-none ${
@@ -834,6 +855,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
                     {hasError && (
                       <button
                         type="button"
+                        disabled={!timingData.hasStarted}
                         onClick={() => handleClearError(rubric.id)}
                         className="px-2.5 py-1.5 text-xs font-semibold text-rose-800 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 border border-rose-200 rounded-lg shrink-0 transition-colors cursor-pointer"
                         title="Effacer cette erreur pour autoriser la validation de la rubrique"
@@ -900,7 +922,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
             <button
               type="button"
               onClick={handleSaveEvaluation}
-              disabled={isSaving || rubrics.length === 0}
+              disabled={isSaving || rubrics.length === 0 || !timingData.hasStarted}
               className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-amber-800 hover:bg-amber-900 active:bg-amber-950 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-all min-h-[44px]"
             >
               <Save className="w-4 h-4 shrink-0" />
