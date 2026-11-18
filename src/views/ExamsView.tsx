@@ -47,6 +47,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const [newDescription, setNewDescription] = useState('');
   const [newExamDate, setNewExamDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExamLevel, setNewExamLevel] = useState<CEFRLevel | ''>('');
+  const [newDurationSeconds, setNewDurationSeconds] = useState(180);
+  const [durationDraftSeconds, setDurationDraftSeconds] = useState(180);
 
   // Rubric Editing inside Details Modal
   const [rubricsDraft, setRubricsDraft] = useState<ExamRubric[]>([]);
@@ -71,6 +73,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     if (full) {
       setSelectedExamForDetails(full);
       setRubricsDraft(full.rubrics || []);
+      setDurationDraftSeconds(Number(full.duration_seconds) || 180);
       setEditingRubricIndex(null);
     }
   };
@@ -80,11 +83,12 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     if (!newTitle.trim() || !newClassId) return;
 
     try {
-      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate, false, newExamLevel || null);
+      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate, false, newExamLevel || null, newDurationSeconds);
       setIsCreateModalOpen(false);
       setNewTitle('');
       setNewDescription('');
       setNewExamLevel('');
+      setNewDurationSeconds(180);
       onRefresh();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "La création de l'examen a échoué.");
@@ -109,6 +113,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const handleSaveRubrics = async () => {
     if (!selectedExamForDetails) return;
     try {
+      await dataService.updateExam(selectedExamForDetails.id, { duration_seconds: durationDraftSeconds });
       await dataService.updateExamRubrics(selectedExamForDetails.id, rubricsDraft);
       onRefresh();
       handleOpenDetails(selectedExamForDetails);
@@ -154,6 +159,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             setNewTitle('');
             setNewDescription('');
             setNewExamLevel('');
+            setNewDurationSeconds(180);
             setIsCreateModalOpen(true);
           }}
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl shadow-2xs transition-colors self-stretch sm:self-auto min-h-[44px]"
@@ -201,6 +207,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               columns={3}
               items={[
                 { label: 'Date', value: exam.exam_date },
+                { label: 'Durée / candidat', value: `${Math.floor((Number(exam.duration_seconds) || 180) / 60)} min` },
                 { label: 'Rubriques', value: `${exam.rubric_count ?? 0} rubr.` },
                 { label: 'Barème max', value: `${exam.max_score ?? 0} pts`, tone: 'accent' }
               ]}
@@ -306,6 +313,21 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Durée maximale par étudiant (minutes)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  step="1"
+                  required
+                  value={Math.floor(newDurationSeconds / 60)}
+                  onChange={(e) => setNewDurationSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm min-h-[44px]"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">Le compte à rebours sera réinitialisé pour chaque candidat. Valeur par défaut : 3 minutes.</p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Description / Consignes générales (facultatif)
                 </label>
@@ -359,15 +381,30 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     value={selectedExamForDetails.level || ''}
                     onChange={(e) => {
                       const level = e.target.value as CEFRLevel | '';
-                      dataService.updateExam(selectedExamForDetails.id, { level: level || null });
-                      setSelectedExamForDetails(previous => previous ? { ...previous, level: level || null } : previous);
-                      onRefresh();
+                      void dataService.updateExam(selectedExamForDetails.id, { level: level || null })
+                        .then(() => {
+                          setSelectedExamForDetails(previous => previous ? { ...previous, level: level || null } : previous);
+                          onRefresh();
+                        })
+                        .catch(error => window.alert(error instanceof Error ? error.message : 'Modification impossible.'));
                     }}
                     className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
                   >
                     <option value="">Non défini</option>
                     {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
                   </select>
+                </label>
+                <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
+                  Durée par candidat (minutes)
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    step="1"
+                    value={Math.floor(durationDraftSeconds / 60)}
+                    onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
+                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                  />
                 </label>
               </div>
               <button
