@@ -3,8 +3,6 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Award,
-  CalendarDays,
   Clock3,
   FileText,
   Loader2,
