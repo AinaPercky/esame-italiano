@@ -676,21 +676,24 @@ export const dataService = {
     return enriched;
   },
 
-  saveEvaluation(
-    examId: string, 
-    studentId: string, 
+  async saveEvaluation(
+    examId: string,
+    studentId: string,
     validatedMap: Record<string, boolean>,
     timing?: { duration_used_seconds?: number; max_duration_seconds?: number; timer_status?: 'completed' | 'stopped_manually' | 'not_timed' },
     errorNotesMap?: Record<string, string>
-  ): Evaluation {
+  ): Promise<Evaluation> {
     const exam = state.exams.find(e => e.id === examId);
     if (!exam) throw new Error('Examen introuvable');
     const student = state.students.find(s => s.id === studentId);
     if (!student) throw new Error('Élève introuvable');
 
     const rubrics = state.rubrics.filter(r => r.exam_id === examId);
-    let totalScore = 0;
+    if (rubrics.length === 0) {
+      throw new Error('Aucun critère n’est configuré pour cet examen. Ajoutez et enregistrez la grille avant de noter un élève.');
+    }
 
+    let totalScore = 0;
     const details = rubrics.map(r => {
       const errorNote = errorNotesMap ? (errorNotesMap[r.id] || '').trim() : '';
       const hasError = errorNote.length > 0;
@@ -709,57 +712,47 @@ export const dataService = {
     const existingIndex = state.evaluations.findIndex(
       e => e.exam_id === examId && e.student_id === studentId
     );
+    const previous = existingIndex !== -1 ? state.evaluations[existingIndex] : undefined;
+    const savedEval: Evaluation = {
+      ...(previous || {}),
+      id: previous && isUUID(previous.id) ? previous.id : generateUUID(),
+      exam_id: examId,
+      student_id: studentId,
+      total_score: totalScore,
+      status: 'completed',
+      created_at: previous?.created_at || now,
+      updated_at: now,
+      details,
+      max_duration_seconds: timing?.max_duration_seconds ?? previous?.max_duration_seconds ?? 180,
+      duration_used_seconds: timing?.duration_used_seconds ?? previous?.duration_used_seconds ?? 0,
+      timer_status: timing?.timer_status ?? previous?.timer_status ?? 'stopped_manually'
+    };
 
-    const maxDuration = timing?.max_duration_seconds ?? 180;
-    const durationUsed = timing?.duration_used_seconds ?? (existingIndex !== -1 ? state.evaluations[existingIndex].duration_used_seconds : 0);
-    const timerStatus = timing?.timer_status ?? (existingIndex !== -1 ? state.evaluations[existingIndex].timer_status : 'stopped_manually');
-    let savedEval: Evaluation;
+    // Cloud persistence is mandatory and awaited. Do not update local state or
+    // show a success state until the header AND every criterion are confirmed.
+    await supabaseService.saveEvaluation(savedEval);
 
     if (existingIndex !== -1) {
-      const currentId = state.evaluations[existingIndex].id;
-      savedEval = {
-        ...state.evaluations[existingIndex],
-        id: isUUID(currentId) ? currentId : generateUUID(),
-        total_score: totalScore,
-        status: 'completed',
-        details,
-        max_duration_seconds: maxDuration,
-        duration_used_seconds: durationUsed,
-        timer_status: timerStatus,
-        updated_at: now
-      };
       state.evaluations[existingIndex] = savedEval;
     } else {
-      savedEval = {
-        id: generateUUID(),
-        exam_id: examId,
-        student_id: studentId,
-        total_score: totalScore,
-        status: 'completed',
-        created_at: now,
-        updated_at: now,
-        details,
-        max_duration_seconds: maxDuration,
-        duration_used_seconds: durationUsed,
-        timer_status: timerStatus
-      };
       state.evaluations.push(savedEval);
     }
 
-    // Mettre à jour l'ordre de passage si l'élève est dedans
     const passOrderIdx = state.passOrder.findIndex(
       po => po.exam_id === examId && po.student_id === studentId
     );
     if (passOrderIdx !== -1) {
-      state.passOrder[passOrderIdx].status = 'completed';
+      state.passOrder[passOrderIdx] = { ...state.passOrder[passOrderIdx], status: 'completed' };
     }
 
     persistState();
     notifySubscribers();
 
-    // Persistance Cloud Supabase en temps réel
-    supabaseService.saveEvaluation(savedEval).catch(err => console.error('Cloud saveEvaluation error:', err));
-    supabaseService.savePassOrder(state.passOrder).catch(err => console.error('Cloud savePassOrder error:', err));
+    // Pass-order persistence is secondary; it must not invalidate a successfully
+    // saved evaluation, but its failure remains visible in diagnostics.
+    void supabaseService.savePassOrder(state.passOrder).catch(err => {
+      console.error('Cloud savePassOrder error:', err);
+    });
 
     return savedEval;
   },
