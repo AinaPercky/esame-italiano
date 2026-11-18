@@ -27,7 +27,7 @@ const evaluation = {
 };
 
 let rubricRows: Array<{ id: string; points: number }> = [];
-let calls: Array<{ table: string; operation: string; payload?: any }> = [];
+let calls: Array<{ table: string; operation: string; payload?: any; options?: any }> = [];
 let failures: Record<string, string> = {};
 
 function installFake() {
