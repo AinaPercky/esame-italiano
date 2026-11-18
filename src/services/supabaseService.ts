@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { normalizeOralExamDurationSeconds } from '../utils/oralExamTiming';
 import {
   ClassRoom,
   Exam,
@@ -860,7 +861,7 @@ class SupabaseService {
         level: exam.level ?? null,
         description: exam.description || null,
         exam_date: exam.exam_date || new Date().toISOString().split('T')[0],
-        duration_seconds: Math.max(15, Math.round(Number(exam.duration_seconds) || 180)),
+        duration_seconds: normalizeOralExamDurationSeconds(exam.duration_seconds),
         status: exam.status || 'in_progress',
         created_at: exam.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
@@ -1550,7 +1551,7 @@ class SupabaseService {
             title: e.title,
             description: e.description || null,
             exam_date: e.exam_date || new Date().toISOString().split('T')[0],
-            duration_seconds: Math.max(15, Math.round(Number(e.duration_seconds) || 180)),
+            duration_seconds: normalizeOralExamDurationSeconds(e.duration_seconds),
             status: e.status || 'in_progress',
             created_at: e.created_at || new Date().toISOString()
           }));
