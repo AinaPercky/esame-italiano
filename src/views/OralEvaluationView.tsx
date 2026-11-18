@@ -241,7 +241,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
       setInitialElapsedSeconds(0);
       setTimingData({
         durationUsedSeconds: 0,
-        maxDurationSeconds: 180,
+        maxDurationSeconds: currentExam?.duration_seconds || 180,
         timerStatus: 'not_timed',
         isExpired: false
       });
