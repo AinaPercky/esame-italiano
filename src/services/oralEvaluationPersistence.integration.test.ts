@@ -46,15 +46,25 @@ function installFake() {
             })
           };
         },
-        upsert: async (payload: any, options?: any) => {
+        upsert(payload: any, options?: any) {
           calls.push({ table, operation: 'upsert', payload, options });
-          return { error: failures[`${table}.upsert`] ? { message: failures[`${table}.upsert`] } : null };
+          return {
+            select: async (_columns: string) => ({
+              data: failures[`${table}.upsert`] ? null : table === 'evaluations'
+                ? [{ id: evaluationId }]
+                : payload.map((item: any) => ({ rubric_id: item.rubric_id })),
+              error: failures[`${table}.upsert`] ? { message: failures[`${table}.upsert`] } : null
+            })
+          };
         },
         update(payload: any) {
           calls.push({ table, operation: 'update', payload });
           return {
-            eq: async (_column: string, _value: string) => ({
-              error: failures[`${table}.update`] ? { message: failures[`${table}.update`] } : null
+            eq: (_column: string, _value: string) => ({
+              select: async (_columns: string) => ({
+                data: failures[`${table}.update`] ? null : [{ id: evaluationId }],
+                error: failures[`${table}.update`] ? { message: failures[`${table}.update`] } : null
+              })
             })
           };
         }
