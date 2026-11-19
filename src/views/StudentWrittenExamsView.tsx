@@ -216,6 +216,12 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       }, graceRemainingMs + debounceMs);
     };
     const hidden = () => {
+      // Mobile browsers may suspend the page as soon as the learner switches apps.
+      // Flush the current answer before suspension instead of waiting for the debounce.
+      if (document.hidden && isMobileDevice) {
+        const questionId = flat[index]?.question.id;
+        if (questionId) void save(questionId, answersRef.current).catch(() => {});
+      }
       if (document.hidden && attempt.exam.integrity_settings?.warn_on_tab_switch !== false) {
         if (!shouldDisqualifyWrittenExamVisibilityChange(isMobileDevice)) {
           void writtenExamService.logIntegrity(attempt.attempt_id, 'visibility_hidden', { page: 'written-exam', platform: 'mobile', policy: 'non_disqualifying' }).catch(() => {});
