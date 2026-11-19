@@ -44,6 +44,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   // New Exam Form
   const [newTitle, setNewTitle] = useState('');
   const [newClassId, setNewClassId] = useState(classes[0]?.id || '');
+  const [newClassIds, setNewClassIds] = useState<string[]>(classes[0]?.id ? [classes[0].id] : []);
+  const [newExamGlobal, setNewExamGlobal] = useState(false);
   const [newDescription, setNewDescription] = useState('');
   const [newExamDate, setNewExamDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExamLevel, setNewExamLevel] = useState<CEFRLevel | ''>('');
@@ -80,14 +82,16 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newClassId) return;
+    if (!newTitle.trim() || (!newExamGlobal && newClassIds.length === 0)) return;
 
     try {
-      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate, false, newExamLevel || null, newDurationSeconds);
+      await dataService.createExam(newTitle.trim(), newClassId || newClassIds[0] || classes[0]?.id || '', newDescription.trim(), newExamDate, false, newExamLevel || null, newDurationSeconds, newClassIds, newExamGlobal);
       setIsCreateModalOpen(false);
       setNewTitle('');
       setNewDescription('');
       setNewExamLevel('');
+      setNewClassIds(classes[0]?.id ? [classes[0].id] : []);
+      setNewExamGlobal(false);
       setNewDurationSeconds(180);
       onRefresh();
     } catch (error) {
@@ -159,6 +163,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             setNewTitle('');
             setNewDescription('');
             setNewExamLevel('');
+            setNewClassIds(classes[0]?.id ? [classes[0].id] : []);
+            setNewExamGlobal(false);
             setNewDurationSeconds(180);
             setIsCreateModalOpen(true);
           }}
@@ -273,19 +279,23 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Classe concernée <span className="text-[#0b3c5d]">*</span>
+                <div className="sm:col-span-2">
+                  <span className="block text-xs font-semibold text-slate-700 mb-2">
+                    Classes concernées <span className="text-[#0b3c5d">*</span>
+                  </span>
+                  <label className="mb-2 flex items-center gap-2 rounded-lg border border-[#b7d3e4] bg-[#f5f9fc] p-3 text-sm font-semibold text-[#072a3f]">
+                    <input type="checkbox" checked={newExamGlobal} onChange={e => setNewExamGlobal(e.target.checked)} />
+                    Toutes les classes (y compris celles créées ultérieurement)
                   </label>
-                  <select
-                    value={newClassId}
-                    onChange={(e) => setNewClassId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white min-h-[44px]"
-                  >
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                  {!newExamGlobal && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
+                    {classes.filter(cls => !cls.archived_at).map(cls => (
+                      <label key={cls.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" checked={newClassIds.includes(cls.id)}
+                          onChange={e => setNewClassIds(previous => e.target.checked ? [...previous, cls.id] : previous.filter(id => id !== cls.id))} />
+                        {cls.name}
+                      </label>
                     ))}
-                  </select>
+                  </div>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
