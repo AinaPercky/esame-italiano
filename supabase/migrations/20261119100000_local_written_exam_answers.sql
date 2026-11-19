@@ -186,7 +186,7 @@ begin
   )
   select coalesce(max(question_index),-1) into v_max_allowed_index
   from ordered_questions
-  where now()>=v_attempt.question_timer_started_at+make_interval(secs=>offset_seconds);
+  where least(now(),v_attempt.deadline_at)>=v_attempt.question_timer_started_at+make_interval(secs=>offset_seconds);
 
   for v_key in select jsonb_object_keys(coalesce(p_answers,'{}'::jsonb)) loop
     with ordered_questions as (
