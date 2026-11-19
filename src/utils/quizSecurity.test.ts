@@ -137,6 +137,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     // et chargé avec une projection explicite uniquement pour un professeur authentifié.
     const protectedDatasets = [
       ['exams', 'examsRequest'],
+      ['oral_exam_classes', 'oralExamClassesRequest'],
       ['exam_rubrics', 'rubricsRequest'],
       ['evaluations', 'evaluationsRequest'],
       ['evaluation_details', 'detailsRequest'],
@@ -222,6 +223,24 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     assert.ok(migration.includes("coalesce(nullif(q.class_ids, ARRAY[]::text[]), ARRAY[q.class_id])"));
   });
 
+
+  it('charge et expose les affectations multi-classes et la portée globale des examens oraux', () => {
+    const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
+    const service = fs.readFileSync(servicePath, 'utf8');
+    assert.ok(service.includes("from('oral_exam_classes').select('exam_id,class_id')"));
+    assert.ok(service.includes("from('oral_exam_classes').delete().eq('exam_id', exam.id)"));
+    assert.ok(service.includes('is_global: Boolean(exam.is_global)'));
+    assert.ok(service.includes('class_ids: e.is_global ? [] : (examClassIds.get(e.id) || [e.class_id])'));
+
+    const migrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261119010000_oral_exams_multiple_classes.sql');
+    const migration = fs.readFileSync(migrationPath, 'utf8');
+    assert.ok(migration.includes('ADD COLUMN IF NOT EXISTS is_global boolean NOT NULL DEFAULT false'));
+    assert.ok(migration.includes('PRIMARY KEY (exam_id, class_id)'));
+    assert.ok(migration.includes('ON CONFLICT (exam_id, class_id) DO NOTHING'));
+    assert.ok(migration.includes('e.is_global'));
+    assert.ok(migration.includes('CREATE OR REPLACE FUNCTION public.get_student_oral_exam_sessions()'));
+  });
+
   it('limite les colonnes téléchargées pendant l’import Supabase', () => {
     const servicePath = path.resolve(process.cwd(), 'src/services/supabaseService.ts');
     const source = fs.readFileSync(servicePath, 'utf8');
@@ -232,7 +251,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     const requiredProjections = [
       "from('classes').select('id,name,enrollment_mode,archived_at,created_at')",
       "from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')",
-      "from('exams').select('id,class_id,title,description,level,exam_date,duration_seconds,status,created_at')",
+      "from('exams').select('id,class_id,is_global,title,description,level,exam_date,duration_seconds,status,created_at')",
       "from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position')",
       "from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at')",
       "from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note')",
