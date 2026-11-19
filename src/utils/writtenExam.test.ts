@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createWrittenExamFromTemplate, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange, hasPendingExpressionWritingScore, getWrittenAttemptCorrectionStatus } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createWrittenExamFromTemplate, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange, hasPendingExpressionWritingScore, getWrittenAttemptCorrectionStatus, groupWrittenExamIntegrityEvents } from './writtenExam';
 
 test('the two built-in JSON templates create independent new exams, not persisted exam records',()=>{
  const a1=createWrittenExamFromTemplate(A1_TEMPLATE);
@@ -152,4 +152,15 @@ test('expression-writing correction remains pending independently of score and i
  const noExpression={status:'graded',expression_writing_max_points:0,expression_writing_score:null};
  assert.equal(hasPendingExpressionWritingScore(noExpression),false);
  assert.equal(getWrittenAttemptCorrectionStatus(noExpression),'graded');
+});
+
+test('integrity events are attributed only to their own attempt',()=>{
+ const grouped=groupWrittenExamIntegrityEvents([
+  {id:'e1',attempt_id:'ben-attempt',event_type:'copy_attempt'},
+  {id:'e2',attempt_id:'ben-attempt',event_type:'visibility_hidden'},
+  {id:'e3',attempt_id:'other-attempt',event_type:'visibility_hidden'}
+ ]);
+ assert.deepEqual(grouped['ben-attempt'].map(e=>e.id),['e1','e2']);
+ assert.deepEqual(grouped['other-attempt'].map(e=>e.id),['e3']);
+ assert.equal(grouped['chris-attempt'],undefined);
 });
