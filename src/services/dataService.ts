@@ -551,6 +551,8 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === id);
     if (!exam) return null;
     const cls = state.classes.find(c => c.id === exam.class_id);
+    const assignedNames = exam.is_global ? ['Toutes les classes'] : (exam.class_ids?.length ? exam.class_ids : [exam.class_id])
+      .map(classId => state.classes.find(item => item.id === classId)?.name).filter(Boolean);
     const rubrics = state.rubrics
       .filter(r => r.exam_id === id)
       .sort((a, b) => a.position - b.position);
@@ -559,7 +561,7 @@ export const dataService = {
 
     return {
       ...exam,
-      class_name: cls ? cls.name : 'Inconnue',
+      class_name: exam.is_global ? 'Toutes les classes' : (assignedNames.join(', ') || (cls ? cls.name : 'Inconnue')),
       rubrics,
       rubric_count: rubrics.length,
       max_score: maxScore,
