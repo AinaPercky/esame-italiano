@@ -41,12 +41,21 @@ CREATE TABLE students (
 CREATE TABLE exams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    is_global BOOLEAN NOT NULL DEFAULT FALSE,
     title TEXT NOT NULL,
     description TEXT,
     exam_date DATE NOT NULL DEFAULT CURRENT_DATE,
     duration_seconds INTEGER NOT NULL DEFAULT 180 CHECK (duration_seconds BETWEEN 60 AND 7200),
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_progress', 'completed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Oral exam class assignments: an exam may target several classes or all classes.
+CREATE TABLE oral_exam_classes (
+    exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    PRIMARY KEY (exam_id, class_id)
 );
 
 -- 5. Table : exam_rubrics
