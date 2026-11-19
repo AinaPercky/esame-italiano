@@ -322,6 +322,13 @@ declare
   v_exam_two uuid;
   v_definition_id uuid;
   v_attempt_id uuid;
+  v_first_question_id uuid;
+  v_second_question_id uuid;
+  v_answers jsonb;
+  v_progress jsonb;
+  v_submit jsonb;
+  v_persisted_answers jsonb;
+  v_status text;
   v_list jsonb;
   v_error text;
 begin
@@ -341,10 +348,16 @@ begin
     'show_corrections_after_publish',true,
     'integrity_settings',jsonb_build_object('fullscreen',false,'warn_on_tab_switch',true,'watermark',false),
     'sections',jsonb_build_array(jsonb_build_object('id','second-section','title','Second exam section','points',0,'shuffle',false,
-      'questions',jsonb_build_array(jsonb_build_object('id','second-qcm','type','qcm','prompt','Second exam QCM','points',1,'shuffle_options',false,
-        'options',jsonb_build_array(jsonb_build_object('id','a','label','A'),jsonb_build_object('id','b','label','B')),
-        'answer_key',jsonb_build_object('correctOptionId','a')
-      ))
+      'questions',jsonb_build_array(
+        jsonb_build_object('id','second-qcm-one','type','qcm','prompt','Second exam QCM one','points',1,'shuffle_options',false,
+          'options',jsonb_build_array(jsonb_build_object('id','a','label','A'),jsonb_build_object('id','b','label','B')),
+          'answer_key',jsonb_build_object('correctOptionId','a')
+        ),
+        jsonb_build_object('id','second-qcm-two','type','qcm','prompt','Second exam QCM two','points',1,'shuffle_options',false,
+          'options',jsonb_build_array(jsonb_build_object('id','a','label','A'),jsonb_build_object('id','b','label','B')),
+          'answer_key',jsonb_build_object('correctOptionId','a')
+        )
+      )
     ))
   );
 
@@ -395,6 +408,43 @@ begin
   end if;
   if (select count(*) from public.written_exam_versions where exam_id=v_exam_two)<>1 then
     raise exception 'The second exam contains more than one definition row.';
+  end if;
+
+  -- Local-answer flow: progression may update the server timer, but must not write answers.
+  perform public.get_or_start_written_exam_question_timer(v_attempt_id);
+  select value::uuid into v_first_question_id
+  from jsonb_array_elements_text(v_started->'order_manifest'->'questions'->(v_started->'order_manifest'->'sections'->>0))
+    with ordinality as q(value,question_ord)
+  order by question_ord limit 1;
+  select value::uuid into v_second_question_id
+  from jsonb_array_elements_text(v_started->'order_manifest'->'questions'->(v_started->'order_manifest'->'sections'->>0))
+    with ordinality as q(value,question_ord)
+  order by question_ord offset 1 limit 1;
+  if v_first_question_id is null or v_second_question_id is null then
+    raise exception 'The local-submission test requires two ordered questions.';
+  end if;
+
+  v_progress:=public.advance_written_exam_question(v_attempt_id,v_first_question_id::text);
+  if coalesce((v_progress->>'advanced')::boolean,false) is not true then
+    raise exception 'The server did not confirm early progression without an answer payload: %',v_progress;
+  end if;
+  if (select coalesce(answers,'{}'::jsonb) from public.written_exam_attempts where id=v_attempt_id)<>'{}'::jsonb then
+    raise exception 'Progression RPC persisted an answer before final submission.';
+  end if;
+
+  v_answers:=jsonb_build_object(v_first_question_id::text,'a',v_second_question_id::text,'a');
+  v_submit:=public.submit_written_exam_with_answers(v_attempt_id,v_answers);
+  if coalesce((v_submit->>'submitted')::boolean,false) is not true then
+    raise exception 'Final local-answer submission failed: %',v_submit;
+  end if;
+  select answers,status into v_persisted_answers,v_status
+  from public.written_exam_attempts where id=v_attempt_id;
+  if v_persisted_answers<>v_answers or v_status<>'graded' then
+    raise exception 'Final answers were not atomically persisted and graded: %, %',v_persisted_answers,v_status;
+  end if;
+  v_submit:=public.submit_written_exam_with_answers(v_attempt_id,v_answers);
+  if coalesce((v_submit->>'already_submitted')::boolean,false) is not true then
+    raise exception 'Repeated final submission was not idempotent: %',v_submit;
   end if;
 end
 $written$;
