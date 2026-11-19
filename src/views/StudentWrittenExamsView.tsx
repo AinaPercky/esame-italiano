@@ -177,7 +177,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       questionDeadlineRef.current = Date.now() + remaining * 1000;
     };
     update();
-    const id = window.setInterval(update, 250);
+    const id = window.setInterval(update, 500);
     return () => window.clearInterval(id);
   }, [attempt, finish, flat.length, index, orderedSections, persistLocalAnswers, submitted]);
 
