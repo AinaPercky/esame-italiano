@@ -7,6 +7,8 @@ export type WrittenExam={id?:string;title:string;description:string;level:string
 export const createWrittenExamFromTemplate=(template:WrittenExam):WrittenExam=>({...JSON.parse(JSON.stringify(template)),id:undefined,status:'draft',class_ids:[]});
 export type WrittenOrderManifest={sections:string[];questions:Record<string,string[]>;options:Record<string,string[]>;items:Record<string,string[]>};
 export type WrittenAttempt={attempt_id:string;status:string;deadline_at:string;started_at:string;question_timer_started_at?:string;answers:Record<string,unknown>;order_manifest:WrittenOrderManifest;exam:any;sections:Array<any>};
+export const hasPendingExpressionWritingScore=(attempt:any):boolean=>Number(attempt?.expression_writing_max_points||0)>0&&(attempt?.expression_writing_score===null||attempt?.expression_writing_score===undefined||attempt?.expression_writing_score==='');
+export const getWrittenAttemptCorrectionStatus=(attempt:any):string=>hasPendingExpressionWritingScore(attempt)?'expression_pending':attempt?.status||'unknown';
 export const DEFAULT_WRITTEN_QCM_TIME_LIMIT_SECONDS=17;
 export const DEFAULT_WRITTEN_TEXT_TIME_LIMIT_SECONDS=32;
 export const getDefaultWrittenQuestionTimeLimit=(question:any):number=>{const type=question?.type??question?.question_type;return type==='text'||type==='verbes_trous'?DEFAULT_WRITTEN_TEXT_TIME_LIMIT_SECONDS:DEFAULT_WRITTEN_QCM_TIME_LIMIT_SECONDS;};
