@@ -130,6 +130,8 @@ declare
   v_student_id uuid;
   v_attempt public.written_exam_attempts%rowtype;
   v_key text;
+  v_answer_index integer;
+  v_max_allowed_index integer;
   v_result jsonb;
 begin
   select id into v_student_id
@@ -164,12 +166,46 @@ begin
     raise exception 'Examen clôturé.';
   end if;
 
+  if v_attempt.question_timer_started_at is null then
+    raise exception 'Chronomètre individuel non initialisé.';
+  end if;
+
+  with ordered_questions as (
+    select q.id::text as question_id,
+      (row_number() over(order by sec.section_ord,oq.question_ord)-1)::integer as question_index,
+      coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,
+        case when q.question_type in ('text','verbes_trous') then 32 else 17 end)::integer as seconds,
+      coalesce(sum(coalesce(nullif(q.public_data->>'time_limit_seconds','')::integer,
+        case when q.question_type in ('text','verbes_trous') then 32 else 17 end))
+        over(order by sec.section_ord,oq.question_ord rows between unbounded preceding and 1 preceding),0)::integer as offset_seconds
+    from jsonb_array_elements_text(v_attempt.order_manifest->'sections')
+      with ordinality as sec(section_id,section_ord)
+    cross join lateral jsonb_array_elements_text(v_attempt.order_manifest->'questions'->(sec.section_id))
+      with ordinality as oq(question_id,question_ord)
+    join public.written_exam_questions q on q.id::text=oq.question_id
+  )
+  select coalesce(max(question_index),-1) into v_max_allowed_index
+  from ordered_questions
+  where now()>=v_attempt.question_timer_started_at+make_interval(secs=>offset_seconds);
+
   for v_key in select jsonb_object_keys(coalesce(p_answers,'{}'::jsonb)) loop
-    if not exists(
-      select 1 from public.written_exam_questions q
-      join public.written_exam_sections s on s.id=q.section_id
-      where s.version_id=v_attempt.version_id and q.id::text=v_key
-    ) then raise exception 'Réponse associée à une question inconnue.'; end if;
+    with ordered_questions as (
+      select q.id::text as question_id,
+        (row_number() over(order by sec.section_ord,oq.question_ord)-1)::integer as question_index
+      from jsonb_array_elements_text(v_attempt.order_manifest->'sections')
+        with ordinality as sec(section_id,section_ord)
+      cross join lateral jsonb_array_elements_text(v_attempt.order_manifest->'questions'->(sec.section_id))
+        with ordinality as oq(question_id,question_ord)
+      join public.written_exam_questions q on q.id::text=oq.question_id
+    )
+    select question_index into v_answer_index
+    from ordered_questions where question_id=v_key;
+    if v_answer_index is null then
+      raise exception 'Réponse associée à une question inconnue.';
+    end if;
+    if v_answer_index>v_max_allowed_index then
+      raise exception 'Une réponse concerne une question dont le délai n’a pas encore commencé.';
+    end if;
   end loop;
 
   update public.written_exam_attempts
