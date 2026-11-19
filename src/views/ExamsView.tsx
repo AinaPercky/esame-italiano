@@ -151,11 +151,13 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       points: 1
     };
     setRubricsDraft([...rubricsDraft, newR]);
+    setEditingRubricIndex(rubricsDraft.length);
   };
 
   const handleRemoveRubricFromDraft = (index: number) => {
     const updated = rubricsDraft.filter((_, i) => i !== index);
     setRubricsDraft(updated);
+    if (editingRubricIndex !== null) setEditingRubricIndex(updated.length ? Math.min(editingRubricIndex, updated.length - 1) : null);
   };
 
   return (
@@ -384,7 +386,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       {/* Modal Gestion des Rubriques d'un Examen */}
       {selectedExamForDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-[24px] shadow-2xl max-w-3xl w-full p-4 sm:p-6 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-5xl w-full p-4 sm:p-6 max-h-[94vh] flex flex-col">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="min-w-0">
                 <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
@@ -454,102 +456,119 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
             </div>
 
-            {/* Rubrics List */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {rubricsDraft.map((r, idx) => (
-                <div
-                  key={r.id || idx}
-                  className="p-3 sm:p-4 border border-slate-200 rounded-2xl bg-[#f7fafc] space-y-2 text-xs"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-semibold text-slate-500">
-                      Rubrique #{r.position}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <label className="text-[11px] text-slate-500">Points :</label>
-                        <input
-                          type="number"
-                          min="0.5"
-                          step="0.5"
-                          value={r.points}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 1;
-                            const copy = [...rubricsDraft];
-                            copy[idx].points = val;
-                            setRubricsDraft(copy);
-                          }}
-                          className="w-14 px-1.5 py-1 border border-slate-300 rounded font-mono text-center min-h-[32px]"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRubricFromDraft(idx)}
-                        className="text-slate-400 hover:text-[#0b3c5d] p-1.5 rounded min-h-[36px] min-w-[36px] flex items-center justify-center"
-                        title="Supprimer cette rubrique"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            {/* Rubric editor: list + focused form */}
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:flex-row">
+              <aside className="flex min-h-0 flex-col lg:w-[34%] lg:shrink-0">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-[#072a3f]">Rubriques de l’épreuve</h4>
+                    <p className="text-[11px] text-slate-500">Sélectionnez une rubrique pour la modifier.</p>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] text-slate-600 font-medium mb-0.5">
-                        Titre en italien :
-                      </label>
-                      <input
-                        type="text"
-                        value={r.title}
-                        onChange={(e) => {
-                          const copy = [...rubricsDraft];
-                          copy[idx].title = e.target.value;
-                          setRubricsDraft(copy);
-                        }}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md bg-white min-h-[36px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-600 font-medium mb-0.5">
-                        Question / Consigne :
-                      </label>
-                      <input
-                        type="text"
-                        value={r.question}
-                        onChange={(e) => {
-                          const copy = [...rubricsDraft];
-                          copy[idx].question = e.target.value;
-                          setRubricsDraft(copy);
-                        }}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md bg-white min-h-[36px]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] text-slate-600 font-medium mb-0.5">
-                        Phrase attendue en italien :
-                      </label>
-                      <input
-                        type="text"
-                        value={r.example_sentence}
-                        onChange={(e) => {
-                          const copy = [...rubricsDraft];
-                          copy[idx].example_sentence = e.target.value;
-                          setRubricsDraft(copy);
-                        }}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md bg-white min-h-[36px]"
-                      />
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddRubricToDraft}
+                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#072a3f] px-3 text-xs font-bold text-white transition hover:bg-[#0b3c5d]"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Ajouter
+                  </button>
                 </div>
-              ))}
+                <div className="flex min-h-0 gap-2 overflow-x-auto pb-2 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1">
+                  {rubricsDraft.map((r, idx) => (
+                    <button
+                      key={r.id || idx}
+                      type="button"
+                      onClick={() => setEditingRubricIndex(idx)}
+                      aria-pressed={editingRubricIndex === idx}
+                      className={`min-w-[210px] rounded-xl border p-3 text-left transition lg:min-w-0 ${editingRubricIndex === idx ? 'border-[#0b3c5d] bg-[#eef5f9] ring-1 ring-[#0b3c5d]/10' : 'border-slate-200 bg-white hover:border-[#b7d3e4] hover:bg-slate-50'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Rubrique {idx + 1}</span>
+                        <span className="rounded-md bg-white px-2 py-0.5 text-[10px] font-bold text-[#0b3c5d]">{Number(r.points) || 0} pt{Number(r.points) === 1 ? '' : 's'}</span>
+                      </div>
+                      <p className="mt-1 truncate text-xs font-bold text-[#072a3f]">{r.title || 'Sans titre'}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500">{r.question || 'Aucune consigne renseignée'}</p>
+                    </button>
+                  ))}
+                  {rubricsDraft.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center">
+                      <ListOrdered className="mx-auto h-6 w-6 text-slate-400" />
+                      <p className="mt-2 text-xs font-semibold text-slate-600">Aucune rubrique</p>
+                      <p className="mt-1 text-[11px] text-slate-500">Ajoutez votre première rubrique pour construire la grille.</p>
+                    </div>
+                  )}
+                </div>
+              </aside>
 
-              <button
-                type="button"
-                onClick={handleAddRubricToDraft}
-                className="w-full py-2.5 border border-dashed border-slate-300 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[44px]"
-              >
-                + Ajouter une rubrique personnalisée
-              </button>
+              <section className="flex min-h-[300px] min-w-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-[#f8fafc] p-3 sm:p-4">
+                {editingRubricIndex !== null && rubricsDraft[editingRubricIndex] ? (
+                  <>
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e6f0f7] text-[#0b3c5d]"><Edit3 className="h-4 w-4" /></span>
+                        <div>
+                          <h4 className="text-sm font-bold text-[#072a3f]">Modifier la rubrique</h4>
+                          <p className="text-[11px] text-slate-500">Rubrique {editingRubricIndex + 1} sur {rubricsDraft.length}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button type="button" disabled={editingRubricIndex === 0} onClick={() => setEditingRubricIndex(i => i === null ? null : i - 1)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique précédente">←</button>
+                        <button type="button" disabled={editingRubricIndex >= rubricsDraft.length - 1} onClick={() => setEditingRubricIndex(i => i === null ? null : i + 1)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique suivante">→</button>
+                        <button type="button" onClick={() => {
+                          const index = editingRubricIndex;
+                          handleRemoveRubricFromDraft(index);
+                          setEditingRubricIndex(rubricsDraft.length <= 1 ? null : Math.max(0, index - 1));
+                        }} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50">
+                          <Trash2 className="h-3.5 w-3.5" /><span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+                    {(() => {
+                      const r = rubricsDraft[editingRubricIndex];
+                      const update = (patch: Partial<ExamRubric>) => setRubricsDraft(current => current.map((item, index) => index === editingRubricIndex ? { ...item, ...patch } : item));
+                      return (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px]">
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Titre de la rubrique <span className="text-rose-500">*</span>
+                              <input type="text" value={r.title} onChange={e => update({ title: e.target.value })} placeholder="Ex. Presentarsi" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                            </label>
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Barème
+                              <span className="mt-1.5 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-2">
+                                <input type="number" min="0" step="0.5" value={r.points} onChange={e => update({ points: Math.max(0, Number(e.target.value) || 0) })} className="w-full border-0 bg-transparent text-sm font-bold text-[#072a3f] outline-none" />
+                                <span className="text-xs text-slate-400">pts</span>
+                              </span>
+                            </label>
+                          </div>
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Question / Consigne
+                            <textarea rows={3} value={r.question} onChange={e => update({ question: e.target.value })} placeholder="Décrivez ce que le candidat doit faire…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                          </label>
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Exemple de réponse attendue (italien)
+                            <textarea rows={3} value={r.example_sentence} onChange={e => update({ example_sentence: e.target.value })} placeholder="Ex. Vorrei visitare Roma perché…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                          </label>
+                          <p className="rounded-lg border border-[#d8e6ee] bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+                            Conseil : formulez une consigne observable et un exemple adapté au niveau CECRL de l’examen.
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
+                    <ListOrdered className="h-8 w-8 text-slate-300" />
+                    <h4 className="mt-3 text-sm font-bold text-[#072a3f]">Aucune rubrique sélectionnée</h4>
+                    <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">Choisissez une rubrique dans la liste ou ajoutez-en une nouvelle pour modifier ses informations.</p>
+                    <button type="button" onClick={handleAddRubricToDraft} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#072a3f] px-4 text-xs font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" /> Ajouter une rubrique</button>
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-2 text-xs">
+              <span className="text-slate-500">{rubricsDraft.length} rubrique(s) · Total : <strong className="text-[#072a3f]">{rubricsDraft.reduce((s, r) => s + (Number(r.points) || 0), 0)} points</strong></span>
+              <span className="text-[10px] text-slate-400">Les changements ne sont pas enregistrés avant validation.</span>
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 mt-3 gap-2">
