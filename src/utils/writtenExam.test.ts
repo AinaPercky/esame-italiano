@@ -141,11 +141,11 @@ test('iOS and other mobile visibility changes never disqualify a written exam',(
 });
 
 test('expression-writing correction remains pending independently of score and integrity status',()=>{
- const flagged={status:'graded',integrity_failed:true,expression_writing_max_points:10,expression_writing_score:null};
+ const flagged={status:'graded',integrity_failed:true,raw_score:0,expression_writing_max_points:10,expression_writing_score:null};
  assert.equal(hasPendingExpressionWritingScore(flagged),true);
  assert.equal(getWrittenAttemptCorrectionStatus(flagged),'expression_pending');
  assert.equal(flagged.integrity_failed,true);
- assert.equal(flagged.raw_score,undefined);
+ assert.equal(flagged.raw_score,0);
  const scored={...flagged,expression_writing_score:0};
  assert.equal(hasPendingExpressionWritingScore(scored),false);
  assert.equal(getWrittenAttemptCorrectionStatus(scored),'graded');
