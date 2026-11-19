@@ -385,8 +385,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
       {/* Modal Gestion des Rubriques d'un Examen */}
       {selectedExamForDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
-          <div className="bg-white rounded-[24px] shadow-2xl max-w-5xl w-full p-4 sm:p-6 max-h-[94vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 backdrop-blur-xs sm:items-center sm:p-4">
+          <div className="my-auto flex max-h-[94vh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-2xl sm:p-6">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="min-w-0">
                 <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
@@ -499,7 +499,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 </div>
               </aside>
 
-              <section className="flex min-h-[300px] min-w-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-[#f8fafc] p-3 sm:p-4">
+              <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-[#f8fafc] p-3 sm:p-4">
                 {editingRubricIndex !== null && rubricsDraft[editingRubricIndex] ? (
                   <>
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
