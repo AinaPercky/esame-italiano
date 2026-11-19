@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { A1_TEMPLATE, L135_TEMPLATE, createWrittenExamFromTemplate, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange } from './writtenExam';
+import { A1_TEMPLATE, L135_TEMPLATE, createWrittenExamFromTemplate, createQuestion, createSection, getWrittenExamTotals, validateWrittenExam, applyWrittenExamOrder, getWrittenQuestionTimeLimit, getTimedQuestionIndex, getTimedQuestionRemainingSeconds, formatWrittenExamTimeSaveError, shouldDisqualifyWrittenExamVisibilityChange, hasPendingExpressionWritingScore, getWrittenAttemptCorrectionStatus } from './writtenExam';
 
 test('the two built-in JSON templates create independent new exams, not persisted exam records',()=>{
  const a1=createWrittenExamFromTemplate(A1_TEMPLATE);
@@ -138,4 +138,18 @@ test('new manually created questions receive quiz-compatible defaults and invali
 test('iOS and other mobile visibility changes never disqualify a written exam',()=>{
  assert.equal(shouldDisqualifyWrittenExamVisibilityChange(true),false);
  assert.equal(shouldDisqualifyWrittenExamVisibilityChange(false),true);
+});
+
+test('expression-writing correction remains pending independently of score and integrity status',()=>{
+ const flagged={status:'graded',integrity_failed:true,expression_writing_max_points:10,expression_writing_score:null};
+ assert.equal(hasPendingExpressionWritingScore(flagged),true);
+ assert.equal(getWrittenAttemptCorrectionStatus(flagged),'expression_pending');
+ assert.equal(flagged.integrity_failed,true);
+ assert.equal(flagged.raw_score,undefined);
+ const scored={...flagged,expression_writing_score:0};
+ assert.equal(hasPendingExpressionWritingScore(scored),false);
+ assert.equal(getWrittenAttemptCorrectionStatus(scored),'graded');
+ const noExpression={status:'graded',expression_writing_max_points:0,expression_writing_score:null};
+ assert.equal(hasPendingExpressionWritingScore(noExpression),false);
+ assert.equal(getWrittenAttemptCorrectionStatus(noExpression),'graded');
 });
