@@ -81,13 +81,17 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
   const current = flat[index];
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaveCountRef = useRef(0);
+  const lastSavedAnswerRef = useRef<Record<string, string>>({});
 
   const save = useCallback(async (questionId: string, next: Record<string, any>, advance = false) => {
     if (!attempt || submitted || !questionId) return;
+    const answerKey = JSON.stringify(next[questionId] ?? null);
+    if (!advance && lastSavedAnswerRef.current[questionId] === answerKey) return;
     pendingSaveCountRef.current += 1;
     setSaving(true);
     const request = saveQueueRef.current.catch(() => undefined).then(async () => {
       await writtenExamService.saveQuestionAnswer(attempt.attempt_id, questionId, next[questionId] ?? null, advance);
+      lastSavedAnswerRef.current[questionId] = answerKey;
     });
     saveQueueRef.current = request;
     try { await request; setError(''); }
@@ -103,7 +107,8 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
     if (!attempt || submitted || !questionId) return;
     const id = window.setTimeout(() => {
       if (!advancingRef.current && !submitLock.current) void save(questionId, answersRef.current).catch(() => {});
-    }, 350);
+    // Wait until the learner pauses typing: avoid one database transaction per short pause/key burst.
+    }, 1200);
     return () => window.clearTimeout(id);
   }, [answers, attempt, flat, index, save, submitted]);
 
@@ -258,6 +263,9 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       const restoredAnswers = result.answers || {};
       setAnswers(restoredAnswers);
       answersRef.current = restoredAnswers;
+      lastSavedAnswerRef.current = Object.fromEntries(
+        Object.entries(restoredAnswers).map(([questionId, answer]) => [questionId, JSON.stringify(answer ?? null)])
+      );
       const initialIndex = getTimedQuestionIndex(sections, result.question_timer_started_at || result.started_at);
       setIndex(initialIndex);
       const initialSeconds = getTimedQuestionRemainingSeconds(sections, initialIndex, result.question_timer_started_at || result.started_at);
