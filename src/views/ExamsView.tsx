@@ -120,6 +120,10 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   const handleSaveRubrics = async () => {
     if (!selectedExamForDetails) return;
+    if (!detailExamGlobal && detailClassIds.length === 0) {
+      window.alert('Sélectionnez au moins une classe ou choisissez « Toutes les classes ».');
+      return;
+    }
     try {
       await dataService.updateExam(selectedExamForDetails.id, {
         duration_seconds: durationDraftSeconds,
