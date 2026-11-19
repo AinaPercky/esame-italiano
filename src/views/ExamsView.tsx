@@ -15,6 +15,7 @@ import {
 import { Exam, ClassRoom, ExamRubric, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ClassAssignmentPicker } from '../components/ClassAssignmentPicker';
 import {
   LearningCard,
   LearningCardFooter,
@@ -200,10 +201,12 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           <LearningCard key={exam.id} active={exam.status !== 'completed'}>
             <LearningCardHeader
               kicker={
-                <>
-                  {exam.class_name}
-                  {exam.level ? ` · ${exam.level}` : ''}
-                </>
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${exam.is_global ? 'bg-[#eaf7ef] text-[#267447]' : 'bg-[#e6f0f7] text-[#0b3c5d]'}`}>
+                    {exam.is_global ? 'Toutes les classes' : `${exam.class_ids?.length || 1} classe${(exam.class_ids?.length || 1) > 1 ? 's' : ''}`}
+                  </span>
+                  {exam.level ? <span>{exam.level}</span> : null}
+                </span>
               }
               status={
                 <StatusBadge tone={exam.status === 'completed' ? 'neutral' : 'live'}>
@@ -292,22 +295,13 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
-                  <span className="block text-xs font-semibold text-slate-700 mb-2">
-                    Classes concernées <span className="text-[#0b3c5d">*</span>
-                  </span>
-                  <label className="mb-2 flex items-center gap-2 rounded-lg border border-[#b7d3e4] bg-[#f5f9fc] p-3 text-sm font-semibold text-[#072a3f]">
-                    <input type="checkbox" checked={newExamGlobal} onChange={e => setNewExamGlobal(e.target.checked)} />
-                    Toutes les classes (y compris celles créées ultérieurement)
-                  </label>
-                  {!newExamGlobal && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
-                    {classes.filter(cls => !cls.archived_at).map(cls => (
-                      <label key={cls.id} className="flex items-center gap-2 text-sm text-slate-700">
-                        <input type="checkbox" checked={newClassIds.includes(cls.id)}
-                          onChange={e => setNewClassIds(previous => e.target.checked ? [...previous, cls.id] : previous.filter(id => id !== cls.id))} />
-                        {cls.name}
-                      </label>
-                    ))}
-                  </div>}
+        <ClassAssignmentPicker
+                  classes={classes}
+                  selectedClassIds={newClassIds}
+                  isGlobal={newExamGlobal}
+                  onSelectedClassIdsChange={setNewClassIds}
+                  onGlobalChange={setNewExamGlobal}
+/>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -386,36 +380,40 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       {selectedExamForDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
           <div className="bg-white rounded-[24px] shadow-2xl max-w-3xl w-full p-4 sm:p-6 max-h-[90vh] flex flex-col">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-3 border-b border-slate-100 mb-3 gap-2">
-              <div>
-                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                  Grille d'évaluation en italien
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="min-w-0">
+                <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+                  Grille d’évaluation en italien
                 </span>
-                <h3 className="font-display text-base sm:text-lg font-bold text-slate-900 mt-1">
+                <h3 className="mt-2 break-words font-display text-base font-bold text-[#072a3f] sm:text-lg">
                   {selectedExamForDetails.title}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Total : {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
+                <p className="mt-1 text-xs text-slate-500">
+                  {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
                 </p>
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <span className="block text-xs font-semibold text-slate-700 mb-2">Classes auxquelles cet examen est attribué</span>
-                  <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#072a3f]">
-                    <input type="checkbox" checked={detailExamGlobal} onChange={e => setDetailExamGlobal(e.target.checked)} />
-                    Toutes les classes (actuelles et futures)
-                  </label>
-                  {!detailExamGlobal && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {classes.filter(cls => !cls.archived_at).map(cls => (
-                      <label key={cls.id} className="flex items-center gap-2 text-xs text-slate-700">
-                        <input type="checkbox" checked={detailClassIds.includes(cls.id)}
-                          onChange={e => setDetailClassIds(previous => e.target.checked ? [...previous, cls.id] : previous.filter(id => id !== cls.id))} />
-                        {cls.name}
-                      </label>
-                    ))}
-                  </div>}
-                  {!detailExamGlobal && detailClassIds.length === 0 && <p className="mt-2 text-[11px] text-rose-600">Sélectionnez au moins une classe.</p>}
-                </div>
-                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                  Niveau (CECRL)
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDeleteExam(selectedExamForDetails.id)}
+                className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Supprimer</span>
+              </button>
+            </div>
+
+            <div className="shrink-0 space-y-3 border-b border-slate-100 py-3">
+              <ClassAssignmentPicker
+                classes={classes}
+                selectedClassIds={detailClassIds}
+                isGlobal={detailExamGlobal}
+                onSelectedClassIdsChange={setDetailClassIds}
+                onGlobalChange={setDetailExamGlobal}
+                compact
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                  <span>Niveau (CECRL)</span>
                   <select
                     value={selectedExamForDetails.level || ''}
                     onChange={(e) => {
@@ -427,33 +425,28 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                         })
                         .catch(error => window.alert(error instanceof Error ? error.message : 'Modification impossible.'));
                     }}
-                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                    className="min-h-9 rounded-lg border border-slate-300 bg-white px-2 text-xs"
                   >
                     <option value="">Non défini</option>
                     {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
                   </select>
                 </label>
-                <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-                  Durée par candidat (minutes)
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    step="1"
-                    value={Math.floor(durationDraftSeconds / 60)}
-                    onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
-                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                  />
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                  <span>Durée par candidat</span>
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      step="1"
+                      value={Math.floor(durationDraftSeconds / 60)}
+                      onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
+                      className="min-h-9 w-16 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                    />
+                    <span className="text-[11px] text-slate-500">min</span>
+                  </span>
                 </label>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDeleteExam(selectedExamForDetails.id)}
-                className="text-xs text-[#0b3c5d] hover:text-[#072a3f] inline-flex items-center gap-1 p-2 rounded hover:bg-[#e6f0f7] self-start sm:self-auto min-h-[36px]"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Supprimer</span>
-              </button>
             </div>
 
             {/* Rubrics List */}
