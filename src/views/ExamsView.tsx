@@ -222,6 +222,10 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
                 {exam.description || 'Aucune description spécifique.'}
               </p>
+              <p className="flex items-start gap-1.5 pt-0.5 text-[11px] leading-relaxed text-slate-500">
+                <span className="shrink-0 font-semibold text-[#0b3c5d]">Diffusion :</span>
+                <span className="line-clamp-1">{exam.is_global ? 'Toutes les classes actuelles et futures' : (exam.class_name || 'Classe non renseignée')}</span>
+              </p>
             </div>
 
             <LearningCardMetrics
@@ -366,7 +370,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
+                  disabled={!newTitle.trim() || (!newExamGlobal && newClassIds.length === 0)}
+                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Créer l'examen
                 </button>
@@ -558,7 +563,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <button
                 type="button"
                 onClick={handleSaveRubrics}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
+                disabled={!detailExamGlobal && detailClassIds.length === 0}
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Enregistrer les modifications
               </button>
