@@ -180,7 +180,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       }
     };
     update();
-    const id = window.setInterval(update, 250);
+    const id = window.setInterval(update, 500);
     return () => window.clearInterval(id);
   }, [attempt, finish, flat.length, index, moveToQuestion, submitted]);
 
