@@ -13,10 +13,21 @@ exports.getClasses = async (req, res) => {
       if (membershipError) throw membershipError;
       const counts = new Map();
       (memberships || []).forEach(row => counts.set(row.class_id, (counts.get(row.class_id) || 0) + 1));
-      const examsResult = await req.supabase.from('exams').select('class_id');
-      if (examsResult.error) throw examsResult.error;
+      const [{ data: exams, error: examsError }, { data: examAssignments, error: assignmentsError }] = await Promise.all([
+        req.supabase.from('exams').select('id,class_id,is_global'),
+        req.supabase.from('oral_exam_classes').select('exam_id,class_id')
+      ]);
+      if (examsError) throw examsError;
+      if (assignmentsError) throw assignmentsError;
       const examCounts = new Map();
-      (examsResult.data || []).forEach(row => examCounts.set(row.class_id, (examCounts.get(row.class_id) || 0) + 1));
+      (exams || []).forEach(exam => {
+        if (exam.is_global) {
+          (classes || []).forEach(cls => examCounts.set(cls.id, (examCounts.get(cls.id) || 0) + 1));
+        } else {
+          const assignedIds = (examAssignments || []).filter(row => row.exam_id === exam.id).map(row => row.class_id);
+          (assignedIds.length ? assignedIds : [exam.class_id]).forEach(classId => examCounts.set(classId, (examCounts.get(classId) || 0) + 1));
+        }
+      });
       return res.json((classes || []).map(cls => ({
         ...cls, enrollment_mode: normalizeMode(cls.enrollment_mode),
         student_count: counts.get(cls.id) || 0, exam_count: examCounts.get(cls.id) || 0
@@ -41,13 +52,17 @@ exports.getClassById = async (req, res) => {
       const { data: cls, error } = await req.supabase.from('classes').select('*').eq('id', id).maybeSingle();
       if (error) throw error;
       if (!cls) return res.status(404).json({ error: 'Classe introuvable' });
-      const [{ data: enrollments, error: enrollError }, { data: exams, error: examError }] = await Promise.all([
+      const [{ data: enrollments, error: enrollError }, { data: allExams, error: examError }, { data: assignments, error: assignmentsError }] = await Promise.all([
         req.supabase.from('class_enrollments').select('*,student:students(*)').eq('class_id', id),
-        req.supabase.from('exams').select('*').eq('class_id', id)
+        req.supabase.from('exams').select('*'),
+        req.supabase.from('oral_exam_classes').select('exam_id,class_id').eq('class_id', id)
       ]);
       if (enrollError) throw enrollError;
       if (examError) throw examError;
-      return res.json({ ...cls, students: (enrollments || []).filter(e => e.status === 'active').map(e => e.student), enrollments: enrollments || [], exams: exams || [] });
+      if (assignmentsError) throw assignmentsError;
+      const assignedExamIds = new Set((assignments || []).map(row => row.exam_id));
+      const exams = (allExams || []).filter(exam => exam.is_global || assignedExamIds.has(exam.id) || exam.class_id === id);
+      return res.json({ ...cls, students: (enrollments || []).filter(e => e.status === 'active').map(e => e.student), enrollments: enrollments || [], exams });
     }
     const cls = memoryStore.classes.find(c => c.id === id);
     if (!cls) return res.status(404).json({ error: 'Classe introuvable' });
