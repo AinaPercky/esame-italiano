@@ -385,8 +385,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
       {/* Modal Gestion des Rubriques d'un Examen */}
       {selectedExamForDetails && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 backdrop-blur-xs sm:items-center sm:p-4">
-          <div className="my-auto flex max-h-[94vh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-2xl sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-2 backdrop-blur-sm sm:p-4">
+          <div className="flex h-[96dvh] max-h-[96dvh] min-h-0 w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white p-3 shadow-2xl sm:rounded-[24px] sm:p-5">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="min-w-0">
                 <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
@@ -409,7 +409,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </button>
             </div>
 
-            <div className="shrink-0 space-y-3 border-b border-slate-100 py-3">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <div className="space-y-3 border-b border-slate-100 py-3">
               <ClassAssignmentPicker
                 classes={classes}
                 selectedClassIds={detailClassIds}
@@ -457,7 +458,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             </div>
 
             {/* Rubric editor: list + focused form */}
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:flex-row">
+            <div className="flex min-h-[480px] flex-col gap-3 overflow-hidden py-3 lg:min-h-0 lg:flex-row">
               <aside className="flex min-h-0 flex-col lg:w-[34%] lg:shrink-0">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>
@@ -472,7 +473,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                     <Plus className="h-3.5 w-3.5" /> Ajouter
                   </button>
                 </div>
-                <div className="flex min-h-0 gap-2 overflow-x-auto pb-2 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1">
+                <div className="flex max-h-28 min-h-0 gap-2 overflow-x-auto pb-2 lg:max-h-none lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1">
                   {rubricsDraft.map((r, idx) => (
                     <button
                       key={r.id || idx}
@@ -564,6 +565,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                   </div>
                 )}
               </section>
+            </div>
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-2 text-xs">
