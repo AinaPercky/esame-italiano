@@ -54,6 +54,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   // Rubric Editing inside Details Modal
   const [rubricsDraft, setRubricsDraft] = useState<ExamRubric[]>([]);
+  const [detailClassIds, setDetailClassIds] = useState<string[]>([]);
+  const [detailExamGlobal, setDetailExamGlobal] = useState(false);
   const [editingRubricIndex, setEditingRubricIndex] = useState<number | null>(null);
 
   // In-app Confirm Dialog
@@ -75,6 +77,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     if (full) {
       setSelectedExamForDetails(full);
       setRubricsDraft(full.rubrics || []);
+      setDetailClassIds(full.class_ids?.length ? full.class_ids : [full.class_id]);
+      setDetailExamGlobal(Boolean(full.is_global));
       setDurationDraftSeconds(Number(full.duration_seconds) || 180);
       setEditingRubricIndex(null);
     }
@@ -117,7 +121,11 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   const handleSaveRubrics = async () => {
     if (!selectedExamForDetails) return;
     try {
-      await dataService.updateExam(selectedExamForDetails.id, { duration_seconds: durationDraftSeconds });
+      await dataService.updateExam(selectedExamForDetails.id, {
+        duration_seconds: durationDraftSeconds,
+        class_ids: detailExamGlobal ? [] : detailClassIds,
+        is_global: detailExamGlobal
+      });
       await dataService.updateExamRubrics(selectedExamForDetails.id, rubricsDraft);
       onRefresh();
       handleOpenDetails(selectedExamForDetails);
@@ -385,6 +393,23 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 <p className="text-xs text-slate-500">
                   Total : {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
                 </p>
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <span className="block text-xs font-semibold text-slate-700 mb-2">Classes auxquelles cet examen est attribué</span>
+                  <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-[#072a3f]">
+                    <input type="checkbox" checked={detailExamGlobal} onChange={e => setDetailExamGlobal(e.target.checked)} />
+                    Toutes les classes (actuelles et futures)
+                  </label>
+                  {!detailExamGlobal && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {classes.filter(cls => !cls.archived_at).map(cls => (
+                      <label key={cls.id} className="flex items-center gap-2 text-xs text-slate-700">
+                        <input type="checkbox" checked={detailClassIds.includes(cls.id)}
+                          onChange={e => setDetailClassIds(previous => e.target.checked ? [...previous, cls.id] : previous.filter(id => id !== cls.id))} />
+                        {cls.name}
+                      </label>
+                    ))}
+                  </div>}
+                  {!detailExamGlobal && detailClassIds.length === 0 && <p className="mt-2 text-[11px] text-rose-600">Sélectionnez au moins une classe.</p>}
+                </div>
                 <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
                   Niveau (CECRL)
                   <select
