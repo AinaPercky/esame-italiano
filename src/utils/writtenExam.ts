@@ -194,3 +194,12 @@ export function applyWrittenExamOrder(sections:any[],manifest:WrittenOrderManife
   })};
  });
 }
+
+export function groupWrittenExamIntegrityEvents(events:any[]=[]):Record<string,any[]>{
+ return events.reduce((groups,event)=>{
+  const attemptId=event?.attempt_id||event?.written_exam_attempts?.id;
+  if(!attemptId)return groups;
+  (groups[attemptId]??=[]).push(event);
+  return groups;
+ },{} as Record<string,any[]>);
+}
