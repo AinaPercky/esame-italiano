@@ -29,6 +29,7 @@ import {
 } from '../components/LearningCard';
 import type { QuizQuestion } from '../types';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
+import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 
 type ExamCard = { id: string; title: string; description: string; level: string; target_language: string; instruction_language: string; duration_minutes: number; raw_max: number; display_scale: number | null; status: string; opens_at?: string; closes_at?: string; class_eligible?: boolean; attempt_status?: string; attempts_used: number; max_attempts: number; results_published: boolean; show_score_after_publish: boolean; show_corrections_after_publish: boolean; integrity_settings: any; navigation_mode: 'free' | 'sequential'; sections: any[]; raw_score?: number | null; normalized_score?: number | null; attempt_raw_max?: number | null; attempt_display_scale?: number | null; };
 
@@ -79,33 +80,21 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
 
   const flat = useMemo(() => orderedSections.flatMap(section => (section.questions || []).map((question: any) => ({ section, question }))), [orderedSections]);
   const current = flat[index];
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingSaveCountRef = useRef(0);
+  const localSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const timerStartedAtRef = useRef<string>('');
+  const submitPendingRef = useRef(false);
 
-  const save = useCallback(async (questionId: string, next: Record<string, any>, advance = false) => {
-    if (!attempt || submitted || !questionId) return;
-    pendingSaveCountRef.current += 1;
+  const persistLocalAnswers = useCallback((next: Record<string, any>, questionIndex: number) => {
+    if (!attempt || submitted) return;
     setSaving(true);
-    const request = saveQueueRef.current.catch(() => undefined).then(async () => {
-      await writtenExamService.saveQuestionAnswer(attempt.attempt_id, questionId, next[questionId] ?? null, advance);
-    });
-    saveQueueRef.current = request;
-    try { await request; setError(''); }
-    catch (e) { setError(e instanceof Error ? e.message : 'La sauvegarde a échoué.'); throw e; }
-    finally {
-      pendingSaveCountRef.current = Math.max(0, pendingSaveCountRef.current - 1);
-      if (pendingSaveCountRef.current === 0) setSaving(false);
-    }
+    const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
+      saveWrittenExamDraft(attempt.attempt_id, next, questionIndex)
+    );
+    localSaveQueueRef.current = write;
+    void write.catch((e) => {
+      setError(e instanceof Error ? e.message : 'La sauvegarde locale a échoué.');
+    }).finally(() => setSaving(false));
   }, [attempt, submitted]);
-
-  useEffect(() => {
-    const questionId = flat[index]?.question.id;
-    if (!attempt || submitted || !questionId) return;
-    const id = window.setTimeout(() => {
-      if (!advancingRef.current && !submitLock.current) void save(questionId, answersRef.current).catch(() => {});
-    }, 350);
-    return () => window.clearTimeout(id);
-  }, [answers, attempt, flat, index, save, submitted]);
 
   const finish = useCallback(async (violationReason?: 'visibility_hidden' | 'window_blur') => {
     if (!attempt || submitLock.current || submitted) return;
@@ -116,21 +105,22 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
         await writtenExamService.flagIntegrityViolation(attempt.attempt_id, violationReason, { page: 'written-exam', userAgent: navigator.userAgent });
         setIntegrityDisqualified(true);
       }
-      const currentQuestion = flat[index]?.question;
-      if (currentQuestion) await save(currentQuestion.id, answersRef.current);
-      await saveQueueRef.current;
-      await writtenExamService.submit(attempt.attempt_id);
+      await localSaveQueueRef.current;
+      await writtenExamService.submitWithAnswers(attempt.attempt_id, answersRef.current);
+      await deleteWrittenExamDraft(attempt.attempt_id);
+      submitPendingRef.current = false;
       setIncompleteConfirmation(null);
       setSubmitted(true);
       setAttempt(null);
       onFullscreenChange?.(false);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'La remise de la copie a échoué.');
+      setError(e instanceof Error ? e.message : 'La remise de la copie a échoué. Votre copie reste conservée sur cet appareil.');
+      submitPendingRef.current = true;
       submitLock.current = false;
       violationPendingRef.current = false;
     } finally { setSubmitting(false); }
-  }, [attempt, flat, index, onFullscreenChange, refresh, save, submitted]);
+  }, [attempt, onFullscreenChange, refresh, submitted]);
 
   useEffect(() => {
     if (!attempt || submitted) return;
@@ -145,39 +135,51 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
   }, [attempt, finish, submitted]);
 
   const moveToQuestion = useCallback(async (nextIndex: number) => {
-    if (!attempt || submitted || advancingRef.current) return;
+    if (!attempt || submitted || advancingRef.current || questionSeconds <= 0) return;
     const bounded = Math.max(index + 1, Math.min(nextIndex, flat.length));
-    if (bounded === index) return;
+    if (bounded === index || bounded >= flat.length) return;
     advancingRef.current = true;
     setValidating(true);
     try {
+      await localSaveQueueRef.current;
       const currentQuestion = flat[index]?.question;
-      if (currentQuestion) await save(currentQuestion.id, answersRef.current, true);
-      if (bounded >= flat.length) return;
-      setIndex(bounded);
-      const nextQuestion = flat[bounded].question;
-      const nextSeconds = getWrittenQuestionTimeLimit(nextQuestion);
-      questionDeadlineRef.current = Date.now() + nextSeconds * 1000;
-      setQuestionSeconds(nextSeconds);
-    } catch (e) { setError(e instanceof Error ? e.message : 'La validation de la réponse a échoué.'); }
+      if (!currentQuestion) return;
+      const progress = await writtenExamService.advanceQuestion(attempt.attempt_id, currentQuestion.id);
+      if (!progress.advanced) throw new Error('La progression de l’examen n’a pas été confirmée par le serveur.');
+      timerStartedAtRef.current = progress.question_timer_started_at || timerStartedAtRef.current;
+      const serverIndex = getTimedQuestionIndex(orderedSections, timerStartedAtRef.current);
+      const nextActiveIndex = Math.min(flat.length - 1, Math.max(index + 1, serverIndex));
+      setIndex(nextActiveIndex);
+      const remaining = getTimedQuestionRemainingSeconds(orderedSections, nextActiveIndex, timerStartedAtRef.current);
+      setQuestionSeconds(remaining);
+      questionDeadlineRef.current = Date.now() + remaining * 1000;
+      persistLocalAnswers(answersRef.current, nextActiveIndex);
+      setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'La progression vers la question suivante a échoué.'); }
     finally { advancingRef.current = false; setValidating(false); }
-  }, [attempt, flat, index, save, submitted]);
+  }, [attempt, flat, index, orderedSections, persistLocalAnswers, questionSeconds, submitted]);
 
   useEffect(() => {
-    if (!attempt || submitted || flat.length === 0) return;
-    if (index >= flat.length) { void finish(); return; }
+    if (!attempt || submitted || flat.length === 0 || !timerStartedAtRef.current) return;
     const update = () => {
-      const left = Math.ceil((questionDeadlineRef.current - Date.now()) / 1000);
-      setQuestionSeconds(Math.max(0, left));
-      if (left <= 0 && !advancingRef.current) {
-        if (index < flat.length - 1) void moveToQuestion(index + 1);
-        else void finish();
+      const activeIndex = getTimedQuestionIndex(orderedSections, timerStartedAtRef.current);
+      if (activeIndex >= flat.length) {
+        setQuestionSeconds(0);
+        void finish();
+        return;
       }
+      if (activeIndex > index && !advancingRef.current) {
+        setIndex(activeIndex);
+        persistLocalAnswers(answersRef.current, activeIndex);
+      }
+      const remaining = getTimedQuestionRemainingSeconds(orderedSections, activeIndex, timerStartedAtRef.current);
+      setQuestionSeconds(remaining);
+      questionDeadlineRef.current = Date.now() + remaining * 1000;
     };
     update();
-    const id = window.setInterval(update, 250);
+    const id = window.setInterval(update, 500);
     return () => window.clearInterval(id);
-  }, [attempt, finish, flat.length, index, moveToQuestion, submitted]);
+  }, [attempt, finish, flat.length, index, orderedSections, persistLocalAnswers, submitted]);
 
   useAssessmentTimerBeeper({
     active: Boolean(attempt && !submitted && current),
@@ -223,7 +225,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
     const copy = () => log('copy_attempt');
     const paste = () => log('paste_attempt');
     const offline = () => log('connection_lost');
-    const online = () => { log('connection_restored'); const questionId = flat[index]?.question.id; if (questionId) void save(questionId, answersRef.current).catch(() => {}); };
+    const online = () => { log('connection_restored'); if (submitPendingRef.current) void finish(); };
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('blur', blur);
     window.addEventListener('focus', focus);
@@ -241,7 +243,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       window.removeEventListener('online', online);
       clearViolationTimer();
     };
-  }, [attempt, finish, flat, index, save, submitted]);
+  }, [attempt, finish, submitted]);
 
   const start = async (id: string) => {
     primeTimerAudio();
@@ -249,20 +251,24 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       setError('');
       onFullscreenChange?.(true);
       const result = await writtenExamService.start(id);
+      const localDraft = await loadWrittenExamDraft(result.attempt_id);
       submitLock.current = false;
       violationPendingRef.current = false;
       setIntegrityDisqualified(false);
       setAttempt(result);
       const sections = applyWrittenExamOrder(result.sections, result.order_manifest);
       setOrderedSections(sections);
-      const restoredAnswers = result.answers || {};
+      const restoredAnswers = { ...(result.answers || {}), ...(localDraft?.answers || {}) };
       setAnswers(restoredAnswers);
       answersRef.current = restoredAnswers;
-      const initialIndex = getTimedQuestionIndex(sections, result.question_timer_started_at || result.started_at);
+      timerStartedAtRef.current = result.question_timer_started_at || result.started_at;
+      const initialIndex = getTimedQuestionIndex(sections, timerStartedAtRef.current);
       setIndex(initialIndex);
-      const initialSeconds = getTimedQuestionRemainingSeconds(sections, initialIndex, result.question_timer_started_at || result.started_at);
+      const initialSeconds = getTimedQuestionRemainingSeconds(sections, initialIndex, timerStartedAtRef.current);
       questionDeadlineRef.current = Date.now() + Math.max(1, initialSeconds) * 1000;
-      setQuestionSeconds(Math.max(1, initialSeconds));
+      setQuestionSeconds(Math.max(0, initialSeconds));
+      localSaveQueueRef.current = Promise.resolve();
+      submitPendingRef.current = false;
       setSubmitted(false);
       setIncompleteConfirmation(null);
       setIntegrityWarning('');
@@ -273,9 +279,11 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
   };
 
   const updateAnswer = (questionId: string, value: any) => {
+    if (questionSeconds <= 0 || advancingRef.current || submitLock.current) return;
     const next = { ...answersRef.current, [questionId]: value };
     answersRef.current = next;
     setAnswers(next);
+    persistLocalAnswers(next, index);
   };
 
   const requestFinish = () => {
@@ -373,12 +381,12 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
             {saving ? (
               <>
                 <Save className="h-3.5 w-3.5 text-[#0b3c5d]" />
-                <span>Sauvegarde…</span>
+                <span>Enregistrement local…</span>
               </>
             ) : (
               <>
                 <CheckCircle2 className="h-3.5 w-3.5 text-[#2fa36b]" />
-                <span>Enregistré</span>
+                <span>Enregistré sur cet appareil</span>
               </>
             )}
           </span>
@@ -387,7 +395,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
           !isLastQuestion ? (
             <button
               type="button"
-              disabled={submitting || validating}
+              disabled={submitting || validating || questionSeconds <= 0}
               onClick={() => void moveToQuestion(index + 1)}
               className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-6 py-2.5 text-sm font-extrabold text-white shadow-sm transition-colors hover:bg-[#0b3c5d] disabled:opacity-50 sm:w-auto"
             >

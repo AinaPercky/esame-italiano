@@ -105,3 +105,18 @@ Après application, vérifier la création des tables `written_*`, les fonctions
 - Sur iPhone/iPad et autres mobiles, un événement `visibilitychange` (changement d'application, écran verrouillé ou interruption iOS) est journalisé sans avertissement bloquant, sans remise automatique et sans disqualification. Une capture d'écran native n'est pas détectable de façon fiable depuis Safari et n'est jamais considérée comme une preuve de fraude. La perte de focus/changement d'onglet reste disqualifiante uniquement sur ordinateur après le délai de tolérance.
 - Les tests automatisés simulent la politique mobile et vérifient que les événements mobiles/screenshot ne modifient pas `integrity_failed`; ils conservent un test de disqualification pour une perte de focus sur ordinateur. Une validation manuelle sur un iPhone physique reste nécessaire avant production.
 - Les canevas A1 et L135 réservent 50 secondes par QCM et 90 secondes par réponse saisie en compréhension écrite. Une marge de lecture de 60 secondes (A1) ou 90 secondes (B1) est ajoutée à la première question de la section. Les durées globales passent respectivement à 80 et 105 minutes.
+
+
+## Stockage local des réponses (architecture de novembre 2026)
+
+- Pendant une tentative, les réponses sont conservées dans IndexedDB sur l'appareil de l'élève. Elles ne sont plus envoyées au backend à chaque frappe ni à chaque changement de question.
+- Le RPC `advance_written_exam_question` valide uniquement la progression et ajuste l'ancre du chronomètre serveur lors d'une validation anticipée ; il ne reçoit aucune réponse.
+- Le RPC `submit_written_exam_with_answers` transmet l'ensemble de la copie une seule fois, puis appelle la correction PostgreSQL existante dans la même transaction. Une répétition après perte de réponse HTTP est idempotente.
+- En cas d'échec réseau lors de la remise, le brouillon IndexedDB est conservé et la remise peut être réessayée. Il est supprimé uniquement après confirmation du serveur.
+- Une validation anticipée manuelle nécessite une connexion pour que le serveur confirme le changement d'ancre du chronomètre. Hors connexion, l'élève peut continuer à répondre localement et le passage automatique à l'échéance continue côté navigateur ; il ne peut pas forcer une avance anticipée tant que la connexion n'est pas revenue.
+- La restauration locale est limitée au même navigateur/appareil. L'effacement des données du navigateur ou un changement d'appareil peut entraîner la perte du brouillon non remis.
+- Le chronomètre reste fondé sur l'horodatage serveur fourni au démarrage. Le navigateur calcule l'affichage et le passage automatique à partir de cette ancre ; le serveur contrôle la progression anticipée et, lors de la remise, refuse les réponses associées à des questions dont le délai n'a pas encore commencé. Les réponses individuelles n'ayant plus d'horodatage serveur, il n'est toutefois pas possible de prouver l'instant exact de saisie de chacune : un élève qui modifie volontairement son navigateur pourrait préparer localement une réponse puis la transmettre lorsque la question devient autorisée. L'échéance globale et l'ordre autorisé restent vérifiés côté serveur.
+
+### Migration supplémentaire
+
+Appliquer également `supabase/migrations/20261119100000_local_written_exam_answers.sql` après les migrations précédentes.
