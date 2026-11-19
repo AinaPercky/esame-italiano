@@ -852,11 +852,15 @@ class SupabaseService {
   public async saveExam(exam: Exam, rubrics?: ExamRubric[]): Promise<void> {
     const client = this.getClient();
     if (!client) throw new Error('Supabase n’est pas configuré : examen non enregistré.');
-    if (!isUUID(exam.id) || !isUUID(exam.class_id)) throw new Error('Identifiants de l’examen invalides.');
+    const classIds = Array.from(new Set((exam.class_ids?.length ? exam.class_ids : [exam.class_id]).filter(isUUID)));
+    if (!isUUID(exam.id) || (!exam.is_global && classIds.length === 0)) throw new Error('Identifiants de l’examen invalides.');
     try {
+      const primaryClassId = classIds[0] || exam.class_id;
+      if (!isUUID(primaryClassId)) throw new Error('Un examen oral doit conserver une classe principale valide.');
       const { error } = await client.from('exams').upsert({
         id: exam.id,
-        class_id: exam.class_id,
+        class_id: primaryClassId,
+        is_global: Boolean(exam.is_global),
         title: exam.title,
         level: exam.level ?? null,
         description: exam.description || null,
@@ -866,6 +870,15 @@ class SupabaseService {
         created_at: exam.created_at || new Date().toISOString()
       }, { onConflict: 'id' });
       if (error) throw new Error(`Enregistrement de l'examen impossible : ${error.message}`);
+
+      const { error: clearAssignmentsError } = await client.from('oral_exam_classes').delete().eq('exam_id', exam.id);
+      if (clearAssignmentsError) throw new Error(`Réinitialisation des classes de l'examen impossible : ${clearAssignmentsError.message}`);
+      if (!exam.is_global) {
+        const assignments = classIds.map(class_id => ({ exam_id: exam.id, class_id }));
+        if (assignments.length === 0) throw new Error('Sélectionnez au moins une classe pour cet examen.');
+        const { error: assignmentError } = await client.from('oral_exam_classes').insert(assignments);
+        if (assignmentError) throw new Error(`Affectation des classes impossible : ${assignmentError.message}`);
+      }
 
       // If a rubric list is supplied, persist it (including an intentionally empty list).
       // Evaluation saving independently verifies that the persisted rubric set is complete.
@@ -1727,7 +1740,8 @@ class SupabaseService {
         : isAuthenticated
           ? client.from('students').select('id,class_id,first_name,last_name,gender,email,student_number,avatar_url,validation_status,created_at,updated_at')
           : emptyRows;
-      const examsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exams').select('id,class_id,title,description,level,exam_date,duration_seconds,status,created_at') : emptyRows;
+      const examsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exams').select('id,class_id,is_global,title,description,level,exam_date,duration_seconds,status,created_at') : emptyRows;
+      const oralExamClassesRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('oral_exam_classes').select('exam_id,class_id') : emptyRows;
       const rubricsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exam_rubrics').select('id,exam_id,title,question,example_sentence,points,position') : emptyRows;
       const evaluationsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at') : emptyRows;
       const detailsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note') : emptyRows;
@@ -1755,6 +1769,7 @@ class SupabaseService {
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
         { data: examsData, error: errE },
+        { data: oralExamClassesData, error: errOEC },
         { data: rubricsData, error: errR },
         { data: evalsData, error: errEv },
         { data: detailsData, error: errD },
@@ -1768,6 +1783,7 @@ class SupabaseService {
         classesRequest,
         studentsRequest,
         examsRequest,
+        oralExamClassesRequest,
         rubricsRequest,
         evaluationsRequest,
         detailsRequest,
@@ -1782,6 +1798,7 @@ class SupabaseService {
       if (errC) throw new Error(`Classes: ${errC.message}`);
       if (errS) throw new Error(`Students: ${errS.message}`);
       if (errE) throw new Error(`Exams: ${errE.message}`);
+      if (errOEC) throw new Error(`Affectations des examens oraux: ${errOEC.message}`);
       if (errR) throw new Error(`Grilles d’examen: ${errR.message}`);
       if (errEv) throw new Error(`Évaluations: ${errEv.message}`);
       if (errD) throw new Error(`Détails d’évaluation: ${errD.message}`);
@@ -1883,9 +1900,17 @@ class SupabaseService {
         position: r.position
       }));
 
+      const examClassIds = new Map<string, string[]>();
+      (oralExamClassesData || []).forEach((row: any) => {
+        const ids = examClassIds.get(row.exam_id) || [];
+        ids.push(row.class_id);
+        examClassIds.set(row.exam_id, ids);
+      });
       const exams: Exam[] = (examsData || []).map(e => ({
         id: e.id,
         class_id: e.class_id,
+        class_ids: e.is_global ? [] : (examClassIds.get(e.id) || [e.class_id]),
+        is_global: Boolean(e.is_global),
         title: e.title,
         description: e.description,
         level: e.level ?? null,

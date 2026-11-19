@@ -15,6 +15,7 @@ import {
 import { Exam, ClassRoom, ExamRubric, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ClassAssignmentPicker } from '../components/ClassAssignmentPicker';
 import {
   LearningCard,
   LearningCardFooter,
@@ -44,6 +45,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
   // New Exam Form
   const [newTitle, setNewTitle] = useState('');
   const [newClassId, setNewClassId] = useState(classes[0]?.id || '');
+  const [newClassIds, setNewClassIds] = useState<string[]>(classes[0]?.id ? [classes[0].id] : []);
+  const [newExamGlobal, setNewExamGlobal] = useState(false);
   const [newDescription, setNewDescription] = useState('');
   const [newExamDate, setNewExamDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExamLevel, setNewExamLevel] = useState<CEFRLevel | ''>('');
@@ -52,6 +55,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   // Rubric Editing inside Details Modal
   const [rubricsDraft, setRubricsDraft] = useState<ExamRubric[]>([]);
+  const [detailClassIds, setDetailClassIds] = useState<string[]>([]);
+  const [detailExamGlobal, setDetailExamGlobal] = useState(false);
   const [editingRubricIndex, setEditingRubricIndex] = useState<number | null>(null);
 
   // In-app Confirm Dialog
@@ -73,6 +78,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
     if (full) {
       setSelectedExamForDetails(full);
       setRubricsDraft(full.rubrics || []);
+      setDetailClassIds(full.class_ids?.length ? full.class_ids : [full.class_id]);
+      setDetailExamGlobal(Boolean(full.is_global));
       setDurationDraftSeconds(Number(full.duration_seconds) || 180);
       setEditingRubricIndex(null);
     }
@@ -80,14 +87,16 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newClassId) return;
+    if (!newTitle.trim() || (!newExamGlobal && newClassIds.length === 0)) return;
 
     try {
-      await dataService.createExam(newTitle.trim(), newClassId, newDescription.trim(), newExamDate, false, newExamLevel || null, newDurationSeconds);
+      await dataService.createExam(newTitle.trim(), newClassId || newClassIds[0] || classes[0]?.id || '', newDescription.trim(), newExamDate, false, newExamLevel || null, newDurationSeconds, newClassIds, newExamGlobal);
       setIsCreateModalOpen(false);
       setNewTitle('');
       setNewDescription('');
       setNewExamLevel('');
+      setNewClassIds(classes[0]?.id ? [classes[0].id] : []);
+      setNewExamGlobal(false);
       setNewDurationSeconds(180);
       onRefresh();
     } catch (error) {
@@ -112,8 +121,16 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
 
   const handleSaveRubrics = async () => {
     if (!selectedExamForDetails) return;
+    if (!detailExamGlobal && detailClassIds.length === 0) {
+      window.alert('Sélectionnez au moins une classe ou choisissez « Toutes les classes ».');
+      return;
+    }
     try {
-      await dataService.updateExam(selectedExamForDetails.id, { duration_seconds: durationDraftSeconds });
+      await dataService.updateExam(selectedExamForDetails.id, {
+        duration_seconds: durationDraftSeconds,
+        class_ids: detailExamGlobal ? [] : detailClassIds,
+        is_global: detailExamGlobal
+      });
       await dataService.updateExamRubrics(selectedExamForDetails.id, rubricsDraft);
       onRefresh();
       handleOpenDetails(selectedExamForDetails);
@@ -159,6 +176,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
             setNewTitle('');
             setNewDescription('');
             setNewExamLevel('');
+            setNewClassIds(classes[0]?.id ? [classes[0].id] : []);
+            setNewExamGlobal(false);
             setNewDurationSeconds(180);
             setIsCreateModalOpen(true);
           }}
@@ -182,10 +201,12 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
           <LearningCard key={exam.id} active={exam.status !== 'completed'}>
             <LearningCardHeader
               kicker={
-                <>
-                  {exam.class_name}
-                  {exam.level ? ` · ${exam.level}` : ''}
-                </>
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${exam.is_global ? 'bg-[#eaf7ef] text-[#267447]' : 'bg-[#e6f0f7] text-[#0b3c5d]'}`}>
+                    {exam.is_global ? 'Toutes les classes' : `${exam.class_ids?.length || 1} classe${(exam.class_ids?.length || 1) > 1 ? 's' : ''}`}
+                  </span>
+                  {exam.level ? <span>{exam.level}</span> : null}
+                </span>
               }
               status={
                 <StatusBadge tone={exam.status === 'completed' ? 'neutral' : 'live'}>
@@ -200,6 +221,10 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </h3>
               <p className="line-clamp-2 text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
                 {exam.description || 'Aucune description spécifique.'}
+              </p>
+              <p className="flex items-start gap-1.5 pt-0.5 text-[11px] leading-relaxed text-slate-500">
+                <span className="shrink-0 font-semibold text-[#0b3c5d]">Diffusion :</span>
+                <span className="line-clamp-1">{exam.is_global ? 'Toutes les classes actuelles et futures' : (exam.class_name || 'Classe non renseignée')}</span>
               </p>
             </div>
 
@@ -273,19 +298,14 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Classe concernée <span className="text-[#0b3c5d]">*</span>
-                  </label>
-                  <select
-                    value={newClassId}
-                    onChange={(e) => setNewClassId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white min-h-[44px]"
-                  >
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                <div className="sm:col-span-2">
+        <ClassAssignmentPicker
+                  classes={classes}
+                  selectedClassIds={newClassIds}
+                  isGlobal={newExamGlobal}
+                  onSelectedClassIdsChange={setNewClassIds}
+                  onGlobalChange={setNewExamGlobal}
+/>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -350,7 +370,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
+                  disabled={!newTitle.trim() || (!newExamGlobal && newClassIds.length === 0)}
+                  className="w-full sm:w-auto px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Créer l'examen
                 </button>
@@ -364,19 +385,40 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       {selectedExamForDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
           <div className="bg-white rounded-[24px] shadow-2xl max-w-3xl w-full p-4 sm:p-6 max-h-[90vh] flex flex-col">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between pb-3 border-b border-slate-100 mb-3 gap-2">
-              <div>
-                <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
-                  Grille d'évaluation en italien
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="min-w-0">
+                <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+                  Grille d’évaluation en italien
                 </span>
-                <h3 className="font-display text-base sm:text-lg font-bold text-slate-900 mt-1">
+                <h3 className="mt-2 break-words font-display text-base font-bold text-[#072a3f] sm:text-lg">
                   {selectedExamForDetails.title}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Total : {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
+                <p className="mt-1 text-xs text-slate-500">
+                  {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
                 </p>
-                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                  Niveau (CECRL)
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDeleteExam(selectedExamForDetails.id)}
+                className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Supprimer</span>
+              </button>
+            </div>
+
+            <div className="shrink-0 space-y-3 border-b border-slate-100 py-3">
+              <ClassAssignmentPicker
+                classes={classes}
+                selectedClassIds={detailClassIds}
+                isGlobal={detailExamGlobal}
+                onSelectedClassIdsChange={setDetailClassIds}
+                onGlobalChange={setDetailExamGlobal}
+                compact
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                  <span>Niveau (CECRL)</span>
                   <select
                     value={selectedExamForDetails.level || ''}
                     onChange={(e) => {
@@ -388,33 +430,28 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                         })
                         .catch(error => window.alert(error instanceof Error ? error.message : 'Modification impossible.'));
                     }}
-                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs"
+                    className="min-h-9 rounded-lg border border-slate-300 bg-white px-2 text-xs"
                   >
                     <option value="">Non défini</option>
                     {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
                   </select>
                 </label>
-                <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
-                  Durée par candidat (minutes)
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    step="1"
-                    value={Math.floor(durationDraftSeconds / 60)}
-                    onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
-                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
-                  />
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                  <span>Durée par candidat</span>
+                  <span className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      step="1"
+                      value={Math.floor(durationDraftSeconds / 60)}
+                      onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
+                      className="min-h-9 w-16 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                    />
+                    <span className="text-[11px] text-slate-500">min</span>
+                  </span>
                 </label>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDeleteExam(selectedExamForDetails.id)}
-                className="text-xs text-[#0b3c5d] hover:text-[#072a3f] inline-flex items-center gap-1 p-2 rounded hover:bg-[#e6f0f7] self-start sm:self-auto min-h-[36px]"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Supprimer</span>
-              </button>
             </div>
 
             {/* Rubrics List */}
@@ -526,7 +563,8 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
               <button
                 type="button"
                 onClick={handleSaveRubrics}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px]"
+                disabled={!detailExamGlobal && detailClassIds.length === 0}
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Enregistrer les modifications
               </button>

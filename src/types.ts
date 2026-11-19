@@ -44,7 +44,9 @@ export interface ExamRubric {
 
 export interface Exam {
   id: string;
-  class_id: string;
+  class_id: string; // Classe principale conservée pour compatibilité historique
+  class_ids?: string[]; // Classes auxquelles l'examen oral est affecté
+  is_global?: boolean; // Disponible dans toutes les classes, y compris les futures
   title: string;
   description?: string;
   level?: CEFRLevel | null;

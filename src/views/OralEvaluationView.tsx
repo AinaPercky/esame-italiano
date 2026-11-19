@@ -53,14 +53,14 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   // 2. Sélection de l'examen
   const availableExams = useMemo(() => {
-    return exams.filter(e => e.class_id === selectedClassId);
+    return exams.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.includes(selectedClassId) : e.class_id === selectedClassId));
   }, [exams, selectedClassId]);
 
   const [selectedExamId, setSelectedExamId] = useState<string>(() => {
-    if (initialExamId && exams.some(e => e.id === initialExamId && e.class_id === selectedClassId)) {
+    if (initialExamId && exams.some(e => e.id === initialExamId && (e.is_global || (e.class_ids?.length ? e.class_ids.includes(selectedClassId) : e.class_id === selectedClassId)))) {
       return initialExamId;
     }
-    const matching = exams.filter(e => e.class_id === selectedClassId);
+    const matching = exams.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.includes(selectedClassId) : e.class_id === selectedClassId));
     return matching[0]?.id || '';
   });
 
@@ -159,7 +159,7 @@ export const OralEvaluationView: React.FC<OralEvaluationViewProps> = ({
 
   const handleClassChange = (newClassId: string) => {
     setSelectedClassId(newClassId);
-    const matching = exams.filter(e => e.class_id === newClassId);
+    const matching = exams.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.includes(newClassId) : e.class_id === newClassId));
     if (matching.length > 0) {
       setSelectedExamId(matching[0].id);
     } else {

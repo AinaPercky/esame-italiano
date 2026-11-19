@@ -76,7 +76,7 @@ function sanitizeState(appState: AppState): AppState {
     });
   const studentIds = new Set(validStudents.map(s => s.id));
 
-  const validExams = appState.exams.filter(e => classIds.has(e.class_id));
+  const validExams = appState.exams.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.some(id => classIds.has(id)) : classIds.has(e.class_id)));
   const examIds = new Set(validExams.map(e => e.id));
 
   const validRubrics = appState.rubrics.filter(r => examIds.has(r.exam_id));
@@ -208,7 +208,7 @@ export const dataService = {
   getClasses(): ClassRoom[] {
     return state.classes.map(c => {
       const studentCount = state.students.filter(s => s.class_ids ? s.class_ids.includes(c.id) : s.class_id === c.id).length;
-      const examCount = state.exams.filter(e => e.class_id === c.id).length;
+      const examCount = state.exams.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.includes(c.id) : e.class_id === c.id)).length;
       return { enrollment_mode: 'approval', ...c, student_count: studentCount, exam_count: examCount };
     });
   },
@@ -527,16 +527,18 @@ export const dataService = {
   getExams(classId?: string): Exam[] {
     let list = [...state.exams];
     if (classId) {
-      list = list.filter(e => e.class_id === classId);
+      list = list.filter(e => e.is_global || (e.class_ids?.length ? e.class_ids.includes(classId) : e.class_id === classId));
     }
     return list.map(e => {
+      const assignedNames = e.is_global ? ['Toutes les classes'] : (e.class_ids?.length ? e.class_ids : [e.class_id])
+        .map(id => state.classes.find(c => c.id === id)?.name).filter(Boolean);
       const cls = state.classes.find(c => c.id === e.class_id);
       const rubrics = state.rubrics.filter(r => r.exam_id === e.id);
       const maxScore = rubrics.reduce((s, r) => s + (Number(r.points) || 1), 0);
       const evals = state.evaluations.filter(ev => ev.exam_id === e.id);
       return {
         ...e,
-        class_name: cls ? cls.name : 'Inconnue',
+        class_name: e.is_global ? 'Toutes les classes' : (assignedNames.join(', ') || (cls ? cls.name : 'Inconnue')),
         rubrics,
         rubric_count: rubrics.length,
         max_score: maxScore,
@@ -549,6 +551,8 @@ export const dataService = {
     const exam = state.exams.find(e => e.id === id);
     if (!exam) return null;
     const cls = state.classes.find(c => c.id === exam.class_id);
+    const assignedNames = exam.is_global ? ['Toutes les classes'] : (exam.class_ids?.length ? exam.class_ids : [exam.class_id])
+      .map(classId => state.classes.find(item => item.id === classId)?.name).filter(Boolean);
     const rubrics = state.rubrics
       .filter(r => r.exam_id === id)
       .sort((a, b) => a.position - b.position);
@@ -557,7 +561,7 @@ export const dataService = {
 
     return {
       ...exam,
-      class_name: cls ? cls.name : 'Inconnue',
+      class_name: exam.is_global ? 'Toutes les classes' : (assignedNames.join(', ') || (cls ? cls.name : 'Inconnue')),
       rubrics,
       rubric_count: rubrics.length,
       max_score: maxScore,
@@ -565,11 +569,14 @@ export const dataService = {
     };
   },
 
-  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false, level?: Exam['level'], durationSeconds: number = 180): Promise<Exam> {
-    if (!title.trim() || !classId) throw new Error('Titre et classe obligatoires');
+  async createExam(title: string, classId: string, description: string = '', examDate?: string, _legacyUseZebuTemplate = false, level?: Exam['level'], durationSeconds: number = 180, classIds: string[] = [classId], isGlobal = false): Promise<Exam> {
+    const normalizedClassIds = Array.from(new Set(classIds.filter(id => state.classes.some(cls => cls.id === id))));
+    if (!title.trim() || (!isGlobal && normalizedClassIds.length === 0)) throw new Error('Titre et au moins une classe obligatoires');
     const newExam: Exam = {
       id: generateUUID(),
-      class_id: classId,
+      class_id: normalizedClassIds[0] || classId,
+      class_ids: isGlobal ? [] : normalizedClassIds,
+      is_global: isGlobal,
       title: title.trim(),
       description: description.trim(),
       level: level || null,
@@ -593,6 +600,7 @@ export const dataService = {
     const idx = state.exams.findIndex(e => e.id === id);
     if (idx === -1) throw new Error('Examen introuvable');
     const updatedExam = { ...state.exams[idx], ...updates };
+    if (updates.class_ids !== undefined) updatedExam.class_ids = Array.from(new Set(updates.class_ids));
     await supabaseService.saveExam(updatedExam);
     state.exams[idx] = updatedExam;
     persistState();
