@@ -363,6 +363,30 @@ export interface ExerciseAttemptQuestion {
   correction?: ExerciseCorrection;
 }
 
+export interface ExerciseAttemptBundleQuestion {
+  question: QuizQuestion;
+  question_number: number;
+  question_count: number;
+  deadline_at: string;
+  seconds_remaining: number;
+}
+
+export interface ExerciseAttemptBundle {
+  attempt_id: string;
+  exercise_id: string;
+  started_at: string;
+  server_now: string;
+  questions: ExerciseAttemptBundleQuestion[];
+}
+
+export interface ExerciseBatchSubmissionResult {
+  completed: true;
+  attempt_id: string;
+  score: number;
+  max_score: number;
+  feedback?: Record<string, ExerciseCorrection>;
+}
+
 export interface ExerciseCorrection {
   correct: boolean;
   points: number;
