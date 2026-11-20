@@ -384,6 +384,7 @@ export interface ExerciseBatchSubmissionResult {
   attempt_id: string;
   score: number;
   max_score: number;
+  completed_at?: string | null;
   feedback?: Record<string, ExerciseCorrection>;
 }
 
