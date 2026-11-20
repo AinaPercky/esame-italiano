@@ -138,7 +138,9 @@ BEGIN
   IF v_launch_id IS NOT NULL AND v_questions IS NOT NULL THEN
     NEW.launch_id := v_launch_id;
     NEW.questions_snapshot := v_questions;
-  ELSIF NEW.questions_snapshot IS NULL THEN
+  ELSE
+    -- Hors lancement suivi (compatibilité historique/public), ne jamais faire
+    -- confiance au snapshot transmis par le navigateur : reprendre la base.
     SELECT q.questions
       INTO NEW.questions_snapshot
       FROM public.quizzes AS q
