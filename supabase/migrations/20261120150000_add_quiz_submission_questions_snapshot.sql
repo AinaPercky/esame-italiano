@@ -88,7 +88,7 @@ CREATE OR REPLACE FUNCTION public.quiz_sanitize_questions(p_questions JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
 STABLE
-AS $
+AS $fn$
 DECLARE
   v_result JSONB := '[]'::jsonb;
   v_q JSONB;
@@ -137,7 +137,7 @@ BEGIN
 
   RETURN v_result;
 END;
-$;
+$fn$;
 
 -- La RPC renvoie uniquement la version assainie des questions : jamais les corrigés.
 CREATE OR REPLACE FUNCTION public.get_student_active_launch(p_quiz_id text)
