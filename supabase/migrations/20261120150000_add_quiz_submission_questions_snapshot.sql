@@ -1,10 +1,10 @@
--- Diagnostic pédagogique : conserver les questions utilisées par chaque nouvelle soumission.
+-- Diagnostic pédagogique : conserver la version exacte des questions prévue au lancement du quiz.
 -- Les lignes historiques ne sont volontairement ni remplies ni modifiées.
 ALTER TABLE public.quiz_submissions
   ADD COLUMN IF NOT EXISTS questions_snapshot jsonb;
 
 COMMENT ON COLUMN public.quiz_submissions.questions_snapshot IS
-  'Snapshot JSONB des questions enregistrées lors de la soumission. NULL pour les soumissions historiques antérieures à cette migration.';
+  'Snapshot JSONB des questions exactes du lancement associé. NULL pour les soumissions historiques antérieures à cette migration.';
 
 CREATE OR REPLACE FUNCTION public.capture_quiz_submission_questions_snapshot()
 RETURNS trigger
@@ -124,7 +124,7 @@ BEGIN
     INTO v_launch_id, v_questions
     FROM public.quiz_launches AS l
    WHERE l.quiz_id = NEW.quiz_id
-     AND l.status = 'launched'
+     AND (l.status = 'launched' OR NEW.status = 'missed')
      AND (NEW.launch_id IS NULL OR l.id = NEW.launch_id)
    ORDER BY l.launched_at DESC
    LIMIT 1;
