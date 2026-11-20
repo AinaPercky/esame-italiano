@@ -30,7 +30,8 @@ import {
   type ClassRoom,
   type ExerciseDefinition,
   type ExerciseStatus,
-  type Quiz
+  type Quiz,
+  type QuizQuestion
 } from '../types';
 import { dataService } from '../services/dataService';
 import {
