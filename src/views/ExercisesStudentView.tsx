@@ -245,6 +245,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     const matchedTitle = items.find(item => item.id === exerciseId)?.title;
     if (matchedTitle) setActiveExerciseTitle(matchedTitle);
     setError(''); setCorrection(null); setAnswer(''); timeoutLock.current = false;
+    localSaveQueueRef.current = Promise.resolve();
     try {
       if (attemptId) {
         const resumedBatch = await exerciseService.resumeAttemptBatch(attemptId);
