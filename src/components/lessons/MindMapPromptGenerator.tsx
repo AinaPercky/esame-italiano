@@ -3,6 +3,8 @@ import { Copy, Sparkles, Languages, FileText } from 'lucide-react';
 
 type Props = { lessonJson: string; onCopy: (value: string, successMessage: string) => void };
 
+const MAX_PROMPT_CHARACTERS = 32000;
+
 const SUBJECTS: Record<string, string> = {
   grammaire: 'Grammaire italienne',
   vocabulaire: 'Vocabulaire italien',
@@ -10,6 +12,87 @@ const SUBJECTS: Record<string, string> = {
   theme: 'Thème / culture italienne',
   prononciation: 'Prononciation italienne'
 };
+
+const clean = (value: unknown): string =>
+  typeof value === 'string' ? value.replace(/==|\+\+/g, '').trim() : '';
+
+function extractBlockLines(block: any): string[] {
+  if (!block || typeof block !== 'object') return [];
+  const c = block.content || {};
+  const lines: string[] = [];
+  const add = (...values: unknown[]) => {
+    const text = values.map(clean).filter(Boolean).join(' — ');
+    if (text) lines.push(text);
+  };
+  const examples = (items: any[] = []) => items.forEach(item => add(item.it, item.fr ? `(${item.fr})` : ''));
+
+  switch (block.type) {
+    case 'dialogue':
+      (c.lines || []).forEach((line: any) => add(line.speaker ? `${line.speaker}:` : '', line.it, line.fr ? `(${line.fr})` : ''));
+      break;
+    case 'vocab_cards':
+    case 'chips':
+      (c.items || []).forEach((item: any) => add(item.it || item.label || item.text, item.fr));
+      break;
+    case 'rules_table':
+      add(c.title);
+      (c.rows || []).forEach((row: any) => add(row.label, ...(row.cells || [])));
+      break;
+    case 'rule_cards':
+      (c.cards || []).forEach((card: any) => {
+        add(card.title, card.text);
+        examples(card.examples);
+      });
+      break;
+    case 'example_list':
+      examples(c.examples);
+      break;
+    case 'steps_text':
+      (c.steps || []).forEach((step: any) => add(step.title, step.it, step.fr ? `(${step.fr})` : ''));
+      break;
+    case 'key_value_list':
+      (c.rows || []).forEach((row: any) => add(row.key, row.it, row.fr ? `(${row.fr})` : ''));
+      break;
+    case 'tip':
+    case 'warning':
+      add(c.text);
+      break;
+    case 'recap':
+      (c.bullets || []).forEach((item: any) => add(item));
+      if (c.model) add(c.model.it, c.model.fr);
+      break;
+    case 'formula':
+      (c.formulas || []).forEach((formula: any) => {
+        add(formula.label, (formula.parts || []).map((part: any) => part.text).join(' '));
+        examples(formula.examples);
+      });
+      break;
+    case 'exceptions':
+      (c.items || []).forEach((item: any) => {
+        add(item.rule, item.explanation);
+        examples(item.examples);
+      });
+      break;
+    case 'module':
+      add(c.title);
+      (c.blocks || []).forEach((child: any) => lines.push(...extractBlockLines(child)));
+      break;
+    case 'discovery':
+      // Les questions et consignes d'activités ne sont pas du contenu de cours.
+      break;
+    default:
+      // Fallback lisible pour les futurs types de blocs.
+      Object.entries(c).forEach(([key, value]) => {
+        if (['audio', 'id', 'source', 'steps'].includes(key)) return;
+        if (typeof value === 'string' || typeof value === 'number') add(value);
+        else if (Array.isArray(value)) value.forEach(item => {
+          if (typeof item === 'string') add(item);
+          else if (item && typeof item === 'object') add(item.it, item.fr, item.text, item.title, item.label, item.explanation);
+        });
+      });
+  }
+  return lines;
+}
 
 export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) => {
   const [language, setLanguage] = useState('Italien (termes et exemples italiens, explications françaises)');
@@ -25,122 +108,69 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
   const prompt = useMemo(() => {
     if (!parsed) return '';
     const title = [parsed.title_it, parsed.title_fr].filter(Boolean).join(' / ') || parsed.slug || 'Cours sans titre';
-    const level = parsed.level || 'Non précisé';
     const subject = SUBJECTS[parsed.type] || parsed.type || 'Cours d’italien';
-    const courseContent = JSON.stringify({
-      titre_italien: parsed.title_it || null,
-      titre_francais: parsed.title_fr || null,
-      objectif_pedagogique: parsed.objective || null,
-      blocs_du_cours: Array.isArray(parsed.blocks) ? parsed.blocks : []
-    }, null, 2);
+    const courseLines = (Array.isArray(parsed.blocks) ? parsed.blocks : [])
+      .flatMap((block: any) => extractBlockLines(block))
+      .filter((line: string, index: number, all: string[]) => all.indexOf(line) === index);
+    const courseContent = courseLines.length
+      ? courseLines.map((line: string) => `• ${line}`).join('\n')
+      : 'Aucun contenu pédagogique exploitable trouvé dans les blocs du cours.';
 
-    return `# PROMPT MAÎTRE — PERCKYLINGUA MIND MAP
+    const generatedPrompt = `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
-Tu es un expert en pédagogie, en sciences cognitives et en cartographie mentale. Tu maîtrises les principes de la méthode de Tony Buzan.
+Crée une véritable carte mentale pour le cours « ${title} ».
 
-Ta mission : transformer le cours fourni en une véritable carte mentale pédagogique, visuelle, structurée et facile à mémoriser.
+**Informations du cours**
+- Niveau : ${parsed.level || 'non précisé'}
+- Matière : ${subject}
+- Langue : ${language}
 
-## PARAMÈTRES DU COURS
-Titre : ${title}
-Niveau : ${level}
-Matière : ${subject}
-Langue de la carte : ${language}
+**Ta mission**
+Tu es spécialiste de pédagogie, de mémorisation visuelle et de cartographie mentale. Transforme le cours fourni en une synthèse visuelle claire, fidèle et facile à mémoriser. La carte doit montrer les liens entre les notions et permettre de retrouver rapidement l'organisation de la leçon. Ce n'est ni une fiche de cours, ni une infographie composée de blocs indépendants.
 
-## 1. OBJECTIF PÉDAGOGIQUE — UN VRAI RÉSUMÉ DU COURS
-- La carte mentale doit être une synthèse fidèle et structurée de la leçon complète, pas une reproduction de son plan ni une seconde fiche de cours.
-- Sélectionne uniquement les notions indispensables à comprendre et mémoriser : concepts, règles, mécanismes, distinctions, exemples courts et exceptions utiles.
-- Condense les explications longues en mots-clés et formulations très courtes, sans perdre leur sens.
-- Ne crée **aucune branche ou section intitulée « À retenir », « À retenir absolument », « L’essentiel », « Résumé », « Conclusion » ou équivalent**. Les éléments importants doivent être intégrés directement dans les branches thématiques auxquelles ils appartiennent.
-- N’ajoute pas de bloc final récapitulatif qui répète les branches déjà présentes.
-- N’invente aucune règle ni information ; adapte la sélection et le vocabulaire au niveau ${level}.
-- La carte doit permettre de retrouver rapidement l'architecture et les idées essentielles de la leçon en un seul regard.
+**Organisation — méthode de Tony Buzan**
+- Place au centre une illustration forte qui représente le sujet, accompagnée du titre court.
+- Fais partir du centre 3 à 7 branches principales, selon la richesse réelle du cours. Chaque branche représente une grande notion, pas un paragraphe ou une étape arbitraire.
+- Développe des sous-branches et, si nécessaire, des niveaux supplémentaires : notion → règle ou caractéristique → exemple, exception ou cas particulier.
+- Répartis les branches autour du centre, avec une composition équilibrée à gauche et à droite.
+- Utilise des branches organiques, courbes et connectées. Les branches principales sont plus épaisses ; les ramifications deviennent progressivement plus fines.
+- Privilégie les mots-clés, expressions courtes, formules et exemples très brefs. Évite les phrases longues, les paragraphes, les tableaux et les listes rigides.
+- Utilise des flèches, associations et petits symboles dessinés pour montrer les relations entre notions lorsque cela apporte une vraie information.
 
-## 2. STRUCTURE HIÉRARCHIQUE — INSPIRATION TONY BUZAN
-- Structure radiale partant du centre, avec une illustration centrale forte représentant le thème.
-- Crée des branches principales correspondant aux grands thèmes ou notions distinctes du cours (généralement 3 à 7, selon le contenu).
-- **Privilégie les sous-branches et sous-sous-branches dès qu'elles clarifient la hiérarchie** : répartis les détails sous la bonne notion au lieu de multiplier les branches principales.
-- Organise chaque branche selon une logique claire : notion → règle ou caractéristique → cas particuliers / exemple bref.
-- Une idée doit apparaître une seule fois, à l'endroit hiérarchique le plus pertinent. Si elle concerne plusieurs notions, indique un lien ou une flèche entre les branches plutôt que de la recopier.
-- Utilise des mots-clés et expressions courtes ; évite les phrases longues, les paragraphes et les répétitions.
-- Les branches sont organiques, courbes et connectées ; les branches secondaires sont plus fines et les niveaux de ramification doivent être visuellement distincts.
-- Utilise associations visuelles, symboles, pictogrammes, mini-dessins et flèches pour expliquer les relations sans dupliquer le texte.
-- Évite les tableaux, les listes rigides et les encadrés d’infographie classique.
+**Qualité pédagogique et fidélité**
+- Analyse tout le contenu avant de construire la carte. Regroupe les informations qui traitent de la même notion et place chacune à l'endroit le plus logique.
+- Chaque règle, définition ou exemple ne doit apparaître qu'une seule fois. Supprime les répétitions, y compris celles qui proviennent du récapitulatif.
+- Conserve les distinctions importantes, les formes grammaticales, les mécanismes et les exceptions utiles. Place chaque exception près de la règle concernée.
+- Choisis des exemples courts et représentatifs, sans recopier plusieurs fois le même exemple.
+- Pour une leçon d'italien, respecte exactement l'orthographe, les accents et les formes italiennes. Selon la langue choisie, garde les termes et exemples italiens avec leurs explications françaises, ou applique strictement la langue sélectionnée.
+- Adapte la densité au niveau ${parsed.level || 'du cours'} : ne simplifie pas au point de supprimer une notion nécessaire, mais écarte les détails secondaires.
+- N'invente aucune règle, traduction, exception ou information absente du cours. Si une information est ambiguë, ne la complète pas par supposition.
+- N'ajoute pas de branche intitulée « À retenir », « L'essentiel », « Résumé » ou « Conclusion ». Ne crée pas de bloc final qui répète les branches.
 
-## 3. IDENTITÉ GRAPHIQUE PERMANENTE — PERCKYLINGUA
-Toutes les cartes doivent conserver la même signature visuelle, quelle que soit la leçon.
+**Identité graphique constante — PerckyLingua**
+Adopte le style d'un manuel scolaire illustré des années 1960, chaleureux et pédagogique, inspiré de l'esprit de la méthode Boscher sans reproduire ses planches, personnages ou compositions. Les dessins doivent être simples, expressifs, légèrement naïfs et immédiatement compréhensibles : personnages, objets du quotidien, animaux ou petites scènes concrètes. Utilise des contours dessinés à l'encre et des aplats évoquant la gouache ou les crayons de couleur imprimés. Chaque illustration doit aider à comprendre ou mémoriser une notion ; évite la décoration gratuite.
 
-**Direction artistique principale : illustration pédagogique française classique des années 1960, inspirée de l'esprit de la Méthode Boscher.** Retrouve le charme des anciens manuels scolaires illustrés : dessins simples, chaleureux, immédiatement compréhensibles et expressifs, avec une touche rétro authentique. Il s'agit d'une inspiration esthétique, pas d'une reproduction de planches, personnages, compositions ou illustrations existants de la Méthode Boscher.
+Utilise une couleur distincte pour chaque branche principale, puis conserve cette couleur sur ses ramifications, mots-clés et illustrations. Palette PerckyLingua : bleu profond #072A3F, bleu secondaire #0B3C5D, vert #2FA36B, vert italien #009246, rouge italien #CE2B37, complétés par orange, jaune, violet et turquoise. Les couleurs doivent être franches, harmonieuses et suffisamment contrastées. Le fond doit rester blanc pur #FFFFFF, uniforme.
 
-Palette de marque et accents :
-- Bleu profond : #072A3F
-- Bleu secondaire : #0B3C5D
-- Vert pédagogique : #2FA36B
-- Vert italien : #009246
-- Rouge italien : #CE2B37
-- Orange vif : #F28C28
-- Jaune lumineux : #F4C542
-- Violet : #805AD5
-- Turquoise : #20A4A8
-- Corail : #E85D75
-- Fond blanc pur obligatoire : #FFFFFF
+À éviter : rendu 3D, photoréalisme, effets glossy ou métalliques, style futuriste, manga, cliparts génériques, emojis à la place des dessins, ombres réalistes, dégradés, textures de papier ou fond crème. La typographie doit être nette, sobre et parfaitement lisible ; une touche manuscrite scolaire est possible pour les mots-clés.
 
-Style d’illustration :
-- Dessins à l'aspect traditionnel, comme réalisés à la main pour un manuel scolaire illustré des années 1960 : formes simples, volumes légèrement naïfs, proportions douces et expressions lisibles.
-- Contours dessinés à l'encre, nets mais légèrement irréguliers ; aplats de couleurs francs, avec un rendu évoquant la gouache ou les crayons de couleur imprimés.
-- Personnages attachants et expressifs, objets du quotidien, animaux, petites scènes concrètes et mises en situation qui rendent les notions immédiatement compréhensibles.
-- Silhouettes simplifiées, détails limités mais significatifs ; chaque illustration doit expliquer ou mémoriser une idée précise, jamais servir de décoration gratuite.
-- Composition de petites scènes pédagogiques et de vignettes illustrées, dans l'esprit des anciens livres d'apprentissage de la lecture.
-- Palette colorée chaleureuse et légèrement rétro, tout en conservant les couleurs PerckyLingua comme repères dominants. Les couleurs peuvent être nuancées pour évoquer l'impression ancienne, mais doivent rester suffisamment contrastées et lisibles.
-- Typographie des textes claire et très lisible ; les mots-clés peuvent avoir une touche manuscrite scolaire sobre, sans sacrifier la lisibilité ni imiter une police propriétaire.
-- Dessin manuel soigné, associé à une structure radiale et des branches organiques inspirées de Tony Buzan.
-- Fond entièrement blanc pur (#FFFFFF), uniforme, sans texture, sans papier crème, sans ombre, sans dégradé et sans cadre coloré.
-- Illustrations nombreuses et pédagogiques : un dessin central fort et au moins une illustration par branche principale, plus des mini-scènes ou petits dessins sur les ramifications importantes.
-- Conserver cette même direction artistique rétro-éducative sur toutes les cartes pour créer une identité PerckyLingua reconnaissable.
+**Mise en page et impression**
+- Produis une seule image au format A4 paysage : 297 × 210 mm, ratio 1,414:1. N'utilise ni format carré ni portrait.
+- Exploite la largeur et la hauteur de la page. Répartis les branches autour du centre et évite les grands espaces vides ou une carte trop tassée au milieu.
+- Garde une marge de sécurité d'environ 5 mm. Aucun texte, dessin ou branche important ne doit être coupé ou toucher le bord.
+- Assure une hiérarchie visuelle évidente et une taille de texte lisible à l'écran comme après impression.
+- N'ajoute ni filigrane, ni signature, ni titre décoratif, ni élément sans intérêt pédagogique.
 
-À ÉVITER ABSOLUMENT :
-- Style 3D, photoréalisme, rendu glossy, effets métalliques ou plastiques.
-- Illustrations vectorielles génériques trop lisses, icônes d'applications modernes, emojis utilisés à la place des dessins.
-- Esthétique futuriste, manga, bande dessinée contemporaine, clipart générique ou design corporate froid.
-- Textures de vieux papier, fond jauni ou crème : le fond reste blanc pur.
-- Surcharge de détails, visages trop complexes, ombres réalistes et dégradés numériques.
+Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
 
-## 4. CODE COULEUR
-Attribue une couleur vive et distincte à chaque branche principale, sans réutiliser la même couleur pour deux branches voisines. Utilise la palette PerckyLingua (bleu, vert, rouge) complétée par orange, jaune, violet, turquoise et corail. Garde une logique stable : bleu pour concepts, vert pour règles, rouge pour exceptions et erreurs, orange/jaune pour exemples, violet/turquoise pour relations et comparaisons. Répète la couleur de la branche sur ses ramifications, mots-clés et illustrations afin de renforcer les associations visuelles. Les couleurs doivent être franches, lumineuses et harmonieuses, jamais ternes.
+**CONTENU DU COURS — SOURCE À RESPECTER**
+Les éléments ci-dessous sont extraits de la leçon et constituent la seule source de contenu. Organise-les en branches cohérentes ; ne les transforme pas en JSON et ne les complète pas avec des informations inventées.
 
-## 5. CONTENU, DÉDOUBLONNAGE ET FIDÉLITÉ
-- Rédige les libellés dans la langue choisie pour la carte et respecte exactement les termes grammaticaux, scientifiques ou techniques.
-- Avant de dessiner, analyse l'ensemble du cours et regroupe les informations qui parlent de la même notion.
-- **Chaque notion, règle, définition, exemple ou information ne doit figurer qu'une seule fois dans toute la carte.** Supprime les doublons même si la même idée apparaît dans plusieurs blocs du cours.
-- Ne reformule pas une même information sur une autre branche ; choisis son emplacement le plus logique et crée éventuellement une flèche de renvoi.
-- N'inscris pas les mêmes exemples à plusieurs endroits. Garde seulement l'exemple le plus clair et le plus représentatif.
-- Ne transforme pas les titres de blocs pédagogiques (« À retenir », récapitulatif, rappel, bilan, etc.) en branches. Récupère uniquement les informations nouvelles et utiles qu'ils contiennent, puis intègre-les dans les branches existantes sans répétition.
-- Mets les exceptions en évidence dans la sous-branche de la règle concernée.
-- Écarte les consignes d'activité, questions d'exercice, répétitions, introductions longues et détails secondaires qui n'aident pas à comprendre la leçon.
-- N’ajoute aucun contenu extérieur présenté comme faisant partie du cours ; ne supprime aucune distinction essentielle.
+${courseContent}`;
 
-## 6. FORMAT DE SORTIE — OBLIGATOIRE
-- **Page A4 en orientation paysage (horizontal), dimensions exactes : 297 × 210 mm, ratio 1,414:1.**
-- Produis une seule image horizontale adaptée à une impression A4 paysage ; n'utilise jamais le format portrait, carré ou vertical.
-- Fais occuper à la carte mentale toute la surface utile de la page : exploite pleinement la largeur et la hauteur, avec une composition équilibrée d'un bord à l'autre.
-- Répartis les branches principales sur toute la largeur du format paysage, à gauche et à droite du centre ; utilise également l'espace supérieur et inférieur.
-- Évite les grandes zones blanches inutilisées et les éléments regroupés uniquement au centre ; la carte doit remplir visuellement la page sans être surchargée.
-- Garde une marge de sécurité discrète d'environ 5 mm pour éviter que les textes et illustrations soient coupés à l'impression ; aucun élément important ne doit toucher le bord.
-- Fond blanc pur #FFFFFF obligatoire sur toute la surface de l’image.
-- Couleurs franches, lumineuses et contrastées, avec de nombreuses illustrations dessinées dans le style pédagogique rétro défini plus haut.
-- Tous les éléments doivent rester dans les limites de l’image, sans rognage ni déformation.
-- Textes lisibles à l’écran et après impression au format A4 paysage.
-- Pas de signature, filigrane, titre parasite ou décoration sans intérêt pédagogique.
-
-## 7. RÉSULTAT ATTENDU
-Produis une véritable carte mentale radiale, et non une infographie, une fiche de cours ou une simple liste.
-Elle doit être immédiatement reconnaissable comme une carte mentale PerckyLingua. Le style graphique reste constant entre les leçons ; seule l’organisation du contenu s’adapte au sujet.
-Vérifie la fidélité du contenu et l’orthographe avant de finaliser.
-
-## CONTENU INTÉGRAL DU COURS
-Les données ci-dessous constituent la source de vérité. Exploite les informations pédagogiques pertinentes sans inventer les éléments absents.
-
-${courseContent}
-`;
+    if (generatedPrompt.length <= MAX_PROMPT_CHARACTERS) return generatedPrompt;
+    const notice = '\n\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
+    return generatedPrompt.slice(0, MAX_PROMPT_CHARACTERS - notice.length).trimEnd() + notice;
   }, [parsed, language]);
 
   return (
@@ -150,7 +180,7 @@ ${courseContent}
           <span className="rounded-lg bg-[#072a3f] p-2 text-white"><Sparkles size={17} /></span>
           <div>
             <h3 className="text-sm font-bold text-[#072a3f]">Générateur de prompt — Mind map</h3>
-            <p className="mt-1 text-xs text-slate-600">Les paramètres et le contenu sont extraits automatiquement de la leçon.</p>
+            <p className="mt-1 text-xs text-slate-600">Un prompt détaillé et lisible, sans structure JSON.</p>
           </div>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">PerckyLingua · Tony Buzan</span>
@@ -172,10 +202,11 @@ ${courseContent}
             </select>
           </label>
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt complet généré</span><span className="text-[10px] text-slate-500">{Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs intégrés</span></div>
-            <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-mono text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} / 32 000 caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
+            <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
+            {prompt.length >= MAX_PROMPT_CHARACTERS && <p className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Le prompt a atteint la limite de 32 000 caractères. Une partie du contenu du cours a été coupée : réduisez-le pour conserver toutes les informations.</p>}
           </div>
-          <button type="button" onClick={() => onCopy(prompt, 'Prompt complet du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
+          <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
         </>
       )}
     </section>
