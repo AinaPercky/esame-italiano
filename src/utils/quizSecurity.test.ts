@@ -83,7 +83,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'CREATE OR REPLACE FUNCTION public.get_public_quiz(',
       'CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()',
       'CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_question(',
-      'CREATE OR REPLACE FUNCTION public.evaluate_quiz_question(',
+      'CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_answers(',
       'CREATE OR REPLACE FUNCTION public.evaluate_quiz_question(',
       'CREATE OR REPLACE FUNCTION public.submit_quiz_submission(',
       'CREATE OR REPLACE FUNCTION public.submit_quiz_presence_submission(',
@@ -294,6 +294,7 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
       'public.get_public_quiz_catalog()',
       'public.get_public_quiz(text)',
       'public.evaluate_public_quiz_question(text,text,text)',
+      'public.evaluate_public_quiz_answers(text,jsonb)',
       'public.evaluate_public_quiz_answers(text,jsonb)'
     ]) {
       assert.ok(rpcMigration.includes(`'${signature}'`), `RPC publique absente de la liste blanche : ${signature}`);
