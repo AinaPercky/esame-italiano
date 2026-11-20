@@ -114,18 +114,56 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
       ? courseLines.map((line: string) => `• ${line}`).join('\n')
       : 'Aucun contenu pédagogique exploitable trouvé dans les blocs du cours.';
 
-    return `Crée une carte mentale pédagogique PerckyLingua sur « ${title} ».
+    return `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
-Niveau : ${parsed.level || 'non précisé'} · Matière : ${subject}
-Langue : ${language}
+Crée une véritable carte mentale pour le cours « ${title} ».
 
-Organise le cours en carte radiale inspirée de Tony Buzan : un centre illustré, 3 à 7 branches principales selon le contenu, puis des sous-branches hiérarchisées. Utilise des mots-clés et formulations courtes, sans paragraphes. Regroupe les idées proches, supprime les doublons et reste fidèle au cours : n'invente aucune règle ni information. Intègre les exceptions et exemples auprès de la notion concernée. Ne crée pas de branche « À retenir » ou de résumé final.
+**Informations du cours**
+- Niveau : ${parsed.level || 'non précisé'}
+- Matière : ${subject}
+- Langue : ${language}
 
-Identité visuelle PerckyLingua : illustration pédagogique rétro chaleureuse inspirée des manuels scolaires des années 1960 et de l'esprit de la méthode Boscher (sans reproduire ses illustrations). Dessins simples faits à la main, expressifs et utiles à la compréhension. Branches organiques et courbes, couleurs distinctes par branche. Palette : bleu #072A3F, bleu #0B3C5D, vert #2FA36B, vert italien #009246, rouge #CE2B37, orange, jaune, violet et turquoise. Fond blanc pur #FFFFFF. Pas de 3D, photoréalisme, emojis, cliparts génériques, texture papier, dégradés ni ombres.
+**Ta mission**
+Tu es spécialiste de pédagogie, de mémorisation visuelle et de cartographie mentale. Transforme le cours fourni en une synthèse visuelle claire, fidèle et facile à mémoriser. La carte doit montrer les liens entre les notions et permettre de retrouver rapidement l'organisation de la leçon. Ce n'est ni une fiche de cours, ni une infographie composée de blocs indépendants.
 
-Format : une seule image A4 paysage, 297 × 210 mm (ratio 1,414:1), composée pour remplir harmonieusement la page. Prévois une petite marge de sécurité, aucun élément coupé et des textes lisibles à l'impression. Pas de filigrane ni de titre décoratif.
+**Organisation — méthode de Tony Buzan**
+- Place au centre une illustration forte qui représente le sujet, accompagnée du titre court.
+- Fais partir du centre 3 à 7 branches principales, selon la richesse réelle du cours. Chaque branche représente une grande notion, pas un paragraphe ou une étape arbitraire.
+- Développe des sous-branches et, si nécessaire, des niveaux supplémentaires : notion → règle ou caractéristique → exemple, exception ou cas particulier.
+- Répartis les branches autour du centre, avec une composition équilibrée à gauche et à droite.
+- Utilise des branches organiques, courbes et connectées. Les branches principales sont plus épaisses ; les ramifications deviennent progressivement plus fines.
+- Privilégie les mots-clés, expressions courtes, formules et exemples très brefs. Évite les phrases longues, les paragraphes, les tableaux et les listes rigides.
+- Utilise des flèches, associations et petits symboles dessinés pour montrer les relations entre notions lorsque cela apporte une vraie information.
 
-CONTENU DU COURS
+**Qualité pédagogique et fidélité**
+- Analyse tout le contenu avant de construire la carte. Regroupe les informations qui traitent de la même notion et place chacune à l'endroit le plus logique.
+- Chaque règle, définition ou exemple ne doit apparaître qu'une seule fois. Supprime les répétitions, y compris celles qui proviennent du récapitulatif.
+- Conserve les distinctions importantes, les formes grammaticales, les mécanismes et les exceptions utiles. Place chaque exception près de la règle concernée.
+- Choisis des exemples courts et représentatifs, sans recopier plusieurs fois le même exemple.
+- Pour une leçon d'italien, respecte exactement l'orthographe, les accents et les formes italiennes. Selon la langue choisie, garde les termes et exemples italiens avec leurs explications françaises, ou applique strictement la langue sélectionnée.
+- Adapte la densité au niveau ${parsed.level || 'du cours'} : ne simplifie pas au point de supprimer une notion nécessaire, mais écarte les détails secondaires.
+- N'invente aucune règle, traduction, exception ou information absente du cours. Si une information est ambiguë, ne la complète pas par supposition.
+- N'ajoute pas de branche intitulée « À retenir », « L'essentiel », « Résumé » ou « Conclusion ». Ne crée pas de bloc final qui répète les branches.
+
+**Identité graphique constante — PerckyLingua**
+Adopte le style d'un manuel scolaire illustré des années 1960, chaleureux et pédagogique, inspiré de l'esprit de la méthode Boscher sans reproduire ses planches, personnages ou compositions. Les dessins doivent être simples, expressifs, légèrement naïfs et immédiatement compréhensibles : personnages, objets du quotidien, animaux ou petites scènes concrètes. Utilise des contours dessinés à l'encre et des aplats évoquant la gouache ou les crayons de couleur imprimés. Chaque illustration doit aider à comprendre ou mémoriser une notion ; évite la décoration gratuite.
+
+Utilise une couleur distincte pour chaque branche principale, puis conserve cette couleur sur ses ramifications, mots-clés et illustrations. Palette PerckyLingua : bleu profond #072A3F, bleu secondaire #0B3C5D, vert #2FA36B, vert italien #009246, rouge italien #CE2B37, complétés par orange, jaune, violet et turquoise. Les couleurs doivent être franches, harmonieuses et suffisamment contrastées. Le fond doit rester blanc pur #FFFFFF, uniforme.
+
+À éviter : rendu 3D, photoréalisme, effets glossy ou métalliques, style futuriste, manga, cliparts génériques, emojis à la place des dessins, ombres réalistes, dégradés, textures de papier ou fond crème. La typographie doit être nette, sobre et parfaitement lisible ; une touche manuscrite scolaire est possible pour les mots-clés.
+
+**Mise en page et impression**
+- Produis une seule image au format A4 paysage : 297 × 210 mm, ratio 1,414:1. N'utilise ni format carré ni portrait.
+- Exploite la largeur et la hauteur de la page. Répartis les branches autour du centre et évite les grands espaces vides ou une carte trop tassée au milieu.
+- Garde une marge de sécurité d'environ 5 mm. Aucun texte, dessin ou branche important ne doit être coupé ou toucher le bord.
+- Assure une hiérarchie visuelle évidente et une taille de texte lisible à l'écran comme après impression.
+- N'ajoute ni filigrane, ni signature, ni titre décoratif, ni élément sans intérêt pédagogique.
+
+Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
+
+**CONTENU DU COURS — SOURCE À RESPECTER**
+Les éléments ci-dessous sont extraits de la leçon et constituent la seule source de contenu. Organise-les en branches cohérentes ; ne les transforme pas en JSON et ne les complète pas avec des informations inventées.
+
 ${courseContent}`;
   }, [parsed, language]);
 
@@ -136,7 +174,7 @@ ${courseContent}`;
           <span className="rounded-lg bg-[#072a3f] p-2 text-white"><Sparkles size={17} /></span>
           <div>
             <h3 className="text-sm font-bold text-[#072a3f]">Générateur de prompt — Mind map</h3>
-            <p className="mt-1 text-xs text-slate-600">Un prompt court, avec le contenu du cours extrait automatiquement.</p>
+            <p className="mt-1 text-xs text-slate-600">Un prompt détaillé et lisible, sans structure JSON.</p>
           </div>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">PerckyLingua · Tony Buzan</span>
@@ -158,10 +196,10 @@ ${courseContent}`;
             </select>
           </label>
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt généré</span><span className="text-[10px] text-slate-500">{Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs analysés</span></div>
+            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs analysés</span></div>
             <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
           </div>
-          <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt</button>
+          <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
         </>
       )}
     </section>
