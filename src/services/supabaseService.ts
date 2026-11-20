@@ -1991,8 +1991,8 @@ class SupabaseService {
       // Nettoyer en arrière-plan les soumissions orphelines d'élèves déjà supprimés dans Supabase
       const orphanedStudentIds = Array.from(new Set(
         (quizSubmissionsData || [])
-          .filter(s => !existingStudentIds.has(s.student_id))
-          .map(s => s.student_id)
+          .filter((s: any) => !existingStudentIds.has(s.student_id))
+          .map((s: any) => s.student_id)
       ));
       if (isTeacher && orphanedStudentIds.length > 0) {
         void (async () => {
