@@ -98,6 +98,9 @@ describe('Parcours étudiant — secondes chances', () => {
     assert.ok(studentView.includes('startQuizSession(launchQuiz, false, presenceInitialization.retryAuthorized === true)'));
     assert.ok(studentView.includes('isRetryAttempt'));
     assert.ok(studentView.includes('dataService.submitQuiz('));
+    assert.ok(studentView.includes('saveWrittenExamDraft(draftId, updatedAnswers, currentQuestionIndex)'));
+    assert.ok(studentView.includes('loadWrittenExamDraft(draftId)'));
+    assert.ok(studentView.includes('deleteWrittenExamDraft('));
   });
 });
 
