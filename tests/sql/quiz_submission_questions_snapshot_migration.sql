@@ -183,7 +183,7 @@ SET ROLE anon;
 INSERT INTO public.quiz_submissions (id, quiz_id)
 VALUES ('new-submission', 'quiz-1');
 
--- Hors lancement actif, un snapshot explicitement fourni reste compatible.
+-- Hors lancement suivi, le serveur ignore tout snapshot transmis par le navigateur.
 INSERT INTO public.quiz_submissions (id, quiz_id, questions_snapshot)
 VALUES ('provided-snapshot', 'quiz-2', '[{"id":"q-provided","question":"Version fournie"}]'::jsonb);
 RESET ROLE;
@@ -208,8 +208,8 @@ BEGIN
   SELECT questions_snapshot INTO provided
   FROM public.quiz_submissions WHERE id = 'provided-snapshot';
 
-  IF provided IS DISTINCT FROM '[{"id":"q-provided","question":"Version fournie"}]'::jsonb THEN
-    RAISE EXCEPTION 'Le snapshot fourni hors lancement a été écrasé : %', provided;
+  IF provided IS DISTINCT FROM '[{"id":"q2","question":"Sans lancement","correct_answer":"ciao"}]'::jsonb THEN
+    RAISE EXCEPTION 'Le snapshot hors lancement doit provenir de la base, pas du navigateur : %', provided;
   END IF;
 
   IF (SELECT count(*) FROM public.quiz_submissions WHERE questions_snapshot IS NULL) <> 1 THEN
