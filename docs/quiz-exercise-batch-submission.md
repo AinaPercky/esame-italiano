@@ -32,7 +32,7 @@ Réduire les allers-retours Supabase pendant une session élève, particulièrem
 
 ## Temps et intégrité
 
-Les exercices groupés utilisent un calendrier de questions calculé depuis exercise_attempts.started_at et la somme des durées configurées, comme le parcours des examens écrits. Une réponse pour une question dont le créneau n'a pas commencé est rejetée côté serveur. Les réponses déjà saisies restent évaluées à la remise finale, même si le créneau individuel est passé ; une question sans réponse dont l'échéance est dépassée reçoit zéro point et le statut timeout. Les horloges du navigateur ne déterminent jamais le score.
+Les exercices groupés utilisent un calendrier de questions calculé depuis exercise_attempts.started_at et la somme des durées configurées, comme le parcours des examens écrits. Le serveur calcule les échéances cumulées depuis le début de la tentative. Les réponses saisies sont corrigées à la remise finale ; une question laissée vide après son échéance reçoit zéro point et le statut timeout. La navigation locale n'effectue pas d'appel de progression par question. Les horloges du navigateur ne déterminent jamais le score.
 
 Les quiz officiels gardent leurs contrôles de lancement, présence, participant, seconde chance, idempotence et unicité dans les RPC de soumission existantes. Aucun changement n'est apporté aux politiques de retry ou au verrouillage des quiz.
 
