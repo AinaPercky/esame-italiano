@@ -214,7 +214,7 @@ INSERT INTO public.quiz_submissions (id, quiz_id, questions_snapshot)
 VALUES ('provided-snapshot', 'quiz-2', '[{"id":"q-provided","question":"Version fournie"}]'::jsonb);
 RESET ROLE;
 
-DO $
+DO $verify$
 DECLARE
   captured jsonb;
   provided jsonb;
@@ -242,6 +242,6 @@ BEGIN
     RAISE EXCEPTION 'La ligne historique doit être la seule à rester sans snapshot';
   END IF;
 END;
-$$;
+$verify$;
 
 SELECT 'quiz snapshot migration: OK' AS result;
