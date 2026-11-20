@@ -130,7 +130,9 @@ VALUES
 -- La migration doit être ré-exécutable.
 \i supabase/migrations/20261120150000_add_quiz_submission_questions_snapshot.sql
 
-DO $$
+DO $
+DECLARE
+  sanitized jsonb;
 BEGIN
   IF (SELECT questions_snapshot FROM public.quiz_submissions WHERE id = 'legacy-submission') IS NOT NULL THEN
     RAISE EXCEPTION 'Les données historiques doivent rester NULL';
