@@ -265,7 +265,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   // Pedagogical indicators count each learner only once unless a class filter is active.
   const diagnosticAttempts = useMemo(() => {
     const uniqueRows = new Map<string, TeacherExerciseAttemptRow>();
-    for (const row of diagnosticAttempts) {
+    for (const row of filteredAttempts) {
       if (!uniqueRows.has(row.student_id)) uniqueRows.set(row.student_id, row);
     }
     return Array.from(uniqueRows.values());
@@ -282,7 +282,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       inProgress,
       notStarted
     };
-  }, [filteredAttempts]);
+  }, [diagnosticAttempts]);
 
   const performanceSummary = useMemo(() => {
     const scored = diagnosticAttempts.filter(row => getAttemptPercentage(row) !== null);
@@ -336,7 +336,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   const questionStats = useMemo(
     () => {
       const questions = new Map<string, { question: QuizQuestion; versionId: string }>();
-      for (const row of filteredAttempts) {
+      for (const row of diagnosticAttempts) {
         for (const question of row.best_questions || []) {
           questions.set(`${row.best_version_id || 'legacy'}:${question.id}`, { question, versionId: row.best_version_id || 'legacy' });
         }
