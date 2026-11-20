@@ -1758,8 +1758,8 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                       className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
                     >
                       <option value="all">Toutes les notes</option>
-                      <option value="passed">Réussi (≥ 50 %)</option>
-                      <option value="needs_review">À consolider (&lt; 50 %)</option>
+                      <option value="passed">Maîtrisé (≥ 70 %)</option>
+                      <option value="needs_review">À accompagner (&lt; 70 %)</option>
                       <option value="unscored">Sans note</option>
                     </select>
                   </label>
@@ -2231,6 +2231,11 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                           <div><p className="text-[10px] text-[#607f93]">Correctes</p><p className="font-bold tabular-nums text-[#17613e]">{row.correct}</p></div>
                           <div><p className="text-[10px] text-[#607f93]">À revoir</p><p className="font-bold tabular-nums text-[#9a4c36]">{row.studentsNeedingSupport.length}</p></div>
                         </div>
+                        {pedagogicalDiagnostic.questions.find(question => question.id === row.id)?.errorPatterns.length ? (
+                          <p className="text-xs text-[#8a5108]">
+                            Erreurs documentées : {pedagogicalDiagnostic.questions.find(question => question.id === row.id)?.errorPatterns.map(pattern => `${pattern.category} (${pattern.count})`).join(' · ')}
+                          </p>
+                        ) : null}
                         {row.studentsNeedingSupport.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
                             {row.studentsNeedingSupport.map(student => (
@@ -2290,7 +2295,9 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
 
                 <div className="space-y-3 overflow-y-auto p-5">
                   {(reviewStudent.best_details || []).map((detail, index) => {
-                    const question = activeAttemptsExercise?.questions.find(
+                    const question = reviewStudent.best_questions?.find(
+                      item => item.id === detail.question_id
+                    ) || activeAttemptsExercise?.questions.find(
                       item => item.id === detail.question_id
                     );
                     const expected =
