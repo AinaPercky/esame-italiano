@@ -26,6 +26,7 @@ import {
 import { applyQuizQuestionOrder, shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { applyQuizItemOrder } from '../utils/quizReorder';
+import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 
 interface PublicQuizViewProps {
   quizId: string | null;
@@ -33,6 +34,10 @@ interface PublicQuizViewProps {
 }
 
 // ─── LocalStorage persistence keys ────────────────────────────────────────────
+function publicQuizDraftId(quizId: string, studentName: string) {
+  return 'public_quiz_draft_' + quizId + '_' + studentName.trim().toLocaleLowerCase();
+}
+
 function storageKey(quizId: string, suffix: string) {
   return `pq_${quizId}_${suffix}`;
 }
@@ -105,6 +110,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
   // Refs to avoid stale closures in timer callbacks
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const localSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const isQuizActive = screen === 'quiz';
   const hasSubmittedRef = useRef(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isTimerBeepEnabled());
@@ -158,54 +164,40 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
     try {
       const publicId = qId || q.public_id || q.id;
-      const feedback: Record<string, QuizFeedbackEntry> = {};
-      let rawScore = 0;
-      for (const question of q.questions || []) {
-        const entry = await supabaseService.evaluatePublicQuizQuestion(
-          publicId,
-          question.id,
-          answersRef.current[question.id] || ''
-        );
-        feedback[question.id] = entry;
-        rawScore += Number(entry.points) || 0;
-      }
-      const maxScore = Number(q.total_points) || 20;
+      // Une seule RPC corrige toutes les réponses côté PostgreSQL à la remise.
+      await localSaveQueueRef.current.catch(() => undefined);
+      const evaluated = await supabaseService.evaluatePublicQuizAnswers(publicId, answersRef.current);
+      const feedback = evaluated.feedback;
+      const rawScore = Number(evaluated.rawScore) || 0;
+      const maxScore = Number(evaluated.maxScore) || Number(q.total_points) || 20;
       setResult({
         rawScore,
         maxScore,
         score20: maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0,
         feedback
       });
-      if (qId) clearStorage(qId);
+      if (qId) {
+        try { await deleteWrittenExamDraft(publicQuizDraftId(qId, studentName)); } catch { /* la correction serveur est déjà validée */ }
+        clearStorage(qId);
+      }
       setScreen('result');
     } catch (error: any) {
       hasSubmittedRef.current = false;
       setLoadError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
       setScreen('start');
     }
-  }, []);
+  }, [studentName]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Validate current question and compute feedback
   // ─────────────────────────────────────────────────────────────────────────
-  const doValidate = useCallback(async (questionId: string) => {
+  const doValidate = useCallback((questionId: string) => {
     const q = quizRef.current;
     if (!q) return;
-    const publicId = activeQuizIdRef.current || q.public_id || q.id;
-    try {
-      const entry = await supabaseService.evaluatePublicQuizQuestion(
-        publicId,
-        questionId,
-        answersRef.current[questionId] || ''
-      );
-      setPerQuestionFeedback((prev) => ({ ...prev, [questionId]: entry }));
-      perQuestionFeedbackRef.current = { ...perQuestionFeedbackRef.current, [questionId]: entry };
-      setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
-      validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
-    } catch (error: any) {
-      setLoadError(error?.message || 'La correction sécurisée est indisponible. Rechargez le quiz.');
-      setScreen('start');
-    }
+    // Validation pédagogique locale uniquement : aucune réponse attendue n'est chargée.
+    // La correction réelle est renvoyée par la RPC groupée à la fin du quiz.
+    setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
+    validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -229,14 +221,6 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       handleSubmit();
     }
   }, [handleSubmit]);
-
-  const scheduleAdvanceAfterCorrection = useCallback((fromIndex: number, total: number) => {
-    if (correctionAdvanceTimeoutRef.current) clearTimeout(correctionAdvanceTimeoutRef.current);
-    correctionAdvanceTimeoutRef.current = setTimeout(() => {
-      correctionAdvanceTimeoutRef.current = null;
-      if (currentIndexRef.current === fromIndex) doAdvance(fromIndex, total);
-    }, 8000);
-  }, [doAdvance]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Load quiz data
@@ -291,10 +275,21 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
       // Restore persisted state
       const savedName = loadFromStorage<string>(storageKey(activeQuizId, 'studentName'), '');
-      const savedAnswers = loadFromStorage<Record<string, string>>(
-        storageKey(activeQuizId, 'answers'), {}
-      );
-      const savedIndex = loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
+      const draftId = savedName ? publicQuizDraftId(activeQuizId, savedName) : '';
+      const localDraft = draftId ? await loadWrittenExamDraft(draftId).catch(() => null) : null;
+      const legacyAnswers = loadFromStorage<Record<string, string>>(storageKey(activeQuizId, 'answers'), {});
+      const savedAnswers = localDraft?.answers && typeof localDraft.answers === 'object'
+        ? localDraft.answers as Record<string, string>
+        : legacyAnswers;
+      const draftIndex = localDraft?.currentIndex;
+      const savedIndex = Number.isInteger(draftIndex)
+        ? draftIndex as number
+        : loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
+      if (draftId && !localDraft && Object.keys(legacyAnswers).length) {
+        await saveWrittenExamDraft(draftId, legacyAnswers, savedIndex).catch(() => undefined);
+        localStorage.removeItem(storageKey(activeQuizId, 'answers'));
+      }
+      localSaveQueueRef.current = Promise.resolve();
       const savedValidated = loadFromStorage<Record<string, boolean>>(
         storageKey(activeQuizId, 'validated'), {}
       );
@@ -332,10 +327,16 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
-    saveToStorage(storageKey(activeQuizId, 'answers'), answers);
-    saveToStorage(storageKey(activeQuizId, 'currentIndex'), currentIndex);
+    if (studentName.trim()) {
+      const draftId = publicQuizDraftId(activeQuizId, studentName);
+      const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
+        saveWrittenExamDraft(draftId, answers, currentIndex)
+      );
+      localSaveQueueRef.current = write;
+      void write.catch((error) => setLoadError(error instanceof Error ? error.message : 'La sauvegarde locale du quiz a échoué.'));
+    }
     saveToStorage(storageKey(activeQuizId, 'validated'), validatedSet);
-  }, [activeQuizId, answers, currentIndex, validatedSet, screen]);
+  }, [activeQuizId, answers, currentIndex, validatedSet, screen, studentName]);
 
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
@@ -413,9 +414,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   }, [isQuizActive, currentIndex, isCorrectionModalOpen]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // When per-question timer hits 0 → show correction (even if no answer) then advance
-  // Zero‑point answer is recorded automatically by doValidate (empty answer = 0 pts).
-  // A visible correction stays open for thirteen seconds before moving on.
+  // When a question timer reaches zero, move on locally. The final RPC grades all answers.
   // ─────────────────────────────────────────────────────────────────────────
   const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
@@ -436,13 +435,13 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const question = q.questions[currentIndex];
     if (!question) return;
 
-    // Auto-validate through the server. Never inspect an answer key in the browser.
+    // Le délai est géré localement ; la correction finale reste autoritaire côté serveur.
     if (!validatedSetRef.current[question.id]) {
-      void doValidate(question.id);
-    } else {
-      scheduleAdvanceAfterCorrection(currentIndex, q.questions.length);
+      setValidatedSet((prev) => ({ ...prev, [question.id]: true }));
+      validatedSetRef.current = { ...validatedSetRef.current, [question.id]: true };
     }
-  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, scheduleAdvanceAfterCorrection, showCorrectionAtEnd]);
+    doAdvance(currentIndex, q.questions.length);
+  }, [questionTimeLeftMs, isQuizActive, currentIndex]);
 
   // Reset zero-fired tracker when question index changes (new question)
   useEffect(() => {
@@ -455,7 +454,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   // Start handler
   // ─────────────────────────────────────────────────────────────────────────
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
     const sourceQuiz = sourceQuizRef.current ?? quizRef.current;
     const normalizedStudentName = studentName.trim();
     if (!sourceQuiz || !normalizedStudentName) return;
@@ -468,8 +467,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const storedOrder = loadFromStorage<unknown>(storageKey(qId, 'questionOrder'), null);
     const storedItemOrders = loadFromStorage<unknown>(storageKey(qId, 'itemOrders'), {});
     const restoredOrder = applyQuizQuestionOrder(sourceQuiz.questions, storedOrder);
-    const savedAnswers = loadFromStorage<unknown>(storageKey(qId, 'answers'), {});
-    const savedIndex = loadFromStorage<number>(storageKey(qId, 'currentIndex'), 0);
+    const savedAnswers = answersRef.current;
+    const savedIndex = currentIndexRef.current;
     const savedValidated = loadFromStorage<unknown>(storageKey(qId, 'validated'), {});
     const hasSavedProgress = (Number.isInteger(savedIndex) && savedIndex > 0)
       || Boolean(savedAnswers && typeof savedAnswers === 'object' && Object.keys(savedAnswers).length)
@@ -491,9 +490,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       itemOrders[question.id] = items.map((item) => item.id);
       return { ...question, items };
     });
-    const startingIndex = resetAttempt ? 0 : currentIndexRef.current;
+    const startingIndex = resetAttempt ? 0 : Math.min(Math.max(0, savedIndex), Math.max(0, sourceQuiz.questions.length - 1));
 
     if (resetAttempt) {
+      if (storedName) await deleteWrittenExamDraft(publicQuizDraftId(qId, storedName)).catch(() => undefined);
       clearStorage(qId);
       setAnswers({});
       answersRef.current = {};
@@ -507,8 +507,15 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     }
 
     const orderedQuiz = { ...sourceQuiz, questions: questionsWithItemOrders };
+    const startingAnswers = resetAttempt || !savedAnswers || typeof savedAnswers !== 'object'
+      ? {}
+      : savedAnswers as Record<string, string>;
     quizRef.current = orderedQuiz;
     setQuiz(orderedQuiz);
+    setAnswers(startingAnswers);
+    answersRef.current = startingAnswers;
+    setCurrentIndex(startingIndex);
+    currentIndexRef.current = startingIndex;
     const startingQuestionTimeMs = getQuestionTimeSeconds(orderedQuestions[startingIndex]) * 1000;
     timePerQuestionMsRef.current = startingQuestionTimeMs;
     setTimePerQuestionMs(startingQuestionTimeMs);
@@ -560,6 +567,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const q = sourceQuizRef.current ?? quizRef.current;
     if (!qId || !q) return;
     clearStorage(qId);
+    void deleteWrittenExamDraft(publicQuizDraftId(qId, studentName)).catch(() => undefined);
     quizRef.current = q;
     setQuiz(q);
     setAnswers({});
@@ -579,7 +587,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     hasSubmittedRef.current = false;
     setResult(null);
     setScreen('start');
-  }, []);
+  }, [studentName]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Navigation between quizzes

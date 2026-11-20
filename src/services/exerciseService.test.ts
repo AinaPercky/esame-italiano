@@ -1,4 +1,6 @@
 import test from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { convertQuizToExercise, parseExerciseJson } from './exerciseService';
 import type { Quiz } from '../types';
@@ -60,4 +62,34 @@ test('convertQuizToExercise preserves questions and supplies the existing quiz t
   assert.equal(converted.metadata.title, 'Presente');
   assert.equal(converted.questions[0].correct_answer, 'sono');
   assert.ok(Number(converted.questions[0].time_limit_seconds) > 0);
+});
+
+
+test('exercise batch migration keeps answer keys server-side and exposes only authenticated batch RPCs', () => {
+  const migrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261120200000_batch_exercise_attempts.sql');
+  const migration = fs.readFileSync(migrationPath, 'utf8');
+  for (const snippet of [
+    'CREATE OR REPLACE FUNCTION public.start_exercise_attempt_batch(',
+    'CREATE OR REPLACE FUNCTION public.get_exercise_attempt_bundle(',
+    'CREATE OR REPLACE FUNCTION public.submit_exercise_attempt_batch(',
+    "- 'correct_answer' - 'answers' - 'explanation'",
+    'public.exercise_grade_question(v_question, coalesce(v_answer, \'null\'::jsonb))',
+    'v_timed_out := NOT v_has_answer AND clock_timestamp() > v_deadline;',
+    'REVOKE ALL ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) FROM PUBLIC, anon;',
+    'GRANT EXECUTE ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) TO authenticated;'
+  ]) assert.ok(migration.includes(snippet), 'SQL groupé incomplet : ' + snippet);
+
+  const servicePath = path.resolve(process.cwd(), 'src/services/exerciseService.ts');
+  const service = fs.readFileSync(servicePath, 'utf8');
+  assert.ok(service.includes("client.rpc('start_exercise_attempt_batch'"));
+  assert.ok(service.includes("client.rpc('get_exercise_attempt_bundle'"));
+  assert.ok(service.includes("client.rpc('submit_exercise_attempt_batch'"));
+
+  const viewPath = path.resolve(process.cwd(), 'src/views/ExercisesStudentView.tsx');
+  const view = fs.readFileSync(viewPath, 'utf8');
+  assert.ok(view.includes('exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers)'));
+  assert.ok(view.includes('saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)'));
+  assert.ok(view.includes('loadWrittenExamDraft(attemptId)'));
+  assert.ok(view.includes('deleteWrittenExamDraft(active.attempt_id)'));
+  assert.ok(!view.includes('exercise_batch_draft_'));
 });

@@ -1445,6 +1445,31 @@ class SupabaseService {
     return data as { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string };
   }
 
+  public async evaluatePublicQuizAnswers(publicId: string, answers: Record<string, string>): Promise<{
+    rawScore: number;
+    maxScore: number;
+    feedback: Record<string, { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string }>;
+  }> {
+    const client = this.getClient();
+    if (!client) throw new Error('Supabase est requis pour corriger le quiz.');
+    const { data, error } = await client.rpc('evaluate_public_quiz_answers', {
+      p_public_id: publicId,
+      p_answers: answers || {}
+    });
+    if (error) {
+      if (isSupabaseMissingRpcError(error, 'evaluate_public_quiz_answers')) {
+        throw new Error('Correction groupée indisponible : appliquez la migration « Soumission groupée des quiz et exercices ».');
+      }
+      throw new Error(`Correction serveur du quiz public : ${error.message}`);
+    }
+    if (!data || typeof data !== 'object') throw new Error('Le serveur n’a retourné aucun résultat de correction.');
+    return {
+      rawScore: Number(data.rawScore) || 0,
+      maxScore: Number(data.maxScore) || 0,
+      feedback: data.feedback && typeof data.feedback === 'object' ? data.feedback : {}
+    };
+  }
+
   public async evaluatePublicQuizQuestion(publicId: string, questionId: string, answer: string): Promise<{
     correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string;
   }> {

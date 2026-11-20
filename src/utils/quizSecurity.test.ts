@@ -288,11 +288,12 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
   const rpcMigration = fs.readFileSync(rpcMigrationPath, 'utf8');
   const rpcTests = fs.readFileSync(rpcTestPath, 'utf8');
 
-  it('conserve les trois RPC strictement nécessaires au quiz public', () => {
+  it('conserve les RPC strictement nécessaires au quiz public', () => {
     for (const signature of [
       'public.get_public_quiz_catalog()',
       'public.get_public_quiz(text)',
-      'public.evaluate_public_quiz_question(text,text,text)'
+      'public.evaluate_public_quiz_question(text,text,text)',
+      'public.evaluate_public_quiz_answers(text,jsonb)'
     ]) {
       assert.ok(rpcMigration.includes(`'${signature}'`), `RPC publique absente de la liste blanche : ${signature}`);
     }
@@ -300,6 +301,20 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
     assert.ok(serviceSource.includes("client.rpc('get_public_quiz_catalog'"));
     assert.ok(serviceSource.includes("client.rpc('get_public_quiz'"));
     assert.ok(serviceSource.includes("client.rpc('evaluate_public_quiz_question'"));
+  });
+
+  it('corrige les quiz publics en une seule requête finale sans correction par question', () => {
+    const publicView = fs.readFileSync(publicViewPath, 'utf8');
+    const studentView = fs.readFileSync(path.resolve(process.cwd(), 'src/views/StudentSpaceView.tsx'), 'utf8');
+    const batchMigrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261120190000_batch_public_quiz_grading.sql');
+    const batchMigration = fs.readFileSync(batchMigrationPath, 'utf8');
+
+    assert.ok(publicView.includes('evaluatePublicQuizAnswers(publicId, answersRef.current)'));
+    assert.ok(!publicView.includes('evaluatePublicQuizQuestion('));
+    assert.ok(!studentView.includes('evaluateQuizQuestion(activeQuiz.id'));
+    assert.ok(batchMigration.includes('CREATE OR REPLACE FUNCTION public.evaluate_public_quiz_answers('));
+    assert.ok(batchMigration.includes('public.quiz_grade_question(v_question, p_answers ->> v_question_id)'));
+    assert.ok(batchMigration.includes('GRANT EXECUTE ON FUNCTION public.evaluate_public_quiz_answers(TEXT, JSONB) TO anon, authenticated;'));
   });
 
   it('préserve les RPC publiques d’inscription et de rapport QR avec des signatures exactes', () => {
@@ -314,7 +329,11 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
 
   it('ne fait pas enregistrer de soumission nominative depuis le parcours de quiz public', () => {
     assert.ok(publicViewSource.includes('supabaseService.fetchPublicQuiz'));
-    assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizQuestion'));
+    assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizAnswers'));
+    assert.ok(publicViewSource.includes('saveWrittenExamDraft(draftId, answers, currentIndex)'));
+    assert.ok(publicViewSource.includes('loadWrittenExamDraft(draftId)'));
+    assert.ok(publicViewSource.includes('deleteWrittenExamDraft(publicQuizDraftId(qId, studentName))'));
+    assert.ok(!publicViewSource.includes('evaluatePublicQuizQuestion('));
     assert.doesNotMatch(publicViewSource, /submitQuizSubmissionAtomically|submitQuizPresenceSubmission|saveQuizSubmission/);
     assert.doesNotMatch(
       rpcMigration,

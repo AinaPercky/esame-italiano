@@ -8,6 +8,7 @@ DECLARE
     'public.get_public_quiz_catalog()',
     'public.get_public_quiz(text)',
     'public.evaluate_public_quiz_question(text,text,text)',
+    'public.evaluate_public_quiz_answers(text,jsonb)',
     'public.prepare_student_registration(text,text,text,text,uuid,text)',
     'public.get_public_oral_report(uuid,uuid,text)'
   ];
@@ -97,6 +98,23 @@ BEGIN
      ) THEN
     RAISE EXCEPTION 'Private written-exam scorer is still executable by a client role.';
   END IF;
+
+  -- Batch exercise RPCs are authenticated-only and never exposed to anon.
+  FOREACH v_signature IN ARRAY ARRAY[
+    'public.get_exercise_attempt_bundle(uuid)',
+    'public.start_exercise_attempt_batch(uuid)',
+    'public.submit_exercise_attempt_batch(uuid,jsonb)'
+  ] LOOP
+    v_function_oid := to_regprocedure(v_signature);
+    IF v_function_oid IS NOT NULL THEN
+      IF has_function_privilege('anon', v_function_oid, 'EXECUTE') THEN
+        RAISE EXCEPTION 'Anonymous users can execute batch exercise RPC: %', v_signature;
+      END IF;
+      IF NOT has_function_privilege('authenticated', v_function_oid, 'EXECUTE') THEN
+        RAISE EXCEPTION 'Authenticated students cannot execute batch exercise RPC: %', v_signature;
+      END IF;
+    END IF;
+  END LOOP;
 
   -- Teacher grading remains available to authenticated callers but not anon.
   IF to_regprocedure('public.grade_written_exam_attempt(uuid,jsonb)') IS NOT NULL THEN

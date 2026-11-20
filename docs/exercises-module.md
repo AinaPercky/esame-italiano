@@ -64,3 +64,16 @@ Import validates the schema version, supported question types, and mandatory pos
 4. Verify teacher create/publish/archive, class access, each question type, timeout, refresh/resume, repeated attempts, JSON import/export, and both conversion directions.
 
 The migration is intentionally committed as a file only; it is not automatically applied to the production database.
+
+
+## Soumission groupée (migration 20261120200000)
+
+Les nouvelles tentatives utilisent désormais le parcours groupé :
+
+- `start_exercise_attempt_batch` crée la tentative et retourne en une seule réponse toutes les questions nettoyées, dans l’ordre aléatoire figé côté serveur ; les clés de réponse et explications restent dans la version privée.
+- Les réponses et l’index courant sont conservés dans IndexedDB pendant le parcours. Le navigateur n’appelle plus PostgreSQL à chaque validation ou changement de question.
+- `submit_exercise_attempt_batch` reçoit l’ensemble des réponses, recalcule chaque note avec `exercise_grade_question`, écrit les lignes de détail et clôt la tentative dans une transaction.
+- Les échéances sont calculées depuis `started_at` et la durée cumulée des questions, comme pour les examens écrits. Une réponse à une question qui n’a pas encore commencé est rejetée ; une réponse déjà saisie reste évaluée à la remise finale.
+- Les tentatives créées avant cette migration conservent les anciennes RPC de reprise et de correction afin de ne pas interrompre les sessions déjà en cours.
+
+Les RPC groupées sont réservées au rôle `authenticated`. La migration doit être appliquée avant de publier la nouvelle version du frontend.

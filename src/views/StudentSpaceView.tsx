@@ -38,6 +38,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { StudentAvatar } from '../components/StudentAvatar';
 import { PhotoUploadInput } from '../components/PhotoUploadInput';
 import { compressAvatarImage } from '../utils/avatarImage';
+import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 import {
   isTimerBeepEnabled,
   playTimerBeep,
@@ -216,6 +217,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [questionSecondsRemaining, setQuestionSecondsRemaining] = useState<number>(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const quizAnswersRef = useRef<Record<string, string>>({});
+  const quizDraftQueueRef = useRef<Promise<void>>(Promise.resolve());
   quizAnswersRef.current = quizAnswers;
   const [quizSecondsRemaining, setQuizSecondsRemaining] = useState<number>(0);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isTimerBeepEnabled());
@@ -351,13 +353,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const updatedAnswers = { ...quizAnswersRef.current, [questionId]: answer };
     quizAnswersRef.current = updatedAnswers;
     setQuizAnswers(updatedAnswers);
-    if (activeQuiz) {
-      const studentId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
-      try {
-        localStorage.setItem('student_quiz_draft_' + studentId + '_' + activeQuiz.id, JSON.stringify(updatedAnswers));
-      } catch { /* stockage local indisponible */ }
+    if (activeQuiz && !isPracticeMode) {
+      const draftId = 'student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id;
+      const write = quizDraftQueueRef.current.catch(() => undefined).then(() =>
+        saveWrittenExamDraft(draftId, updatedAnswers, currentQuestionIndex)
+      );
+      quizDraftQueueRef.current = write;
+      void write.catch((e) => setQuizSubmissionError(e instanceof Error ? e.message : 'La sauvegarde locale du quiz a échoué.'));
     }
-  }, [activeQuiz, currentUser.id, currentUser.student_id, studentRecord?.id]);
+  }, [activeQuiz, currentQuestionIndex, isPracticeMode, currentUser.id, currentUser.student_id, studentRecord?.id]);
 
   const loadData = () => {
     // Synchroniser avec dataService
@@ -642,7 +646,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     return () => clearInterval(fbTimer);
   }, [incorrectFeedback?.isOpen]);
 
-  const startQuizSession = (quiz: Quiz, practiceMode: boolean, retryAttempt = false) => {
+  const startQuizSession = async (quiz: Quiz, practiceMode: boolean, retryAttempt = false) => {
     primeTimerAudio();
     setIsRetryAttempt(retryAttempt);
     quizSubmissionLockRef.current = false;
@@ -652,7 +656,34 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setTimeoutNotice(false);
     setAntiCheatNotice(false);
     let restoredAnswers: Record<string, string> = {};
-    if (!practiceMode) { try { const saved = localStorage.getItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + quiz.id); if (saved) { const parsed = JSON.parse(saved); if (parsed && typeof parsed === 'object') restoredAnswers = parsed; } } catch { /* ignorer un brouillon illisible */ } }
+    quizDraftQueueRef.current = Promise.resolve();
+    if (!practiceMode) {
+      const draftId = 'student_quiz_draft_' + getStudentQueryInfo().stId + '_' + quiz.id;
+      try {
+        if (retryAttempt) {
+          await deleteWrittenExamDraft(draftId);
+          localStorage.removeItem(draftId);
+        } else {
+          const draft = await loadWrittenExamDraft(draftId);
+        if (draft?.answers && typeof draft.answers === 'object') {
+          restoredAnswers = draft.answers as Record<string, string>;
+        } else {
+          // Migration douce des brouillons créés avant le passage à IndexedDB.
+          const legacy = localStorage.getItem(draftId);
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            if (parsed && typeof parsed === 'object') {
+              restoredAnswers = parsed as Record<string, string>;
+              await saveWrittenExamDraft(draftId, restoredAnswers, 0);
+              localStorage.removeItem(draftId);
+            }
+          }
+          }
+        }
+      } catch (e) {
+        setQuizSubmissionError(e instanceof Error ? e.message : 'Lecture du brouillon local impossible.');
+      }
+    }
     quizAnswersRef.current = restoredAnswers;
     setQuizAnswers(restoredAnswers);
     setIncompletePhraseConfirmation(null);
@@ -837,7 +868,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     advanceToNextQuestion(pendingAnswers);
   };
 
-  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 13s
+  // Les quiz officiels sont corrigés en une seule transaction lors de la remise finale.
+  // Le mode tutoriel conserve sa correction locale et son feedback immédiat.
   const processQuestionProgression = async (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
@@ -846,53 +878,29 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const currentQ = activeQuiz.questions[currentQuestionIndex];
     if (!currentQ) return;
 
-    const studentAns = updatedAnswers[currentQ.id] || '';
-    let evaluation: { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string };
-
-    try {
-      // Les quiz officiels sont corrigés exclusivement par PostgreSQL.
-      // Seul le mode tutoriel local conserve sa correction pédagogique locale.
-      evaluation = isPracticeMode
-        ? (() => {
-            const local = calculateQuestionPointsEarned(currentQ, studentAns);
-            return {
-              correct: local.isFullyCorrect,
-              points: local.awardedPoints,
-              maxPoints: local.maxPoints,
-              expected: '',
-              studentAnswer: studentAns
-            };
-          })()
-        : await supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns);
-    } catch (error: any) {
-      setQuizSubmissionError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
-      return;
-    }
-
-    if (evaluation.correct) {
+    if (!isPracticeMode) {
       advanceToNextQuestion(updatedAnswers);
       return;
     }
 
-    const studentDisplay = currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-      ? currentQ.verbes_trous.phrases.map((phrase) => {
-          const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)];
-          return `${phrase.debut || ''}__[${response?.verbe_choisi || '—'}]__ ${response?.texte_saisi || '—'}${phrase.fin || ''}`;
-        }).join('\\n')
-      : evaluation.studentAnswer || studentAns;
+    const studentAns = updatedAnswers[currentQ.id] || '';
+    const local = calculateQuestionPointsEarned(currentQ, studentAns);
+    if (local.isFullyCorrect) {
+      advanceToNextQuestion(updatedAnswers);
+      return;
+    }
 
     setIncorrectFeedback({
       isOpen: true,
       questionNumber: currentQuestionIndex + 1,
       questionText: currentQ.question,
-      studentAnswer: studentDisplay,
-      correctAnswer: evaluation.expected,
-      explanation: evaluation.explanation,
+      studentAnswer: studentAns,
+      correctAnswer: '',
       countdown: CORRECTION_DISPLAY_SECONDS,
       pendingNextAnswers: updatedAnswers,
       isTimeout,
-      points: evaluation.points,
-      maxPoints: evaluation.maxPoints
+      points: local.awardedPoints,
+      maxPoints: local.maxPoints
     });
   };
 
@@ -972,6 +980,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const clId = activeQuiz.class_id;
 
     try {
+      await quizDraftQueueRef.current.catch(() => undefined);
       const result = await dataService.submitQuiz(
         activeQuiz.id,
         stId,
@@ -984,7 +993,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isRetryAttempt
       );
 
-      try { localStorage.removeItem('student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id); } catch { /* stockage local indisponible */ }
+      try { await deleteWrittenExamDraft('student_quiz_draft_' + stId + '_' + activeQuiz.id); } catch { /* la soumission serveur est déjà validée */ }
+      try { localStorage.removeItem('student_quiz_draft_' + stId + '_' + activeQuiz.id); } catch { /* nettoyage des anciens brouillons */ }
       setActiveQuiz(null);
       setCurrentQuestionIndex(0);
       setLastSubmissionResult(result);
