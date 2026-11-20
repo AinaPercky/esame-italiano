@@ -2177,6 +2177,11 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                           <div className="h-2.5 overflow-hidden rounded-full bg-[#e6f0f7]">
                             <div className={`h-full rounded-full ${skill.masteryRate !== null && skill.masteryRate >= 70 ? 'bg-[#2fa36b]' : 'bg-[#d97757]'}`} style={{ width: `${Math.min(100, Math.max(0, skill.masteryRate || 0))}%` }} />
                           </div>
+                          {skill.studentsNeedingSupport.length > 0 && (
+                            <p className="break-words text-[11px] leading-relaxed text-[#9a4c36]">
+                              À accompagner : {skill.studentsNeedingSupport.map(student => student.studentName).join(', ')}
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
