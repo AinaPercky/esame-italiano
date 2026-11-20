@@ -789,7 +789,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                     <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#2fa36b]">Question {index + 1}</p>
                     <h3 className="mt-1 break-words text-sm font-bold leading-relaxed text-[#072a3f]">{question.question}</h3>
                   </div>
-                  <StatusBadge tone={question.correct ? 'success' : 'danger'}>
+                  <StatusBadge tone={question.correct && !unanswered ? 'success' : 'danger'}>
                     {question.points_awarded} / {question.max_points} pt{unanswered ? ' · Non répondu' : question.correct ? ' · Correcte' : ' · Incorrecte'}
                   </StatusBadge>
                 </div>
