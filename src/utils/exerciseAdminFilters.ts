@@ -476,7 +476,8 @@ export function buildExercisePedagogicalDiagnostic(
     for (const row of completed) {
       let studentPoints = 0, studentMaxPoints = 0;
       for (const question of group) {
-        const sourceQuestion = (row.best_questions || []).find(item => question.id.endsWith(':' + item.id));
+        const [questionVersionId, questionId] = question.id.split(':', 2);
+        const sourceQuestion = (row.best_questions || []).find(item => item.id === questionId && (row.best_version_id || 'legacy') === questionVersionId);
         const detail = (row.best_details || []).find(item => item.question_id === sourceQuestion?.id);
         if (sourceQuestion && detail) { studentPoints += Number(detail.points || 0); studentMaxPoints += Number(detail.max_points || 0); }
       }
