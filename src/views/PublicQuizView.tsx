@@ -281,8 +281,9 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       const savedAnswers = localDraft?.answers && typeof localDraft.answers === 'object'
         ? localDraft.answers as Record<string, string>
         : legacyAnswers;
-      const savedIndex = Number.isInteger(localDraft?.currentIndex)
-        ? localDraft.currentIndex
+      const draftIndex = localDraft?.currentIndex;
+      const savedIndex = Number.isInteger(draftIndex)
+        ? draftIndex as number
         : loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
       if (draftId && !localDraft && Object.keys(legacyAnswers).length) {
         await saveWrittenExamDraft(draftId, legacyAnswers, savedIndex).catch(() => undefined);
