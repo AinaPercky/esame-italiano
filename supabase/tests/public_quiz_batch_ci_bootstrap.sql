@@ -6,13 +6,9 @@ BEGIN
 END
 $roles$;
 
-CREATE TABLE public.quizzes (
-  id TEXT PRIMARY KEY,
-  public_id TEXT,
-  is_public BOOLEAN NOT NULL DEFAULT FALSE,
-  questions JSONB NOT NULL DEFAULT '[]'::jsonb,
-  total_points NUMERIC
-);
+ALTER TABLE public.quizzes
+  ADD COLUMN IF NOT EXISTS public_id TEXT,
+  ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE OR REPLACE FUNCTION public.quiz_grade_question(p_question JSONB, p_answer TEXT)
 RETURNS JSONB
@@ -31,8 +27,8 @@ $$;
 
 INSERT INTO public.quizzes(id, public_id, is_public, questions, total_points) VALUES
 (
-  'public-quiz-1',
-  'share-quiz-1',
+  'batch-public-quiz-1',
+  'batch-share-quiz-1',
   TRUE,
   '[
     {"id":"q1","type":"qcm","question":"Scegli.","correct_answer":"sono","points":2,"explanation":"Prima persona."},
@@ -41,8 +37,8 @@ INSERT INTO public.quizzes(id, public_id, is_public, questions, total_points) VA
   5
 ),
 (
-  'private-quiz-1',
-  'private-share-1',
+  'batch-private-quiz-1',
+  'batch-private-share-1',
   FALSE,
   '[{"id":"q1","correct_answer":"secret","points":1}]'::jsonb,
   1
