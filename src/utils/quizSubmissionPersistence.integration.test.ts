@@ -49,27 +49,28 @@ const batchGradingMigration = readFileSync(
 
 describe('batch quiz grading and correction regression', () => {
   it('grades the answers submitted in the final batch for standard and strict-presence quizzes', () => {
-    assert.equal((batchGradingMigration.match(/saved_answers := coalesce\(p_submission -> 'answers', '\{\}'::jsonb\)/g) || []).length, 2);
-    assert.match(batchGradingMigration, /public\.quiz_grade_all\(v_quiz_id, saved_answers\)/);
-    assert.match(batchGradingMigration, /jsonb_typeof\(saved_answers\) <> 'object'/);
-    assert.doesNotMatch(batchGradingMigration, /FROM public\.quiz_question_evaluations/);
+    const answerAssignment = "saved_answers := coalesce(p_submission -> 'answers', '{}'::jsonb);";
+    assert.equal(batchGradingMigration.split(answerAssignment).length - 1, 2);
+    assert.ok(batchGradingMigration.includes('public.quiz_grade_all(v_quiz_id, saved_answers)'));
+    assert.ok(batchGradingMigration.includes("jsonb_typeof(saved_answers) <> 'object'"));
+    assert.ok(!batchGradingMigration.includes('FROM public.quiz_question_evaluations'));
   });
 
   it('does not erase earned points when the overall quiz timer expires', () => {
-    assert.match(batchGradingMigration, /Les réponses saisies avant la fin du temps restent notées/);
-    assert.match(batchGradingMigration, /Les questions non répondues reçoivent zéro point individuellement/);
-    assert.doesNotMatch(batchGradingMigration, /jsonb_set\(jsonb_set\(e, '\{rawScore\}', '0'::jsonb\)/);
+    assert.ok(batchGradingMigration.includes('Les réponses saisies avant la fin du temps restent notées'));
+    assert.ok(batchGradingMigration.includes('Les questions non répondues reçoivent zéro point individuellement'));
+    assert.ok(!batchGradingMigration.includes("jsonb_set(jsonb_set(e, '{rawScore}', '0'::jsonb)"));
   });
 
   it('renders correction data returned by the server in all student modules', () => {
     const studentQuizView = readFileSync(new URL('../views/StudentSpaceView.tsx', import.meta.url), 'utf8');
     const publicResultView = readFileSync(new URL('../views/publicQuiz/PublicQuizResultScreen.tsx', import.meta.url), 'utf8');
     const exerciseView = readFileSync(new URL('../views/ExercisesStudentView.tsx', import.meta.url), 'utf8');
-    assert.match(studentQuizView, /lastSubmissionResult\.feedback/);
-    assert.match(studentQuizView, /Bonne réponse/);
-    assert.match(publicResultView, /itemFeedback\.explanation/);
-    assert.match(publicResultView, /Non répondu/);
-    assert.match(exerciseView, /!question\.correct \|\| unanswered/);
-    assert.match(exerciseView, /Réponse attendue/);
+    assert.ok(studentQuizView.includes('lastSubmissionResult.feedback'));
+    assert.ok(studentQuizView.includes('Bonne réponse'));
+    assert.ok(publicResultView.includes('itemFeedback.explanation'));
+    assert.ok(publicResultView.includes('Non répondu'));
+    assert.ok(exerciseView.includes('!question.correct || unanswered'));
+    assert.ok(exerciseView.includes('Réponse attendue'));
   });
 });
