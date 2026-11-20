@@ -31,6 +31,7 @@ BEGIN
           ('public.get_public_quiz_catalog()'),
           ('public.get_public_quiz(text)'),
           ('public.evaluate_public_quiz_question(text,text,text)'),
+          ('public.evaluate_public_quiz_answers(text,jsonb)'),
           ('public.prepare_student_registration(text,text,text,text,uuid,text)'),
           ('public.get_public_oral_report(uuid,uuid,text)')
         ) AS allowed(signature)
@@ -71,6 +72,7 @@ BEGIN
     'public.get_public_quiz_catalog()',
     'public.get_public_quiz(text)',
     'public.evaluate_public_quiz_question(text,text,text)',
+    'public.evaluate_public_quiz_answers(text,jsonb)',
     'public.prepare_student_registration(text,text,text,text,uuid,text)',
     'public.get_public_oral_report(uuid,uuid,text)'
   ]
