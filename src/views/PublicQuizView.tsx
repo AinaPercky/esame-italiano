@@ -507,10 +507,13 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     }
 
     const orderedQuiz = { ...sourceQuiz, questions: questionsWithItemOrders };
+    const startingAnswers = resetAttempt || !savedAnswers || typeof savedAnswers !== 'object'
+      ? {}
+      : savedAnswers as Record<string, string>;
     quizRef.current = orderedQuiz;
     setQuiz(orderedQuiz);
-    setAnswers(savedAnswers && typeof savedAnswers === 'object' ? savedAnswers as Record<string, string> : {});
-    answersRef.current = savedAnswers && typeof savedAnswers === 'object' ? savedAnswers as Record<string, string> : {};
+    setAnswers(startingAnswers);
+    answersRef.current = startingAnswers;
     setCurrentIndex(startingIndex);
     currentIndexRef.current = startingIndex;
     const startingQuestionTimeMs = getQuestionTimeSeconds(orderedQuestions[startingIndex]) * 1000;
