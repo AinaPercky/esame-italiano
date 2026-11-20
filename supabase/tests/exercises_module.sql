@@ -159,6 +159,50 @@ $timeout$;
 
 reset role;
 set role authenticated;
+select set_config('request.jwt.claims','{"email":"student@example.test"}',false);
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+
+do $batch$
+declare
+  v_exercise_id uuid := current_setting('test.exercise_id')::uuid;
+  v_bundle jsonb;
+  v_attempt_id uuid;
+  v_result jsonb;
+  v_review jsonb;
+begin
+  v_bundle := public.start_exercise_attempt_batch(v_exercise_id);
+  v_attempt_id := (v_bundle ->> 'attempt_id')::uuid;
+  if jsonb_array_length(v_bundle -> 'questions') <> 1 then
+    raise exception 'Batch start must return the complete question set';
+  end if;
+  if (v_bundle #> '{questions,0,question}') ? 'correct_answer'
+     or (v_bundle #> '{questions,0,question}') ? 'answers'
+     or (v_bundle #> '{questions,0,question}') ? 'explanation' then
+    raise exception 'Batch start leaked a private answer key or explanation';
+  end if;
+
+  v_result := public.submit_exercise_attempt_batch(v_attempt_id, jsonb_build_object('q1','sono'));
+  if coalesce((v_result ->> 'completed')::boolean,false) is not true
+     or (v_result ->> 'score')::numeric <> 2 then
+    raise exception 'Batch submission did not grade and complete the exercise correctly';
+  end if;
+
+  -- A repeated network submission is idempotent and cannot duplicate score rows.
+  v_result := public.submit_exercise_attempt_batch(v_attempt_id, jsonb_build_object('q1','sono'));
+  if coalesce((v_result ->> 'score')::numeric,0) <> 2 then
+    raise exception 'Repeated batch submission changed the stored score';
+  end if;
+
+  v_review := public.get_student_exercise_attempt_details(v_attempt_id);
+  if v_review #>> '{questions,0,answer}' <> 'sono'
+     or coalesce((v_review #>> '{questions,0,correct}')::boolean,false) is not true then
+    raise exception 'Batch submission did not preserve the detailed student review';
+  end if;
+end;
+$batch$;
+
+reset role;
+set role authenticated;
 select set_config('request.jwt.claims','{"email":"ainapercky@gmail.com"}',false);
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 
@@ -168,8 +212,8 @@ declare
   v_attempts jsonb;
 begin
   v_attempts := public.get_teacher_exercise_attempts(v_exercise_id);
-  if jsonb_array_length(v_attempts) <> 2 then
-    raise exception 'Teacher should see both independent student attempts';
+  if jsonb_array_length(v_attempts) <> 3 then
+    raise exception 'Teacher should see the two legacy attempts and the batch attempt';
   end if;
 end;
 $$;
