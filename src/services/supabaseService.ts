@@ -1300,8 +1300,11 @@ class SupabaseService {
     });
 
     if (!individual.error) {
-      const data = individual.data as { id?: string; granted?: number; count?: number } | null;
-      return data?.id ? 1 : Number(data?.granted ?? data?.count ?? 0);
+      const data = individual.data as { id?: string; granted?: number; count?: number; already_granted?: boolean } | null;
+      // The RPC may return an existing grant for idempotency. Its id does not
+      // mean a new retry was issued: only the explicit granted count does.
+      if (data?.granted !== undefined) return Number(data.granted);
+      return data?.id ? 1 : Number(data?.count ?? 0);
     }
 
     const isMissingIndividualRpc =
