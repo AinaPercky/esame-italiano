@@ -1,6 +1,8 @@
 import { supabaseService } from './supabaseService';
 import type {
   ExerciseAttemptQuestion,
+  ExerciseAttemptBundle,
+  ExerciseBatchSubmissionResult,
   ExerciseCorrection,
   ExerciseDefinition,
   ExerciseAttemptResult,
