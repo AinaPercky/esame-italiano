@@ -136,7 +136,7 @@ VALUES ('00000000-0000-0000-0000-000000000002', 'quiz-2', 'student-1', 'class-1'
 -- La migration doit être ré-exécutable.
 \i supabase/migrations/20261120150000_add_quiz_submission_questions_snapshot.sql
 
-DO $
+DO $block$
 DECLARE
   sanitized jsonb;
   active_snapshot jsonb;
@@ -191,7 +191,7 @@ BEGIN
     RAISE EXCEPTION 'Un lancement historique actif doit utiliser un fallback assaini : %', active_snapshot;
   END IF;
 END;
-$$;
+$block$;
 
 -- Le trigger de lancement doit figer la version de quiz avant toute modification.
 INSERT INTO public.quiz_launches (id, quiz_id)
@@ -214,11 +214,10 @@ INSERT INTO public.quiz_submissions (id, quiz_id, questions_snapshot)
 VALUES ('provided-snapshot', 'quiz-2', '[{"id":"q-provided","question":"Version fournie"}]'::jsonb);
 RESET ROLE;
 
-DO $$
+DO $
 DECLARE
   captured jsonb;
   provided jsonb;
-  sanitized jsonb;
 BEGIN
   SELECT questions_snapshot INTO captured
   FROM public.quiz_submissions WHERE id = 'new-submission';
