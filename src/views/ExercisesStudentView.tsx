@@ -796,7 +796,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                 <div className="space-y-2 p-3.5 sm:p-4">
                   <div className={'rounded-xl border p-3 ' + (question.correct ? 'border-[#bfe3ce] bg-[#eef9f3]' : 'border-rose-200 bg-rose-50')}>
                     <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Votre réponse</p>
-                    <p className={'break-words text-sm font-semibold ' + (question.correct ? 'text-[#145c3d]' : 'text-rose-800')}>{correctionText(question.answer ?? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Aucune réponse'))}</p>
+                    <p className={'break-words text-sm font-semibold ' + (question.correct ? 'text-[#145c3d]' : 'text-rose-800')}>{unanswered ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu') : correctionText(question.answer)}</p>
                   </div>
                   {(!question.correct || unanswered) && <>
                     <div className="rounded-xl border border-[#bfe3ce] bg-[#eef9f3] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#145c3d]">Réponse attendue</p><p className="break-words text-sm font-bold text-[#145c3d]">{correctionText(question.expected)}</p></div>
