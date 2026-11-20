@@ -38,6 +38,21 @@ const hasSubmittedAnswer = (value: unknown): boolean => {
   return false;
 };
 
+const formatExerciseExpected = (question: ExerciseAttemptReview['questions'][number]): string => {
+  if (question.type === 'reorder' && question.items?.length) {
+    try {
+      const raw = typeof question.expected === 'string' ? question.expected : JSON.stringify(question.expected);
+      const ids = JSON.parse(raw || '[]');
+      if (Array.isArray(ids)) {
+        return ids.map((id) => question.items?.find((item) => item.id === String(id))?.text || String(id)).join(' → ');
+      }
+    } catch {
+      // Fallback to the raw correction when the legacy answer is not a JSON order.
+    }
+  }
+  return correctionText(question.expected);
+};
+
 const correctionText = (value: unknown): string => {
   if (value == null) return '—';
   if (typeof value === 'string') return value;
@@ -794,12 +809,12 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                   </StatusBadge>
                 </div>
                 <div className="space-y-2 p-3.5 sm:p-4">
-                  <div className={'rounded-xl border p-3 ' + (question.correct ? 'border-[#bfe3ce] bg-[#eef9f3]' : 'border-rose-200 bg-rose-50')}>
+                  <div className={'rounded-xl border p-3 ' + (question.correct && !unanswered ? 'border-[#bfe3ce] bg-[#eef9f3]' : 'border-rose-200 bg-rose-50')}>
                     <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Votre réponse</p>
-                    <p className={'break-words text-sm font-semibold ' + (question.correct ? 'text-[#145c3d]' : 'text-rose-800')}>{unanswered ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu') : correctionText(question.answer)}</p>
+                    <p className={'break-words text-sm font-semibold ' + (question.correct && !unanswered ? 'text-[#145c3d]' : 'text-rose-800')}>{unanswered ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu') : correctionText(question.answer)}</p>
                   </div>
                   {(!question.correct || unanswered) && <>
-                    <div className="rounded-xl border border-[#bfe3ce] bg-[#eef9f3] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#145c3d]">Réponse attendue</p><p className="break-words text-sm font-bold text-[#145c3d]">{correctionText(question.expected)}</p></div>
+                    <div className="rounded-xl border border-[#bfe3ce] bg-[#eef9f3] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#145c3d]">Réponse attendue</p><p className="break-words text-sm font-bold text-[#145c3d]">{formatExerciseExpected(question)}</p></div>
                     {question.explanation && <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#46657a]">Explication</p><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#072a3f]">{correctionText(question.explanation)}</p></div>}
                   </>}
                 </div>
