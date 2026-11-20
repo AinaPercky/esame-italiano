@@ -1749,7 +1749,7 @@ class SupabaseService {
       const detailsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note') : emptyRows;
       const passOrderRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exam_pass_order').select('id,exam_id,student_id,position,status,created_at') : emptyRows;
       const quizSubmissionsRequest = isAuthenticated
-        ? client.from('quiz_submissions').select('id,quiz_id,quiz_title,student_id,student_name,student_number,class_id,class_name,started_at,submitted_at,answers,score,max_score,score_20,status,feedback,date,attempt_number,launch_id,attendance_status,retry_grant_id,is_counted')
+        ? client.from('quiz_submissions').select('id,quiz_id,quiz_title,student_id,student_name,student_number,class_id,class_name,started_at,submitted_at,answers,questions_snapshot,score,max_score,score_20,status,feedback,date,attempt_number,launch_id,attendance_status,retry_grant_id,is_counted')
         : emptyRequest;
       // The student roster RPC exposes only classmate names and identifiers,
       // never e-mail addresses or private profile fields.
@@ -2015,6 +2015,7 @@ class SupabaseService {
         started_at: s.started_at,
         submitted_at: s.submitted_at || undefined,
         answers: s.answers || {},
+        questions_snapshot: Array.isArray(s.questions_snapshot) ? s.questions_snapshot : null,
         score: Number(s.score) || 0,
         max_score: Number(s.max_score) || 20,
         score_20: Number(s.score_20) || 0,
