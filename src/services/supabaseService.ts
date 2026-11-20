@@ -1210,6 +1210,7 @@ class SupabaseService {
       started_at: submission.started_at,
       submitted_at: submission.submitted_at || null,
       answers: submission.answers || {},
+      questions_snapshot: submission.questions_snapshot || null,
       score: Number(submission.score) || 0,
       max_score: Number(submission.max_score) || 20,
       score_20: Number(submission.score_20) || 0,
@@ -1402,6 +1403,7 @@ class SupabaseService {
         student_number: submission.student_number || null, class_id: submission.class_id,
         class_name: submission.class_name || null, started_at: submission.started_at,
         submitted_at: submission.submitted_at || null, answers: submission.answers || {},
+        questions_snapshot: submission.questions_snapshot || null,
         status: submission.status, date: submission.date,
         retry_grant_id: submission.retry_grant_id || null
       }
@@ -1746,9 +1748,11 @@ class SupabaseService {
       const evaluationsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluations').select('id,exam_id,student_id,total_score,status,max_duration_seconds,duration_used_seconds,timer_status,created_at,updated_at') : emptyRows;
       const detailsRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('evaluation_details').select('evaluation_id,rubric_id,is_validated,awarded_points,error_note') : emptyRows;
       const passOrderRequest = isStudentSession ? emptyRows : isAuthenticated ? client.from('exam_pass_order').select('id,exam_id,student_id,position,status,created_at') : emptyRows;
-      const quizSubmissionsRequest = isAuthenticated
-        ? client.from('quiz_submissions').select('id,quiz_id,quiz_title,student_id,student_name,student_number,class_id,class_name,started_at,submitted_at,answers,score,max_score,score_20,status,feedback,date,attempt_number,launch_id,attendance_status,retry_grant_id,is_counted')
-        : emptyRequest;
+      const quizSubmissionsRequest = isTeacher
+        ? client.rpc('get_teacher_quiz_submissions')
+        : isAuthenticated
+          ? client.from('quiz_submissions').select('id,quiz_id,quiz_title,student_id,student_name,student_number,class_id,class_name,started_at,submitted_at,answers,score,max_score,score_20,status,feedback,date,attempt_number,launch_id,attendance_status,retry_grant_id,is_counted')
+          : emptyRequest;
       // The student roster RPC exposes only classmate names and identifiers,
       // never e-mail addresses or private profile fields.
       const classRosterRequest = isAuthenticated && !isTeacher
@@ -1987,8 +1991,8 @@ class SupabaseService {
       // Nettoyer en arrière-plan les soumissions orphelines d'élèves déjà supprimés dans Supabase
       const orphanedStudentIds = Array.from(new Set(
         (quizSubmissionsData || [])
-          .filter(s => !existingStudentIds.has(s.student_id))
-          .map(s => s.student_id)
+          .filter((s: any) => !existingStudentIds.has(s.student_id))
+          .map((s: any) => s.student_id)
       ));
       if (isTeacher && orphanedStudentIds.length > 0) {
         void (async () => {
@@ -2013,6 +2017,7 @@ class SupabaseService {
         started_at: s.started_at,
         submitted_at: s.submitted_at || undefined,
         answers: s.answers || {},
+        questions_snapshot: Array.isArray(s.questions_snapshot) ? s.questions_snapshot : null,
         score: Number(s.score) || 0,
         max_score: Number(s.max_score) || 20,
         score_20: Number(s.score_20) || 0,

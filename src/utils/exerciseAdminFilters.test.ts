@@ -347,7 +347,7 @@ test('pedagogical diagnostic uses best attempt details and the 70 percent thresh
     best_score: 7,
     max_score: 10,
     best_questions: [
-      { id: 'q1', type: 'qcm', question: 'Choisir l’auxiliaire', correct_answer: 'essere', points: 5, competency: 'Choix de l’auxiliaire', skill_code: 'AUX', error_category_map: { avere: 'Confusion essere/avere' } },
+      { id: 'q1', type: 'qcm', question: 'Choisir l’auxiliaire', correct_answer: 'essere', points: 5, competency: 'Choix de l’auxiliaire', skill_code: 'AUX', error_categories: ['Confusion essere/avere'], error_category_map: { avere: 'Confusion essere/avere' } },
       { id: 'q2', type: 'text', question: 'Participe passé', correct_answer: 'fatto', points: 5, competency: 'Participe passé', skill_code: 'PART' }
     ],
     best_details: [

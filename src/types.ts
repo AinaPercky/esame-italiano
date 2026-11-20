@@ -253,6 +253,8 @@ export interface QuizSubmission {
   started_at: string;
   submitted_at?: string;
   answers: Record<string, string>; // question_id -> réponse de l'élève
+  /** Copie des questions du lancement associé; null pour l'historique antérieur à la migration. */
+  questions_snapshot?: QuizQuestion[] | null;
   score: number; // Points obtenus
   max_score: number; // Total points du quiz
   score_20: number; // Note normalisée sur 20
@@ -273,6 +275,8 @@ export interface QuizLaunch {
   quiz_id: string;
   launched_at: string;
   closed_at?: string | null;
+  /** Questions frozen server-side when the teacher launched this quiz; student-safe projection. */
+  questions_snapshot?: QuizQuestion[] | null;
   /** Deprecated launch-level field; presence initialization is per participant. */
   presence_deadline_at?: string | null;
   status: 'launched' | 'closed';

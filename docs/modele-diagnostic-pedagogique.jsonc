@@ -1,0 +1,64 @@
+{
+  // Modèle complémentaire : diagnostic pédagogique des quiz et exercices PerckyLingua.
+  // Ce fichier ne remplace ni ne modifie les modèles JSON/JSONC déjà utilisés.
+  // Les quatre propriétés pédagogiques sont facultatives pour préserver la compatibilité historique.
+  "title": "Passato prossimo – scelta dell’ausiliare",
+  "level": "A2",
+  "category": "Grammatica",
+  "description": "Verificare la scelta tra essere e avere.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "qcm",
+      "question": "Ieri Marco ___ andato a scuola.",
+      "options": ["ha", "è", "sono", "hanno"],
+      "correct_answer": "è",
+      "points": 1,
+      "time_limit_seconds": 17,
+      "explanation": "Andare si coniuga con l’ausiliare essere.",
+      "competency": "Choix de l’auxiliaire",
+      "skill_code": "PASSATO_PROSSIMO_AUX",
+      "error_categories": [
+        "Confusion essere/avere",
+        "Erreur d’accord de l’auxiliaire"
+      ],
+      "error_category_map": {
+        "ha": "Confusion essere/avere",
+        "sono": "Erreur d’accord de l’auxiliaire",
+        "hanno": "Erreur d’accord de l’auxiliaire"
+      }
+    },
+    {
+      "id": "q2",
+      "type": "text",
+      "question": "Completa: Maria ha ___ (scrivere) una lettera.",
+      "correct_answer": "scritto",
+      "points": 1,
+      "time_limit_seconds": 32,
+      "explanation": "Il participio passato di scrivere è scritto.",
+      "competency": "Formation du participe passé",
+      "skill_code": "PASSATO_PROSSIMO_PARTICIPLE",
+      "error_categories": [
+        "Participe passé irrégulier"
+      ],
+      "error_category_map": {
+        "scrivuto": "Participe passé irrégulier"
+      }
+    }
+  ]
+}
+
+// Règles de renseignement :
+// - competency : intitulé lisible de la compétence ciblée.
+// - skill_code : code stable et réutilisable pour regrouper les questions équivalentes.
+// - error_categories : liste des catégories que le professeur souhaite suivre.
+// - error_category_map : association exacte entre une réponse incorrecte (ou un distracteur)
+//   et une catégorie explicitement définie ci-dessus.
+// - N’ajoutez une catégorie que si le professeur a réellement identifié cette erreur.
+// - Une réponse incorrecte absente de error_category_map reste « erreur non catégorisée ».
+// - Le système ne déduit jamais une cause d’erreur à partir de la seule réponse.
+// - Les quatre propriétés sont facultatives. Les anciennes questions restent valides et
+//   apparaissent dans l’analyse sous « Compétence à renseigner ».
+// - Pour les questions textuelles, ne mappez que des réponses erronées exactes connues.
+//   Ne tentez pas de catégoriser automatiquement toutes les variantes possibles.
+//

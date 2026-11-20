@@ -78,6 +78,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'CREATE OR REPLACE FUNCTION public.quiz_text_matches(',
       'CREATE OR REPLACE FUNCTION public.quiz_sanitize_questions(',
       "'blank_count'",
+      "- 'error_category_map'",
       'CREATE OR REPLACE FUNCTION public.get_public_quiz_catalog()',
       'CREATE OR REPLACE FUNCTION public.get_public_quiz(',
       'CREATE OR REPLACE FUNCTION public.get_student_quiz_catalog()',
@@ -107,7 +108,12 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'supabase/migrations/20261120000000_quiz_server_side_grading_security.sql'
     );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
-    assert.equal(sqlFromFile, QUIZ_SECURITY_MIGRATION_SQL.trim());
+    // Le script de bootstrap masque aussi les nouveaux mappings de diagnostic.
+    // La migration historique reste immuable ; la migration additive reprend ce correctif.
+    const bootstrapWithoutDiagnosticMapping = QUIZ_SECURITY_MIGRATION_SQL
+      .replace(" - 'error_category_map'", '')
+      .trim();
+    assert.equal(sqlFromFile, bootstrapWithoutDiagnosticMapping);
   });
 
   it('ne contourne jamais la RLS sur quizzes pour les sessions non-professeur', () => {

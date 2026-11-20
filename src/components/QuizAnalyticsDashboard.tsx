@@ -123,10 +123,19 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const questionAnalyses = useMemo(() => {
     const rows: QuestionAnalysis[] = [];
     visibleQuizzes.forEach(quiz => {
-      (quiz.questions || []).forEach((question, index) => {
+      const questionsById = new Map<string, QuizQuestion>();
+      (quiz.questions || []).forEach(question => questionsById.set(question.id, question));
+      classSubmissions.filter(submission => submission.quiz_id === quiz.id).forEach(submission => {
+        (submission.questions_snapshot || []).forEach(question => {
+          if (!questionsById.has(question.id)) questionsById.set(question.id, question);
+        });
+      });
+      Array.from(questionsById.values()).forEach((question, index) => {
         const classDetails = classSubmissions.flatMap(submission => {
           if (submission.quiz_id !== quiz.id) return [];
-          const detail = analyzeSubmissionQuestion(question, submission);
+          const snapshotQuestion = submission.questions_snapshot?.find(item => item.id === question.id);
+          const questionForAttempt = snapshotQuestion || question;
+          const detail = analyzeSubmissionQuestion(questionForAttempt, submission);
           return detail ? [detail] : [];
         });
         if (!classDetails.length) return;
@@ -151,6 +160,23 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
       return leftRate - rightRate;
     });
   }, [visibleQuizzes, classSubmissions, studentId]);
+
+  const competencyAnalyses = useMemo(() => {
+    const groups = new Map<string, { competency: string; skillCode: string | null; details: AnswerDetail[] }>();
+    for (const row of questionAnalyses) {
+      const competency = row.question.competency?.trim() || 'Compétence à renseigner';
+      const skillCode = row.question.skill_code?.trim() || null;
+      const key = skillCode || (competency === 'Compétence à renseigner' ? `unassigned:${row.key}` : competency);
+      const group = groups.get(key) || { competency, skillCode, details: [] };
+      group.details.push(...row.classDetails);
+      groups.set(key, group);
+    }
+    return Array.from(groups.values()).map(group => ({
+      ...group,
+      rate: rateOf(group.details),
+      responses: group.details.length
+    })).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
+  }, [questionAnalyses]);
 
   const trend = useMemo(() => visibleQuizzes.map(quiz => {
     const quizSubs = classSubmissions.filter(submission => submission.quiz_id === quiz.id);
@@ -283,6 +309,23 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
                 </div>
               </section>
 
+              <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <h3 className="text-sm font-bold text-slate-900">Maîtrise par compétence</h3>
+                <p className="mt-1 text-[11px] text-slate-500">Regroupement selon les codes et intitulés explicitement renseignés par le professeur.</p>
+                <div className="mt-3 space-y-3">
+                  {competencyAnalyses.length ? competencyAnalyses.map((group, index) => (
+                    <div key={group.skillCode || group.competency + index} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-slate-800">{group.competency}</p>
+                        {group.skillCode && <p className="font-mono text-[9px] text-slate-400">{group.skillCode}</p>}
+                        <p className="text-[10px] text-slate-500">{group.responses} réponse(s)</p>
+                      </div>
+                      <span className={`text-sm font-black ${group.rate !== null && group.rate < 60 ? 'text-rose-700' : group.rate !== null && group.rate < 80 ? 'text-amber-700' : 'text-emerald-700'}`}>{group.rate === null ? '—' : `${Math.round(group.rate)}%`}</span>
+                    </div>
+                  )) : <p className="text-xs text-slate-500">Aucune compétence renseignée dans les questions de cette sélection.</p>}
+                </div>
+              </section>
+
               <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <div className="border-b border-slate-200 px-4 py-3 sm:px-5">
                   <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900"><BookOpen className="h-4 w-4 text-indigo-700" /> Résultats et réponses par question</h3>
@@ -304,12 +347,26 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
                         </summary>
                         <div className="mt-3 rounded-lg bg-slate-50 p-3">
                           <p className="mb-2 text-[10px] font-semibold text-slate-500">Réussite calculée sur les points obtenus; {row.classDetails.length} réponse(s) de classe{studentId ? `, ${row.details.length} de ${selectedStudent?.first_name || 'l’élève'}` : ''}.</p>
+                          <div className="mb-3 rounded-md border border-indigo-100 bg-white p-2 text-[11px]">
+                            <p className="font-bold text-indigo-950">Compétence : {row.question.competency || 'Compétence à renseigner'}</p>
+                            {row.question.skill_code && <p className="mt-0.5 font-mono text-[10px] text-slate-500">{row.question.skill_code}</p>}
+                            {(() => {
+                              const mapping = row.question.error_category_map || {};
+                              const counts = new Map<string, number>();
+                              (studentId ? row.details : row.classDetails).filter(detail => !detail.correct).forEach(detail => {
+                                const answer = (detail.answer || '').trim().toLocaleLowerCase();
+                                const entry = Object.entries(mapping).find(([key]) => key.trim().toLocaleLowerCase() === answer);
+                                if (entry && (row.question.error_categories || []).includes(entry[1])) counts.set(entry[1], (counts.get(entry[1]) || 0) + 1);
+                              });
+                              return counts.size ? <div className="mt-2 flex flex-wrap gap-1.5">{Array.from(counts.entries()).map(([category,count]) => <span key={category} className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-900">{category} · {count}</span>)}</div> : <p className="mt-1 text-[10px] text-slate-500">Aucune cause d’erreur explicitement catégorisée pour cette sélection.</p>;
+                            })()}
+                          </div>
                           <div className="max-h-64 space-y-2 overflow-y-auto">
                             {studentId && row.details.length === 0 && <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900">Aucune réponse enregistrée pour cet élève. Les résultats de la classe pour cette question : {row.classDetails.length} réponse(s).</p>}
                             {(studentId ? row.details : row.classDetails).map((detail, detailIndex) => (
                               <div key={`${detail.submission.id}-${detailIndex}`} className="grid gap-1 rounded-md border border-slate-200 bg-white p-2 text-[11px] sm:grid-cols-[minmax(100px,0.8fr)_2fr_1.5fr_auto] sm:items-start">
                                 <span className="font-semibold text-slate-700">{detail.submission.student_name || 'Élève'}</span>
-                                <span className="break-words text-slate-700"><strong>Réponse :</strong> {detail.answer}</span>
+                                <span className="break-words text-slate-700"><strong>Réponse :</strong> {detail.answer}{!detail.correct && row.question.error_category_map && Object.entries(row.question.error_category_map).some(([key, category]) => key.trim().toLocaleLowerCase() === detail.answer.trim().toLocaleLowerCase() && (row.question.error_categories || []).includes(category)) && <span className="mt-1 block font-semibold text-amber-800">Cause renseignée : {Object.entries(row.question.error_category_map).find(([key, category]) => key.trim().toLocaleLowerCase() === detail.answer.trim().toLocaleLowerCase() && (row.question.error_categories || []).includes(category))?.[1]}</span>}</span>
                                 <span className="break-words text-slate-500"><strong>Attendu :</strong> {detail.expected}</span>
                                 <span className={detail.correct ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>{detail.points}/{detail.maxPoints} pt{detail.correct ? ' · correct' : ''}</span>
                               </div>
