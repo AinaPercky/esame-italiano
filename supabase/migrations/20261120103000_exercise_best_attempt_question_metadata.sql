@@ -32,6 +32,7 @@ begin
     'latest_score', latest.score,
     'max_score', coalesce(best.max_score, latest.max_score, stats.max_score, 0),
     'best_attempt_id', best.id,
+    'best_version_id', best.version_id,
     'best_details', coalesce(best.details, '[]'::jsonb),
     'best_questions', coalesce(best.questions, '[]'::jsonb),
     'started_at', latest.started_at,
@@ -68,7 +69,7 @@ begin
     where a.exercise_id = p_exercise_id and a.student_id = s.id
   ) stats on true
   left join lateral (
-    select a.id, a.score, a.max_score, ev.content -> 'questions' as questions,
+    select a.id, a.version_id, a.score, a.max_score, ev.content -> 'questions' as questions,
       (
         select coalesce(jsonb_agg(jsonb_build_object(
           'question_id', ans.question_id,
