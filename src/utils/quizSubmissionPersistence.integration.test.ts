@@ -78,8 +78,9 @@ describe('batch quiz grading and correction regression', () => {
     const studentQuizView = readFileSync(new URL('../views/StudentSpaceView.tsx', import.meta.url), 'utf8');
     const publicResultView = readFileSync(new URL('../views/publicQuiz/PublicQuizResultScreen.tsx', import.meta.url), 'utf8');
     const exerciseView = readFileSync(new URL('../views/ExercisesStudentView.tsx', import.meta.url), 'utf8');
-    assert.ok(studentQuizView.includes('lastSubmissionResult.feedback'));
-    assert.ok(studentQuizView.includes('Bonne réponse'));
+    assert.ok(studentQuizView.includes('incorrectFeedback?.correctAnswer'));
+    assert.ok(studentQuizView.includes('Votre note finale :'));
+    assert.ok(!studentQuizView.includes('lastSubmissionResult.feedback'));
     assert.ok(publicResultView.includes('itemFeedback.explanation'));
     assert.ok(publicResultView.includes('Non répondu'));
     assert.ok(exerciseView.includes('!question.correct || unanswered'));
