@@ -165,14 +165,18 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)
       );
       localSaveQueueRef.current = localWrite;
-      await localWrite;
       try {
+        await localWrite;
         if (batchIndex >= batchBundle.questions.length - 1) {
           await localSaveQueueRef.current;
           await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
-          await deleteWrittenExamDraft(active.attempt_id);
-          const completedReview = await exerciseService.getStudentAttemptDetails(active.attempt_id);
-          setAttemptReview(completedReview);
+          try { await deleteWrittenExamDraft(active.attempt_id); } catch { /* la remise serveur est déjà confirmée */ }
+          try {
+            const completedReview = await exerciseService.getStudentAttemptDetails(active.attempt_id);
+            setAttemptReview(completedReview);
+          } catch {
+            setError('La remise est enregistrée. Le détail de la correction sera disponible dans l’historique.');
+          }
           setHistoryExerciseId(batchBundle.exercise_id);
           setBatchBundle(null);
           setBatchAnswers({});
