@@ -119,7 +119,8 @@ La soumission conserve également son `launch_id` lorsqu'elle appartient à un l
 Les snapshots complets contiennent des corrigés et des mappings réservés à l'enseignant :
 - les élèves ne peuvent pas lire directement les colonnes de snapshot ;
 - les élèves reçoivent une projection assainie des questions ;
-- la fonction d'assainissement retire notamment `correct_answer`, `answers`, `explanation`, les données de correction de phrases et `error_category_map` ;
+- la fonction d'assainissement des quiz retire notamment `correct_answer`, `answers`, `explanation`, les données de correction de phrases et `error_category_map` ;
+- le RPC de question étudiant des exercices retire également `error_category_map` ;
 - l'enseignant récupère les soumissions complètes via la RPC `get_teacher_quiz_submissions`, qui vérifie son rôle ;
 - les élèves gardent l'accès aux seules colonnes nécessaires à leurs propres résultats.
 
@@ -165,7 +166,7 @@ Elle doit être appliquée après revue et validation :
 - fallback pour un lancement actif antérieur à la migration ;
 - absence de backfill des soumissions historiques ;
 - refus de lecture directe des snapshots complets par les élèves ;
-- masquage des corrigés et de `error_category_map` dans les projections élèves ;
+- masquage des corrigés et de `error_category_map` dans les projections élèves des Quiz et des Exercices ;
 - accès aux snapshots complets réservé au professeur.
 
 ### Critères d'acceptation
