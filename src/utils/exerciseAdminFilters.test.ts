@@ -343,6 +343,7 @@ test('pedagogical diagnostic uses best attempt details and the 70 percent thresh
   const attempts: TeacherExerciseAttemptRow[] = [{
     ...ATTEMPTS[0],
     best_attempt_id: 'best-1',
+    best_version_id: 'v1',
     best_score: 7,
     max_score: 10,
     best_questions: [
@@ -360,8 +361,8 @@ test('pedagogical diagnostic uses best attempt details and the 70 percent thresh
   assert.equal(result.masteredStudents, 1);
   assert.equal(result.studentsNeedingSupport, 0);
   assert.equal(result.globalMasteryRate, 70);
-  assert.equal(result.questions.find(q => q.id === 'q1')?.masteryRate, 40);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.masteryRate, 40);
   assert.equal(result.questions.find(q => q.id === 'q1')?.studentsNeedingSupport.length, 1);
   assert.equal(result.questions.find(q => q.id === 'q1')?.errorPatterns[0]?.category, 'Confusion essere/avere');
-  assert.equal(result.questions.find(q => q.id === 'q2')?.masteryRate, 100);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q2'))?.masteryRate, 100);
 });
