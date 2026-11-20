@@ -30,7 +30,8 @@ import {
   type ClassRoom,
   type ExerciseDefinition,
   type ExerciseStatus,
-  type Quiz
+  type Quiz,
+  type QuizQuestion
 } from '../types';
 import { dataService } from '../services/dataService';
 import {
@@ -54,6 +55,8 @@ import {
   DEFAULT_ATTEMPT_FILTERS,
   DEFAULT_EXERCISE_CATALOG_FILTERS,
   countActiveAttemptFilters,
+  buildExercisePedagogicalDiagnostic,
+  PEDAGOGICAL_MASTERY_THRESHOLD,
   countActiveExerciseFilters,
   filterAndSortAttempts,
   filterAndSortExercises,
@@ -258,20 +261,31 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     [attemptFilters]
   );
 
+  // A student enrolled in several assigned classes may appear once per class in the RPC.
+  // Pedagogical indicators count each learner only once unless a class filter is active.
+  const diagnosticAttempts = useMemo(() => {
+    const uniqueRows = new Map<string, TeacherExerciseAttemptRow>();
+    for (const row of filteredAttempts) {
+      if (!uniqueRows.has(row.student_id)) uniqueRows.set(row.student_id, row);
+    }
+    return Array.from(uniqueRows.values());
+  }, [filteredAttempts]);
+
+
   const attemptSummary = useMemo(() => {
-    const completed = filteredAttempts.filter(row => row.status === 'completed').length;
-    const inProgress = filteredAttempts.filter(row => row.status === 'in_progress').length;
-    const notStarted = filteredAttempts.length - completed - inProgress;
+    const completed = diagnosticAttempts.filter(row => row.status === 'completed').length;
+    const inProgress = diagnosticAttempts.filter(row => row.status === 'in_progress').length;
+    const notStarted = diagnosticAttempts.length - completed - inProgress;
     return {
-      total: filteredAttempts.length,
+      total: diagnosticAttempts.length,
       completed,
       inProgress,
       notStarted
     };
-  }, [filteredAttempts]);
+  }, [diagnosticAttempts]);
 
   const performanceSummary = useMemo(() => {
-    const scored = filteredAttempts.filter(row => getAttemptPercentage(row) !== null);
+    const scored = diagnosticAttempts.filter(row => getAttemptPercentage(row) !== null);
     const percentages = scored
       .map(row => getAttemptPercentage(row))
       .filter((v): v is number => v !== null);
@@ -281,20 +295,20 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     return {
       average,
       successRate: percentages.length
-        ? (percentages.filter(value => value >= 50).length / percentages.length) * 100
+        ? (percentages.filter(value => value >= PEDAGOGICAL_MASTERY_THRESHOLD).length / percentages.length) * 100
         : null,
-      completionRate: filteredAttempts.length
-        ? (filteredAttempts.filter(row => row.status === 'completed').length /
-            filteredAttempts.length) *
+      completionRate: diagnosticAttempts.length
+        ? (diagnosticAttempts.filter(row => row.status === 'completed').length /
+            diagnosticAttempts.length) *
           100
         : 0,
       scoredCount: scored.length,
-      averageAttempts: filteredAttempts.length
-        ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) /
-          filteredAttempts.length
+      averageAttempts: diagnosticAttempts.length
+        ? diagnosticAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) /
+          diagnosticAttempts.length
         : 0
     };
-  }, [filteredAttempts]);
+  }, [diagnosticAttempts]);
 
   const scoreDistribution = useMemo(
     () =>
@@ -306,32 +320,51 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         { label: '81–100 %', min: 80, max: 100.001 }
       ].map(range => ({
         ...range,
-        count: filteredAttempts.filter(row => {
+        count: diagnosticAttempts.filter(row => {
           const pct = getAttemptPercentage(row);
           return pct !== null && pct >= range.min && pct < range.max;
         }).length
       })),
-    [filteredAttempts]
+    [diagnosticAttempts]
+  );
+
+  const pedagogicalDiagnostic = useMemo(
+    () => buildExercisePedagogicalDiagnostic(diagnosticAttempts, PEDAGOGICAL_MASTERY_THRESHOLD),
+    [diagnosticAttempts]
   );
 
   const questionStats = useMemo(
-    () =>
-      (activeAttemptsExercise?.questions || []).map(question => {
-        const responses = filteredAttempts
-          .flatMap(row => row.details || [])
-          .filter(detail => detail.question_id === question.id);
-        const correct = responses.filter(detail => detail.correct).length;
+    () => {
+      const questions = new Map<string, { question: QuizQuestion; versionId: string }>();
+      for (const row of diagnosticAttempts) {
+        for (const question of row.best_questions || []) {
+          questions.set(`${row.best_version_id || 'legacy'}:${question.id}`, { question, versionId: row.best_version_id || 'legacy' });
+        }
+      }
+      return Array.from(questions.values()).map(({ question, versionId }) => {
+        const responses = diagnosticAttempts
+          .flatMap(row => (row.best_details || []).map(detail => ({ row, detail })))
+          .filter(item => item.detail.question_id === question.id && (item.row.best_version_id || 'legacy') === versionId);
+        const correct = responses.filter(item => item.detail.correct).length;
+        const points = responses.reduce((sum, item) => sum + Number(item.detail.points || 0), 0);
+        const maxPoints = responses.reduce((sum, item) => sum + Number(item.detail.max_points || 0), 0);
         return {
-          id: question.id,
+          id: `${versionId}:${question.id}`,
           label: question.question,
+          competency: question.competency || 'Compétence à renseigner',
           responses: responses.length,
           correct,
-          rate: responses.length > 0 ? Math.round((correct / responses.length) * 100) : null,
-          points: responses.reduce((sum, detail) => sum + Number(detail.points || 0), 0),
-          maxPoints: responses.reduce((sum, detail) => sum + Number(detail.max_points || 0), 0)
+          rate: maxPoints > 0 ? Math.round((points / maxPoints) * 100) : null,
+          points,
+          maxPoints,
+          studentsNeedingSupport: responses.filter(item =>
+            Number(item.detail.max_points) > 0 &&
+            (Number(item.detail.points || 0) / Number(item.detail.max_points)) * 100 < PEDAGOGICAL_MASTERY_THRESHOLD
+          ).map(item => item.row)
         };
-      }),
-    [activeAttemptsExercise, filteredAttempts]
+      }).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
+    },
+    [diagnosticAttempts]
   );
 
   const populateEditorFromItem = (item: ExerciseDefinition) => {
@@ -1737,8 +1770,8 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                       className="min-h-10 w-full rounded-xl border border-[#cfe1ec] bg-[#f7fafc] px-3 py-2 text-sm font-semibold text-[#072a3f]"
                     >
                       <option value="all">Toutes les notes</option>
-                      <option value="passed">Réussi (≥ 50 %)</option>
-                      <option value="needs_review">À consolider (&lt; 50 %)</option>
+                      <option value="passed">Maîtrisé (≥ 70 %)</option>
+                      <option value="needs_review">À accompagner (&lt; 70 %)</option>
                       <option value="unscored">Sans note</option>
                     </select>
                   </label>
@@ -2033,7 +2066,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                   <div>
                     <h3 className="font-bold text-[#072a3f]">Analyse pédagogique</h3>
                     <p className="mt-0.5 text-xs text-[#607f93]">
-                      Indicateurs calculés sur la meilleure tentative terminée des élèves affichés (
+                      Indicateurs calculés sur la meilleure tentative terminée uniquement (
                       {attemptSummary.total}).
                     </p>
                   </div>
@@ -2041,21 +2074,22 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
-                    <p className="text-xs font-semibold text-[#607f93]">Score moyen</p>
+                    <p className="text-xs font-semibold text-[#607f93]">Maîtrise globale</p>
                     <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
-                      {performanceSummary.average === null
+                      {pedagogicalDiagnostic.globalMasteryRate === null
                         ? '—'
-                        : `${performanceSummary.average.toFixed(1)} %`}
+                        : `${Math.round(pedagogicalDiagnostic.globalMasteryRate)} %`}
                     </p>
+                    <p className="text-[11px] text-[#607f93]">Pondérée par les points possibles</p>
                   </article>
                   <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
-                    <p className="text-xs font-semibold text-[#607f93]">Taux de réussite</p>
+                    <p className="text-xs font-semibold text-[#607f93]">Élèves maîtrisant (≥ 70 %)</p>
                     <p className="mt-2 text-2xl font-black tabular-nums text-[#145c3d]">
                       {performanceSummary.successRate === null
                         ? '—'
                         : `${Math.round(performanceSummary.successRate)} %`}
                     </p>
-                    <p className="text-[11px] text-[#607f93]">Seuil : 50 %</p>
+                    <p className="text-[11px] text-[#607f93]">Seuil : 70 %</p>
                   </article>
                   <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
                     <p className="text-xs font-semibold text-[#607f93]">Taux d’achèvement</p>
@@ -2106,51 +2140,126 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                 </div>
               </section>
 
-              {questionStats.length > 0 && (
-                <div className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white">
-                  <div className="border-b border-[#eaf1f6] px-4 py-4">
-                    <h3 className="font-bold text-[#072a3f]">Analyse par question</h3>
-                    <p className="mt-0.5 text-xs text-[#607f93]">
-                      Réponses des dernières tentatives selon les filtres sélectionnés.
-                    </p>
+
+              <section className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-bold text-[#072a3f]">Diagnostic par compétence</h3>
+                    <p className="mt-0.5 text-xs text-[#607f93]">Seuil de maîtrise : 70 %. Calcul sur les points de la meilleure tentative terminée de chaque élève.</p>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-left text-xs">
-                      <thead className="bg-[#f5f9fc] text-[11px] font-bold uppercase tracking-wide text-[#46657a]">
-                        <tr>
-                          <th className="p-3.5">Question</th>
-                          <th className="p-3.5 text-right">Réponses</th>
-                          <th className="p-3.5 text-right">Correctes</th>
-                          <th className="p-3.5 text-right">Réussite</th>
-                          <th className="p-3.5 text-right">Points obtenus</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#eaf1f6]">
-                        {questionStats.map((row, index) => (
-                          <tr key={row.id} className="hover:bg-[#f7fafc]">
-                            <td className="max-w-md p-3.5 text-[#315267]">
-                              <span className="font-bold text-[#072a3f]">Q{index + 1}. </span>
-                              {row.label}
-                            </td>
-                            <td className="p-3.5 text-right tabular-nums text-[#46657a]">
-                              {row.responses}
-                            </td>
-                            <td className="p-3.5 text-right tabular-nums text-[#46657a]">
-                              {row.correct}
-                            </td>
-                            <td className="p-3.5 text-right font-semibold tabular-nums text-[#072a3f]">
-                              {row.rate === null ? '—' : `${row.rate} %`}
-                            </td>
-                            <td className="p-3.5 text-right font-semibold tabular-nums text-[#072a3f]">
-                              {row.points} / {row.maxPoints}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <StatusBadge tone={pedagogicalDiagnostic.uncategorizedQuestions > 0 ? 'warning' : 'success'}>
+                    {pedagogicalDiagnostic.uncategorizedQuestions > 0 ? `${pedagogicalDiagnostic.uncategorizedQuestions} question(s) à catégoriser` : 'Compétences renseignées'}
+                  </StatusBadge>
+                </div>
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
+                    <p className="text-xs font-semibold text-[#607f93]">Élèves évalués</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">{pedagogicalDiagnostic.evaluatedStudents}</p>
+                  </article>
+                  <article className="rounded-2xl border border-[#bfe3ce] bg-[#eef9f3]/60 p-4">
+                    <p className="text-xs font-semibold text-[#17613e]">Maîtrisent (≥ 70 %)</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#145c3d]">{pedagogicalDiagnostic.masteredStudents}</p>
+                  </article>
+                  <article className="rounded-2xl border border-[#f0d5ca] bg-[#fff7f3] p-4">
+                    <p className="text-xs font-semibold text-[#9a4c36]">À accompagner</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#9a4c36]">{pedagogicalDiagnostic.studentsNeedingSupport}</p>
+                  </article>
+                  <article className="rounded-2xl border border-[#f0dfb8] bg-[#fffaf0] p-4">
+                    <p className="text-xs font-semibold text-[#8a5108]">Questions difficiles</p>
+                    <p className="mt-2 text-2xl font-black tabular-nums text-[#8a5108]">{pedagogicalDiagnostic.difficultQuestions}</p>
+                  </article>
+                </div>
+                {pedagogicalDiagnostic.competencies.length > 0 && (
+                  <div className="rounded-2xl border border-[#d8e6ee] bg-white p-4 sm:p-5">
+                    <h4 className="font-bold text-[#072a3f]">Maîtrise des compétences</h4>
+                    <div className="mt-4 space-y-4">
+                      {pedagogicalDiagnostic.competencies.map(skill => (
+                        <div key={skill.skillCode || skill.competency} className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-semibold text-[#315267]">{skill.competency}</p>
+                              <p className="text-[11px] text-[#89a8bb]">{skill.questions} question(s) · {skill.studentsNeedingSupport.length} élève(s) sous 70 %</p>
+                            </div>
+                            <strong className={`shrink-0 text-sm tabular-nums ${skill.masteryRate !== null && skill.masteryRate >= 70 ? 'text-[#17613e]' : 'text-[#a34f38]'}`}>
+                              {skill.masteryRate === null ? '—' : `${Math.round(skill.masteryRate)} %`}
+                            </strong>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-[#e6f0f7]">
+                            <div className={`h-full rounded-full ${skill.masteryRate !== null && skill.masteryRate >= 70 ? 'bg-[#2fa36b]' : 'bg-[#d97757]'}`} style={{ width: `${Math.min(100, Math.max(0, skill.masteryRate || 0))}%` }} />
+                          </div>
+                          {skill.studentsNeedingSupport.length > 0 && (
+                            <p className="break-words text-[11px] leading-relaxed text-[#9a4c36]">À accompagner : {skill.studentsNeedingSupport.map(student => student.studentName).join(', ')}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                )}
+                {pedagogicalDiagnostic.targetedStudents.length > 0 && (
+                  <div className="rounded-2xl border border-[#f0d5ca] bg-white p-4 sm:p-5">
+                    <h4 className="font-bold text-[#072a3f]">Élèves à accompagner</h4>
+                    <p className="mt-0.5 text-xs text-[#607f93]">Classement selon leur meilleure note terminée, sous le seuil de 70 %.</p>
+                    <div className="mt-3 divide-y divide-[#eaf1f6]">
+                      {pedagogicalDiagnostic.targetedStudents.map(student => (
+                        <div key={student.studentId} className="flex items-center justify-between gap-3 py-3">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-semibold text-[#072a3f]">{student.studentName}</p>
+                            <p className="text-xs text-[#607f93]">{student.className}</p>
+                          </div>
+                          <StatusBadge tone="danger">{Math.round(student.rate)} %</StatusBadge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+              {pedagogicalDiagnostic.uncategorizedQuestions > 0 && (
+                <div className="rounded-xl border border-[#f0dfb8] bg-[#fffaf0] p-4 text-xs leading-relaxed text-[#77551b]">
+                  <p className="font-bold">Pour expliquer les difficultés, associez chaque question à une compétence.</p>
+                  <p className="mt-1">Dans le JSON de l’exercice, ajoutez les propriétés competency, skill_code, error_categories et error_category_map. Les causes d’erreur ne sont affichées que lorsqu’elles sont explicitement renseignées par le professeur : le système ne devine pas les raisons d’une mauvaise réponse.</p>
+                  <pre className="mt-2 overflow-x-auto rounded-lg bg-white p-3 text-[11px] text-[#315267]">{JSON.stringify({competency:"Choix de l’auxiliaire",skill_code:"PASSATO_PROSSIMO_AUX",error_categories:["Confusion essere/avere"],error_category_map:{avere:"Confusion essere/avere"}},null,2)}</pre>
                 </div>
               )}
+              {questionStats.length > 0 && (
+                <section className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white">
+                  <div className="border-b border-[#eaf1f6] px-4 py-4">
+                    <h3 className="font-bold text-[#072a3f]">Diagnostic par question</h3>
+                    <p className="mt-0.5 text-xs text-[#607f93]">Réponses issues de la meilleure tentative terminée de chaque élève.</p>
+                  </div>
+                  <div className="divide-y divide-[#eaf1f6]">
+                    {questionStats.map((row, index) => (
+                      <article key={row.id} className="space-y-2 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-[#607f93]">QUESTION {index + 1}</p>
+                            <p className="mt-1 break-words text-sm font-semibold text-[#072a3f]">{row.label}</p>
+                            <p className="mt-1 text-xs text-[#607f93]">{row.competency}</p>
+                          </div>
+                          <StatusBadge tone={row.rate !== null && row.rate >= 70 ? 'success' : 'danger'}>
+                            {row.rate === null ? 'Non évaluée' : `${Math.round(row.rate)} %`}
+                          </StatusBadge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 rounded-xl bg-[#f5f9fc] p-3 text-center">
+                          <div><p className="text-[10px] text-[#607f93]">Réponses</p><p className="font-bold tabular-nums text-[#072a3f]">{row.responses}</p></div>
+                          <div><p className="text-[10px] text-[#607f93]">Correctes</p><p className="font-bold tabular-nums text-[#17613e]">{row.correct}</p></div>
+                          <div><p className="text-[10px] text-[#607f93]">À revoir</p><p className="font-bold tabular-nums text-[#9a4c36]">{row.studentsNeedingSupport.length}</p></div>
+                        </div>
+                        {pedagogicalDiagnostic.questions.find(question => question.id === row.id)?.errorPatterns.length ? (
+                          <p className="text-xs text-[#8a5108]">Erreurs documentées : {pedagogicalDiagnostic.questions.find(question => question.id === row.id)?.errorPatterns.map(pattern => `${pattern.category} (${pattern.count})`).join(' · ')}</p>
+                        ) : null}
+                        {row.studentsNeedingSupport.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {row.studentsNeedingSupport.map(student => (
+                              <span key={student.student_id} className="rounded-full bg-[#fff1eb] px-2.5 py-1 text-[11px] font-semibold text-[#9a4c36]">{student.student_name}</span>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+
             </>
           )}
 
@@ -2197,7 +2306,9 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
 
                 <div className="space-y-3 overflow-y-auto p-5">
                   {(reviewStudent.best_details || []).map((detail, index) => {
-                    const question = activeAttemptsExercise?.questions.find(
+                    const question = reviewStudent.best_questions?.find(
+                      item => item.id === detail.question_id
+                    ) || activeAttemptsExercise?.questions.find(
                       item => item.id === detail.question_id
                     );
                     const expected =

@@ -336,3 +336,33 @@ test('filterAndSortQuizzes supports multi-criteria filtering, visibility, class,
   );
   assert.deepEqual(getDistinctQuizCategories(QUIZZES), ['Conjugaison', 'Vocabulaire']);
 });
+
+
+test('pedagogical diagnostic uses best attempt details and the 70 percent threshold', async () => {
+  const { buildExercisePedagogicalDiagnostic } = await import('./exerciseAdminFilters');
+  const attempts: TeacherExerciseAttemptRow[] = [{
+    ...ATTEMPTS[0],
+    best_attempt_id: 'best-1',
+    best_version_id: 'v1',
+    best_score: 7,
+    max_score: 10,
+    best_questions: [
+      { id: 'q1', type: 'qcm', question: 'Choisir l’auxiliaire', correct_answer: 'essere', points: 5, competency: 'Choix de l’auxiliaire', skill_code: 'AUX', error_category_map: { avere: 'Confusion essere/avere' } },
+      { id: 'q2', type: 'text', question: 'Participe passé', correct_answer: 'fatto', points: 5, competency: 'Participe passé', skill_code: 'PART' }
+    ],
+    best_details: [
+      { question_id: 'q1', answer: 'avere', correct: false, points: 2, max_points: 5 },
+      { question_id: 'q2', answer: 'fatto', correct: true, points: 5, max_points: 5 }
+    ],
+    details: [{ question_id: 'q1', answer: 'essere', correct: true, points: 5, max_points: 5 }]
+  }];
+  const result = buildExercisePedagogicalDiagnostic(attempts);
+  assert.equal(result.evaluatedStudents, 1);
+  assert.equal(result.masteredStudents, 1);
+  assert.equal(result.studentsNeedingSupport, 0);
+  assert.equal(result.globalMasteryRate, 70);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.masteryRate, 40);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.studentsNeedingSupport.length, 1);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.errorPatterns[0]?.category, 'Confusion essere/avere');
+  assert.equal(result.questions.find(q => q.id.endsWith(':q2'))?.masteryRate, 100);
+});
