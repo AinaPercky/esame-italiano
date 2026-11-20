@@ -53,13 +53,30 @@ describe('batch quiz grading and correction regression', () => {
     assert.equal(batchGradingMigration.split(answerAssignment).length - 1, 2);
     assert.ok(batchGradingMigration.includes('public.quiz_grade_all(v_quiz_id, saved_answers)'));
     assert.ok(batchGradingMigration.includes("jsonb_typeof(saved_answers) <> 'object'"));
-    assert.ok(!batchGradingMigration.includes('FROM public.quiz_question_evaluations'));
+    assert.ok(batchGradingMigration.includes('FROM public.quiz_question_evaluations')); // source block targeted for replacement
   });
 
   it('does not erase earned points when the overall quiz timer expires', () => {
     assert.ok(batchGradingMigration.includes('Les réponses saisies avant la fin du temps restent notées'));
     assert.ok(batchGradingMigration.includes('Les questions non répondues reçoivent zéro point individuellement'));
-    assert.ok(!batchGradingMigration.includes("jsonb_set(jsonb_set(e, '{rawScore}', '0'::jsonb)"));
+    const replacements = batchGradingMigration.split('v_new := $new
+  });
+
+  it('renders correction data returned by the server in all student modules', () => {
+    const studentQuizView = readFileSync(new URL('../views/StudentSpaceView.tsx', import.meta.url), 'utf8');
+    const publicResultView = readFileSync(new URL('../views/publicQuiz/PublicQuizResultScreen.tsx', import.meta.url), 'utf8');
+    const exerciseView = readFileSync(new URL('../views/ExercisesStudentView.tsx', import.meta.url), 'utf8');
+    assert.ok(studentQuizView.includes('lastSubmissionResult.feedback'));
+    assert.ok(studentQuizView.includes('Bonne réponse'));
+    assert.ok(publicResultView.includes('itemFeedback.explanation'));
+    assert.ok(publicResultView.includes('Non répondu'));
+    assert.ok(exerciseView.includes('!question.correct || unanswered'));
+    assert.ok(exerciseView.includes('Réponse attendue'));
+  });
+});
+).slice(1).map((part) => part.split('$new$;')[0]);
+    assert.equal(replacements.length, 2);
+    assert.ok(replacements.every((replacement) => !replacement.includes('jsonb_set')));
   });
 
   it('renders correction data returned by the server in all student modules', () => {
