@@ -361,7 +361,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       quizDraftQueueRef.current = write;
       void write.catch((e) => setQuizSubmissionError(e instanceof Error ? e.message : 'La sauvegarde locale du quiz a échoué.'));
     }
-  }, [activeQuiz, currentQuestionIndex, isPracticeMode]);
+  }, [activeQuiz, currentQuestionIndex, isPracticeMode, currentUser.id, currentUser.student_id, studentRecord?.id]);
 
   const loadData = () => {
     // Synchroniser avec dataService
