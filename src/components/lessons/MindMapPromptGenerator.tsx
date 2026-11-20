@@ -3,6 +3,8 @@ import { Copy, Sparkles, Languages, FileText } from 'lucide-react';
 
 type Props = { lessonJson: string; onCopy: (value: string, successMessage: string) => void };
 
+const MAX_PROMPT_CHARACTERS = 32000;
+
 const SUBJECTS: Record<string, string> = {
   grammaire: 'Grammaire italienne',
   vocabulaire: 'Vocabulaire italien',
@@ -114,7 +116,7 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
       ? courseLines.map((line: string) => `• ${line}`).join('\n')
       : 'Aucun contenu pédagogique exploitable trouvé dans les blocs du cours.';
 
-    return `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
+    const generatedPrompt = `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
 Crée une véritable carte mentale pour le cours « ${title} ».
 
@@ -165,6 +167,10 @@ Avant de finaliser, vérifie que la carte est bien radiale, que les branches son
 Les éléments ci-dessous sont extraits de la leçon et constituent la seule source de contenu. Organise-les en branches cohérentes ; ne les transforme pas en JSON et ne les complète pas avec des informations inventées.
 
 ${courseContent}`;
+
+    if (generatedPrompt.length <= MAX_PROMPT_CHARACTERS) return generatedPrompt;
+    const notice = '\\n\\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
+    return generatedPrompt.slice(0, MAX_PROMPT_CHARACTERS - notice.length).trimEnd() + notice;
   }, [parsed, language]);
 
   return (
@@ -196,8 +202,9 @@ ${courseContent}`;
             </select>
           </label>
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs analysés</span></div>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} / 32 000 caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
             <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
+            {prompt.length >= MAX_PROMPT_CHARACTERS && <p className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Le prompt a atteint la limite de 32 000 caractères. Une partie du contenu du cours a été coupée : réduisez-le pour conserver toutes les informations.</p>}
           </div>
           <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
         </>
