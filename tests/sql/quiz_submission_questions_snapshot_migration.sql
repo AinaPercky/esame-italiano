@@ -149,6 +149,12 @@ BEGIN
   IF NOT has_column_privilege('authenticated', 'public.quiz_launches', 'id', 'SELECT') THEN
     RAISE EXCEPTION 'Les métadonnées non sensibles du lancement doivent rester lisibles';
   END IF;
+  IF has_column_privilege('authenticated', 'public.quiz_submissions', 'questions_snapshot', 'SELECT') THEN
+    RAISE EXCEPTION 'Les élèves ne doivent pas lire les snapshots complets des soumissions';
+  END IF;
+  IF NOT has_column_privilege('authenticated', 'public.quiz_submissions', 'answers', 'SELECT') THEN
+    RAISE EXCEPTION 'Les élèves doivent conserver l''accès à leurs réponses enregistrées';
+  END IF;
 
   IF position('v_launch.questions_snapshot' IN pg_get_functiondef(
     'public.submit_quiz_presence_submission(jsonb)'::regprocedure
