@@ -1837,32 +1837,30 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                 </article>
               </div>
 
-              {/* Student Progression Table (Fixed Header Alignment) */}
-              <div className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-[0_6px_20px_rgba(7,42,63,0.03)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#eaf1f6] px-4 py-4">
-                  <div>
-                    <h3 className="font-bold text-[#072a3f]">Progression des étudiants</h3>
-                    <p className="mt-0.5 text-xs text-[#607f93]">
+              {/* Student Progression — cards on mobile, aligned table on desktop */}
+              <section aria-labelledby="student-progression-title" className="min-w-0 overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-[0_6px_20px_rgba(7,42,63,0.03)]">
+                <div className="flex flex-col gap-2 border-b border-[#eaf1f6] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 id="student-progression-title" className="font-bold text-[#072a3f]">Progression des étudiants</h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[#607f93]">
                       La meilleure note terminée est conservée pour le suivi pédagogique.
                     </p>
                   </div>
-                  <span className="text-xs font-bold tabular-nums text-[#46657a]">
+                  <span className="self-start rounded-full bg-[#f1f6f9] px-2.5 py-1 text-xs font-bold tabular-nums text-[#46657a] sm:self-center">
                     {attemptSummary.total} étudiant(s)
                   </span>
                 </div>
 
                 {attemptsLoading ? (
-                  <div className="space-y-2.5 p-5">
+                  <div className="space-y-3 p-4" aria-label="Chargement des tentatives">
                     {[1, 2, 3].map(idx => (
-                      <div key={idx} className="h-11 animate-pulse rounded-xl bg-[#f3f8fb]" />
+                      <div key={idx} className="h-28 animate-pulse rounded-xl bg-[#f3f8fb]" />
                     ))}
                   </div>
                 ) : filteredAttempts.length === 0 ? (
-                  <div className="p-10 text-center">
+                  <div className="p-8 text-center sm:p-10">
                     <Users className="mx-auto mb-2 text-[#89a8bb]" size={30} />
-                    <p className="font-semibold text-[#315267]">
-                      Aucun étudiant dans cette sélection
-                    </p>
+                    <p className="font-semibold text-[#315267]">Aucun étudiant dans cette sélection</p>
                     <p className="mt-1 text-xs text-[#607f93]">
                       {attempts.length === 0
                         ? 'Vérifiez les classes attribuées à cet exercice.'
@@ -1872,123 +1870,162 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                       <button
                         type="button"
                         onClick={() => setAttemptFilters(DEFAULT_ATTEMPT_FILTERS)}
-                        className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-1.5 text-xs font-bold text-[#0b3c5d]"
+                        className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#cfe1ec] bg-[#f5f9fc] px-3.5 py-2 text-xs font-bold text-[#0b3c5d]"
                       >
-                        <RotateCcw size={13} />
-                        Réinitialiser les filtres
+                        <RotateCcw size={13} /> Réinitialiser les filtres
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[780px] text-left text-sm">
-                      <thead className="bg-[#f5f9fc] text-[11px] font-bold uppercase tracking-wide text-[#46657a]">
-                        <tr>
-                          <th className="px-4 py-3">Étudiant</th>
-                          <th className="px-4 py-3">Classe</th>
-                          <th className="px-4 py-3">Progression</th>
-                          <th className="px-4 py-3 text-right">Meilleure note</th>
-                          <th className="px-4 py-3 text-right">Tentatives</th>
-                          <th className="px-4 py-3">Dernière activité</th>
-                          <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#eaf1f6]">
-                        {filteredAttempts.map(row => {
-                          const done = row.status === 'completed';
-                          const running = row.status === 'in_progress';
-                          const score = row.best_score;
-                          const scoreMax = row.max_score;
-                          const percentage = getAttemptPercentage(row);
-                          const score20 =
-                            percentage !== null
-                              ? ((Number(score) / Number(scoreMax)) * 20)
-                                  .toFixed(2)
-                                  .replace(/\.00$/, '')
-                              : null;
+                  <>
+                    {/* Mobile: each student is a readable, non-clipped card */}
+                    <div className="divide-y divide-[#eaf1f6] md:hidden">
+                      {filteredAttempts.map(row => {
+                        const done = row.status === 'completed';
+                        const running = row.status === 'in_progress';
+                        const score = row.best_score;
+                        const scoreMax = row.max_score;
+                        const percentage = getAttemptPercentage(row);
+                        const score20 = percentage !== null && Number(scoreMax) > 0
+                          ? ((Number(score) / Number(scoreMax)) * 20).toFixed(2).replace(/\.00$/, '')
+                          : null;
+                        const progressBadge = done ? (
+                          <StatusBadge tone="success">Terminé</StatusBadge>
+                        ) : running && score !== null && score !== undefined ? (
+                          <StatusBadge tone="warning">Nouvelle tentative</StatusBadge>
+                        ) : running ? (
+                          <StatusBadge tone="warning">En cours</StatusBadge>
+                        ) : (
+                          <StatusBadge tone="neutral">Non commencé</StatusBadge>
+                        );
 
-                          const progressBadge = done ? (
-                            <StatusBadge tone="success">Terminé</StatusBadge>
-                          ) : running && score !== null && score !== undefined ? (
-                            <StatusBadge tone="warning">Nouvelle tentative</StatusBadge>
-                          ) : running ? (
-                            <StatusBadge tone="warning">En cours</StatusBadge>
-                          ) : (
-                            <StatusBadge tone="neutral">Non commencé</StatusBadge>
-                          );
+                        return (
+                          <article key={`${row.student_id}-${row.class_id}`} className="min-w-0 p-3.5">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <StudentAvatar
+                                name={row.student_name || 'Élève'}
+                                src={row.avatar_url || undefined}
+                                className="h-11 w-11 shrink-0 border border-[#d8e6ee] text-xs"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="break-words font-bold leading-snug text-[#072a3f]">{row.student_name || 'Élève'}</p>
+                                {row.student_number && (
+                                  <p className="mt-0.5 text-xs tabular-nums text-[#607f93]">N° {row.student_number}</p>
+                                )}
+                                <p className="mt-1 break-words text-xs text-[#607f93]">{row.class_name || 'Classe non renseignée'}</p>
+                              </div>
+                              <div className="shrink-0">{progressBadge}</div>
+                            </div>
 
-                          return (
-                            <tr
-                              key={`${row.student_id}-${row.class_id}`}
-                              className="transition hover:bg-[#f7fafc]"
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <StudentAvatar
-                                    name={row.student_name || 'Élève'}
-                                    src={row.avatar_url || undefined}
-                                    className="h-9 w-9 border border-[#d8e6ee] text-xs"
-                                  />
-                                  <div className="min-w-0">
-                                    <p className="truncate font-bold text-[#072a3f]">
-                                      {row.student_name}
-                                    </p>
-                                    {row.student_number && (
-                                      <p className="text-[11px] tabular-nums text-[#607f93]">
-                                        N° {row.student_number}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-[#46657a]">{row.class_name}</td>
-                              <td className="px-4 py-3">{progressBadge}</td>
-                              <td className="px-4 py-3 text-right">
-                                <div className="font-bold tabular-nums text-[#072a3f]">
-                                  {score !== null && score !== undefined && scoreMax > 0 ? (
-                                    <>
-                                      {score}{' '}
-                                      <span className="font-medium text-[#607f93]">
-                                        / {scoreMax}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="font-medium text-[#89a8bb]">—</span>
-                                  )}
-                                </div>
+                            <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl bg-[#f5f9fc] p-3">
+                              <div className="min-w-0">
+                                <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#607f93]">Meilleure note</dt>
+                                <dd className="mt-0.5 font-bold tabular-nums text-[#072a3f]">
+                                  {score !== null && score !== undefined && scoreMax > 0 ? `${score} / ${scoreMax}` : '—'}
+                                </dd>
                                 {percentage !== null && (
-                                  <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#46657a]">
-                                    {Math.round(percentage)} % · {score20}/20
-                                  </p>
+                                  <p className="text-[11px] font-semibold tabular-nums text-[#46657a]">{Math.round(percentage)} % · {score20}/20</p>
                                 )}
-                              </td>
-                              <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#315267]">
-                                {row.attempt_count}
-                              </td>
-                              <td className="px-4 py-3 text-xs tabular-nums text-[#607f93]">
-                                {formatDateTime(row.completed_at || row.started_at)}
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                {row.best_attempt_id ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setReviewStudent(row)}
-                                    className="inline-flex min-h-9 items-center whitespace-nowrap rounded-xl border border-[#cfe0ea] bg-[#f5f9fc] px-3 py-1.5 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3]"
-                                  >
-                                    Voir les réponses
-                                  </button>
-                                ) : (
-                                  <span className="text-xs text-[#89a8bb]">Aucune terminée</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                              <div>
+                                <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#607f93]">Tentatives</dt>
+                                <dd className="mt-0.5 font-bold tabular-nums text-[#315267]">{row.attempt_count}</dd>
+                              </div>
+                              <div className="col-span-2 min-w-0">
+                                <dt className="text-[10px] font-semibold uppercase tracking-wide text-[#607f93]">Dernière activité</dt>
+                                <dd className="mt-0.5 break-words text-xs tabular-nums text-[#46657a]">{formatDateTime(row.completed_at || row.started_at)}</dd>
+                              </div>
+                            </dl>
+
+                            <div className="mt-3">
+                              {row.best_attempt_id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewStudent(row)}
+                                  className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[#cfe0ea] bg-white px-3 py-2 text-sm font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2fa36b]"
+                                >
+                                  <FileText size={15} className="mr-2" /> Voir les réponses
+                                </button>
+                              ) : (
+                                <p className="py-1 text-center text-xs text-[#89a8bb]">Aucune tentative terminée à consulter</p>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+
+                    {/* Desktop/tablet: retain the comparison table where there is room */}
+                    <div className="hidden min-w-0 overflow-x-auto md:block">
+                      <table className="w-full min-w-[780px] text-left text-sm">
+                        <thead className="bg-[#f5f9fc] text-[11px] font-bold uppercase tracking-wide text-[#46657a]">
+                          <tr>
+                            <th scope="col" className="px-4 py-3">Étudiant</th>
+                            <th scope="col" className="px-4 py-3">Classe</th>
+                            <th scope="col" className="px-4 py-3">Progression</th>
+                            <th scope="col" className="px-4 py-3 text-right">Meilleure note</th>
+                            <th scope="col" className="px-4 py-3 text-right">Tentatives</th>
+                            <th scope="col" className="px-4 py-3">Dernière activité</th>
+                            <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#eaf1f6]">
+                          {filteredAttempts.map(row => {
+                            const done = row.status === 'completed';
+                            const running = row.status === 'in_progress';
+                            const score = row.best_score;
+                            const scoreMax = row.max_score;
+                            const percentage = getAttemptPercentage(row);
+                            const score20 = percentage !== null && Number(scoreMax) > 0
+                              ? ((Number(score) / Number(scoreMax)) * 20).toFixed(2).replace(/\.00$/, '')
+                              : null;
+                            const progressBadge = done ? (
+                              <StatusBadge tone="success">Terminé</StatusBadge>
+                            ) : running && score !== null && score !== undefined ? (
+                              <StatusBadge tone="warning">Nouvelle tentative</StatusBadge>
+                            ) : running ? (
+                              <StatusBadge tone="warning">En cours</StatusBadge>
+                            ) : (
+                              <StatusBadge tone="neutral">Non commencé</StatusBadge>
+                            );
+
+                            return (
+                              <tr key={`${row.student_id}-${row.class_id}`} className="transition hover:bg-[#f7fafc]">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <StudentAvatar name={row.student_name || 'Élève'} src={row.avatar_url || undefined} className="h-9 w-9 border border-[#d8e6ee] text-xs" />
+                                    <div className="min-w-0">
+                                      <p className="truncate font-bold text-[#072a3f]">{row.student_name}</p>
+                                      {row.student_number && <p className="text-[11px] tabular-nums text-[#607f93]">N° {row.student_number}</p>}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-[#46657a]">{row.class_name}</td>
+                                <td className="px-4 py-3">{progressBadge}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="font-bold tabular-nums text-[#072a3f]">
+                                    {score !== null && score !== undefined && scoreMax > 0 ? <>{score}{' '}<span className="font-medium text-[#607f93]">/ {scoreMax}</span></> : <span className="font-medium text-[#89a8bb]">—</span>}
+                                  </div>
+                                  {percentage !== null && <p className="mt-0.5 text-xs font-semibold tabular-nums text-[#46657a]">{Math.round(percentage)} % · {score20}/20</p>}
+                                </td>
+                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-[#315267]">{row.attempt_count}</td>
+                                <td className="px-4 py-3 text-xs tabular-nums text-[#607f93]">{formatDateTime(row.completed_at || row.started_at)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  {row.best_attempt_id ? (
+                                    <button type="button" onClick={() => setReviewStudent(row)} className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl border border-[#cfe0ea] bg-[#f5f9fc] px-3 py-2 text-xs font-bold text-[#0b3c5d] transition hover:border-[#2fa36b] hover:bg-[#eef9f3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2fa36b]">
+                                      Voir les réponses
+                                    </button>
+                                  ) : <span className="text-xs text-[#89a8bb]">Aucune terminée</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
-              </div>
+              </section>
 
               {/* Analytics Section */}
               <section className="space-y-3">
