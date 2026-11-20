@@ -181,7 +181,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   // Validate current question and compute feedback
   // ─────────────────────────────────────────────────────────────────────────
-  const doValidate = useCallback(async (questionId: string) => {
+  const doValidate = useCallback((questionId: string) => {
     const q = quizRef.current;
     if (!q) return;
     // Validation pédagogique locale uniquement : aucune réponse attendue n'est chargée.
@@ -211,14 +211,6 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       handleSubmit();
     }
   }, [handleSubmit]);
-
-  const scheduleAdvanceAfterCorrection = useCallback((fromIndex: number, total: number) => {
-    if (correctionAdvanceTimeoutRef.current) clearTimeout(correctionAdvanceTimeoutRef.current);
-    correctionAdvanceTimeoutRef.current = setTimeout(() => {
-      correctionAdvanceTimeoutRef.current = null;
-      if (currentIndexRef.current === fromIndex) doAdvance(fromIndex, total);
-    }, 8000);
-  }, [doAdvance]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Load quiz data
@@ -395,9 +387,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   }, [isQuizActive, currentIndex, isCorrectionModalOpen]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // When per-question timer hits 0 → show correction (even if no answer) then advance
-  // Zero‑point answer is recorded automatically by doValidate (empty answer = 0 pts).
-  // A visible correction stays open for thirteen seconds before moving on.
+  // When a question timer reaches zero, move on locally. The final RPC grades all answers.
   // ─────────────────────────────────────────────────────────────────────────
   const timeZeroFiredRef = useRef<number>(-1); // tracks which question index triggered
   useEffect(() => {
@@ -424,7 +414,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       validatedSetRef.current = { ...validatedSetRef.current, [question.id]: true };
     }
     doAdvance(currentIndex, q.questions.length);
-  }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, scheduleAdvanceAfterCorrection, showCorrectionAtEnd]);
+  }, [questionTimeLeftMs, isQuizActive, currentIndex]);
 
   // Reset zero-fired tracker when question index changes (new question)
   useEffect(() => {
