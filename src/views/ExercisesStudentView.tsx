@@ -163,6 +163,9 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       try {
         if (batchIndex >= batchBundle.questions.length - 1) {
           await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
+          const completedReview = await exerciseService.getStudentAttemptDetails(active.attempt_id);
+          setAttemptReview(completedReview);
+          setHistoryExerciseId(batchBundle.exercise_id);
           try { localStorage.removeItem('exercise_batch_draft_' + active.attempt_id); } catch { /* stockage local indisponible */ }
           setBatchBundle(null);
           setBatchAnswers({});
