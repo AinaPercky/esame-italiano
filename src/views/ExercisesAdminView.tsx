@@ -2294,7 +2294,9 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
 
                 <div className="space-y-3 overflow-y-auto p-5">
                   {(reviewStudent.best_details || []).map((detail, index) => {
-                    const question = activeAttemptsExercise?.questions.find(
+                    const question = reviewStudent.best_questions?.find(
+                      item => item.id === detail.question_id
+                    ) || activeAttemptsExercise?.questions.find(
                       item => item.id === detail.question_id
                     );
                     const expected =
