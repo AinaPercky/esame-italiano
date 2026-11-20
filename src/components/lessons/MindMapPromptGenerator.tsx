@@ -3,8 +3,6 @@ import { Copy, Sparkles, Languages, FileText } from 'lucide-react';
 
 type Props = { lessonJson: string; onCopy: (value: string, successMessage: string) => void };
 
-const MAX_PROMPT_CHARACTERS = 32000;
-
 const SUBJECTS: Record<string, string> = {
   grammaire: 'Grammaire italienne',
   vocabulaire: 'Vocabulaire italien',
@@ -13,85 +11,40 @@ const SUBJECTS: Record<string, string> = {
   prononciation: 'Prononciation italienne'
 };
 
-const clean = (value: unknown): string =>
-  typeof value === 'string' ? value.replace(/==|\+\+/g, '').trim() : '';
+const normalizeSectionName = (value: unknown): string =>
+  typeof value === 'string'
+    ? value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[’']/g, '')
+    : '';
 
-function extractBlockLines(block: any): string[] {
-  if (!block || typeof block !== 'object') return [];
-  const c = block.content || {};
-  const lines: string[] = [];
-  const add = (...values: unknown[]) => {
-    const text = values.map(clean).filter(Boolean).join(' — ');
-    if (text) lines.push(text);
-  };
-  const examples = (items: any[] = []) => items.forEach(item => add(item.it, item.fr ? `(${item.fr})` : ''));
+const isExcludedMindMapBlock = (value: Record<string, any>): boolean => {
+  const type = normalizeSectionName(value.type || value.kind);
+  if (type === 'dialogue' || type === 'recap') return true;
 
-  switch (block.type) {
-    case 'dialogue':
-      (c.lines || []).forEach((line: any) => add(line.speaker ? `${line.speaker}:` : '', line.it, line.fr ? `(${line.fr})` : ''));
-      break;
-    case 'vocab_cards':
-    case 'chips':
-      (c.items || []).forEach((item: any) => add(item.it || item.label || item.text, item.fr));
-      break;
-    case 'rules_table':
-      add(c.title);
-      (c.rows || []).forEach((row: any) => add(row.label, ...(row.cells || [])));
-      break;
-    case 'rule_cards':
-      (c.cards || []).forEach((card: any) => {
-        add(card.title, card.text);
-        examples(card.examples);
-      });
-      break;
-    case 'example_list':
-      examples(c.examples);
-      break;
-    case 'steps_text':
-      (c.steps || []).forEach((step: any) => add(step.title, step.it, step.fr ? `(${step.fr})` : ''));
-      break;
-    case 'key_value_list':
-      (c.rows || []).forEach((row: any) => add(row.key, row.it, row.fr ? `(${row.fr})` : ''));
-      break;
-    case 'tip':
-    case 'warning':
-      add(c.text);
-      break;
-    case 'recap':
-      (c.bullets || []).forEach((item: any) => add(item));
-      if (c.model) add(c.model.it, c.model.fr);
-      break;
-    case 'formula':
-      (c.formulas || []).forEach((formula: any) => {
-        add(formula.label, (formula.parts || []).map((part: any) => part.text).join(' '));
-        examples(formula.examples);
-      });
-      break;
-    case 'exceptions':
-      (c.items || []).forEach((item: any) => {
-        add(item.rule, item.explanation);
-        examples(item.examples);
-      });
-      break;
-    case 'module':
-      add(c.title);
-      (c.blocks || []).forEach((child: any) => lines.push(...extractBlockLines(child)));
-      break;
-    case 'discovery':
-      // Les questions et consignes d'activités ne sont pas du contenu de cours.
-      break;
-    default:
-      // Fallback lisible pour les futurs types de blocs.
-      Object.entries(c).forEach(([key, value]) => {
-        if (['audio', 'id', 'source', 'steps'].includes(key)) return;
-        if (typeof value === 'string' || typeof value === 'number') add(value);
-        else if (Array.isArray(value)) value.forEach(item => {
-          if (typeof item === 'string') add(item);
-          else if (item && typeof item === 'object') add(item.it, item.fr, item.text, item.title, item.label, item.explanation);
-        });
-      });
+  const headings = [value.title, value.label, value.heading, value.subtitle]
+    .map(normalizeSectionName)
+    .filter(Boolean);
+
+  return headings.some(heading =>
+    /^(dialogue|a retenir|points a retenir|recap|recapitulatif)$/.test(heading)
+  );
+};
+
+// Exclut ces deux sections même lorsqu'elles sont imbriquées dans un module.
+function filterMindMapSource(value: any): any {
+  if (Array.isArray(value)) {
+    return value
+      .filter(item => !(item && typeof item === 'object' && !Array.isArray(item) && isExcludedMindMapBlock(item)))
+      .map(filterMindMapSource);
   }
-  return lines;
+  if (!value || typeof value !== 'object') return value;
+
+  const filtered: Record<string, any> = {};
+  for (const [key, child] of Object.entries(value)) {
+    const normalizedKey = normalizeSectionName(key).replace(/[^a-z0-9]+/g, '_');
+    if (['dialogue', 'recap', 'a_retenir', 'points_a_retenir'].includes(normalizedKey)) continue;
+    filtered[key] = filterMindMapSource(child);
+  }
+  return filtered;
 }
 
 export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) => {
@@ -109,12 +62,9 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
     if (!parsed) return '';
     const title = [parsed.title_it, parsed.title_fr].filter(Boolean).join(' / ') || parsed.slug || 'Cours sans titre';
     const subject = SUBJECTS[parsed.type] || parsed.type || 'Cours d’italien';
-    const courseLines = (Array.isArray(parsed.blocks) ? parsed.blocks : [])
-      .flatMap((block: any) => extractBlockLines(block))
-      .filter((line: string, index: number, all: string[]) => all.indexOf(line) === index);
-    const courseContent = courseLines.length
-      ? courseLines.map((line: string) => `• ${line}`).join('\n')
-      : 'Aucun contenu pédagogique exploitable trouvé dans les blocs du cours.';
+    // Conserve le JSON du cours, en excluant uniquement le dialogue et « À retenir ».
+    const lessonForMindMap = filterMindMapSource(parsed);
+    const courseContent = JSON.stringify(lessonForMindMap, null, 2);
 
     const generatedPrompt = `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
@@ -164,13 +114,11 @@ Utilise une couleur distincte pour chaque branche principale, puis conserve cett
 Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
 
 **CONTENU DU COURS — SOURCE À RESPECTER**
-Les éléments ci-dessous sont extraits de la leçon et constituent la seule source de contenu. Organise-les en branches cohérentes ; ne les transforme pas en JSON et ne les complète pas avec des informations inventées.
+Le JSON ci-dessous contient le contenu pédagogique du cours et constitue la seule source à respecter. Le dialogue et la section « À retenir » ont été volontairement exclus. Exploite les autres blocs : règles, explications, définitions, vocabulaire, tableaux, exemples, étapes, formules, exceptions, conseils et avertissements. Organise-les en branches cohérentes sans inventer d'informations.
 
 ${courseContent}`;
 
-    if (generatedPrompt.length <= MAX_PROMPT_CHARACTERS) return generatedPrompt;
-    const notice = '\n\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
-    return generatedPrompt.slice(0, MAX_PROMPT_CHARACTERS - notice.length).trimEnd() + notice;
+    return generatedPrompt;
   }, [parsed, language]);
 
   return (
@@ -180,7 +128,7 @@ ${courseContent}`;
           <span className="rounded-lg bg-[#072a3f] p-2 text-white"><Sparkles size={17} /></span>
           <div>
             <h3 className="text-sm font-bold text-[#072a3f]">Générateur de prompt — Mind map</h3>
-            <p className="mt-1 text-xs text-slate-600">Un prompt détaillé et lisible, sans structure JSON.</p>
+            <p className="mt-1 text-xs text-slate-600">Un prompt détaillé avec le contenu du cours au format JSON, sans dialogue ni récapitulatif.</p>
           </div>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">PerckyLingua · Tony Buzan</span>
@@ -202,9 +150,8 @@ ${courseContent}`;
             </select>
           </label>
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} / 32 000 caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
             <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
-            {prompt.length >= MAX_PROMPT_CHARACTERS && <p className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Le prompt a atteint la limite de 32 000 caractères. Une partie du contenu du cours a été coupée : réduisez-le pour conserver toutes les informations.</p>}
           </div>
           <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
         </>
