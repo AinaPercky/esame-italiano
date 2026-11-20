@@ -86,6 +86,8 @@ RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT 'student-1'::text; $fn$;
 
 CREATE FUNCTION public.quiz_sanitize_questions(p_questions jsonb)
 RETURNS jsonb LANGUAGE sql STABLE AS $fn$ SELECT coalesce(p_questions, '[]'::jsonb); $fn$;
+CREATE FUNCTION public.quiz_expected_answers_list(p_question jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$ SELECT '[]'::jsonb; $fn$;
 
 CREATE FUNCTION public.quiz_grade_question(p_question jsonb, p_answer text)
 RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$ SELECT '{}'::jsonb; $fn$;
@@ -164,6 +166,15 @@ BEGIN
   )) = 0 THEN
     RAISE EXCEPTION 'La correction serveur doit utiliser le snapshot du lancement';
   END IF;
+  SELECT public.quiz_sanitize_questions(
+    '[{"id":"q-safe","correct_answer":"segreto","error_categories":["Confusion"],"error_category_map":{"avere":"Confusion"}}]'::jsonb
+  ) INTO sanitized;
+  IF sanitized::text LIKE '%correct_answer%' OR sanitized::text LIKE '%error_category_map%' THEN
+    RAISE EXCEPTION 'La projection élève expose des corrigés ou mappings privés : %', sanitized;
+  END IF;
+  IF sanitized #>> '{0,error_categories,0}' IS DISTINCT FROM 'Confusion' THEN
+    RAISE EXCEPTION 'Les catégories de diagnostic non sensibles doivent rester disponibles';
+  END IF;
 END;
 $$;
 
@@ -192,6 +203,7 @@ DO $$
 DECLARE
   captured jsonb;
   provided jsonb;
+  sanitized jsonb;
 BEGIN
   SELECT questions_snapshot INTO captured
   FROM public.quiz_submissions WHERE id = 'new-submission';
