@@ -89,5 +89,8 @@ test('exercise batch migration keeps answer keys server-side and exposes only au
   const viewPath = path.resolve(process.cwd(), 'src/views/ExercisesStudentView.tsx');
   const view = fs.readFileSync(viewPath, 'utf8');
   assert.ok(view.includes('exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers)'));
-  assert.ok(view.includes("localStorage.setItem('exercise_batch_draft_'"));
+  assert.ok(view.includes('saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)'));
+  assert.ok(view.includes('loadWrittenExamDraft(attemptId)'));
+  assert.ok(view.includes('deleteWrittenExamDraft(active.attempt_id)'));
+  assert.ok(!view.includes('exercise_batch_draft_'));
 });
