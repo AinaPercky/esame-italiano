@@ -1,0 +1,12 @@
+[
+  {
+    "email": "student01@example.test",
+    "password": "REPLACE_WITH_TEST_PASSWORD",
+    "name": "Test Student 01"
+  },
+  {
+    "email": "student02@example.test",
+    "password": "REPLACE_WITH_TEST_PASSWORD",
+    "name": "Test Student 02"
+  }
+]
