@@ -158,18 +158,11 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
     try {
       const publicId = qId || q.public_id || q.id;
-      const feedback: Record<string, QuizFeedbackEntry> = {};
-      let rawScore = 0;
-      for (const question of q.questions || []) {
-        const entry = await supabaseService.evaluatePublicQuizQuestion(
-          publicId,
-          question.id,
-          answersRef.current[question.id] || ''
-        );
-        feedback[question.id] = entry;
-        rawScore += Number(entry.points) || 0;
-      }
-      const maxScore = Number(q.total_points) || 20;
+      // Une seule RPC corrige toutes les réponses côté PostgreSQL à la remise.
+      const evaluated = await supabaseService.evaluatePublicQuizAnswers(publicId, answersRef.current);
+      const feedback = evaluated.feedback;
+      const rawScore = Number(evaluated.rawScore) || 0;
+      const maxScore = Number(evaluated.maxScore) || Number(q.total_points) || 20;
       setResult({
         rawScore,
         maxScore,
@@ -191,21 +184,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   const doValidate = useCallback(async (questionId: string) => {
     const q = quizRef.current;
     if (!q) return;
-    const publicId = activeQuizIdRef.current || q.public_id || q.id;
-    try {
-      const entry = await supabaseService.evaluatePublicQuizQuestion(
-        publicId,
-        questionId,
-        answersRef.current[questionId] || ''
-      );
-      setPerQuestionFeedback((prev) => ({ ...prev, [questionId]: entry }));
-      perQuestionFeedbackRef.current = { ...perQuestionFeedbackRef.current, [questionId]: entry };
-      setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
-      validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
-    } catch (error: any) {
-      setLoadError(error?.message || 'La correction sécurisée est indisponible. Rechargez le quiz.');
-      setScreen('start');
-    }
+    // Validation pédagogique locale uniquement : aucune réponse attendue n'est chargée.
+    // La correction réelle est renvoyée par la RPC groupée à la fin du quiz.
+    setValidatedSet((prev) => ({ ...prev, [questionId]: true }));
+    validatedSetRef.current = { ...validatedSetRef.current, [questionId]: true };
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -436,12 +418,12 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const question = q.questions[currentIndex];
     if (!question) return;
 
-    // Auto-validate through the server. Never inspect an answer key in the browser.
+    // Le délai est géré localement ; la correction finale reste autoritaire côté serveur.
     if (!validatedSetRef.current[question.id]) {
-      void doValidate(question.id);
-    } else {
-      scheduleAdvanceAfterCorrection(currentIndex, q.questions.length);
+      setValidatedSet((prev) => ({ ...prev, [question.id]: true }));
+      validatedSetRef.current = { ...validatedSetRef.current, [question.id]: true };
     }
+    doAdvance(currentIndex, q.questions.length);
   }, [questionTimeLeftMs, isQuizActive, currentIndex, doValidate, scheduleAdvanceAfterCorrection, showCorrectionAtEnd]);
 
   // Reset zero-fired tracker when question index changes (new question)
