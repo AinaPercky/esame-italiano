@@ -521,8 +521,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                               <span className="sr-only">{isOpen ? 'Replier' : 'Déplier'} la rubrique {idx + 1}</span>
                             </button>
                           </h5>
-                          {isOpen && (
-                            <div id={`oral-rubric-panel-${idx}`} role="region" aria-labelledby={`oral-rubric-trigger-${idx}`} className="space-y-4 border-t border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                          <div id={`oral-rubric-panel-${idx}`} role="region" aria-labelledby={`oral-rubric-trigger-${idx}`} hidden={!isOpen} className="space-y-4 border-t border-slate-200 bg-slate-50/70 p-3 sm:p-4">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <p className="text-xs font-semibold text-slate-600">Modification de la rubrique {idx + 1} sur {rubricsDraft.length}</p>
                                 <button
@@ -561,7 +560,6 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
                                 Conseil : formulez une consigne observable et un exemple adapté au niveau CECRL de l’examen.
                               </p>
                             </div>
-                          )}
                         </article>
                       );
                     })}
