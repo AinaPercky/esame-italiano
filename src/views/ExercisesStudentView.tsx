@@ -169,14 +169,47 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         await localWrite;
         if (batchIndex >= batchBundle.questions.length - 1) {
           await localSaveQueueRef.current;
-          await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
+          const submitted = await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
           try { await deleteWrittenExamDraft(active.attempt_id); } catch { /* la remise serveur est déjà confirmée */ }
-          try {
-            const completedReview = await exerciseService.getStudentAttemptDetails(active.attempt_id);
-            setAttemptReview(completedReview);
-          } catch {
-            setError('La remise est enregistrée. Le détail de la correction sera disponible dans l’historique.');
-          }
+          const completedReview: ExerciseAttemptReview = {
+            attempt_id: active.attempt_id,
+            exercise_id: batchBundle.exercise_id,
+            score: submitted.score,
+            max_score: submitted.max_score,
+            status: 'completed',
+            started_at: batchBundle.started_at,
+            completed_at: submitted.completed_at || new Date().toISOString(),
+            questions: batchBundle.questions.map((item) => {
+              const questionId = item.question.id;
+              const correction = submitted.feedback?.[questionId];
+              const fallbackCorrection: ExerciseCorrection = {
+                correct: false,
+                points: 0,
+                max_points: Number(item.question.points) || 0,
+                expected: null,
+                timed_out: false,
+                question_id: questionId
+              };
+              const graded = correction || fallbackCorrection;
+              return {
+                question_id: questionId,
+                question: item.question.question,
+                type: item.question.type,
+                points: graded.max_points,
+                answer: nextAnswers[questionId] ?? null,
+                correct: graded.correct,
+                points_awarded: graded.points,
+                max_points: graded.max_points,
+                timed_out: graded.timed_out,
+                expected: graded.expected,
+                explanation: graded.explanation,
+                options: item.question.options,
+                items: item.question.items,
+                verbes_trous: item.question.verbes_trous
+              };
+            })
+          };
+          setAttemptReview(completedReview);
           setHistoryExerciseId(batchBundle.exercise_id);
           setBatchBundle(null);
           setBatchAnswers({});
