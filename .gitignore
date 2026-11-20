@@ -7,3 +7,7 @@ coverage/
 .env*
 !.env.example
 .history
+
+# Local k6 load-test credentials and answer payloads
+k6/students.json
+k6/answers.json
