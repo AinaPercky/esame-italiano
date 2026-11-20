@@ -5,6 +5,11 @@ CREATE ROLE authenticated NOLOGIN;
 
 CREATE TABLE public.quizzes (
   id text PRIMARY KEY,
+  title text NOT NULL DEFAULT 'Quiz test',
+  status text NOT NULL DEFAULT 'launched',
+  class_id text NOT NULL DEFAULT 'class-1',
+  class_ids text[] NOT NULL DEFAULT ARRAY['class-1'],
+  total_points numeric NOT NULL DEFAULT 20,
   questions jsonb NOT NULL DEFAULT '[]'::jsonb
 );
 
@@ -13,17 +18,103 @@ CREATE TABLE public.quiz_launches (
   id uuid PRIMARY KEY,
   quiz_id text NOT NULL,
   launched_at timestamptz NOT NULL DEFAULT now(),
+  closed_at timestamptz,
+  launched_by uuid,
+  presence_deadline_at timestamptz,
   status text NOT NULL DEFAULT 'launched'
 );
+
+CREATE TABLE public.quiz_participants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  launch_id uuid NOT NULL,
+  quiz_id text NOT NULL,
+  student_id text NOT NULL,
+  class_id text NOT NULL,
+  presence_status text NOT NULL DEFAULT 'present',
+  presence_confirmed_at timestamptz DEFAULT now(),
+  presence_deadline_at timestamptz DEFAULT now() - interval '1 minute'
+);
+
+CREATE TABLE public.quiz_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id text NOT NULL,
+  launch_id uuid,
+  participant_id uuid,
+  student_id text NOT NULL,
+  attempt_number integer NOT NULL,
+  answers jsonb NOT NULL DEFAULT '{}'::jsonb,
+  score numeric NOT NULL DEFAULT 0,
+  max_score numeric NOT NULL DEFAULT 20,
+  score_20 numeric NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'completed',
+  feedback jsonb NOT NULL DEFAULT '{}'::jsonb,
+  started_at timestamptz DEFAULT now(),
+  submitted_at timestamptz
+);
+
+CREATE TABLE public.quiz_retry_grants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id text NOT NULL,
+  student_id text NOT NULL,
+  used_at timestamptz,
+  launch_id uuid,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE public.class_enrollments (
+  student_id text NOT NULL,
+  class_id text NOT NULL,
+  status text NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE public.students (
+  id text PRIMARY KEY,
+  first_name text,
+  last_name text,
+  student_number text,
+  class_id text
+);
+
+CREATE TABLE public.classes (
+  id text PRIMARY KEY,
+  name text
+);
+
+CREATE FUNCTION public.quiz_current_student_id()
+RETURNS text LANGUAGE sql STABLE AS $ SELECT 'student-1'::text; $;
+
+CREATE FUNCTION public.quiz_sanitize_questions(p_questions jsonb)
+RETURNS jsonb LANGUAGE sql STABLE AS $ SELECT coalesce(p_questions, '[]'::jsonb); $;
+
+CREATE FUNCTION public.quiz_grade_question(p_question jsonb, p_answer text)
+RETURNS jsonb LANGUAGE sql IMMUTABLE AS $ SELECT '{}'::jsonb; $;
 
 CREATE TABLE public.quiz_submissions (
   id text PRIMARY KEY,
   quiz_id text NOT NULL,
-  launch_id uuid
+  quiz_title text,
+  student_id text,
+  student_name text,
+  student_number text,
+  class_id text,
+  class_name text,
+  started_at timestamptz,
+  submitted_at timestamptz,
+  answers jsonb DEFAULT '{}'::jsonb,
+  score numeric DEFAULT 0,
+  max_score numeric DEFAULT 20,
+  score_20 numeric DEFAULT 0,
+  status text,
+  feedback jsonb DEFAULT '{}'::jsonb,
+  date date DEFAULT current_date,
+  attempt_number integer DEFAULT 1,
+  is_counted boolean DEFAULT true,
+  launch_id uuid,
+  UNIQUE (quiz_id, student_id, attempt_number)
 );
 
-INSERT INTO public.quiz_submissions (id, quiz_id)
-VALUES ('legacy-submission', 'quiz-1');
+INSERT INTO public.quiz_submissions (id, quiz_id, student_id, status)
+VALUES ('legacy-submission', 'quiz-1', 'legacy-student', 'completed');
 
 INSERT INTO public.quizzes (id, questions)
 VALUES
@@ -51,6 +142,12 @@ BEGIN
   IF has_function_privilege('anon', 'public.capture_quiz_launch_questions_snapshot()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.capture_quiz_launch_questions_snapshot()', 'EXECUTE') THEN
     RAISE EXCEPTION 'Les rôles clients ne doivent pas appeler directement le trigger de lancement';
+  END IF;
+
+  IF position('v_launch.questions_snapshot' IN pg_get_functiondef(
+    'public.submit_quiz_presence_submission(jsonb)'::regprocedure
+  )) = 0 THEN
+    RAISE EXCEPTION 'La correction serveur doit utiliser le snapshot du lancement';
   END IF;
 END;
 $$;
