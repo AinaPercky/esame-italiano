@@ -68,17 +68,21 @@ test('convertQuizToExercise preserves questions and supplies the existing quiz t
 test('exercise batch migration keeps answer keys server-side and exposes only authenticated batch RPCs', () => {
   const migrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261120200000_batch_exercise_attempts.sql');
   const migration = fs.readFileSync(migrationPath, 'utf8');
+  const feedbackMigrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261120230000_exercise_question_feedback.sql');
+  const feedbackMigration = fs.readFileSync(feedbackMigrationPath, 'utf8');
   for (const snippet of [
     'CREATE OR REPLACE FUNCTION public.start_exercise_attempt_batch(',
     'CREATE OR REPLACE FUNCTION public.get_exercise_attempt_bundle(',
     'CREATE OR REPLACE FUNCTION public.submit_exercise_attempt_batch(',
-    'CREATE OR REPLACE FUNCTION public.evaluate_exercise_attempt_question(',
     "- 'correct_answer' - 'answers' - 'explanation'",
     'public.exercise_grade_question(v_question, coalesce(v_answer, \'null\'::jsonb))',
     'v_timed_out := NOT v_has_answer AND clock_timestamp() > v_deadline;',
     'REVOKE ALL ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) FROM PUBLIC, anon;',
     'GRANT EXECUTE ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) TO authenticated;'
   ]) assert.ok(migration.includes(snippet), 'SQL groupé incomplet : ' + snippet);
+  assert.ok(feedbackMigration.includes('CREATE OR REPLACE FUNCTION public.evaluate_exercise_attempt_question('));
+  assert.ok(feedbackMigration.includes('REVOKE ALL ON FUNCTION public.evaluate_exercise_attempt_question(UUID, TEXT, JSONB) FROM PUBLIC, anon;'));
+  assert.ok(feedbackMigration.includes('GRANT EXECUTE ON FUNCTION public.evaluate_exercise_attempt_question(UUID, TEXT, JSONB) TO authenticated;'));
 
   const servicePath = path.resolve(process.cwd(), 'src/services/exerciseService.ts');
   const service = fs.readFileSync(servicePath, 'utf8');
