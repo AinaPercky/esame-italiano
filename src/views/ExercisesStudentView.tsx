@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw, CheckCircle2, XCircle, ArrowRight, Loader2, History, Award, Eye, CalendarDays, RefreshCw } from 'lucide-react';
-import type { ExerciseAttemptQuestion, ExerciseCorrection, StudentExerciseItem, ExerciseAttemptResult, ExerciseAttemptReview, QuizQuestion } from '../types';
+import type { ExerciseAttemptQuestion, ExerciseAttemptBundle, ExerciseCorrection, StudentExerciseItem, ExerciseAttemptResult, ExerciseAttemptReview, QuizQuestion } from '../types';
 import { exerciseService } from '../services/exerciseService';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { QuizReorderList } from '../components/QuizReorderList';
@@ -48,6 +48,10 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   const [attemptReview, setAttemptReview] = useState<ExerciseAttemptReview | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [active, setActive] = useState<ExerciseAttemptQuestion | null>(null);
+  const [batchBundle, setBatchBundle] = useState<ExerciseAttemptBundle | null>(null);
+  const [batchIndex, setBatchIndex] = useState(0);
+  const [batchAnswers, setBatchAnswers] = useState<Record<string, unknown>>({});
+  const [batchMode, setBatchMode] = useState(false);
   const [activeExerciseTitle, setActiveExerciseTitle] = useState('Exercice');
   const [answer, setAnswer] = useState('');
   const [correction, setCorrection] = useState<ExerciseCorrection | null>(null);
@@ -115,9 +119,63 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     setRemaining(nextQuestion.seconds_remaining);
   }, [onFullscreenChange, refresh]);
 
+  const activateBatchQuestion = useCallback((bundle: ExerciseAttemptBundle, index: number, answers: Record<string, unknown>) => {
+    const item = bundle.questions[index];
+    if (!item) return;
+    serverClockOffset.current = Date.now() - new Date(bundle.server_now).getTime();
+    const nextQuestion: ExerciseAttemptQuestion = {
+      attempt_id: bundle.attempt_id,
+      question: item.question,
+      question_number: item.question_number,
+      question_count: item.question_count,
+      deadline_at: item.deadline_at,
+      seconds_remaining: item.seconds_remaining,
+      server_now: bundle.server_now
+    };
+    setActive(nextQuestion);
+    setCorrection(null);
+    const savedAnswer = answers[item.question.id];
+    setAnswer(typeof savedAnswer === 'string' ? savedAnswer : savedAnswer == null ? '' : JSON.stringify(savedAnswer));
+    timeoutLock.current = false;
+    setRemaining(item.seconds_remaining);
+  }, []);
+
   const submit = useCallback(async (value?: string) => {
     if (!active || submitting || correction) return;
     setSubmitting(true); setError('');
+    if (batchMode && batchBundle) {
+      const currentAnswer = value === undefined ? answer : value;
+      const nextAnswers = { ...batchAnswers, [active.question.id]: currentAnswer };
+      setBatchAnswers(nextAnswers);
+      try {
+        localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: batchIndex }));
+      } catch { /* stockage local indisponible */ }
+      try {
+        if (batchIndex >= batchBundle.questions.length - 1) {
+          await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
+          try { localStorage.removeItem('exercise_batch_draft_' + active.attempt_id); } catch { /* stockage local indisponible */ }
+          setBatchBundle(null);
+          setBatchAnswers({});
+          setBatchIndex(0);
+          setBatchMode(false);
+          setActive(null);
+          setCorrection(null);
+          setAnswer('');
+          onFullscreenChange(false);
+          await refresh();
+        } else {
+          const nextIndex = batchIndex + 1;
+          setBatchIndex(nextIndex);
+          try { localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: nextIndex })); } catch { /* stockage local indisponible */ }
+          activateBatchQuestion(batchBundle, nextIndex, nextAnswers);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Remise groupée impossible. Réessayez.');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
     try {
       const result = await exerciseService.submitAnswer(active.attempt_id, value === undefined ? answer : value);
       if (result.correct) {
@@ -138,7 +196,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Validation impossible. Réessayez.'); }
     finally { setSubmitting(false); }
-  }, [active, answer, applyAttemptState, correction, submitting]);
+  }, [active, answer, applyAttemptState, correction, submitting, batchMode, batchBundle, batchAnswers, batchIndex, activateBatchQuestion, onFullscreenChange, refresh]);
 
   useEffect(() => {
     if (active && remaining <= 0 && !correction && !submitting && !timeoutLock.current) {
@@ -164,9 +222,48 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     if (matchedTitle) setActiveExerciseTitle(matchedTitle);
     setError(''); setCorrection(null); setAnswer(''); timeoutLock.current = false;
     try {
-      const current = attemptId
-        ? await exerciseService.resumeAttempt(attemptId)
-        : await exerciseService.startAttempt(exerciseId);
+      if (attemptId) {
+        const resumedBatch = await exerciseService.resumeAttemptBatch(attemptId);
+        if (resumedBatch && 'completed' in resumedBatch) {
+          try { localStorage.removeItem('exercise_batch_draft_' + attemptId); } catch { /* stockage local indisponible */ }
+          await refresh();
+          return;
+        }
+        if (resumedBatch) {
+          const draft = (() => {
+            try { return JSON.parse(localStorage.getItem('exercise_batch_draft_' + attemptId) || 'null'); } catch { return null; }
+          })();
+          const restoredAnswers = draft?.answers && typeof draft.answers === 'object' ? draft.answers as Record<string, unknown> : {};
+          serverClockOffset.current = Date.now() - new Date(resumedBatch.server_now).getTime();
+          const estimatedServerNow = Date.now() - serverClockOffset.current;
+          const inferredIndex = Math.max(0, resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow));
+          const restoredIndex = Number.isInteger(draft?.index)
+            ? Math.min(resumedBatch.questions.length - 1, Math.max(0, draft.index))
+            : (inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex);
+          setBatchMode(true);
+          setBatchBundle(resumedBatch);
+          setBatchAnswers(restoredAnswers);
+          setBatchIndex(restoredIndex);
+          onFullscreenChange(true);
+          activateBatchQuestion(resumedBatch, restoredIndex, restoredAnswers);
+          return;
+        }
+      } else {
+        const startedBatch = await exerciseService.startAttemptBatch(exerciseId);
+        setBatchMode(true);
+        setBatchBundle(startedBatch);
+        setBatchAnswers({});
+        setBatchIndex(0);
+        onFullscreenChange(true);
+        activateBatchQuestion(startedBatch, 0, {});
+        try { localStorage.setItem('exercise_batch_draft_' + startedBatch.attempt_id, JSON.stringify({ answers: {}, index: 0 })); } catch { /* stockage local indisponible */ }
+        return;
+      }
+
+      // Tentative historique créée avant la migration groupée : conserver son ancien parcours.
+      const current = await exerciseService.resumeAttempt(attemptId as string);
+      setBatchMode(false);
+      setBatchBundle(null);
       onFullscreenChange(true);
       if (current.correction?.correct) {
         try {
@@ -271,6 +368,8 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   const returnToList = () => {
     onFullscreenChange(false);
     setActive(null);
+    setBatchBundle(null);
+    setBatchMode(false);
     setCorrection(null);
     setAnswer('');
     setError('');
@@ -318,9 +417,11 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               <span>
-                {q.type === 'verbes_trous'
-                  ? isLastQuestion ? 'Corriger et terminer' : 'Corriger et continuer'
-                  : isLastQuestion ? 'Valider et terminer' : 'Valider la réponse'}
+                {batchMode
+                  ? isLastQuestion ? 'Remettre l’exercice' : 'Enregistrer et continuer'
+                  : q.type === 'verbes_trous'
+                    ? isLastQuestion ? 'Corriger et terminer' : 'Corriger et continuer'
+                    : isLastQuestion ? 'Valider et terminer' : 'Valider la réponse'}
               </span>
             </button>
           ) : correction.correct ? (
