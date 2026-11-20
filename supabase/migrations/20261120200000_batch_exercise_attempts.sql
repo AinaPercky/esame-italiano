@@ -173,7 +173,6 @@ DECLARE
   v_answers JSONB := coalesce(p_answers, '{}'::jsonb);
   v_elapsed_seconds INTEGER := 0;
   v_duration INTEGER;
-  v_question_start TIMESTAMPTZ;
   v_deadline TIMESTAMPTZ;
   v_timed_out BOOLEAN;
   v_has_answer BOOLEAN;
@@ -232,7 +231,6 @@ BEGIN
     END IF;
 
     v_duration := greatest(1, coalesce((v_question ->> 'time_limit_seconds')::integer, 1));
-    v_question_start := v_attempt.started_at + make_interval(secs => v_elapsed_seconds);
     v_elapsed_seconds := v_elapsed_seconds + v_duration;
     v_deadline := v_attempt.started_at + make_interval(secs => v_elapsed_seconds);
     v_answer := v_answers -> v_question_id;
@@ -240,12 +238,9 @@ BEGIN
       AND v_answer <> 'null'::jsonb
       AND (jsonb_typeof(v_answer) <> 'string' OR btrim(v_answer #>> '{}') <> '');
 
-    -- Même principe que les examens écrits : une réponse est recevable dès
-    -- l'ouverture de sa question, et les réponses déjà saisies restent notées
-    -- lors de la remise finale, même si l'échéance de cette question est passée.
-    IF v_has_answer AND clock_timestamp() < v_question_start THEN
-      RAISE EXCEPTION 'Une réponse concerne une question dont le délai n’a pas encore commencé.';
-    END IF;
+    -- Le navigateur progresse sans RPC intermédiaire. Les réponses déjà saisies
+    -- restent évaluées à la remise finale ; seules les questions laissées vides
+    -- après leur échéance cumulative sont marquées timeout côté serveur.
     v_timed_out := NOT v_has_answer AND clock_timestamp() > v_deadline;
 
     IF v_timed_out THEN
