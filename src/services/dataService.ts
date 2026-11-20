@@ -1558,7 +1558,7 @@ export const dataService = {
     }
 
     let rawScore = 0;
-    const feedback: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }> = {};
+    const feedback: Record<string, { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string }> = {};
 
     quiz.questions.forEach(q => {
       const studentAns = (answers[q.id] || '').trim();
@@ -1568,6 +1568,8 @@ export const dataService = {
       feedback[q.id] = {
         correct: pointsInfo.isFullyCorrect,
         points: awarded,
+        maxPoints: pointsInfo.maxPoints,
+        explanation: q.explanation,
         expected: q.type === 'reorder'
           ? formatCorrectReorderAnswer(q)
           : q.type === 'text'
