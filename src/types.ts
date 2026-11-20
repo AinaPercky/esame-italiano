@@ -173,6 +173,14 @@ export interface QuizQuestion {
   blank_count?: number; // Nombre de trous conservé après nettoyage serveur des réponses attendues
   points: number; // Barème pour cette question (ex: 2, 4, 5 points)
   explanation?: string; // Explication pédagogique affichée lors de la correction
+  /** Compétence pédagogique ciblée, utilisée par le diagnostic professeur. */
+  competency?: string;
+  /** Identifiant stable de la compétence (ex. PASSATO_PROSSIMO_AUX). */
+  skill_code?: string;
+  /** Catégories d'erreurs explicitement définies par le professeur. */
+  error_categories?: string[];
+  /** Association réponse/distracteur -> catégorie d'erreur documentée. */
+  error_category_map?: Record<string, string>;
   time_limit_seconds?: number; // Temps individuel de réponse; valeur par défaut selon le type si absent
   titre?: string;
   consigne?: string;
