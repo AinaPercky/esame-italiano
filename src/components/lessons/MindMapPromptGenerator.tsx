@@ -76,13 +76,11 @@ Utilise une couleur distincte pour chaque branche principale, puis conserve cett
 Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
 
 **CONTENU DU COURS — SOURCE À RESPECTER**
-Le JSON complet ci-dessous est la source de vérité du cours. Analyse toutes ses propriétés et tous ses blocs pour construire la carte mentale. Respecte les informations, les exemples, les règles, les exceptions et leur structure. N'ignore aucun contenu pédagogique pertinent et n'invente aucune information.
+Le JSON complet ci-dessous est la source de vérité du cours. Exploite l'intégralité de son contenu pédagogique, et pas seulement le dialogue ou une éventuelle section « À retenir ». Prends en compte tous les blocs et champs présents : explications, définitions, règles, tableaux, cartes de vocabulaire, exemples, listes, étapes, formules, exceptions, conseils, avertissements, récapitulatifs et tout autre contenu pédagogique. Sélectionne et organise les informations utiles en branches cohérentes, sans omettre une notion importante, sans répéter inutilement les mêmes informations et sans inventer de contenu.
 
 ${courseContent}`;
 
-    if (generatedPrompt.length <= MAX_PROMPT_CHARACTERS) return generatedPrompt;
-    const notice = '\n\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
-    return generatedPrompt.slice(0, MAX_PROMPT_CHARACTERS - notice.length).trimEnd() + notice;
+    return generatedPrompt;
   }, [parsed, language]);
 
   return (
@@ -114,7 +112,7 @@ ${courseContent}`;
             </select>
           </label>
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} / 32 000 caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
             <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
           </div>
           <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
