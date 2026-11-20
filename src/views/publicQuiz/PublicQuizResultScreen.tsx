@@ -133,7 +133,7 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
                     </p>
                     {itemFeedback.explanation && (
                       <p className="mt-2">
-                        <span className="font-semibold">Explication :</span> {question.explanation}
+                        <span className="font-semibold">Explication :</span> {itemFeedback.explanation}
                       </p>
                     )}
                   </div>
