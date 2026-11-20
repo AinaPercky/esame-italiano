@@ -68,7 +68,7 @@ begin
     where a.exercise_id = p_exercise_id and a.student_id = s.id
   ) stats on true
   left join lateral (
-    select a.id, a.score, a.max_score, version.content -> 'questions' as questions,
+    select a.id, a.score, a.max_score, ev.content -> 'questions' as questions,
       (
         select coalesce(jsonb_agg(jsonb_build_object(
           'question_id', ans.question_id,
@@ -82,7 +82,7 @@ begin
         where ans.attempt_id = a.id
       ) as details
     from public.exercise_attempts a
-    join public.exercise_versions version on version.id = a.version_id
+    join public.exercise_versions ev on ev.id = a.version_id
     where a.exercise_id = p_exercise_id
       and a.student_id = s.id
       and a.status = 'completed'
