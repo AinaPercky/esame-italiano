@@ -81,7 +81,7 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
       setDetailClassIds(full.class_ids?.length ? full.class_ids : [full.class_id]);
       setDetailExamGlobal(Boolean(full.is_global));
       setDurationDraftSeconds(Number(full.duration_seconds) || 180);
-      setEditingRubricIndex(null);
+      setEditingRubricIndex(full.rubrics?.length ? 0 : null);
     }
   };
 
@@ -383,214 +383,234 @@ export const ExamsView: React.FC<ExamsViewProps> = ({
         </div>
       )}
 
-      {/* Modal Gestion des Rubriques d'un Examen */}
+      {/* Espace de travail des rubriques de l'examen oral */}
       {selectedExamForDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-2 backdrop-blur-sm sm:p-4">
-          <div className="flex h-[96dvh] max-h-[96dvh] min-h-0 w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white p-3 shadow-2xl sm:rounded-[24px] sm:p-5">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-950/60 backdrop-blur-sm md:items-center md:p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="oral-rubrics-title"
+            className="flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-white shadow-2xl md:h-[92dvh] md:max-h-[900px] md:max-w-7xl md:rounded-2xl"
+          >
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
               <div className="min-w-0">
-                <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
-                  Grille d’évaluation en italien
+                <span className="inline-flex rounded-full bg-[#e6f0f7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0b3c5d]">
+                  Grille d’évaluation · Examen oral
                 </span>
-                <h3 className="mt-2 break-words font-display text-base font-bold text-[#072a3f] sm:text-lg">
+                <h3 id="oral-rubrics-title" className="mt-2 break-words font-display text-base font-bold text-[#072a3f] sm:text-lg">
                   {selectedExamForDetails.title}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  {rubricsDraft.length} rubriques · Barème total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 1), 0)} points
+                  {rubricsDraft.length} rubrique(s) · Barème : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 0), 0)} points
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDeleteExam(selectedExamForDetails.id)}
-                className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Supprimer</span>
-              </button>
-            </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteExam(selectedExamForDetails.id)}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                  aria-label="Supprimer cet examen"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Supprimer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedExamForDetails(null)}
+                  className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d]"
+                >
+                  Fermer
+                </button>
+              </div>
+            </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <div className="space-y-3 border-b border-slate-100 py-3">
-              <ClassAssignmentPicker
-                classes={classes}
-                selectedClassIds={detailClassIds}
-                isGlobal={detailExamGlobal}
-                onSelectedClassIdsChange={setDetailClassIds}
-                onGlobalChange={setDetailExamGlobal}
-                compact
-              />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
-                  <span>Niveau (CECRL)</span>
-                  <select
-                    value={selectedExamForDetails.level || ''}
-                    onChange={(e) => {
-                      const level = e.target.value as CEFRLevel | '';
-                      void dataService.updateExam(selectedExamForDetails.id, { level: level || null })
-                        .then(() => {
-                          setSelectedExamForDetails(previous => previous ? { ...previous, level: level || null } : previous);
-                          onRefresh();
-                        })
-                        .catch(error => window.alert(error instanceof Error ? error.message : 'Modification impossible.'));
-                    }}
-                    className="min-h-9 rounded-lg border border-slate-300 bg-white px-2 text-xs"
-                  >
-                    <option value="">Non défini</option>
-                    {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
-                  </select>
-                </label>
-                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
-                  <span>Durée par candidat</span>
-                  <span className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      step="1"
-                      value={Math.floor(durationDraftSeconds / 60)}
-                      onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
-                      className="min-h-9 w-16 rounded-lg border border-slate-300 bg-white px-2 text-sm"
-                    />
-                    <span className="text-[11px] text-slate-500">min</span>
-                  </span>
-                </label>
+              <div className="space-y-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+                <ClassAssignmentPicker
+                  classes={classes}
+                  selectedClassIds={detailClassIds}
+                  isGlobal={detailExamGlobal}
+                  onSelectedClassIdsChange={setDetailClassIds}
+                  onGlobalChange={setDetailExamGlobal}
+                  compact
+                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                    <span>Niveau (CECRL)</span>
+                    <select
+                      value={selectedExamForDetails.level || ''}
+                      onChange={(e) => {
+                        const level = e.target.value as CEFRLevel | '';
+                        void dataService.updateExam(selectedExamForDetails.id, { level: level || null })
+                          .then(() => {
+                            setSelectedExamForDetails(previous => previous ? { ...previous, level: level || null } : previous);
+                            onRefresh();
+                          })
+                          .catch(error => window.alert(error instanceof Error ? error.message : 'Modification impossible.'));
+                      }}
+                      className="min-h-10 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                    >
+                      <option value="">Non défini</option>
+                      {CEFR_LEVELS.map(level => <option key={level} value={level}>{level}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">
+                    <span>Durée par candidat</span>
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        step="1"
+                        value={Math.floor(durationDraftSeconds / 60)}
+                        onChange={(e) => setDurationDraftSeconds(Math.max(1, Math.min(120, Number(e.target.value) || 1)) * 60)}
+                        className="min-h-10 w-20 rounded-lg border border-slate-300 bg-white px-2 text-base"
+                      />
+                      <span className="text-[11px] text-slate-500">min</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid min-w-0 grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(240px,0.34fr)_minmax(0,1fr)] lg:gap-5">
+                <aside className="min-w-0">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-[#072a3f]">Rubriques de l’épreuve</h4>
+                      <p className="text-[11px] text-slate-500">Touchez une rubrique pour modifier son contenu.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddRubricToDraft}
+                      className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#072a3f] px-3 text-xs font-bold text-white transition-colors hover:bg-[#0b3c5d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0b3c5d]"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Ajouter
+                    </button>
+                  </div>
+
+                  <div className="flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch] lg:max-h-[calc(92dvh-250px)] lg:flex-col lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
+                    {rubricsDraft.map((r, idx) => (
+                      <button
+                        key={r.id || idx}
+                        type="button"
+                        onClick={() => setEditingRubricIndex(idx)}
+                        aria-pressed={editingRubricIndex === idx}
+                        className={`w-[min(78vw,260px)] shrink-0 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] lg:w-full ${editingRubricIndex === idx ? 'border-[#0b3c5d] bg-[#eef5f9] ring-1 ring-[#0b3c5d]/15' : 'border-slate-200 bg-white hover:border-[#b7d3e4] hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Rubrique {idx + 1}</span>
+                          <span className="rounded-md bg-[#e6f0f7] px-2 py-0.5 text-[10px] font-bold text-[#0b3c5d]">{Number(r.points) || 0} pt{Number(r.points) === 1 ? '' : 's'}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs font-bold text-[#072a3f]">{r.title || 'Sans titre'}</p>
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500">{r.question || 'Aucune consigne renseignée'}</p>
+                      </button>
+                    ))}
+                    {rubricsDraft.length === 0 && (
+                      <div className="w-full rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center">
+                        <ListOrdered className="mx-auto h-6 w-6 text-slate-400" />
+                        <p className="mt-2 text-xs font-semibold text-slate-600">Aucune rubrique pour cet examen</p>
+                        <p className="mt-1 text-[11px] text-slate-500">Ajoutez une rubrique pour construire votre grille d’évaluation.</p>
+                      </div>
+                    )}
+                  </div>
+                  {rubricsDraft.length > 1 && (
+                    <p className="mt-1 text-[10px] text-slate-400 lg:hidden">Faites défiler horizontalement la liste pour voir toutes les rubriques.</p>
+                  )}
+                </aside>
+
+                <section className="min-w-0 rounded-2xl border border-slate-200 bg-[#f8fafc] p-3 sm:p-4">
+                  {editingRubricIndex !== null && rubricsDraft[editingRubricIndex] ? (
+                    <>
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e6f0f7] text-[#0b3c5d]"><Edit3 className="h-4 w-4" /></span>
+                          <div>
+                            <h4 className="text-sm font-bold text-[#072a3f]">Modifier la rubrique</h4>
+                            <p className="text-[11px] text-slate-500">Rubrique {editingRubricIndex + 1} sur {rubricsDraft.length}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button type="button" disabled={editingRubricIndex === 0} onClick={() => setEditingRubricIndex(i => i === null ? null : i - 1)} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique précédente">←</button>
+                          <button type="button" disabled={editingRubricIndex >= rubricsDraft.length - 1} onClick={() => setEditingRubricIndex(i => i === null ? null : i + 1)} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique suivante">→</button>
+                          <button type="button" onClick={() => {
+                            const index = editingRubricIndex;
+                            handleRemoveRubricFromDraft(index);
+                            setEditingRubricIndex(rubricsDraft.length <= 1 ? null : Math.max(0, index - 1));
+                          }} className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50">
+                            <Trash2 className="h-3.5 w-3.5" /><span>Supprimer</span>
+                          </button>
+                        </div>
+                      </div>
+                      {(() => {
+                        const r = rubricsDraft[editingRubricIndex];
+                        const update = (patch: Partial<ExamRubric>) => setRubricsDraft(current => current.map((item, index) => index === editingRubricIndex ? { ...item, ...patch } : item));
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+                              <label className="block text-xs font-semibold text-slate-700">
+                                Titre de la rubrique <span className="text-rose-500">*</span>
+                                <input type="text" value={r.title} onChange={e => update({ title: e.target.value })} placeholder="Ex. Presentarsi" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base font-normal text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                              </label>
+                              <label className="block text-xs font-semibold text-slate-700">
+                                Barème
+                                <span className="mt-1.5 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-2">
+                                  <input type="number" min="0" step="0.5" value={r.points} onChange={e => update({ points: Math.max(0, Number(e.target.value) || 0) })} className="w-full border-0 bg-transparent text-base font-bold text-[#072a3f] outline-none" />
+                                  <span className="text-xs text-slate-400">pts</span>
+                                </span>
+                              </label>
+                            </div>
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Question / Consigne
+                              <textarea rows={4} value={r.question} onChange={e => update({ question: e.target.value })} placeholder="Décrivez ce que le candidat doit faire…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                            </label>
+                            <label className="block text-xs font-semibold text-slate-700">
+                              Exemple de réponse attendue (italien)
+                              <textarea rows={4} value={r.example_sentence} onChange={e => update({ example_sentence: e.target.value })} placeholder="Ex. Vorrei visitare Roma perché…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
+                            </label>
+                            <p className="rounded-lg border border-[#d8e6ee] bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+                              Conseil : formulez une consigne observable et un exemple adapté au niveau CECRL de l’examen.
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="flex min-h-56 flex-col items-center justify-center px-4 py-8 text-center">
+                      <ListOrdered className="h-8 w-8 text-slate-300" />
+                      <h4 className="mt-3 text-sm font-bold text-[#072a3f]">Aucune rubrique sélectionnée</h4>
+                      <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">Choisissez une rubrique dans la liste ou ajoutez-en une nouvelle pour modifier ses informations.</p>
+                      <button type="button" onClick={handleAddRubricToDraft} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#072a3f] px-4 text-xs font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" /> Ajouter une rubrique</button>
+                    </div>
+                  )}
+                </section>
               </div>
             </div>
 
-            {/* Rubric editor: list + focused form */}
-            <div className="flex min-h-[480px] flex-col gap-3 overflow-hidden py-3 lg:min-h-0 lg:flex-row">
-              <aside className="flex min-h-0 flex-col lg:w-[34%] lg:shrink-0">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div>
-                    <h4 className="text-sm font-bold text-[#072a3f]">Rubriques de l’épreuve</h4>
-                    <p className="text-[11px] text-slate-500">Sélectionnez une rubrique pour la modifier.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddRubricToDraft}
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#072a3f] px-3 text-xs font-bold text-white transition hover:bg-[#0b3c5d]"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Ajouter
-                  </button>
-                </div>
-                <div className="flex max-h-28 min-h-0 gap-2 overflow-x-auto pb-2 lg:max-h-none lg:flex-1 lg:flex-col lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1">
-                  {rubricsDraft.map((r, idx) => (
-                    <button
-                      key={r.id || idx}
-                      type="button"
-                      onClick={() => setEditingRubricIndex(idx)}
-                      aria-pressed={editingRubricIndex === idx}
-                      className={`min-w-[210px] rounded-xl border p-3 text-left transition lg:min-w-0 ${editingRubricIndex === idx ? 'border-[#0b3c5d] bg-[#eef5f9] ring-1 ring-[#0b3c5d]/10' : 'border-slate-200 bg-white hover:border-[#b7d3e4] hover:bg-slate-50'}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Rubrique {idx + 1}</span>
-                        <span className="rounded-md bg-white px-2 py-0.5 text-[10px] font-bold text-[#0b3c5d]">{Number(r.points) || 0} pt{Number(r.points) === 1 ? '' : 's'}</span>
-                      </div>
-                      <p className="mt-1 truncate text-xs font-bold text-[#072a3f]">{r.title || 'Sans titre'}</p>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500">{r.question || 'Aucune consigne renseignée'}</p>
-                    </button>
-                  ))}
-                  {rubricsDraft.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center">
-                      <ListOrdered className="mx-auto h-6 w-6 text-slate-400" />
-                      <p className="mt-2 text-xs font-semibold text-slate-600">Aucune rubrique</p>
-                      <p className="mt-1 text-[11px] text-slate-500">Ajoutez votre première rubrique pour construire la grille.</p>
-                    </div>
-                  )}
-                </div>
-              </aside>
-
-              <section className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-[#f8fafc] p-3 sm:p-4">
-                {editingRubricIndex !== null && rubricsDraft[editingRubricIndex] ? (
-                  <>
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e6f0f7] text-[#0b3c5d]"><Edit3 className="h-4 w-4" /></span>
-                        <div>
-                          <h4 className="text-sm font-bold text-[#072a3f]">Modifier la rubrique</h4>
-                          <p className="text-[11px] text-slate-500">Rubrique {editingRubricIndex + 1} sur {rubricsDraft.length}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button type="button" disabled={editingRubricIndex === 0} onClick={() => setEditingRubricIndex(i => i === null ? null : i - 1)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique précédente">←</button>
-                        <button type="button" disabled={editingRubricIndex >= rubricsDraft.length - 1} onClick={() => setEditingRubricIndex(i => i === null ? null : i + 1)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-35" title="Rubrique suivante">→</button>
-                        <button type="button" onClick={() => {
-                          const index = editingRubricIndex;
-                          handleRemoveRubricFromDraft(index);
-                          setEditingRubricIndex(rubricsDraft.length <= 1 ? null : Math.max(0, index - 1));
-                        }} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50">
-                          <Trash2 className="h-3.5 w-3.5" /><span>Supprimer</span>
-                        </button>
-                      </div>
-                    </div>
-                    {(() => {
-                      const r = rubricsDraft[editingRubricIndex];
-                      const update = (patch: Partial<ExamRubric>) => setRubricsDraft(current => current.map((item, index) => index === editingRubricIndex ? { ...item, ...patch } : item));
-                      return (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_120px]">
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Titre de la rubrique <span className="text-rose-500">*</span>
-                              <input type="text" value={r.title} onChange={e => update({ title: e.target.value })} placeholder="Ex. Presentarsi" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-700">
-                              Barème
-                              <span className="mt-1.5 flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-2">
-                                <input type="number" min="0" step="0.5" value={r.points} onChange={e => update({ points: Math.max(0, Number(e.target.value) || 0) })} className="w-full border-0 bg-transparent text-sm font-bold text-[#072a3f] outline-none" />
-                                <span className="text-xs text-slate-400">pts</span>
-                              </span>
-                            </label>
-                          </div>
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Question / Consigne
-                            <textarea rows={3} value={r.question} onChange={e => update({ question: e.target.value })} placeholder="Décrivez ce que le candidat doit faire…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
-                          </label>
-                          <label className="block text-xs font-semibold text-slate-700">
-                            Exemple de réponse attendue (italien)
-                            <textarea rows={3} value={r.example_sentence} onChange={e => update({ example_sentence: e.target.value })} placeholder="Ex. Vorrei visitare Roma perché…" className="mt-1.5 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal leading-relaxed text-slate-800 outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/10" />
-                          </label>
-                          <p className="rounded-lg border border-[#d8e6ee] bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-500">
-                            Conseil : formulez une consigne observable et un exemple adapté au niveau CECRL de l’examen.
-                          </p>
-                        </div>
-                      );
-                    })()}
-                  </>
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 text-center">
-                    <ListOrdered className="h-8 w-8 text-slate-300" />
-                    <h4 className="mt-3 text-sm font-bold text-[#072a3f]">Aucune rubrique sélectionnée</h4>
-                    <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">Choisissez une rubrique dans la liste ou ajoutez-en une nouvelle pour modifier ses informations.</p>
-                    <button type="button" onClick={handleAddRubricToDraft} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#072a3f] px-4 text-xs font-bold text-white hover:bg-[#0b3c5d]"><Plus className="h-4 w-4" /> Ajouter une rubrique</button>
-                  </div>
-                )}
-              </section>
-            </div>
-            </div>
-
-            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 pt-2 text-xs">
-              <span className="text-slate-500">{rubricsDraft.length} rubrique(s) · Total : <strong className="text-[#072a3f]">{rubricsDraft.reduce((s, r) => s + (Number(r.points) || 0), 0)} points</strong></span>
-              <span className="text-[10px] text-slate-400">Les changements ne sont pas enregistrés avant validation.</span>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-slate-100 mt-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedExamForDetails(null)}
-                className="px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg min-h-[44px]"
-              >
-                Fermer
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveRubrics}
-                disabled={!detailExamGlobal && detailClassIds.length === 0}
-                className="px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#072a3f] hover:bg-[#0b3c5d] active:bg-[#072a3f] rounded-xl min-h-[44px] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Enregistrer les modifications
-              </button>
-            </div>
-          </div>
+            <footer className="flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="min-w-0 text-[11px] text-slate-500">
+                <span className="font-semibold text-[#072a3f]">{rubricsDraft.length} rubrique(s)</span>
+                <span> · Total : {rubricsDraft.reduce((s, r) => s + (Number(r.points) || 0), 0)} points</span>
+                <span className="hidden sm:inline"> · Les changements sont enregistrés après validation.</span>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedExamForDetails(null)}
+                  className="min-h-11 flex-1 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 sm:flex-none"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveRubrics}
+                  disabled={!detailExamGlobal && detailClassIds.length === 0}
+                  className="min-h-11 flex-1 rounded-xl bg-[#072a3f] px-5 text-xs font-semibold text-white transition-colors hover:bg-[#0b3c5d] disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                >
+                  Enregistrer
+                </button>
+              </div>
+            </footer>
+          </section>
         </div>
       )}
 
