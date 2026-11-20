@@ -126,6 +126,12 @@ VALUES
   ('quiz-1', '[{"id":"q1","question":"Version au lancement","correct_answer":"è"}]'::jsonb),
   ('quiz-2', '[{"id":"q2","question":"Sans lancement","correct_answer":"ciao"}]'::jsonb);
 
+-- Simule un lancement actif antérieur à la migration : son snapshot reste NULL.
+INSERT INTO public.quiz_launches (id, quiz_id)
+VALUES ('00000000-0000-0000-0000-000000000002', 'quiz-2');
+INSERT INTO public.quiz_participants (launch_id, quiz_id, student_id, class_id)
+VALUES ('00000000-0000-0000-0000-000000000002', 'quiz-2', 'student-1', 'class-1');
+
 \i supabase/migrations/20261120150000_add_quiz_submission_questions_snapshot.sql
 -- La migration doit être ré-exécutable.
 \i supabase/migrations/20261120150000_add_quiz_submission_questions_snapshot.sql
@@ -133,6 +139,7 @@ VALUES
 DO $
 DECLARE
   sanitized jsonb;
+  active_snapshot jsonb;
 BEGIN
   IF (SELECT questions_snapshot FROM public.quiz_submissions WHERE id = 'legacy-submission') IS NOT NULL THEN
     RAISE EXCEPTION 'Les données historiques doivent rester NULL';
@@ -176,6 +183,12 @@ BEGIN
   END IF;
   IF sanitized #>> '{0,error_categories,0}' IS DISTINCT FROM 'Confusion' THEN
     RAISE EXCEPTION 'Les catégories de diagnostic non sensibles doivent rester disponibles';
+  END IF;
+  SELECT public.get_student_active_launch('quiz-2') -> 'launch' -> 'questions_snapshot'
+    INTO active_snapshot;
+  IF active_snapshot #>> '{0,id}' IS DISTINCT FROM 'q2'
+     OR active_snapshot::text LIKE '%correct_answer%' THEN
+    RAISE EXCEPTION 'Un lancement historique actif doit utiliser un fallback assaini : %', active_snapshot;
   END IF;
 END;
 $$;
