@@ -74,8 +74,7 @@ test('exercise batch migration keeps answer keys server-side and exposes only au
     'CREATE OR REPLACE FUNCTION public.submit_exercise_attempt_batch(',
     "- 'correct_answer' - 'answers' - 'explanation'",
     'public.exercise_grade_question(v_question, coalesce(v_answer, \'null\'::jsonb))',
-    'v_question_start := v_attempt.started_at + make_interval(secs => v_elapsed_seconds)',
-    'Une réponse concerne une question dont le délai n’a pas encore commencé.',
+    'v_timed_out := NOT v_has_answer AND clock_timestamp() > v_deadline;',
     'REVOKE ALL ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) FROM PUBLIC, anon;',
     'GRANT EXECUTE ON FUNCTION public.submit_exercise_attempt_batch(UUID, JSONB) TO authenticated;'
   ]) assert.ok(migration.includes(snippet), 'SQL groupé incomplet : ' + snippet);
