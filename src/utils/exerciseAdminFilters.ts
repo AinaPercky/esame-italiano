@@ -509,15 +509,6 @@ export function buildExercisePedagogicalDiagnostic(
   const competencies: ExerciseCompetencyDiagnostic[] = Array.from(competencyMap, ([competency, questions]) => {
     const points = questions.reduce((sum, question) => sum + question.points, 0);
     const maxPoints = questions.reduce((sum, question) => sum + question.maxPoints, 0);
-    const studentMap = new Map<string, { studentId: string; studentName: string; className: string; points: number; maxPoints: number }>();
-    for (const question of questions) {
-      for (const student of question.studentsNeedingSupport) {
-        const current = studentMap.get(student.studentId) || { ...student, points: 0, maxPoints: 0 };
-        // Per-question support list only contains below-threshold learners. Their
-        // competency score is computed from all questions below in the dedicated pass.
-        studentMap.set(student.studentId, current);
-      }
-    }
     const perStudent = new Map<string, { studentId: string; studentName: string; className: string; points: number; maxPoints: number }>();
     for (const row of completed) {
       const studentQuestions = questions.flatMap(question => {
