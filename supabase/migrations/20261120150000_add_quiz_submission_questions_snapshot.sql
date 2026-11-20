@@ -83,6 +83,62 @@ BEFORE INSERT ON public.quiz_launches
 FOR EACH ROW
 EXECUTE FUNCTION public.capture_quiz_launch_questions_snapshot();
 
+-- La projection élève doit aussi masquer le mapping des réponses erronées défini par le professeur.
+CREATE OR REPLACE FUNCTION public.quiz_sanitize_questions(p_questions JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+AS $
+DECLARE
+  v_result JSONB := '[]'::jsonb;
+  v_q JSONB;
+  v_clean JSONB;
+  v_type TEXT;
+  v_vt JSONB;
+  v_phrases JSONB;
+  v_items JSONB;
+  v_blank_count INTEGER;
+BEGIN
+  IF p_questions IS NULL OR jsonb_typeof(p_questions) <> 'array' THEN
+    RETURN '[]'::jsonb;
+  END IF;
+
+  FOR v_q IN SELECT value FROM jsonb_array_elements(p_questions) LOOP
+    v_type := coalesce(v_q ->> 'type', 'qcm');
+    v_clean := (v_q - 'correct_answer' - 'answers' - 'explanation' - 'phrases' - 'error_category_map');
+
+    IF v_type = 'text' THEN
+      v_blank_count := greatest(1, jsonb_array_length(public.quiz_expected_answers_list(v_q)));
+      v_clean := v_clean || jsonb_build_object('blank_count', v_blank_count);
+    ELSIF v_type = 'reorder' AND jsonb_typeof(v_q -> 'items') = 'array' THEN
+      SELECT coalesce(jsonb_agg(item.value ORDER BY md5(coalesce(v_q ->> 'id', '') || ':' || coalesce(item.value ->> 'id', item.value::text))), '[]'::jsonb)
+      INTO v_items
+      FROM jsonb_array_elements(v_q -> 'items') AS item(value);
+      v_clean := v_clean || jsonb_build_object('items', v_items);
+    ELSIF v_type = 'verbes_trous' AND jsonb_typeof(v_q -> 'verbes_trous') = 'object' THEN
+      v_vt := (v_q -> 'verbes_trous');
+      IF jsonb_typeof(v_vt -> 'phrases') = 'array' THEN
+        SELECT coalesce(jsonb_agg(
+          jsonb_build_object(
+            'id', p.value -> 'id',
+            'debut', coalesce(p.value ->> 'debut', ''),
+            'fin', coalesce(p.value ->> 'fin', '')
+          )
+        ), '[]'::jsonb)
+        INTO v_phrases
+        FROM jsonb_array_elements(v_vt -> 'phrases') WITH ORDINALITY AS p(value, ord);
+        v_vt := jsonb_set(v_vt, '{phrases}', v_phrases, true);
+      END IF;
+      v_clean := jsonb_set(v_clean, '{verbes_trous}', v_vt, true);
+    END IF;
+
+    v_result := v_result || jsonb_build_array(v_clean);
+  END LOOP;
+
+  RETURN v_result;
+END;
+$;
+
 -- La RPC renvoie uniquement la version assainie des questions : jamais les corrigés.
 CREATE OR REPLACE FUNCTION public.get_student_active_launch(p_quiz_id text)
 RETURNS jsonb
