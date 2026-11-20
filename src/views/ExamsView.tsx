@@ -6,7 +6,6 @@ import {
   Calendar, 
   ListOrdered, 
   Trash2, 
-  Edit3, 
   Check, 
   Layers,
   ArrowRight,
