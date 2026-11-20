@@ -189,8 +189,9 @@ begin
 
   -- A repeated network submission is idempotent and cannot duplicate score rows.
   v_result := public.submit_exercise_attempt_batch(v_attempt_id, jsonb_build_object('q1','sono'));
-  if coalesce((v_result ->> 'score')::numeric,0) <> 2 then
-    raise exception 'Repeated batch submission changed the stored score';
+  if coalesce((v_result ->> 'score')::numeric,0) <> 2
+     or coalesce((v_result #>> '{feedback,q1,correct}')::boolean,false) is not true then
+    raise exception 'Repeated batch submission changed the score or lost its detailed feedback';
   end if;
 
   v_review := public.get_student_exercise_attempt_details(v_attempt_id);
