@@ -294,7 +294,6 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
       'public.get_public_quiz_catalog()',
       'public.get_public_quiz(text)',
       'public.evaluate_public_quiz_question(text,text,text)',
-      'public.evaluate_public_quiz_answers(text,jsonb)',
       'public.evaluate_public_quiz_answers(text,jsonb)'
     ]) {
       assert.ok(rpcMigration.includes(`'${signature}'`), `RPC publique absente de la liste blanche : ${signature}`);
