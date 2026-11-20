@@ -123,15 +123,15 @@ export const PublicQuizResultScreen: React.FC<PublicQuizResultScreenProps> = ({
                   <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 text-sm text-slate-700 animate-fade-in">
                     <p>
                       <span className="font-semibold">Votre réponse :</span>{' '}
-                      {itemFeedback.studentAnswer || '(aucune réponse)'}
+                      {itemFeedback.studentAnswer?.trim() || 'Non répondu'}
                     </p>
                     <p className="mt-2">
                       <span className="font-semibold">Bonne réponse :</span> {itemFeedback.expected}
                     </p>
                     <p className={`mt-2 font-semibold ${itemFeedback.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {itemFeedback.correct ? 'Réponse juste' : 'Réponse fausse'} • {itemFeedback.points} / {question.points} pt
+                      {itemFeedback.correct ? 'Réponse juste' : 'Réponse fausse'} • {itemFeedback.points} / {itemFeedback.maxPoints ?? question.points} pt
                     </p>
-                    {question.explanation && (
+                    {itemFeedback.explanation && (
                       <p className="mt-2">
                         <span className="font-semibold">Explication :</span> {question.explanation}
                       </p>
