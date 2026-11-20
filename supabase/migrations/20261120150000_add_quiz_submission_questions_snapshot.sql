@@ -45,6 +45,12 @@ ALTER TABLE public.quiz_launches
 COMMENT ON COLUMN public.quiz_launches.questions_snapshot IS
   'Copie serveur des questions au moment du lancement; conserve les corrigés pour la correction serveur.';
 
+-- Le snapshot de lancement contient les corrigés : interdire sa lecture directe
+-- via la Data API. Les élèves reçoivent uniquement la projection assainie par RPC.
+REVOKE SELECT ON TABLE public.quiz_launches FROM PUBLIC, anon, authenticated;
+GRANT SELECT (id, quiz_id, launched_at, closed_at, launched_by, presence_deadline_at, status, created_at)
+  ON TABLE public.quiz_launches TO authenticated;
+
 ALTER TABLE public.quiz_submissions
   ADD COLUMN IF NOT EXISTS launch_id uuid;
 
