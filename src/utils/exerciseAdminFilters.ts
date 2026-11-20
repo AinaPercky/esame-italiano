@@ -447,7 +447,9 @@ export function buildExercisePedagogicalDiagnostic(
       if (detail.correct) continue;
       const answerKey = typeof detail.answer === 'string' ? detail.answer : JSON.stringify(detail.answer ?? '');
       const category = mapping[answerKey] || mapping[answerKey.trim()];
-      if (category) errorCounts.set(category, (errorCounts.get(category) || 0) + 1);
+      if (category && (question.error_categories || []).includes(category)) {
+        errorCounts.set(category, (errorCounts.get(category) || 0) + 1);
+      }
     }
     return {
       id: key, label: question.question || question.titre || question.id,
