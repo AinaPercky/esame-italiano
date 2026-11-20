@@ -26,7 +26,24 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
     if (!parsed) return '';
     const title = [parsed.title_it, parsed.title_fr].filter(Boolean).join(' / ') || parsed.slug || 'Cours sans titre';
     const subject = SUBJECTS[parsed.type] || parsed.type || 'Cours d’italien';
-    const courseContent = JSON.stringify(parsed, null, 2);
+    // Exclure volontairement le dialogue et la partie « À retenir » du contenu transmis.
+    const excludedBlock = (block: any) => {
+      const values = [block?.type, block?.kind, block?.title, block?.label, block?.heading, block?.subtitle]
+        .filter((value): value is string => typeof value === 'string')
+        .join(' ')
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+        .toLowerCase();
+      return /\\bdialogue\\b/.test(values) || /\\brecap\\b/.test(values) ||
+        /a retenir|points? cles|essentiel/.test(values);
+    };
+    const lessonForMindMap = {
+      ...parsed,
+      ...(Array.isArray(parsed.blocks)
+        ? { blocks: parsed.blocks.filter((block: any) => !excludedBlock(block)) }
+        : {})
+    };
+    const courseContent = JSON.stringify(lessonForMindMap, null, 2);
 
     const generatedPrompt = `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
@@ -76,7 +93,7 @@ Utilise une couleur distincte pour chaque branche principale, puis conserve cett
 Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
 
 **CONTENU DU COURS — SOURCE À RESPECTER**
-Le JSON complet ci-dessous est la source de vérité du cours. Exploite l'intégralité de son contenu pédagogique, et pas seulement le dialogue ou une éventuelle section « À retenir ». Prends en compte tous les blocs et champs présents : explications, définitions, règles, tableaux, cartes de vocabulaire, exemples, listes, étapes, formules, exceptions, conseils, avertissements, récapitulatifs et tout autre contenu pédagogique. Sélectionne et organise les informations utiles en branches cohérentes, sans omettre une notion importante, sans répéter inutilement les mêmes informations et sans inventer de contenu.
+Le JSON ci-dessous contient le contenu pédagogique à utiliser pour la carte mentale. Le dialogue et la partie « À retenir » ont volontairement été exclus. Exploite les autres blocs et champs présents : explications, définitions, règles, tableaux, cartes de vocabulaire, exemples, listes, étapes, formules, exceptions, conseils, avertissements et autres contenus pédagogiques. Sélectionne et organise les informations utiles en branches cohérentes, sans omettre une notion importante, sans répéter inutilement les mêmes informations et sans inventer de contenu.
 
 ${courseContent}`;
 
