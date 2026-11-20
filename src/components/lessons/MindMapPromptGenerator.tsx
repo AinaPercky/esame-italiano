@@ -3,8 +3,6 @@ import { Copy, Sparkles, Languages, FileText } from 'lucide-react';
 
 type Props = { lessonJson: string; onCopy: (value: string, successMessage: string) => void };
 
-const MAX_PROMPT_CHARACTERS = 32000;
-
 const SUBJECTS: Record<string, string> = {
   grammaire: 'Grammaire italienne',
   vocabulaire: 'Vocabulaire italien',
@@ -109,12 +107,7 @@ export const MindMapPromptGenerator: React.FC<Props> = ({ lessonJson, onCopy }) 
     if (!parsed) return '';
     const title = [parsed.title_it, parsed.title_fr].filter(Boolean).join(' / ') || parsed.slug || 'Cours sans titre';
     const subject = SUBJECTS[parsed.type] || parsed.type || 'Cours d’italien';
-    const courseLines = (Array.isArray(parsed.blocks) ? parsed.blocks : [])
-      .flatMap((block: any) => extractBlockLines(block))
-      .filter((line: string, index: number, all: string[]) => all.indexOf(line) === index);
-    const courseContent = courseLines.length
-      ? courseLines.map((line: string) => `• ${line}`).join('\n')
-      : 'Aucun contenu pédagogique exploitable trouvé dans les blocs du cours.';
+    const courseContent = JSON.stringify(parsed, null, 2);
 
     const generatedPrompt = `# CARTE MENTALE PÉDAGOGIQUE — PERCKYLINGUA
 
@@ -164,7 +157,7 @@ Utilise une couleur distincte pour chaque branche principale, puis conserve cett
 Avant de finaliser, vérifie que la carte est bien radiale, que les branches sont hiérarchisées, que les informations essentielles sont présentes une seule fois et que tous les textes sont correctement orthographiés.
 
 **CONTENU DU COURS — SOURCE À RESPECTER**
-Les éléments ci-dessous sont extraits de la leçon et constituent la seule source de contenu. Organise-les en branches cohérentes ; ne les transforme pas en JSON et ne les complète pas avec des informations inventées.
+Le JSON complet ci-dessous est la source de vérité du cours. Analyse toutes ses propriétés et tous ses blocs pour construire la carte mentale. Respecte les informations, les exemples, les règles, les exceptions et leur structure. N'ignore aucun contenu pédagogique pertinent et n'invente aucune information.
 
 ${courseContent}`;
 
@@ -180,7 +173,7 @@ ${courseContent}`;
           <span className="rounded-lg bg-[#072a3f] p-2 text-white"><Sparkles size={17} /></span>
           <div>
             <h3 className="text-sm font-bold text-[#072a3f]">Générateur de prompt — Mind map</h3>
-            <p className="mt-1 text-xs text-slate-600">Un prompt détaillé et lisible, sans structure JSON.</p>
+            <p className="mt-1 text-xs text-slate-600">Un prompt pédagogique complet avec le contenu intégral du cours au format JSON.</p>
           </div>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800">PerckyLingua · Tony Buzan</span>
@@ -204,7 +197,6 @@ ${courseContent}`;
           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2"><span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><FileText size={14} /> Prompt détaillé généré</span><span className="text-[10px] text-slate-500">{prompt.length.toLocaleString("fr-FR")} / 32 000 caractères · {Array.isArray(parsed.blocks) ? parsed.blocks.length : 0} blocs</span></div>
             <textarea readOnly value={prompt} className="max-h-72 min-h-48 w-full resize-y bg-white p-3 font-sans text-[11px] leading-relaxed text-slate-700 focus:outline-none" />
-            {prompt.length >= MAX_PROMPT_CHARACTERS && <p className="border-t border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">Le prompt a atteint la limite de 32 000 caractères. Une partie du contenu du cours a été coupée : réduisez-le pour conserver toutes les informations.</p>}
           </div>
           <button type="button" onClick={() => onCopy(prompt, 'Prompt du mind map copié dans le presse-papiers.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#072a3f] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#0b3c5d]"><Copy size={15} /> Copier le prompt complet</button>
         </>
