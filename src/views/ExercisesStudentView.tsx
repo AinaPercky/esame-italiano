@@ -29,6 +29,15 @@ import {
   StatusBadge
 } from '../components/LearningCard';
 
+const hasSubmittedAnswer = (value: unknown): boolean => {
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
+  if (Array.isArray(value)) return value.some(hasSubmittedAnswer);
+  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).some(hasSubmittedAnswer);
+  return false;
+};
+
 const correctionText = (value: unknown): string => {
   if (value == null) return '—';
   if (typeof value === 'string') return value;
@@ -771,7 +780,9 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
             </div>
           </div>
           <div className="space-y-3 p-4 sm:p-5">
-            {attemptReview.questions.map((question, index) => (
+            {attemptReview.questions.map((question, index) => {
+              const unanswered = !hasSubmittedAnswer(question.answer);
+              return (
               <article key={question.question_id} className="overflow-hidden rounded-2xl border border-[#e0eaf0]">
                 <div className="flex items-start justify-between gap-3 bg-[#f7fafc] p-3.5 sm:p-4">
                   <div className="min-w-0">
@@ -779,7 +790,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                     <h3 className="mt-1 break-words text-sm font-bold leading-relaxed text-[#072a3f]">{question.question}</h3>
                   </div>
                   <StatusBadge tone={question.correct ? 'success' : 'danger'}>
-                    {question.points_awarded} / {question.max_points} pt{question.correct ? ' · Correcte' : ' · Incorrecte'}
+                    {question.points_awarded} / {question.max_points} pt{unanswered ? ' · Non répondu' : question.correct ? ' · Correcte' : ' · Incorrecte'}
                   </StatusBadge>
                 </div>
                 <div className="space-y-2 p-3.5 sm:p-4">
@@ -787,13 +798,14 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                     <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Votre réponse</p>
                     <p className={'break-words text-sm font-semibold ' + (question.correct ? 'text-[#145c3d]' : 'text-rose-800')}>{correctionText(question.answer ?? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Aucune réponse'))}</p>
                   </div>
-                  {!question.correct && <>
+                  {(!question.correct || unanswered) && <>
                     <div className="rounded-xl border border-[#bfe3ce] bg-[#eef9f3] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#145c3d]">Réponse attendue</p><p className="break-words text-sm font-bold text-[#145c3d]">{correctionText(question.expected)}</p></div>
                     {question.explanation && <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#46657a]">Explication</p><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#072a3f]">{correctionText(question.explanation)}</p></div>}
                   </>}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
