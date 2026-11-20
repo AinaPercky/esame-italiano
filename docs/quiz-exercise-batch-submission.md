@@ -24,7 +24,7 @@ Réduire les allers-retours Supabase pendant une session élève, particulièrem
 ### Exercices
 
 - start_exercise_attempt_batch(uuid) crée une tentative avec l'ordre des questions et des options figé côté serveur, puis renvoie le paquet complet de questions nettoyées.
-- Le navigateur conserve chaque réponse et l'index courant localement (localStorage), y compris pendant la saisie.
+- Le navigateur conserve chaque réponse et l'index courant localement (IndexedDB), y compris pendant la saisie.
 - Le passage d'une question à l'autre ne déclenche plus de RPC.
 - submit_exercise_attempt_batch(uuid,jsonb) corrige toutes les réponses côté serveur, écrit les lignes de détail, calcule le score et clôt la tentative dans une transaction.
 - get_exercise_attempt_bundle(uuid) permet la reprise d'une tentative groupée après rechargement. Les tentatives anciennes continuent d'utiliser les RPC historiques.
