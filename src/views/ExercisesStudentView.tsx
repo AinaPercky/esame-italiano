@@ -140,6 +140,16 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     setRemaining(item.seconds_remaining);
   }, []);
 
+  const updateAnswer = useCallback((value: string) => {
+    setAnswer(value);
+    if (!batchMode || !active) return;
+    const nextAnswers = { ...batchAnswers, [active.question.id]: value };
+    setBatchAnswers(nextAnswers);
+    try {
+      localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: batchIndex }));
+    } catch { /* stockage local indisponible */ }
+  }, [active, batchAnswers, batchIndex, batchMode]);
+
   const submit = useCallback(async (value?: string) => {
     if (!active || submitting || correction) return;
     setSubmitting(true); setError('');
@@ -334,7 +344,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         <AssessmentQcmOptions
           options={(question.options || []).map((option) => ({ value: option, label: option }))}
           selectedValue={answer}
-          onSelect={setAnswer}
+          onSelect={updateAnswer}
         />
       );
     }
@@ -344,7 +354,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           question={question}
           customSentence={customSentence}
           answer={answer}
-          onChange={setAnswer}
+          onChange={updateAnswer}
           theme="navy"
           onEnterPress={() => void submit()}
         />
