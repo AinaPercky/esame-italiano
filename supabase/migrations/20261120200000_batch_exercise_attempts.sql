@@ -83,7 +83,8 @@ BEGIN
       'completed', TRUE,
       'attempt_id', v_attempt.id,
       'score', v_attempt.score,
-      'max_score', v_attempt.max_score
+      'max_score', v_attempt.max_score,
+      'completed_at', v_attempt.completed_at
     );
   END IF;
 
@@ -178,6 +179,7 @@ DECLARE
   v_has_answer BOOLEAN;
   v_score NUMERIC := 0;
   v_max_points NUMERIC;
+  v_completed_at TIMESTAMPTZ;
 BEGIN
   IF jsonb_typeof(v_answers) <> 'object' THEN
     RAISE EXCEPTION 'Format des réponses invalide.';
@@ -290,13 +292,15 @@ BEGIN
       status = 'completed',
       completed_at = clock_timestamp(),
       updated_at = clock_timestamp()
-  WHERE id = v_attempt.id;
+  WHERE id = v_attempt.id
+  RETURNING completed_at INTO v_completed_at;
 
   RETURN jsonb_build_object(
     'completed', TRUE,
     'attempt_id', v_attempt.id,
     'score', round(v_score, 2),
     'max_score', v_max_points,
+    'completed_at', v_completed_at,
     'feedback', v_feedback
   );
 END;
