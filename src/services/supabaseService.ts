@@ -1210,6 +1210,7 @@ class SupabaseService {
       started_at: submission.started_at,
       submitted_at: submission.submitted_at || null,
       answers: submission.answers || {},
+      questions_snapshot: submission.questions_snapshot || null,
       score: Number(submission.score) || 0,
       max_score: Number(submission.max_score) || 20,
       score_20: Number(submission.score_20) || 0,
@@ -1402,6 +1403,7 @@ class SupabaseService {
         student_number: submission.student_number || null, class_id: submission.class_id,
         class_name: submission.class_name || null, started_at: submission.started_at,
         submitted_at: submission.submitted_at || null, answers: submission.answers || {},
+        questions_snapshot: submission.questions_snapshot || null,
         status: submission.status, date: submission.date,
         retry_grant_id: submission.retry_grant_id || null
       }
