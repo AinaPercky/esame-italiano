@@ -89,6 +89,24 @@ const STUDENT_TABS = [
   { id: 'written_exams', label: 'Examens écrits', shortLabel: 'Écrit', icon: FileText }
 ] as const;
 
+const hasQuizAnswer = (value: unknown): boolean => {
+  if (value == null) return false;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed !== null && typeof parsed === 'object') return hasQuizAnswer(parsed);
+    } catch {
+      // Ordinary text answers are not JSON and count as submitted.
+    }
+    return true;
+  }
+  if (Array.isArray(value)) return value.some(hasQuizAnswer);
+  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).some(hasQuizAnswer);
+  return true;
+};
+
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
   onLogout: () => void;
@@ -1424,6 +1442,46 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   Fermer
                 </button>
               </div>
+            )}
+
+            {lastSubmissionResult && (
+              <section className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-sm" aria-live="polite">
+                <div className="border-b border-[#d8e6ee] bg-[#f7fafc] p-4">
+                  <h3 className="text-sm font-extrabold text-[#072a3f]">Correction détaillée du quiz</h3>
+                  <p className="mt-1 text-xs text-[#607f93]">Chaque réponse est comparée au corrigé enregistré côté serveur.</p>
+                </div>
+                <div className="space-y-3 p-4">
+                  {(lastSubmissionResult.questions_snapshot || quizzes.find(q => q.id === lastSubmissionResult.quiz_id)?.questions || []).map((question, index) => {
+                    const item = lastSubmissionResult.feedback?.[question.id];
+                    const submittedAnswer = lastSubmissionResult.answers?.[question.id];
+                    const unanswered = !hasQuizAnswer(submittedAnswer);
+                    return (
+                      <article key={question.id} className="rounded-xl border border-[#e0eaf0] p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#607f93]">Question {index + 1}</p>
+                            <p className="mt-1 break-words text-sm font-bold text-[#072a3f]">{question.question}</p>
+                          </div>
+                          <span className={'shrink-0 rounded-full px-2 py-1 text-[10px] font-extrabold ' + (item?.correct ? 'bg-[#eef9f3] text-[#145c3d]' : 'bg-rose-50 text-rose-700')}>
+                            {item?.correct ? 'Correcte' : unanswered ? 'Non répondu' : 'Incorrecte'}
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2 text-xs">
+                          <p className="break-words"><strong>Votre réponse :</strong> {unanswered ? 'Non répondu' : item?.studentAnswer || submittedAnswer}</p>
+                          {(!item?.correct || unanswered) && (
+                            <>
+                              <p className="break-words rounded-lg bg-[#eef9f3] p-2 text-[#145c3d]"><strong>Bonne réponse :</strong> {item?.expected || 'Corrigé indisponible pour cette question.'}</p>
+                              {item?.explanation && <p className="whitespace-pre-wrap break-words rounded-lg bg-[#f7fafc] p-2 text-[#072a3f]"><strong>Explication :</strong> {item.explanation}</p>}
+                            </>
+                          )}
+                          {item && <p className="font-bold text-[#46657a]">{item.points} / {item.maxPoints ?? question.points} point(s)</p>}
+                          {!item && <p className="text-amber-700">Le détail de correction n'a pas été renvoyé par le serveur.</p>}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
             )}
 
             {tutorialResult && (

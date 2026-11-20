@@ -259,7 +259,7 @@ export interface QuizSubmission {
   max_score: number; // Total points du quiz
   score_20: number; // Note normalisée sur 20
   status: 'completed' | 'timeout' | 'missed'; // 'missed' = non fait avant la clôture (note = 0)
-  feedback?: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }>;
+  feedback?: Record<string, { correct: boolean; points: number; maxPoints?: number; expected: string; studentAnswer: string; explanation?: string }>;
   date: string; // YYYY-MM-DD
   attempt_number?: number;
   launch_id?: string;

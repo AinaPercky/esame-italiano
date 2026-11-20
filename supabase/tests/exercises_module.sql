@@ -219,4 +219,76 @@ begin
 end;
 $$;
 
+
+reset role;
+
+-- Verb-bank exercises must score verb selection and conjugation independently.
+DO $verbes_trous_grading$
+DECLARE
+  v_question jsonb := '{
+    "id":"vt1",
+    "type":"verbes_trous",
+    "points":6,
+    "explanation":"Choisir le bon verbe et le conjuguer.",
+    "verbes_trous":{
+      "points_par_phrase":3,
+      "phrases":[
+        {"id":"p1","verbe":"essere","reponses":["sono"]},
+        {"id":"p2","verbe":"avere","reponses":["ho"]}
+      ]
+    }
+  }'::jsonb;
+  v_result jsonb;
+BEGIN
+  v_result := public.exercise_grade_question(
+    v_question,
+    '{"p1":{"verbe_choisi":"essere","texte_saisi":"sono"},"p2":{"verbe_choisi":"avere","texte_saisi":"ho"}}'::jsonb
+  );
+  IF (v_result ->> 'points')::numeric <> 6 OR coalesce((v_result ->> 'correct')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Correct verb choices and conjugations must award all 6 points: %', v_result;
+  END IF;
+
+  -- Correct conjugations with the wrong selected verbs earn only the two conjugation points per phrase.
+  v_result := public.exercise_grade_question(
+    v_question,
+    '{"p1":{"verbe_choisi":"avere","texte_saisi":"sono"},"p2":{"verbe_choisi":"essere","texte_saisi":"ho"}}'::jsonb
+  );
+  IF (v_result ->> 'points')::numeric <> 4 OR coalesce((v_result ->> 'correct')::boolean,true) IS NOT FALSE THEN
+    RAISE EXCEPTION 'Wrong verb selections must not receive the verb-selection points: %', v_result;
+  END IF;
+
+  -- Correct verbs with wrong conjugations earn only one point per phrase.
+  v_result := public.exercise_grade_question(
+    v_question,
+    '{"p1":{"verbe_choisi":"essere","texte_saisi":"ho"},"p2":{"verbe_choisi":"avere","texte_saisi":"sono"}}'::jsonb
+  );
+  IF (v_result ->> 'points')::numeric <> 2 THEN
+    RAISE EXCEPTION 'Wrong conjugations must not receive conjugation points: %', v_result;
+  END IF;
+
+  -- A verb cannot be reused in another blank.
+  v_result := public.exercise_grade_question(
+    v_question,
+    '{"p1":{"verbe_choisi":"essere","texte_saisi":"sono"},"p2":{"verbe_choisi":"essere","texte_saisi":"ho"}}'::jsonb
+  );
+  IF (v_result ->> 'points')::numeric <> 3 THEN
+    RAISE EXCEPTION 'Reusing a verb must invalidate the duplicate selection: %', v_result;
+  END IF;
+
+  v_result := public.exercise_grade_question(v_question, '{}'::jsonb);
+  IF (v_result ->> 'points')::numeric <> 0 OR coalesce((v_result ->> 'correct')::boolean,true) IS NOT FALSE THEN
+    RAISE EXCEPTION 'An unanswered verb-bank question must score zero: %', v_result;
+  END IF;
+
+  -- Keep compatibility with the bank's parallel choices/saisies representation.
+  v_result := public.exercise_grade_question(
+    v_question,
+    '{"choices":["essere","avere"],"saisies":["sono","ho"]}'::jsonb
+  );
+  IF (v_result ->> 'points')::numeric <> 6 THEN
+    RAISE EXCEPTION 'Parallel choices/saisies representation was not graded correctly: %', v_result;
+  END IF;
+END;
+$verbes_trous_grading$;
+
 reset role;

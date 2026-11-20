@@ -1558,7 +1558,7 @@ export const dataService = {
     }
 
     let rawScore = 0;
-    const feedback: Record<string, { correct: boolean; points: number; expected: string; studentAnswer: string }> = {};
+    const feedback: Record<string, { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string }> = {};
 
     quiz.questions.forEach(q => {
       const studentAns = (answers[q.id] || '').trim();
@@ -1568,6 +1568,8 @@ export const dataService = {
       feedback[q.id] = {
         correct: pointsInfo.isFullyCorrect,
         points: awarded,
+        maxPoints: pointsInfo.maxPoints,
+        explanation: q.explanation,
         expected: q.type === 'reorder'
           ? formatCorrectReorderAnswer(q)
           : q.type === 'text'
@@ -1586,8 +1588,10 @@ export const dataService = {
     });
 
     const maxScore = quiz.total_points || 20;
-    const finalScore = isTimeout ? 0 : rawScore;
-    const score20 = isTimeout ? 0 : (maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0);
+    // Une expiration clôt le quiz, mais ne doit pas annuler les points déjà gagnés.
+    // Les questions restées vides sont déjà notées zéro par la correction question par question.
+    const finalScore = rawScore;
+    const score20 = maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0;
     const now = new Date().toISOString();
     const today = now.split('T')[0];
 
