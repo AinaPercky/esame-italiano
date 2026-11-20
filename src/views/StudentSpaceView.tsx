@@ -837,7 +837,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     advanceToNextQuestion(pendingAnswers);
   };
 
-  // Traiter la réponse de la question : si fausse, afficher l'explication pendant 13s
+  // Les quiz officiels sont corrigés en une seule transaction lors de la remise finale.
+  // Le mode tutoriel conserve sa correction locale et son feedback immédiat.
   const processQuestionProgression = async (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
@@ -846,53 +847,29 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const currentQ = activeQuiz.questions[currentQuestionIndex];
     if (!currentQ) return;
 
-    const studentAns = updatedAnswers[currentQ.id] || '';
-    let evaluation: { correct: boolean; points: number; maxPoints: number; expected: string; studentAnswer: string; explanation?: string };
-
-    try {
-      // Les quiz officiels sont corrigés exclusivement par PostgreSQL.
-      // Seul le mode tutoriel local conserve sa correction pédagogique locale.
-      evaluation = isPracticeMode
-        ? (() => {
-            const local = calculateQuestionPointsEarned(currentQ, studentAns);
-            return {
-              correct: local.isFullyCorrect,
-              points: local.awardedPoints,
-              maxPoints: local.maxPoints,
-              expected: '',
-              studentAnswer: studentAns
-            };
-          })()
-        : await supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns);
-    } catch (error: any) {
-      setQuizSubmissionError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
-      return;
-    }
-
-    if (evaluation.correct) {
+    if (!isPracticeMode) {
       advanceToNextQuestion(updatedAnswers);
       return;
     }
 
-    const studentDisplay = currentQ.type === 'verbes_trous' && currentQ.verbes_trous
-      ? currentQ.verbes_trous.phrases.map((phrase) => {
-          const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)];
-          return `${phrase.debut || ''}__[${response?.verbe_choisi || '—'}]__ ${response?.texte_saisi || '—'}${phrase.fin || ''}`;
-        }).join('\\n')
-      : evaluation.studentAnswer || studentAns;
+    const studentAns = updatedAnswers[currentQ.id] || '';
+    const local = calculateQuestionPointsEarned(currentQ, studentAns);
+    if (local.isFullyCorrect) {
+      advanceToNextQuestion(updatedAnswers);
+      return;
+    }
 
     setIncorrectFeedback({
       isOpen: true,
       questionNumber: currentQuestionIndex + 1,
       questionText: currentQ.question,
-      studentAnswer: studentDisplay,
-      correctAnswer: evaluation.expected,
-      explanation: evaluation.explanation,
+      studentAnswer: studentAns,
+      correctAnswer: '',
       countdown: CORRECTION_DISPLAY_SECONDS,
       pendingNextAnswers: updatedAnswers,
       isTimeout,
-      points: evaluation.points,
-      maxPoints: evaluation.maxPoints
+      points: local.awardedPoints,
+      maxPoints: local.maxPoints
     });
   };
 
