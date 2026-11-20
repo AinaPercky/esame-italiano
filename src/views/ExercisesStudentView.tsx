@@ -236,10 +236,11 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           const restoredAnswers = draft?.answers && typeof draft.answers === 'object' ? draft.answers as Record<string, unknown> : {};
           serverClockOffset.current = Date.now() - new Date(resumedBatch.server_now).getTime();
           const estimatedServerNow = Date.now() - serverClockOffset.current;
-          const inferredIndex = Math.max(0, resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow));
+          const inferredIndex = resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow);
+          const fallbackIndex = inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex;
           const restoredIndex = Number.isInteger(draft?.index)
-            ? Math.min(resumedBatch.questions.length - 1, Math.max(0, draft.index))
-            : (inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex);
+            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draft.index)))
+            : fallbackIndex;
           setBatchMode(true);
           setBatchBundle(resumedBatch);
           setBatchAnswers(restoredAnswers);
