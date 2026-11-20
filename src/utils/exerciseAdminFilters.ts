@@ -247,8 +247,8 @@ export function filterAndSortAttempts(
     if (filters.progress !== 'all' && row.status !== filters.progress) return false;
 
     const pct = getAttemptPercentage(row);
-    if (filters.scoreBand === 'passed' && (pct === null || pct < 50)) return false;
-    if (filters.scoreBand === 'needs_review' && (pct === null || pct >= 50)) return false;
+    if (filters.scoreBand === 'passed' && (pct === null || pct < 70)) return false;
+    if (filters.scoreBand === 'needs_review' && (pct === null || pct >= 70)) return false;
     if (filters.scoreBand === 'unscored' && pct !== null) return false;
 
     if (searchTerms.length > 0) {
