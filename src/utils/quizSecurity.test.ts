@@ -329,7 +329,8 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
 
   it('ne fait pas enregistrer de soumission nominative depuis le parcours de quiz public', () => {
     assert.ok(publicViewSource.includes('supabaseService.fetchPublicQuiz'));
-    assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizQuestion'));
+    assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizAnswers'));
+    assert.ok(!publicViewSource.includes('evaluatePublicQuizQuestion('));
     assert.doesNotMatch(publicViewSource, /submitQuizSubmissionAtomically|submitQuizPresenceSubmission|saveQuizSubmission/);
     assert.doesNotMatch(
       rpcMigration,
