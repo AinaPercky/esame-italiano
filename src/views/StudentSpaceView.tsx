@@ -243,6 +243,20 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
+  const submissionCorrectionRef = useRef<HTMLElement | null>(null);
+
+  // Après la remise, l'élève se trouve généralement en bas du quiz.
+  // Ramener automatiquement la correction dans la zone visible, notamment sur mobile.
+  useEffect(() => {
+    if (!lastSubmissionResult) return;
+    const frame = window.requestAnimationFrame(() => {
+      submissionCorrectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [lastSubmissionResult?.id]);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
   const [incompletePhraseConfirmation, setIncompletePhraseConfirmation] = useState<number | null>(null);
@@ -1445,7 +1459,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
             )}
 
             {lastSubmissionResult && (
-              <section className="overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-sm" aria-live="polite">
+              <section
+                ref={submissionCorrectionRef}
+                tabIndex={-1}
+                className="scroll-mt-4 overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-sm outline-none"
+                aria-live="polite"
+                aria-label="Correction détaillée du quiz"
+              >
                 <div className="border-b border-[#d8e6ee] bg-[#f7fafc] p-4">
                   <h3 className="text-sm font-extrabold text-[#072a3f]">Correction détaillée du quiz</h3>
                   <p className="mt-1 text-xs text-[#607f93]">Chaque réponse est comparée au corrigé enregistré côté serveur.</p>
