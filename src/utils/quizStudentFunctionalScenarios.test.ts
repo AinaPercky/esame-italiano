@@ -210,7 +210,9 @@ describe('Parcours étudiant — réponses, correction et persistance', () => {
 
   it('refuse les doubles soumissions côté interface et corrige les quiz officiels côté serveur', () => {
     assert.ok(studentView.includes('if (quizSubmissionLockRef.current) return'));
-    assert.ok(studentView.includes('supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns)'));
+    assert.ok(studentView.includes('if (!isPracticeMode)'));
+    assert.ok(studentView.includes('advanceToNextQuestion(updatedAnswers)'));
+    assert.ok(!studentView.includes('evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns)'));
     assert.ok(studentView.includes('dataService.submitQuiz('));
     assert.ok(submissionMigration.includes('public.quiz_grade_all(q.id, coalesce(saved_answers'));
   });
