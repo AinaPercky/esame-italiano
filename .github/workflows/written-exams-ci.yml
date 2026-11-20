@@ -66,6 +66,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113100000_student_exercise_attempt_details.sql
       - name: Add batch exercise start, resume and final submission RPCs
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120200000_batch_exercise_attempts.sql
+      - name: Fix exercise verb-bank grading weights
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120220000_fix_exercise_verbes_trous_grading.sql
       - name: Add explicit validated exercise publication
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113071100_publish_exercise_rpc.sql
       - name: Apply written exam migration
