@@ -8,6 +8,7 @@ export { isTextAnswerCorrect, isQuestionAnswerCorrect };
 export interface QuizFeedbackEntry {
   correct: boolean;
   points: number;
+  maxPoints?: number;
   expected: string;
   studentAnswer: string;
   explanation?: string;
