@@ -330,6 +330,9 @@ describe('non-régression des parcours de quiz publics et authentifiés', () => 
   it('ne fait pas enregistrer de soumission nominative depuis le parcours de quiz public', () => {
     assert.ok(publicViewSource.includes('supabaseService.fetchPublicQuiz'));
     assert.ok(publicViewSource.includes('supabaseService.evaluatePublicQuizAnswers'));
+    assert.ok(publicViewSource.includes('saveWrittenExamDraft(draftId, answers, currentIndex)'));
+    assert.ok(publicViewSource.includes('loadWrittenExamDraft(draftId)'));
+    assert.ok(publicViewSource.includes('deleteWrittenExamDraft(publicQuizDraftId(qId, studentName))'));
     assert.ok(!publicViewSource.includes('evaluatePublicQuizQuestion('));
     assert.doesNotMatch(publicViewSource, /submitQuizSubmissionAtomically|submitQuizPresenceSubmission|saveQuizSubmission/);
     assert.doesNotMatch(
