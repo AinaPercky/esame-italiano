@@ -153,6 +153,35 @@ export const exerciseService = {
     return (Array.isArray(data) ? data : []) as StudentExerciseItem[];
   },
 
+  async startAttemptBatch(exerciseId: string): Promise<ExerciseAttemptBundle> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('start_exercise_attempt_batch', { p_exercise_id: exerciseId });
+    if (error) throwIfError(error, 'Démarrage groupé de l’exercice impossible');
+    if (!data?.attempt_id || !Array.isArray(data.questions)) throw new Error('Le serveur n’a pas retourné le paquet de questions sécurisé.');
+    return data as ExerciseAttemptBundle;
+  },
+
+  async resumeAttemptBatch(attemptId: string): Promise<ExerciseAttemptBundle | ExerciseBatchSubmissionResult | null> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('get_exercise_attempt_bundle', { p_attempt_id: attemptId });
+    if (error) throwIfError(error, 'Reprise groupée de l’exercice impossible');
+    if (!data) return null;
+    if (data.completed) return data as ExerciseBatchSubmissionResult;
+    if (!Array.isArray(data.questions)) throw new Error('Le paquet de reprise de l’exercice est invalide.');
+    return data as ExerciseAttemptBundle;
+  },
+
+  async submitAttemptBatch(attemptId: string, answers: Record<string, unknown>): Promise<ExerciseBatchSubmissionResult> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('submit_exercise_attempt_batch', {
+      p_attempt_id: attemptId,
+      p_answers: answers || {}
+    });
+    if (error) throwIfError(error, 'Remise groupée de l’exercice impossible');
+    if (!data?.completed) throw new Error('Le serveur n’a pas confirmé la remise de l’exercice.');
+    return data as ExerciseBatchSubmissionResult;
+  },
+
   async startAttempt(exerciseId: string): Promise<ExerciseAttemptQuestion> {
     const client = requireClient();
     const { data, error } = await client.rpc('start_exercise_attempt', { p_exercise_id: exerciseId });
