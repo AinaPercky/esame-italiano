@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RotateCcw, CheckCircle2, XCircle, ArrowRight, Loader2, History, Award, Eye, CalendarDays, RefreshCw } from 'lucide-react';
 import type { ExerciseAttemptQuestion, ExerciseAttemptBundle, ExerciseCorrection, StudentExerciseItem, ExerciseAttemptResult, ExerciseAttemptReview, QuizQuestion } from '../types';
+import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 import { exerciseService } from '../services/exerciseService';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { QuizReorderList } from '../components/QuizReorderList';
@@ -64,6 +65,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
   const timeoutLock = useRef(false);
   const advanceLock = useRef(false);
   const serverClockOffset = useRef(0);
+  const localSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -145,9 +147,11 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     if (!batchMode || !active) return;
     const nextAnswers = { ...batchAnswers, [active.question.id]: value };
     setBatchAnswers(nextAnswers);
-    try {
-      localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: batchIndex }));
-    } catch { /* stockage local indisponible */ }
+    const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
+      saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)
+    );
+    localSaveQueueRef.current = write;
+    void write.catch((e) => setError(e instanceof Error ? e.message : 'La sauvegarde locale a échoué.'));
   }, [active, batchAnswers, batchIndex, batchMode]);
 
   const submit = useCallback(async (value?: string) => {
@@ -157,16 +161,19 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       const currentAnswer = value === undefined ? answer : value;
       const nextAnswers = { ...batchAnswers, [active.question.id]: currentAnswer };
       setBatchAnswers(nextAnswers);
-      try {
-        localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: batchIndex }));
-      } catch { /* stockage local indisponible */ }
+      const localWrite = localSaveQueueRef.current.catch(() => undefined).then(() =>
+        saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)
+      );
+      localSaveQueueRef.current = localWrite;
+      await localWrite;
       try {
         if (batchIndex >= batchBundle.questions.length - 1) {
+          await localSaveQueueRef.current;
           await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
+          await deleteWrittenExamDraft(active.attempt_id);
           const completedReview = await exerciseService.getStudentAttemptDetails(active.attempt_id);
           setAttemptReview(completedReview);
           setHistoryExerciseId(batchBundle.exercise_id);
-          try { localStorage.removeItem('exercise_batch_draft_' + active.attempt_id); } catch { /* stockage local indisponible */ }
           setBatchBundle(null);
           setBatchAnswers({});
           setBatchIndex(0);
@@ -179,7 +186,11 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         } else {
           const nextIndex = batchIndex + 1;
           setBatchIndex(nextIndex);
-          try { localStorage.setItem('exercise_batch_draft_' + active.attempt_id, JSON.stringify({ answers: nextAnswers, index: nextIndex })); } catch { /* stockage local indisponible */ }
+          const nextWrite = localSaveQueueRef.current.catch(() => undefined).then(() =>
+            saveWrittenExamDraft(active.attempt_id, nextAnswers, nextIndex)
+          );
+          localSaveQueueRef.current = nextWrite;
+          await nextWrite;
           activateBatchQuestion(batchBundle, nextIndex, nextAnswers);
         }
       } catch (e) {
@@ -238,21 +249,19 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       if (attemptId) {
         const resumedBatch = await exerciseService.resumeAttemptBatch(attemptId);
         if (resumedBatch && 'completed' in resumedBatch) {
-          try { localStorage.removeItem('exercise_batch_draft_' + attemptId); } catch { /* stockage local indisponible */ }
+          await deleteWrittenExamDraft(attemptId);
           await refresh();
           return;
         }
         if (resumedBatch) {
-          const draft = (() => {
-            try { return JSON.parse(localStorage.getItem('exercise_batch_draft_' + attemptId) || 'null'); } catch { return null; }
-          })();
+          const draft = await loadWrittenExamDraft(attemptId);
           const restoredAnswers = draft?.answers && typeof draft.answers === 'object' ? draft.answers as Record<string, unknown> : {};
           serverClockOffset.current = Date.now() - new Date(resumedBatch.server_now).getTime();
           const estimatedServerNow = Date.now() - serverClockOffset.current;
           const inferredIndex = resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow);
           const fallbackIndex = inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex;
-          const restoredIndex = Number.isInteger(draft?.index)
-            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draft.index)))
+          const restoredIndex = Number.isInteger(draft?.currentIndex)
+            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draft.currentIndex)))
             : fallbackIndex;
           setBatchMode(true);
           setBatchBundle(resumedBatch);
@@ -270,7 +279,8 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         setBatchIndex(0);
         onFullscreenChange(true);
         activateBatchQuestion(startedBatch, 0, {});
-        try { localStorage.setItem('exercise_batch_draft_' + startedBatch.attempt_id, JSON.stringify({ answers: {}, index: 0 })); } catch { /* stockage local indisponible */ }
+        localSaveQueueRef.current = Promise.resolve();
+        await saveWrittenExamDraft(startedBatch.attempt_id, {}, 0);
         return;
       }
 
