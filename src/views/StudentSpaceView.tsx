@@ -690,7 +690,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         }
         setPresenceStartError(null);
         setPresenceInitialization(null);
-        startQuizSession(quiz, false, presenceInitialization.retryAuthorized === true);
+        const launchQuiz = active.launch.questions_snapshot?.length
+          ? { ...quiz, questions: active.launch.questions_snapshot }
+          : quiz;
+        startQuizSession(launchQuiz, false, presenceInitialization.retryAuthorized === true);
       } catch (error) {
         setPresenceInitialization(null);
         setPresenceStartError(error instanceof Error ? error.message : 'Impossible de démarrer ce quiz.');
