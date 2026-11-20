@@ -1606,6 +1606,7 @@ export const dataService = {
       started_at: now,
       submitted_at: now,
       answers,
+      questions_snapshot: JSON.parse(JSON.stringify(quiz.questions || [])),
       score: finalScore,
       max_score: maxScore,
       score_20: score20,
