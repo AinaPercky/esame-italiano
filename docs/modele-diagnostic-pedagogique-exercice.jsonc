@@ -1,0 +1,60 @@
+{
+  // Modèle importable dans le module Exercices.
+  // Les propriétés du diagnostic sont facultatives et doivent être renseignées par le professeur.
+  "schema": "perckylingua.exercise",
+  "schema_version": 1,
+  "metadata": {
+    "title": "Passato prossimo – scelta dell’ausiliare",
+    "description": "Diagnostic de la compétence de choix de l’auxiliaire.",
+    "category": "Grammaire",
+    "level": "A2"
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "type": "qcm",
+      "question": "Ieri Marco ___ andato a scuola.",
+      "options": ["ha", "è", "sono", "hanno"],
+      "correct_answer": "è",
+      "points": 1,
+      "time_limit_seconds": 17,
+      "explanation": "Andare si coniuga con l’ausiliare essere.",
+      "competency": "Choix de l’auxiliaire",
+      "skill_code": "PASSATO_PROSSIMO_AUX",
+      "error_categories": [
+        "Confusion essere/avere",
+        "Erreur d’accord de l’auxiliaire"
+      ],
+      "error_category_map": {
+        "ha": "Confusion essere/avere",
+        "sono": "Erreur d’accord de l’auxiliaire",
+        "hanno": "Erreur d’accord de l’auxiliaire"
+      }
+    },
+    {
+      "id": "q2",
+      "type": "text",
+      "question": "Completa: Maria ha ___ (scrivere) una lettera.",
+      "correct_answer": "scritto",
+      "points": 1,
+      "time_limit_seconds": 32,
+      "explanation": "Il participio passato di scrivere è scritto.",
+      "competency": "Formation du participe passé",
+      "skill_code": "PASSATO_PROSSIMO_PARTICIPLE",
+      "error_categories": [
+        "Participe passé irrégulier"
+      ],
+      "error_category_map": {
+        "scrivuto": "Participe passé irrégulier"
+      }
+    }
+  ]
+}
+
+// Consignes :
+// - error_category_map associe uniquement des réponses erronées précises à une catégorie déclarée.
+// - Une réponse absente de la correspondance reste non catégorisée.
+// - Le système ne déduit jamais la cause d'une erreur.
+// - Les questions sans competency ou skill_code restent valides et apparaissent comme
+//   « Compétence à renseigner » dans le diagnostic.
+// - Ne pas ajouter une catégorie d'erreur sans validation pédagogique du professeur.
