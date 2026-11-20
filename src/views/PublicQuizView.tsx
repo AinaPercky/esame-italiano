@@ -26,6 +26,7 @@ import {
 import { applyQuizQuestionOrder, shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { applyQuizItemOrder } from '../utils/quizReorder';
+import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 
 interface PublicQuizViewProps {
   quizId: string | null;
@@ -33,6 +34,10 @@ interface PublicQuizViewProps {
 }
 
 // ─── LocalStorage persistence keys ────────────────────────────────────────────
+function publicQuizDraftId(quizId: string, studentName: string) {
+  return 'public_quiz_draft_' + quizId + '_' + studentName.trim().toLocaleLowerCase();
+}
+
 function storageKey(quizId: string, suffix: string) {
   return `pq_${quizId}_${suffix}`;
 }
@@ -105,6 +110,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
   // Refs to avoid stale closures in timer callbacks
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const localSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const isQuizActive = screen === 'quiz';
   const hasSubmittedRef = useRef(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isTimerBeepEnabled());
@@ -159,6 +165,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     try {
       const publicId = qId || q.public_id || q.id;
       // Une seule RPC corrige toutes les réponses côté PostgreSQL à la remise.
+      await localSaveQueueRef.current.catch(() => undefined);
       const evaluated = await supabaseService.evaluatePublicQuizAnswers(publicId, answersRef.current);
       const feedback = evaluated.feedback;
       const rawScore = Number(evaluated.rawScore) || 0;
@@ -169,14 +176,17 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
         score20: maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0,
         feedback
       });
-      if (qId) clearStorage(qId);
+      if (qId) {
+        try { await deleteWrittenExamDraft(publicQuizDraftId(qId, studentName)); } catch { /* la correction serveur est déjà validée */ }
+        clearStorage(qId);
+      }
       setScreen('result');
     } catch (error: any) {
       hasSubmittedRef.current = false;
       setLoadError(error?.message || 'La correction sécurisée est indisponible. Réessayez.');
       setScreen('start');
     }
-  }, []);
+  }, [studentName]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Validate current question and compute feedback
@@ -265,10 +275,20 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
 
       // Restore persisted state
       const savedName = loadFromStorage<string>(storageKey(activeQuizId, 'studentName'), '');
-      const savedAnswers = loadFromStorage<Record<string, string>>(
-        storageKey(activeQuizId, 'answers'), {}
-      );
-      const savedIndex = loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
+      const draftId = savedName ? publicQuizDraftId(activeQuizId, savedName) : '';
+      const localDraft = draftId ? await loadWrittenExamDraft(draftId).catch(() => null) : null;
+      const legacyAnswers = loadFromStorage<Record<string, string>>(storageKey(activeQuizId, 'answers'), {});
+      const savedAnswers = localDraft?.answers && typeof localDraft.answers === 'object'
+        ? localDraft.answers as Record<string, string>
+        : legacyAnswers;
+      const savedIndex = Number.isInteger(localDraft?.currentIndex)
+        ? localDraft.currentIndex
+        : loadFromStorage<number>(storageKey(activeQuizId, 'currentIndex'), 0);
+      if (draftId && !localDraft && Object.keys(legacyAnswers).length) {
+        await saveWrittenExamDraft(draftId, legacyAnswers, savedIndex).catch(() => undefined);
+        localStorage.removeItem(storageKey(activeQuizId, 'answers'));
+      }
+      localSaveQueueRef.current = Promise.resolve();
       const savedValidated = loadFromStorage<Record<string, boolean>>(
         storageKey(activeQuizId, 'validated'), {}
       );
@@ -306,10 +326,16 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
-    saveToStorage(storageKey(activeQuizId, 'answers'), answers);
-    saveToStorage(storageKey(activeQuizId, 'currentIndex'), currentIndex);
+    if (studentName.trim()) {
+      const draftId = publicQuizDraftId(activeQuizId, studentName);
+      const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
+        saveWrittenExamDraft(draftId, answers, currentIndex)
+      );
+      localSaveQueueRef.current = write;
+      void write.catch((error) => setLoadError(error instanceof Error ? error.message : 'La sauvegarde locale du quiz a échoué.'));
+    }
     saveToStorage(storageKey(activeQuizId, 'validated'), validatedSet);
-  }, [activeQuizId, answers, currentIndex, validatedSet, screen]);
+  }, [activeQuizId, answers, currentIndex, validatedSet, screen, studentName]);
 
   useEffect(() => {
     if (!activeQuizId || screen !== 'quiz') return;
@@ -427,7 +453,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
   // ─────────────────────────────────────────────────────────────────────────
   // Start handler
   // ─────────────────────────────────────────────────────────────────────────
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
     const sourceQuiz = sourceQuizRef.current ?? quizRef.current;
     const normalizedStudentName = studentName.trim();
     if (!sourceQuiz || !normalizedStudentName) return;
@@ -440,8 +466,8 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const storedOrder = loadFromStorage<unknown>(storageKey(qId, 'questionOrder'), null);
     const storedItemOrders = loadFromStorage<unknown>(storageKey(qId, 'itemOrders'), {});
     const restoredOrder = applyQuizQuestionOrder(sourceQuiz.questions, storedOrder);
-    const savedAnswers = loadFromStorage<unknown>(storageKey(qId, 'answers'), {});
-    const savedIndex = loadFromStorage<number>(storageKey(qId, 'currentIndex'), 0);
+    const savedAnswers = answersRef.current;
+    const savedIndex = currentIndexRef.current;
     const savedValidated = loadFromStorage<unknown>(storageKey(qId, 'validated'), {});
     const hasSavedProgress = (Number.isInteger(savedIndex) && savedIndex > 0)
       || Boolean(savedAnswers && typeof savedAnswers === 'object' && Object.keys(savedAnswers).length)
@@ -463,9 +489,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
       itemOrders[question.id] = items.map((item) => item.id);
       return { ...question, items };
     });
-    const startingIndex = resetAttempt ? 0 : currentIndexRef.current;
+    const startingIndex = resetAttempt ? 0 : Math.min(Math.max(0, savedIndex), Math.max(0, sourceQuiz.questions.length - 1));
 
     if (resetAttempt) {
+      if (storedName) await deleteWrittenExamDraft(publicQuizDraftId(qId, storedName)).catch(() => undefined);
       clearStorage(qId);
       setAnswers({});
       answersRef.current = {};
@@ -481,6 +508,10 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const orderedQuiz = { ...sourceQuiz, questions: questionsWithItemOrders };
     quizRef.current = orderedQuiz;
     setQuiz(orderedQuiz);
+    setAnswers(savedAnswers && typeof savedAnswers === 'object' ? savedAnswers as Record<string, string> : {});
+    answersRef.current = savedAnswers && typeof savedAnswers === 'object' ? savedAnswers as Record<string, string> : {};
+    setCurrentIndex(startingIndex);
+    currentIndexRef.current = startingIndex;
     const startingQuestionTimeMs = getQuestionTimeSeconds(orderedQuestions[startingIndex]) * 1000;
     timePerQuestionMsRef.current = startingQuestionTimeMs;
     setTimePerQuestionMs(startingQuestionTimeMs);
@@ -532,6 +563,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     const q = sourceQuizRef.current ?? quizRef.current;
     if (!qId || !q) return;
     clearStorage(qId);
+    void deleteWrittenExamDraft(publicQuizDraftId(qId, studentName)).catch(() => undefined);
     quizRef.current = q;
     setQuiz(q);
     setAnswers({});
@@ -551,7 +583,7 @@ export const PublicQuizView: React.FC<PublicQuizViewProps> = ({
     hasSubmittedRef.current = false;
     setResult(null);
     setScreen('start');
-  }, []);
+  }, [studentName]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Navigation between quizzes
