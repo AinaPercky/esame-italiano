@@ -55,3 +55,27 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: perckylingua_test
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quiz_submission_questions_snapshot_migration.sql
+      - name: Bootstrap minimal schema for public quiz batch grading
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public_quiz_batch_ci_bootstrap.sql
+      - name: Apply public quiz batch grading migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120190000_batch_public_quiz_grading.sql
+      - name: Test public quiz batch grading, privacy and RPC grants
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public_quiz_batch_grading.sql
