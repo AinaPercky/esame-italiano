@@ -84,15 +84,20 @@ BEGIN
   SELECT questions_snapshot INTO captured
   FROM public.quiz_submissions WHERE id = 'new-submission';
 
-  IF captured IS DISTINCT FROM '[{"id":"q1","question":"Test","correct_answer":"è"}]'::jsonb THEN
-    RAISE EXCEPTION 'Le trigger n''a pas capturé le contenu du quiz : %', captured;
+  IF captured IS DISTINCT FROM '[{"id":"q1","question":"Version au lancement","correct_answer":"è"}]'::jsonb THEN
+    RAISE EXCEPTION 'La soumission ne reprend pas la version figée au lancement : %', captured;
+  END IF;
+
+  IF (SELECT launch_id FROM public.quiz_submissions WHERE id = 'new-submission')
+       IS DISTINCT FROM '00000000-0000-0000-0000-000000000001'::uuid THEN
+    RAISE EXCEPTION 'Le lancement actif n''a pas été associé à la soumission';
   END IF;
 
   SELECT questions_snapshot INTO provided
   FROM public.quiz_submissions WHERE id = 'provided-snapshot';
 
-  IF provided IS DISTINCT FROM '[{"id":"q-launched","question":"Version fournie"}]'::jsonb THEN
-    RAISE EXCEPTION 'Le snapshot fourni par le client a été écrasé : %', provided;
+  IF provided IS DISTINCT FROM '[{"id":"q-provided","question":"Version fournie"}]'::jsonb THEN
+    RAISE EXCEPTION 'Le snapshot fourni hors lancement a été écrasé : %', provided;
   END IF;
 
   IF (SELECT count(*) FROM public.quiz_submissions WHERE questions_snapshot IS NULL) <> 1 THEN
