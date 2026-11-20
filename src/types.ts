@@ -275,6 +275,8 @@ export interface QuizLaunch {
   quiz_id: string;
   launched_at: string;
   closed_at?: string | null;
+  /** Questions frozen server-side when the teacher launched this quiz; student-safe projection. */
+  questions_snapshot?: QuizQuestion[] | null;
   /** Deprecated launch-level field; presence initialization is per participant. */
   presence_deadline_at?: string | null;
   status: 'launched' | 'closed';
