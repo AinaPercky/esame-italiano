@@ -126,7 +126,9 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
       (quiz.questions || []).forEach((question, index) => {
         const classDetails = classSubmissions.flatMap(submission => {
           if (submission.quiz_id !== quiz.id) return [];
-          const detail = analyzeSubmissionQuestion(question, submission);
+          const snapshotQuestion = submission.questions_snapshot?.find(item => item.id === question.id);
+          const questionForAttempt = snapshotQuestion || question;
+          const detail = analyzeSubmissionQuestion(questionForAttempt, submission);
           return detail ? [detail] : [];
         });
         if (!classDetails.length) return;
@@ -304,12 +306,26 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
                         </summary>
                         <div className="mt-3 rounded-lg bg-slate-50 p-3">
                           <p className="mb-2 text-[10px] font-semibold text-slate-500">Réussite calculée sur les points obtenus; {row.classDetails.length} réponse(s) de classe{studentId ? `, ${row.details.length} de ${selectedStudent?.first_name || 'l’élève'}` : ''}.</p>
+                          <div className="mb-3 rounded-md border border-indigo-100 bg-white p-2 text-[11px]">
+                            <p className="font-bold text-indigo-950">Compétence : {row.question.competency || 'Compétence à renseigner'}</p>
+                            {row.question.skill_code && <p className="mt-0.5 font-mono text-[10px] text-slate-500">{row.question.skill_code}</p>}
+                            {(() => {
+                              const mapping = row.question.error_category_map || {};
+                              const counts = new Map<string, number>();
+                              (studentId ? row.details : row.classDetails).filter(detail => !detail.correct).forEach(detail => {
+                                const answer = (detail.answer || '').trim().toLocaleLowerCase();
+                                const entry = Object.entries(mapping).find(([key]) => key.trim().toLocaleLowerCase() === answer);
+                                if (entry) counts.set(entry[1], (counts.get(entry[1]) || 0) + 1);
+                              });
+                              return counts.size ? <div className="mt-2 flex flex-wrap gap-1.5">{Array.from(counts.entries()).map(([category,count]) => <span key={category} className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-900">{category} · {count}</span>)}</div> : <p className="mt-1 text-[10px] text-slate-500">Aucune cause d’erreur explicitement catégorisée pour cette sélection.</p>;
+                            })()}
+                          </div>
                           <div className="max-h-64 space-y-2 overflow-y-auto">
                             {studentId && row.details.length === 0 && <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900">Aucune réponse enregistrée pour cet élève. Les résultats de la classe pour cette question : {row.classDetails.length} réponse(s).</p>}
                             {(studentId ? row.details : row.classDetails).map((detail, detailIndex) => (
                               <div key={`${detail.submission.id}-${detailIndex}`} className="grid gap-1 rounded-md border border-slate-200 bg-white p-2 text-[11px] sm:grid-cols-[minmax(100px,0.8fr)_2fr_1.5fr_auto] sm:items-start">
                                 <span className="font-semibold text-slate-700">{detail.submission.student_name || 'Élève'}</span>
-                                <span className="break-words text-slate-700"><strong>Réponse :</strong> {detail.answer}</span>
+                                <span className="break-words text-slate-700"><strong>Réponse :</strong> {detail.answer}{!detail.correct && row.question.error_category_map && Object.entries(row.question.error_category_map).some(([key]) => key.trim().toLocaleLowerCase() === detail.answer.trim().toLocaleLowerCase()) && <span className="mt-1 block font-semibold text-amber-800">Cause renseignée : {Object.entries(row.question.error_category_map).find(([key]) => key.trim().toLocaleLowerCase() === detail.answer.trim().toLocaleLowerCase())?.[1]}</span>}</span>
                                 <span className="break-words text-slate-500"><strong>Attendu :</strong> {detail.expected}</span>
                                 <span className={detail.correct ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>{detail.points}/{detail.maxPoints} pt{detail.correct ? ' · correct' : ''}</span>
                               </div>
