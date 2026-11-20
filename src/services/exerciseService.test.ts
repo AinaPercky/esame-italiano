@@ -72,6 +72,7 @@ test('exercise batch migration keeps answer keys server-side and exposes only au
     'CREATE OR REPLACE FUNCTION public.start_exercise_attempt_batch(',
     'CREATE OR REPLACE FUNCTION public.get_exercise_attempt_bundle(',
     'CREATE OR REPLACE FUNCTION public.submit_exercise_attempt_batch(',
+    'CREATE OR REPLACE FUNCTION public.evaluate_exercise_attempt_question(',
     "- 'correct_answer' - 'answers' - 'explanation'",
     'public.exercise_grade_question(v_question, coalesce(v_answer, \'null\'::jsonb))',
     'v_timed_out := NOT v_has_answer AND clock_timestamp() > v_deadline;',
@@ -84,10 +85,12 @@ test('exercise batch migration keeps answer keys server-side and exposes only au
   assert.ok(service.includes("client.rpc('start_exercise_attempt_batch'"));
   assert.ok(service.includes("client.rpc('get_exercise_attempt_bundle'"));
   assert.ok(service.includes("client.rpc('submit_exercise_attempt_batch'"));
+  assert.ok(service.includes("client.rpc('evaluate_exercise_attempt_question'"));
 
   const viewPath = path.resolve(process.cwd(), 'src/views/ExercisesStudentView.tsx');
   const view = fs.readFileSync(viewPath, 'utf8');
   assert.ok(view.includes('exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers)'));
+  assert.ok(view.includes('exerciseService.evaluateAttemptQuestion('));
   assert.ok(view.includes('saveWrittenExamDraft(active.attempt_id, nextAnswers, batchIndex)'));
   assert.ok(view.includes('loadWrittenExamDraft(attemptId)'));
   assert.ok(view.includes('deleteWrittenExamDraft(active.attempt_id)'));
