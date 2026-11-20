@@ -93,7 +93,9 @@ describe('Parcours étudiant — secondes chances', () => {
     assert.ok(studentView.includes('isRetryAuthorizedParticipant(activeLaunch.participant.presence_status)'));
     assert.ok(studentView.includes('confirmQuizPresence(activeLaunch.launch.id)'));
     assert.ok(studentView.includes('retryAuthorized'));
-    assert.ok(studentView.includes('startQuizSession(quiz, false, presenceInitialization.retryAuthorized === true)'));
+    assert.ok(studentView.includes('active.launch.questions_snapshot?.length'));
+    assert.ok(studentView.includes('questions: active.launch.questions_snapshot'));
+    assert.ok(studentView.includes('startQuizSession(launchQuiz, false, presenceInitialization.retryAuthorized === true)'));
     assert.ok(studentView.includes('isRetryAttempt'));
     assert.ok(studentView.includes('dataService.submitQuiz('));
   });
