@@ -75,6 +75,8 @@ export interface TeacherExerciseAttemptRow {
   max_score: number;
   best_attempt_id?: string | null;
   best_details?: TeacherExerciseAttemptDetail[];
+  /** Questions from the exact version used by the best completed attempt. */
+  best_questions?: import('../types').QuizQuestion[];
   started_at?: string | null;
   completed_at?: string | null;
   details?: TeacherExerciseAttemptDetail[];
@@ -395,4 +397,174 @@ export function filterAndSortQuizzes(
   });
 
   return sorted;
+}
+
+
+export const PEDAGOGICAL_MASTERY_THRESHOLD = 70;
+
+export interface ExerciseQuestionDiagnostic {
+  id: string;
+  label: string;
+  competency: string;
+  skillCode: string | null;
+  responses: number;
+  correct: number;
+  incorrect: number;
+  points: number;
+  maxPoints: number;
+  masteryRate: number | null;
+  studentsNeedingSupport: Array<{ studentId: string; studentName: string; className: string; rate: number }>;
+  errorPatterns: Array<{ category: string; count: number }>;
+}
+
+export interface ExerciseCompetencyDiagnostic {
+  competency: string;
+  skillCode: string | null;
+  questions: number;
+  responses: number;
+  points: number;
+  maxPoints: number;
+  masteryRate: number | null;
+  studentsNeedingSupport: Array<{ studentId: string; studentName: string; className: string; rate: number }>;
+}
+
+export interface ExercisePedagogicalDiagnostic {
+  evaluatedStudents: number;
+  masteredStudents: number;
+  studentsNeedingSupport: number;
+  globalMasteryRate: number | null;
+  difficultQuestions: number;
+  uncategorizedQuestions: number;
+  questions: ExerciseQuestionDiagnostic[];
+  competencies: ExerciseCompetencyDiagnostic[];
+  targetedStudents: Array<{ studentId: string; studentName: string; className: string; rate: number }>;
+}
+
+/**
+ * Build pedagogical indicators from each student's best completed attempt only.
+ * Competency/error interpretations are only emitted when the teacher explicitly
+ * annotated the question; the function never guesses a cause from free text.
+ */
+export function buildExercisePedagogicalDiagnostic(
+  attempts: TeacherExerciseAttemptRow[],
+  threshold = PEDAGOGICAL_MASTERY_THRESHOLD
+): ExercisePedagogicalDiagnostic {
+  const completed = attempts.filter(row => row.best_attempt_id && Array.isArray(row.best_details));
+  const perQuestion = new Map<string, {
+    question: NonNullable<TeacherExerciseAttemptRow['best_questions']>[number];
+    details: Array<{ row: TeacherExerciseAttemptRow; detail: TeacherExerciseAttemptDetail }>;
+  }>();
+
+  for (const row of completed) {
+    const questions = row.best_questions || [];
+    for (const question of questions) {
+      const entry = perQuestion.get(question.id) || { question, details: [] };
+      for (const detail of row.best_details || []) {
+        if (detail.question_id === question.id) entry.details.push({ row, detail });
+      }
+      perQuestion.set(question.id, entry);
+    }
+  }
+
+  const questionStats: ExerciseQuestionDiagnostic[] = Array.from(perQuestion.values()).map(({ question, details }) => {
+    const points = details.reduce((sum, item) => sum + Number(item.detail.points || 0), 0);
+    const maxPoints = details.reduce((sum, item) => sum + Number(item.detail.max_points || 0), 0);
+    const masteryRate = maxPoints > 0 ? (points / maxPoints) * 100 : null;
+    const byStudent = details.map(({ row, detail }) => ({
+      studentId: row.student_id,
+      studentName: row.student_name,
+      className: row.class_name,
+      rate: Number(detail.max_points) > 0 ? (Number(detail.points || 0) / Number(detail.max_points)) * 100 : 0
+    }));
+    const errorCounts = new Map<string, number>();
+    const mapping = question.error_category_map || {};
+    for (const { detail } of details) {
+      if (detail.correct) continue;
+      const answerKey = typeof detail.answer === 'string' ? detail.answer : JSON.stringify(detail.answer ?? '');
+      const category = mapping[answerKey] || mapping[answerKey.trim()];
+      if (category) errorCounts.set(category, (errorCounts.get(category) || 0) + 1);
+    }
+    return {
+      id: question.id,
+      label: question.question || question.titre || question.id,
+      competency: question.competency?.trim() || 'Compétence à renseigner',
+      skillCode: question.skill_code || null,
+      responses: details.length,
+      correct: details.filter(item => item.detail.correct).length,
+      incorrect: details.filter(item => !item.detail.correct).length,
+      points,
+      maxPoints,
+      masteryRate,
+      studentsNeedingSupport: byStudent.filter(student => student.rate < threshold).sort((a, b) => a.rate - b.rate),
+      errorPatterns: Array.from(errorCounts, ([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count)
+    };
+  });
+
+  const competencyMap = new Map<string, ExerciseQuestionDiagnostic[]>();
+  for (const question of questionStats) {
+    const list = competencyMap.get(question.competency) || [];
+    list.push(question);
+    competencyMap.set(question.competency, list);
+  }
+  const competencies: ExerciseCompetencyDiagnostic[] = Array.from(competencyMap, ([competency, questions]) => {
+    const points = questions.reduce((sum, question) => sum + question.points, 0);
+    const maxPoints = questions.reduce((sum, question) => sum + question.maxPoints, 0);
+    const studentMap = new Map<string, { studentId: string; studentName: string; className: string; points: number; maxPoints: number }>();
+    for (const question of questions) {
+      for (const student of question.studentsNeedingSupport) {
+        const current = studentMap.get(student.studentId) || { ...student, points: 0, maxPoints: 0 };
+        // Per-question support list only contains below-threshold learners. Their
+        // competency score is computed from all questions below in the dedicated pass.
+        studentMap.set(student.studentId, current);
+      }
+    }
+    const perStudent = new Map<string, { studentId: string; studentName: string; className: string; points: number; maxPoints: number }>();
+    for (const row of completed) {
+      const studentQuestions = questions.flatMap(question => {
+        const questionDef = (row.best_questions || []).find(item => item.id === question.id);
+        const detail = (row.best_details || []).find(item => item.question_id === question.id);
+        return questionDef && detail ? [{ detail }] : [];
+      });
+      if (!studentQuestions.length) continue;
+      const studentPoints = studentQuestions.reduce((sum, item) => sum + Number(item.detail.points || 0), 0);
+      const studentMax = studentQuestions.reduce((sum, item) => sum + Number(item.detail.max_points || 0), 0);
+      perStudent.set(row.student_id, { studentId: row.student_id, studentName: row.student_name, className: row.class_name, points: studentPoints, maxPoints: studentMax });
+    }
+    const studentsNeedingSupport = Array.from(perStudent.values())
+      .map(student => ({ studentId: student.studentId, studentName: student.studentName, className: student.className, rate: student.maxPoints > 0 ? (student.points / student.maxPoints) * 100 : 0 }))
+      .filter(student => student.rate < threshold)
+      .sort((a, b) => a.rate - b.rate);
+    return {
+      competency,
+      skillCode: questions.find(question => question.skillCode)?.skillCode || null,
+      questions: questions.length,
+      responses: questions.reduce((sum, question) => sum + question.responses, 0),
+      points,
+      maxPoints,
+      masteryRate: maxPoints > 0 ? (points / maxPoints) * 100 : null,
+      studentsNeedingSupport
+    };
+  }).sort((a, b) => (a.masteryRate ?? 101) - (b.masteryRate ?? 101));
+
+  const totalPoints = questionStats.reduce((sum, question) => sum + question.points, 0);
+  const totalMaxPoints = questionStats.reduce((sum, question) => sum + question.maxPoints, 0);
+  const studentRates = completed.map(row => ({
+    studentId: row.student_id,
+    studentName: row.student_name,
+    className: row.class_name,
+    rate: Number(row.max_score) > 0 ? (Number(row.best_score || 0) / Number(row.max_score)) * 100 : 0
+  }));
+  const targetedStudents = studentRates.filter(student => student.rate < threshold).sort((a, b) => a.rate - b.rate);
+
+  return {
+    evaluatedStudents: completed.length,
+    masteredStudents: studentRates.filter(student => student.rate >= threshold).length,
+    studentsNeedingSupport: targetedStudents.length,
+    globalMasteryRate: totalMaxPoints > 0 ? (totalPoints / totalMaxPoints) * 100 : null,
+    difficultQuestions: questionStats.filter(question => question.masteryRate !== null && question.masteryRate < threshold).length,
+    uncategorizedQuestions: questionStats.filter(question => question.competency === 'Compétence à renseigner').length,
+    questions: questionStats,
+    competencies,
+    targetedStudents
+  };
 }
