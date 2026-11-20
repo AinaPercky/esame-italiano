@@ -89,6 +89,24 @@ const STUDENT_TABS = [
   { id: 'written_exams', label: 'Examens écrits', shortLabel: 'Écrit', icon: FileText }
 ] as const;
 
+const hasQuizAnswer = (value: unknown): boolean => {
+  if (value == null) return false;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed !== null && typeof parsed === 'object') return hasQuizAnswer(parsed);
+    } catch {
+      // Ordinary text answers are not JSON and count as submitted.
+    }
+    return true;
+  }
+  if (Array.isArray(value)) return value.some(hasQuizAnswer);
+  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).some(hasQuizAnswer);
+  return true;
+};
+
 interface StudentSpaceViewProps {
   currentUser: AuthUser;
   onLogout: () => void;
@@ -1435,7 +1453,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <div className="space-y-3 p-4">
                   {(lastSubmissionResult.questions_snapshot || quizzes.find(q => q.id === lastSubmissionResult.quiz_id)?.questions || []).map((question, index) => {
                     const item = lastSubmissionResult.feedback?.[question.id];
-                    const unanswered = !item?.studentAnswer?.trim();
+                    const submittedAnswer = lastSubmissionResult.answers?.[question.id];
+                    const unanswered = !hasQuizAnswer(submittedAnswer);
                     return (
                       <article key={question.id} className="rounded-xl border border-[#e0eaf0] p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -1448,7 +1467,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                           </span>
                         </div>
                         <div className="mt-3 space-y-2 text-xs">
-                          <p className="break-words"><strong>Votre réponse :</strong> {unanswered ? 'Non répondu' : item?.studentAnswer}</p>
+                          <p className="break-words"><strong>Votre réponse :</strong> {unanswered ? 'Non répondu' : item?.studentAnswer || submittedAnswer}</p>
                           {(!item?.correct || unanswered) && (
                             <>
                               <p className="break-words rounded-lg bg-[#eef9f3] p-2 text-[#145c3d]"><strong>Bonne réponse :</strong> {item?.expected || 'Corrigé indisponible pour cette question.'}</p>
