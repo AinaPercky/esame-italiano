@@ -8,7 +8,7 @@ Réduire les allers-retours Supabase pendant une session élève, particulièrem
 
 ### Quiz officiels (élèves authentifiés)
 
-- Les réponses restent dans l'état local et dans le brouillon navigateur pendant la session.
+- Les réponses restent dans l'état local et sont sauvegardées dans IndexedDB pendant la session.
 - Le navigateur ne demande plus la correction question par question.
 - À la fin, le service existant submitQuiz envoie toutes les réponses à submit_quiz_submission ou submit_quiz_presence_submission.
 - PostgreSQL recalcule les points et le feedback à partir de la version privée du quiz, puis conserve les historiques, tentatives, notes et états de seconde chance.
@@ -16,7 +16,7 @@ Réduire les allers-retours Supabase pendant une session élève, particulièrem
 
 ### Quiz publics
 
-- Le navigateur garde les réponses en local et ne demande aucune correction intermédiaire.
+- Le navigateur garde les réponses en local dans IndexedDB et ne demande aucune correction intermédiaire.
 - La nouvelle RPC evaluate_public_quiz_answers(text,jsonb) corrige toutes les questions dans une seule transaction.
 - Elle retourne le score et le feedback détaillé sans enregistrer d'identité ni de soumission nominative.
 - La fonction n'accepte que les quiz publics et reste exécutable par anon et authenticated, explicitement et sans privilège PUBLIC.
