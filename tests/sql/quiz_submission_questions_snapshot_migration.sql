@@ -143,6 +143,12 @@ BEGIN
      OR has_function_privilege('authenticated', 'public.capture_quiz_launch_questions_snapshot()', 'EXECUTE') THEN
     RAISE EXCEPTION 'Les rôles clients ne doivent pas appeler directement le trigger de lancement';
   END IF;
+  IF has_column_privilege('authenticated', 'public.quiz_launches', 'questions_snapshot', 'SELECT') THEN
+    RAISE EXCEPTION 'Les élèves ne doivent pas lire les snapshots bruts contenant les corrigés';
+  END IF;
+  IF NOT has_column_privilege('authenticated', 'public.quiz_launches', 'id', 'SELECT') THEN
+    RAISE EXCEPTION 'Les métadonnées non sensibles du lancement doivent rester lisibles';
+  END IF;
 
   IF position('v_launch.questions_snapshot' IN pg_get_functiondef(
     'public.submit_quiz_presence_submission(jsonb)'::regprocedure
