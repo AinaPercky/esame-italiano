@@ -5,7 +5,7 @@ DECLARE
   v_failed BOOLEAN := FALSE;
 BEGIN
   v_result := public.evaluate_public_quiz_answers(
-    'share-quiz-1',
+    'batch-share-quiz-1',
     '{"q1":"sono","q2":"sbagliato"}'::jsonb
   );
   IF (v_result ->> 'rawScore')::numeric <> 2
@@ -21,7 +21,7 @@ BEGIN
   END IF;
 
   BEGIN
-    PERFORM public.evaluate_public_quiz_answers('private-share-1', '{}'::jsonb);
+    PERFORM public.evaluate_public_quiz_answers('batch-private-share-1', '{}'::jsonb);
   EXCEPTION WHEN OTHERS THEN
     v_failed := TRUE;
   END;
