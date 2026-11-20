@@ -261,12 +261,23 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
     [attemptFilters]
   );
 
+  // A student enrolled in several assigned classes may appear once per class in the RPC.
+  // Pedagogical indicators count each learner only once unless a class filter is active.
+  const diagnosticAttempts = useMemo(() => {
+    const uniqueRows = new Map<string, TeacherExerciseAttemptRow>();
+    for (const row of diagnosticAttempts) {
+      if (!uniqueRows.has(row.student_id)) uniqueRows.set(row.student_id, row);
+    }
+    return Array.from(uniqueRows.values());
+  }, [filteredAttempts]);
+
+
   const attemptSummary = useMemo(() => {
-    const completed = filteredAttempts.filter(row => row.status === 'completed').length;
-    const inProgress = filteredAttempts.filter(row => row.status === 'in_progress').length;
-    const notStarted = filteredAttempts.length - completed - inProgress;
+    const completed = diagnosticAttempts.filter(row => row.status === 'completed').length;
+    const inProgress = diagnosticAttempts.filter(row => row.status === 'in_progress').length;
+    const notStarted = diagnosticAttempts.length - completed - inProgress;
     return {
-      total: filteredAttempts.length,
+      total: diagnosticAttempts.length,
       completed,
       inProgress,
       notStarted
@@ -274,7 +285,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
   }, [filteredAttempts]);
 
   const performanceSummary = useMemo(() => {
-    const scored = filteredAttempts.filter(row => getAttemptPercentage(row) !== null);
+    const scored = diagnosticAttempts.filter(row => getAttemptPercentage(row) !== null);
     const percentages = scored
       .map(row => getAttemptPercentage(row))
       .filter((v): v is number => v !== null);
@@ -286,18 +297,18 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
       successRate: percentages.length
         ? (percentages.filter(value => value >= PEDAGOGICAL_MASTERY_THRESHOLD).length / percentages.length) * 100
         : null,
-      completionRate: filteredAttempts.length
-        ? (filteredAttempts.filter(row => row.status === 'completed').length /
-            filteredAttempts.length) *
+      completionRate: diagnosticAttempts.length
+        ? (diagnosticAttempts.filter(row => row.status === 'completed').length /
+            diagnosticAttempts.length) *
           100
         : 0,
       scoredCount: scored.length,
-      averageAttempts: filteredAttempts.length
-        ? filteredAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) /
-          filteredAttempts.length
+      averageAttempts: diagnosticAttempts.length
+        ? diagnosticAttempts.reduce((sum, row) => sum + Number(row.attempt_count || 0), 0) /
+          diagnosticAttempts.length
         : 0
     };
-  }, [filteredAttempts]);
+  }, [diagnosticAttempts]);
 
   const scoreDistribution = useMemo(
     () =>
@@ -309,17 +320,17 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         { label: '81–100 %', min: 80, max: 100.001 }
       ].map(range => ({
         ...range,
-        count: filteredAttempts.filter(row => {
+        count: diagnosticAttempts.filter(row => {
           const pct = getAttemptPercentage(row);
           return pct !== null && pct >= range.min && pct < range.max;
         }).length
       })),
-    [filteredAttempts]
+    [diagnosticAttempts]
   );
 
   const pedagogicalDiagnostic = useMemo(
-    () => buildExercisePedagogicalDiagnostic(filteredAttempts, PEDAGOGICAL_MASTERY_THRESHOLD),
-    [filteredAttempts]
+    () => buildExercisePedagogicalDiagnostic(diagnosticAttempts, PEDAGOGICAL_MASTERY_THRESHOLD),
+    [diagnosticAttempts]
   );
 
   const questionStats = useMemo(
@@ -331,7 +342,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         }
       }
       return Array.from(questions.values()).map(({ question, versionId }) => {
-        const responses = filteredAttempts
+        const responses = diagnosticAttempts
           .flatMap(row => (row.best_details || []).map(detail => ({ row, detail })))
           .filter(item => item.detail.question_id === question.id && (item.row.best_version_id || 'legacy') === versionId);
         const correct = responses.filter(item => item.detail.correct).length;
@@ -353,7 +364,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
         };
       });
     },
-    [filteredAttempts]
+    [diagnosticAttempts]
   );
 
   const populateEditorFromItem = (item: ExerciseDefinition) => {
