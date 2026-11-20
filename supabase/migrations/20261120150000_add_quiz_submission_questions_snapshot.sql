@@ -346,3 +346,38 @@ END;
 $function$;
 
 NOTIFY pgrst, 'reload schema';
+
+
+-- Le snapshot de soumission contient les corrigés et mappings privés.
+-- Les élèves gardent l'accès à leurs résultats/réponses, mais pas à cette colonne.
+REVOKE SELECT ON TABLE public.quiz_submissions FROM PUBLIC, anon, authenticated;
+GRANT SELECT (
+  id, quiz_id, quiz_title, student_id, student_name, student_number,
+  class_id, class_name, started_at, submitted_at, answers, score, max_score,
+  score_20, status, feedback, date, attempt_number, launch_id,
+  attendance_status, retry_grant_id, is_counted
+) ON TABLE public.quiz_submissions TO authenticated;
+
+-- Seul le professeur peut récupérer les snapshots complets pour le diagnostic.
+CREATE OR REPLACE FUNCTION public.get_teacher_quiz_submissions()
+RETURNS SETOF public.quiz_submissions
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.quiz_is_teacher() THEN
+    RAISE EXCEPTION 'Autorisation professeur requise.';
+  END IF;
+
+  RETURN QUERY
+  SELECT s.*
+  FROM public.quiz_submissions AS s
+  ORDER BY s.submitted_at DESC NULLS LAST;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_teacher_quiz_submissions() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_teacher_quiz_submissions() TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
