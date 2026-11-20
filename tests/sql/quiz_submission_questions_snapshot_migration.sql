@@ -82,13 +82,13 @@ CREATE TABLE public.classes (
 );
 
 CREATE FUNCTION public.quiz_current_student_id()
-RETURNS text LANGUAGE sql STABLE AS $ SELECT 'student-1'::text; $;
+RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT 'student-1'::text; $fn$;
 
 CREATE FUNCTION public.quiz_sanitize_questions(p_questions jsonb)
-RETURNS jsonb LANGUAGE sql STABLE AS $ SELECT coalesce(p_questions, '[]'::jsonb); $;
+RETURNS jsonb LANGUAGE sql STABLE AS $fn$ SELECT coalesce(p_questions, '[]'::jsonb); $fn$;
 
 CREATE FUNCTION public.quiz_grade_question(p_question jsonb, p_answer text)
-RETURNS jsonb LANGUAGE sql IMMUTABLE AS $ SELECT '{}'::jsonb; $;
+RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$ SELECT '{}'::jsonb; $fn$;
 
 CREATE TABLE public.quiz_submissions (
   id text PRIMARY KEY,
