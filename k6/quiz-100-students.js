@@ -3,7 +3,7 @@ import { check } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 
-const BASE_URL = (__ENV.SUPABASE_URL || '').replace(/\\/+$/, '');
+const BASE_URL = (__ENV.SUPABASE_URL || '').replace(/\/+$/, '');
 const ANON_KEY = __ENV.SUPABASE_ANON_KEY || '';
 const QUIZ_ID = __ENV.QUIZ_ID || '';
 const VUS = Number(__ENV.VUS || 100);
