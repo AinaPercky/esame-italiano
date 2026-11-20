@@ -1586,8 +1586,10 @@ export const dataService = {
     });
 
     const maxScore = quiz.total_points || 20;
-    const finalScore = isTimeout ? 0 : rawScore;
-    const score20 = isTimeout ? 0 : (maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0);
+    // Une expiration clôt le quiz, mais ne doit pas annuler les points déjà gagnés.
+    // Les questions restées vides sont déjà notées zéro par la correction question par question.
+    const finalScore = rawScore;
+    const score20 = maxScore > 0 ? Number(((rawScore / maxScore) * 20).toFixed(1)) : 0;
     const now = new Date().toISOString();
     const today = now.split('T')[0];
 
