@@ -198,12 +198,51 @@ BEGIN
     RAISE EXCEPTION 'Cette tentative utilise encore le parcours de validation historique.';
   END IF;
 
+  SELECT content INTO v_content
+  FROM public.exercise_versions
+  WHERE id = v_attempt.version_id;
+
   IF v_attempt.status = 'completed' THEN
+    -- Rebuild the correction payload after a lost network response so retries
+    -- remain idempotent and still render the detailed review.
+    FOR v_question_id IN
+      SELECT value FROM jsonb_array_elements_text(v_attempt.question_order)
+    LOOP
+      SELECT q.value INTO v_question
+      FROM jsonb_array_elements(v_content -> 'questions') q(value)
+      WHERE q.value ->> 'id' = v_question_id;
+
+      SELECT answer, timed_out INTO v_answer, v_timed_out
+      FROM public.exercise_answers
+      WHERE attempt_id = v_attempt.id AND question_id = v_question_id;
+
+      IF coalesce(v_timed_out, FALSE) THEN
+        v_grade := jsonb_build_object(
+          'correct', FALSE,
+          'points', 0,
+          'max_points', coalesce((v_question ->> 'points')::numeric, 0),
+          'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+          'explanation', v_question -> 'explanation'
+        );
+      ELSE
+        v_grade := public.exercise_grade_question(v_question, coalesce(v_answer, 'null'::jsonb));
+      END IF;
+
+      v_grade := v_grade || jsonb_build_object(
+        'timed_out', coalesce(v_timed_out, FALSE),
+        'question_id', v_question_id,
+        'student_answer', v_answer
+      );
+      v_feedback := v_feedback || jsonb_build_object(v_question_id, v_grade);
+    END LOOP;
+
     RETURN jsonb_build_object(
       'completed', TRUE,
       'attempt_id', v_attempt.id,
       'score', v_attempt.score,
-      'max_score', v_attempt.max_score
+      'max_score', v_attempt.max_score,
+      'completed_at', v_attempt.completed_at,
+      'feedback', v_feedback
     );
   END IF;
 
@@ -214,10 +253,6 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Une réponse est associée à une question inconnue.';
   END IF;
-
-  SELECT content INTO v_content
-  FROM public.exercise_versions
-  WHERE id = v_attempt.version_id;
 
   v_max_points := v_attempt.max_score;
 
