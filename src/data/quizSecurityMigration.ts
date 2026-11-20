@@ -202,7 +202,7 @@ BEGIN
 
   FOR v_q IN SELECT value FROM jsonb_array_elements(p_questions) LOOP
     v_type := coalesce(v_q ->> 'type', 'qcm');
-    v_clean := (v_q - 'correct_answer' - 'answers' - 'explanation' - 'phrases');
+    v_clean := (v_q - 'correct_answer' - 'answers' - 'explanation' - 'phrases' - 'error_category_map');
 
     IF v_type = 'text' THEN
       v_blank_count := greatest(1, jsonb_array_length(public.quiz_expected_answers_list(v_q)));
