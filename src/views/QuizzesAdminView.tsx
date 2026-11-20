@@ -310,6 +310,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
       points: type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
       explanation: q.explanation || '',
+      competency: typeof q.competency === 'string' ? q.competency : undefined,
+      skill_code: typeof q.skill_code === 'string' ? q.skill_code : undefined,
+      error_categories: Array.isArray(q.error_categories) ? q.error_categories.filter((category: unknown): category is string => typeof category === 'string') : undefined,
+      error_category_map: q.error_category_map && typeof q.error_category_map === 'object' && !Array.isArray(q.error_category_map)
+        ? Object.fromEntries(Object.entries(q.error_category_map).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+        : undefined,
       time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
     };
   };
