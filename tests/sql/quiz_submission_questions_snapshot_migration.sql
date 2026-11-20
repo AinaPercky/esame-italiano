@@ -91,6 +91,26 @@ RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$ SELECT '[]'::jsonb; $fn$;
 
 CREATE FUNCTION public.quiz_grade_question(p_question jsonb, p_answer text)
 RETURNS jsonb LANGUAGE sql IMMUTABLE AS $fn$ SELECT '{}'::jsonb; $fn$;
+CREATE FUNCTION public.exercise_current_student_id()
+RETURNS uuid LANGUAGE sql STABLE AS $fn$ SELECT '00000000-0000-0000-0000-000000000010'::uuid; $fn$;
+
+CREATE FUNCTION public.exercise_is_teacher()
+RETURNS boolean LANGUAGE sql STABLE AS $fn$ SELECT false; $fn$;
+
+CREATE TABLE public.exercise_attempts (
+  id uuid PRIMARY KEY,
+  student_id uuid NOT NULL,
+  status text NOT NULL,
+  version_id uuid NOT NULL,
+  question_order jsonb NOT NULL,
+  current_question_index integer NOT NULL DEFAULT 0,
+  current_question_deadline_at timestamptz
+);
+
+CREATE TABLE public.exercise_versions (
+  id uuid PRIMARY KEY,
+  content jsonb NOT NULL
+);
 
 CREATE TABLE public.quiz_submissions (
   id text PRIMARY KEY,
