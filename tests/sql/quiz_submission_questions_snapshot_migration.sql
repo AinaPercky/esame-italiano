@@ -21,7 +21,8 @@ CREATE TABLE public.quiz_launches (
   closed_at timestamptz,
   launched_by uuid,
   presence_deadline_at timestamptz,
-  status text NOT NULL DEFAULT 'launched'
+  status text NOT NULL DEFAULT 'launched',
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE public.quiz_participants (
@@ -110,6 +111,8 @@ CREATE TABLE public.quiz_submissions (
   attempt_number integer DEFAULT 1,
   is_counted boolean DEFAULT true,
   launch_id uuid,
+  attendance_status text DEFAULT 'unknown',
+  retry_grant_id uuid,
   UNIQUE (quiz_id, student_id, attempt_number)
 );
 
