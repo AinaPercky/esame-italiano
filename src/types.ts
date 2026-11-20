@@ -253,6 +253,8 @@ export interface QuizSubmission {
   started_at: string;
   submitted_at?: string;
   answers: Record<string, string>; // question_id -> réponse de l'élève
+  /** Copie des questions au moment de la soumission; null pour l'historique antérieur à la migration. */
+  questions_snapshot?: QuizQuestion[] | null;
   score: number; // Points obtenus
   max_score: number; // Total points du quiz
   score_20: number; // Note normalisée sur 20
