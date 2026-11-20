@@ -261,8 +261,9 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           const estimatedServerNow = Date.now() - serverClockOffset.current;
           const inferredIndex = resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow);
           const fallbackIndex = inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex;
-          const restoredIndex = Number.isInteger(draft?.currentIndex)
-            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draft.currentIndex)))
+          const draftIndex = draft?.currentIndex;
+          const restoredIndex = Number.isInteger(draftIndex)
+            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draftIndex as number)))
             : fallbackIndex;
           setBatchMode(true);
           setBatchBundle(resumedBatch);
