@@ -191,6 +191,15 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       localSaveQueueRef.current = localWrite;
       try {
         await localWrite;
+        const questionFeedback = await exerciseService.evaluateAttemptQuestion(
+          active.attempt_id,
+          active.question.id,
+          currentAnswer
+        );
+        if (!questionFeedback.correct) {
+          setCorrection({ ...questionFeedback, student_answer: currentAnswer });
+          return;
+        }
         if (batchIndex >= batchBundle.questions.length - 1) {
           await localSaveQueueRef.current;
           const submitted = await exerciseService.submitAttemptBatch(active.attempt_id, nextAnswers);
@@ -370,11 +379,57 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     advanceLock.current = true;
     setSubmitting(true); setError('');
     try {
-      const result = await exerciseService.advance(active.attempt_id);
-      await applyAttemptState(result);
+      if (batchMode && batchBundle) {
+        if (batchIndex < batchBundle.questions.length - 1) {
+          const nextIndex = batchIndex + 1;
+          setBatchIndex(nextIndex);
+          const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
+            saveWrittenExamDraft(active.attempt_id, batchAnswers, nextIndex)
+          );
+          localSaveQueueRef.current = write;
+          await write;
+          activateBatchQuestion(batchBundle, nextIndex, batchAnswers);
+        } else {
+          await localSaveQueueRef.current;
+          const submitted = await exerciseService.submitAttemptBatch(active.attempt_id, batchAnswers);
+          try { await deleteWrittenExamDraft(active.attempt_id); } catch { /* remise confirmée */ }
+          const completedReview: ExerciseAttemptReview = {
+            attempt_id: active.attempt_id,
+            exercise_id: batchBundle.exercise_id,
+            score: submitted.score,
+            max_score: submitted.max_score,
+            status: 'completed',
+            started_at: batchBundle.started_at,
+            completed_at: submitted.completed_at || new Date().toISOString(),
+            questions: batchBundle.questions.map((item) => {
+              const questionId = item.question.id;
+              const graded = submitted.feedback?.[questionId] || {
+                correct: false, points: 0, max_points: Number(item.question.points) || 0,
+                expected: null, timed_out: false, question_id: questionId
+              };
+              return {
+                question_id: questionId, question: item.question.question, type: item.question.type,
+                points: graded.max_points, answer: batchAnswers[questionId] ?? null,
+                correct: graded.correct, points_awarded: graded.points, max_points: graded.max_points,
+                timed_out: graded.timed_out, expected: graded.expected, explanation: graded.explanation,
+                options: item.question.options, items: item.question.items, verbes_trous: item.question.verbes_trous
+              };
+            })
+          };
+          setAttemptReview(completedReview);
+          setHistoryExerciseId(batchBundle.exercise_id);
+          setBatchBundle(null); setBatchAnswers({}); setBatchIndex(0); setBatchMode(false);
+          setActive(null); setCorrection(null); setAnswer('');
+          onFullscreenChange(false);
+          await refresh();
+        }
+      } else {
+        const result = await exerciseService.advance(active.attempt_id);
+        await applyAttemptState(result);
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Passage à la question suivante impossible.'); }
     finally { advanceLock.current = false; setSubmitting(false); }
-  }, [active, applyAttemptState]);
+  }, [active, applyAttemptState, batchMode, batchBundle, batchIndex, batchAnswers, activateBatchQuestion, onFullscreenChange, refresh]);
 
   useEffect(() => {
     if (!active || !correction || correction.correct) return;

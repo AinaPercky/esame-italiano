@@ -173,6 +173,17 @@ export const exerciseService = {
     return data as ExerciseAttemptBundle;
   },
 
+  async evaluateAttemptQuestion(attemptId: string, questionId: string, answer: unknown): Promise<ExerciseCorrection> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('evaluate_exercise_attempt_question', {
+      p_attempt_id: attemptId,
+      p_question_id: questionId,
+      p_answer: answer === undefined ? null : answer
+    });
+    if (error) throwIfError(error, 'Correction de la question impossible');
+    return data as ExerciseCorrection;
+  },
+
   async submitAttemptBatch(attemptId: string, answers: Record<string, unknown>): Promise<ExerciseBatchSubmissionResult> {
     const client = requireClient();
     const { data, error } = await client.rpc('submit_exercise_attempt_batch', {

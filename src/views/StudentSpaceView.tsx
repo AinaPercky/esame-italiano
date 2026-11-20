@@ -243,20 +243,6 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quizSubmissionError, setQuizSubmissionError] = useState<string | null>(null);
   const [lastSubmissionResult, setLastSubmissionResult] = useState<QuizSubmission | null>(null);
-  const submissionCorrectionRef = useRef<HTMLElement | null>(null);
-
-  // Après la remise, l'élève se trouve généralement en bas du quiz.
-  // Ramener automatiquement la correction dans la zone visible, notamment sur mobile.
-  useEffect(() => {
-    if (!lastSubmissionResult) return;
-    const frame = window.requestAnimationFrame(() => {
-      submissionCorrectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [lastSubmissionResult?.id]);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const [tutorialResult, setTutorialResult] = useState<TutorialQuizScore | null>(null);
   const [incompletePhraseConfirmation, setIncompletePhraseConfirmation] = useState<number | null>(null);
@@ -900,8 +886,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     advanceToNextQuestion(pendingAnswers);
   };
 
-  // Les quiz officiels sont corrigés en une seule transaction lors de la remise finale.
-  // Le mode tutoriel conserve sa correction locale et son feedback immédiat.
+  // Chaque question officielle est vérifiée côté serveur dès sa validation.
+  // Seul le feedback de la question courante est renvoyé au navigateur.
   const processQuestionProgression = async (
     updatedAnswers: Record<string, string>,
     isTimeout: boolean = false
@@ -909,31 +895,54 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!activeQuiz) return;
     const currentQ = activeQuiz.questions[currentQuestionIndex];
     if (!currentQ) return;
-
-    if (!isPracticeMode) {
-      advanceToNextQuestion(updatedAnswers);
-      return;
-    }
-
     const studentAns = updatedAnswers[currentQ.id] || '';
-    const local = calculateQuestionPointsEarned(currentQ, studentAns);
-    if (local.isFullyCorrect) {
-      advanceToNextQuestion(updatedAnswers);
+
+    if (isPracticeMode) {
+      const local = calculateQuestionPointsEarned(currentQ, studentAns);
+      if (local.isFullyCorrect) {
+        advanceToNextQuestion(updatedAnswers);
+        return;
+      }
+      setIncorrectFeedback({
+        isOpen: true,
+        questionNumber: currentQuestionIndex + 1,
+        questionText: currentQ.question,
+        studentAnswer: studentAns,
+        correctAnswer: '',
+        countdown: CORRECTION_DISPLAY_SECONDS,
+        pendingNextAnswers: updatedAnswers,
+        isTimeout,
+        points: local.awardedPoints,
+        maxPoints: local.maxPoints
+      });
       return;
     }
 
-    setIncorrectFeedback({
-      isOpen: true,
-      questionNumber: currentQuestionIndex + 1,
-      questionText: currentQ.question,
-      studentAnswer: studentAns,
-      correctAnswer: '',
-      countdown: CORRECTION_DISPLAY_SECONDS,
-      pendingNextAnswers: updatedAnswers,
-      isTimeout,
-      points: local.awardedPoints,
-      maxPoints: local.maxPoints
-    });
+    try {
+      const feedback = activeQuiz.is_public && activeQuiz.public_id
+        ? (await supabaseService.evaluatePublicQuizAnswers(activeQuiz.public_id, { [currentQ.id]: studentAns })).feedback[currentQ.id]
+        : await supabaseService.evaluateQuizQuestion(activeQuiz.id, currentQ.id, studentAns);
+      if (!feedback) throw new Error('Le serveur n’a retourné aucune correction pour cette question.');
+      if (feedback.correct) {
+        advanceToNextQuestion(updatedAnswers);
+        return;
+      }
+      setIncorrectFeedback({
+        isOpen: true,
+        questionNumber: currentQuestionIndex + 1,
+        questionText: currentQ.question,
+        studentAnswer: studentAns,
+        correctAnswer: feedback.expected || '',
+        explanation: feedback.explanation,
+        countdown: CORRECTION_DISPLAY_SECONDS,
+        pendingNextAnswers: updatedAnswers,
+        isTimeout,
+        points: feedback.points,
+        maxPoints: feedback.maxPoints
+      });
+    } catch (error) {
+      setQuizSubmissionError(error instanceof Error ? error.message : 'La correction de cette question est indisponible. Réessayez.');
+    }
   };
 
   // Si le temps de la question est écoulé -> note 0 pour cette question et on analyse
@@ -1441,10 +1450,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-bold text-emerald-950 text-sm">
-                      Quiz validé et corrigé avec succès !
+                      Quiz terminé !
                     </h3>
                     <p className="text-xs text-emerald-800">
-                      Votre note obtenue : <strong className="text-base font-mono font-extrabold">{lastSubmissionResult.score_20} / 20</strong> ({lastSubmissionResult.score}/{lastSubmissionResult.max_score} pts). Ces points sont pris en compte dans votre note journalière pondérée.
+                      Votre note finale : <strong className="text-base font-mono font-extrabold">{lastSubmissionResult.score_20} / 20</strong> ({lastSubmissionResult.score}/{lastSubmissionResult.max_score} pts).
                     </p>
                   </div>
                 </div>
@@ -1458,51 +1467,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               </div>
             )}
 
-            {lastSubmissionResult && (
-              <section
-                ref={submissionCorrectionRef}
-                tabIndex={-1}
-                className="scroll-mt-4 overflow-hidden rounded-2xl border border-[#d8e6ee] bg-white shadow-sm outline-none"
-                aria-live="polite"
-                aria-label="Correction détaillée du quiz"
-              >
-                <div className="border-b border-[#d8e6ee] bg-[#f7fafc] p-4">
-                  <h3 className="text-sm font-extrabold text-[#072a3f]">Correction détaillée du quiz</h3>
-                  <p className="mt-1 text-xs text-[#607f93]">Chaque réponse est comparée au corrigé enregistré côté serveur.</p>
-                </div>
-                <div className="space-y-3 p-4">
-                  {(lastSubmissionResult.questions_snapshot || quizzes.find(q => q.id === lastSubmissionResult.quiz_id)?.questions || []).map((question, index) => {
-                    const item = lastSubmissionResult.feedback?.[question.id];
-                    const submittedAnswer = lastSubmissionResult.answers?.[question.id];
-                    const unanswered = !hasQuizAnswer(submittedAnswer);
-                    return (
-                      <article key={question.id} className="rounded-xl border border-[#e0eaf0] p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#607f93]">Question {index + 1}</p>
-                            <p className="mt-1 break-words text-sm font-bold text-[#072a3f]">{question.question}</p>
-                          </div>
-                          <span className={'shrink-0 rounded-full px-2 py-1 text-[10px] font-extrabold ' + (item?.correct ? 'bg-[#eef9f3] text-[#145c3d]' : 'bg-rose-50 text-rose-700')}>
-                            {item?.correct ? 'Correcte' : unanswered ? 'Non répondu' : 'Incorrecte'}
-                          </span>
-                        </div>
-                        <div className="mt-3 space-y-2 text-xs">
-                          <p className="break-words"><strong>Votre réponse :</strong> {unanswered ? 'Non répondu' : item?.studentAnswer || submittedAnswer}</p>
-                          {(!item?.correct || unanswered) && (
-                            <>
-                              <p className="break-words rounded-lg bg-[#eef9f3] p-2 text-[#145c3d]"><strong>Bonne réponse :</strong> {item?.expected || 'Corrigé indisponible pour cette question.'}</p>
-                              {item?.explanation && <p className="whitespace-pre-wrap break-words rounded-lg bg-[#f7fafc] p-2 text-[#072a3f]"><strong>Explication :</strong> {item.explanation}</p>}
-                            </>
-                          )}
-                          {item && <p className="font-bold text-[#46657a]">{item.points} / {item.maxPoints ?? question.points} point(s)</p>}
-                          {!item && <p className="text-amber-700">Le détail de correction n'a pas été renvoyé par le serveur.</p>}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+
 
             {tutorialResult && (
               <div role="status" className="flex flex-col gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
