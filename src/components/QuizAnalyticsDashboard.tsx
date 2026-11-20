@@ -123,7 +123,14 @@ export const QuizAnalyticsDashboard: React.FC<QuizAnalyticsDashboardProps> = ({
   const questionAnalyses = useMemo(() => {
     const rows: QuestionAnalysis[] = [];
     visibleQuizzes.forEach(quiz => {
-      (quiz.questions || []).forEach((question, index) => {
+      const questionsById = new Map<string, QuizQuestion>();
+      (quiz.questions || []).forEach(question => questionsById.set(question.id, question));
+      classSubmissions.filter(submission => submission.quiz_id === quiz.id).forEach(submission => {
+        (submission.questions_snapshot || []).forEach(question => {
+          if (!questionsById.has(question.id)) questionsById.set(question.id, question);
+        });
+      });
+      Array.from(questionsById.values()).forEach((question, index) => {
         const classDetails = classSubmissions.flatMap(submission => {
           if (submission.quiz_id !== quiz.id) return [];
           const snapshotQuestion = submission.questions_snapshot?.find(item => item.id === question.id);
