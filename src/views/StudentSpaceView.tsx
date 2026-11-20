@@ -660,7 +660,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!practiceMode) {
       const draftId = 'student_quiz_draft_' + getStudentQueryInfo().stId + '_' + quiz.id;
       try {
-        const draft = await loadWrittenExamDraft(draftId);
+        if (retryAttempt) {
+          await deleteWrittenExamDraft(draftId);
+          localStorage.removeItem(draftId);
+        } else {
+          const draft = await loadWrittenExamDraft(draftId);
         if (draft?.answers && typeof draft.answers === 'object') {
           restoredAnswers = draft.answers as Record<string, string>;
         } else {
@@ -673,6 +677,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
               await saveWrittenExamDraft(draftId, restoredAnswers, 0);
               localStorage.removeItem(draftId);
             }
+          }
           }
         }
       } catch (e) {
