@@ -362,7 +362,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
             (Number(item.detail.points || 0) / Number(item.detail.max_points)) * 100 < PEDAGOGICAL_MASTERY_THRESHOLD
           ).map(item => item.row)
         };
-      });
+      }).sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
     },
     [diagnosticAttempts]
   );
@@ -2074,12 +2074,13 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
 
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
-                    <p className="text-xs font-semibold text-[#607f93]">Score moyen</p>
+                    <p className="text-xs font-semibold text-[#607f93]">Maîtrise globale</p>
                     <p className="mt-2 text-2xl font-black tabular-nums text-[#072a3f]">
-                      {performanceSummary.average === null
+                      {pedagogicalDiagnostic.globalMasteryRate === null
                         ? '—'
-                        : `${performanceSummary.average.toFixed(1)} %`}
+                        : `${Math.round(pedagogicalDiagnostic.globalMasteryRate)} %`}
                     </p>
+                    <p className="text-[11px] text-[#607f93]">Pondérée par les points possibles</p>
                   </article>
                   <article className="rounded-2xl border border-[#d8e6ee] bg-white p-4">
                     <p className="text-xs font-semibold text-[#607f93]">Élèves maîtrisant (≥ 70 %)</p>
