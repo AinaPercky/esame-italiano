@@ -354,15 +354,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     quizAnswersRef.current = updatedAnswers;
     setQuizAnswers(updatedAnswers);
     if (activeQuiz && !isPracticeMode) {
-      const studentId = studentRecord?.id || currentUser.student_id || `student_${currentUser.id}`;
-      const draftId = 'student_quiz_draft_' + studentId + '_' + activeQuiz.id;
+      const draftId = 'student_quiz_draft_' + getStudentQueryInfo().stId + '_' + activeQuiz.id;
       const write = quizDraftQueueRef.current.catch(() => undefined).then(() =>
         saveWrittenExamDraft(draftId, updatedAnswers, currentQuestionIndex)
       );
       quizDraftQueueRef.current = write;
       void write.catch((e) => setQuizSubmissionError(e instanceof Error ? e.message : 'La sauvegarde locale du quiz a échoué.'));
     }
-  }, [activeQuiz, currentUser.id, currentUser.student_id, studentRecord?.id]);
+  }, [activeQuiz, currentQuestionIndex, isPracticeMode]);
 
   const loadData = () => {
     // Synchroniser avec dataService
@@ -976,7 +975,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const clId = activeQuiz.class_id;
 
     try {
-      await quizDraftQueueRef.current;
+      await quizDraftQueueRef.current.catch(() => undefined);
       const result = await dataService.submitQuiz(
         activeQuiz.id,
         stId,
