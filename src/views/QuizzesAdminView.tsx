@@ -234,6 +234,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
         if (q.explanation) {
           item.explanation = q.explanation;
         }
+        if (q.competency) item.competency = q.competency;
+        if (q.skill_code) item.skill_code = q.skill_code;
+        if (q.error_categories?.length) item.error_categories = q.error_categories;
+        if (q.error_category_map && Object.keys(q.error_category_map).length) item.error_category_map = q.error_category_map;
         return item;
       })
     };
@@ -2162,6 +2166,25 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                         className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs font-semibold text-slate-900"
                       />
                     </div>
+
+                    <details className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                      <summary className="cursor-pointer text-[11px] font-bold text-indigo-950">Diagnostic pédagogique (facultatif)</summary>
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="text-[10px] font-bold text-slate-600">Compétence ciblée
+                          <input value={q.competency || ''} onChange={e => { const updated=[...questions]; updated[idx]={...updated[idx],competency:e.target.value}; setQuestions(updated); }} placeholder="Ex. Choix de l’auxiliaire" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs" />
+                        </label>
+                        <label className="text-[10px] font-bold text-slate-600">Code de compétence
+                          <input value={q.skill_code || ''} onChange={e => { const updated=[...questions]; updated[idx]={...updated[idx],skill_code:e.target.value.trim().toUpperCase()}; setQuestions(updated); }} placeholder="Ex. PASSATO_PROSSIMO_AUX" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-mono" />
+                        </label>
+                        <label className="text-[10px] font-bold text-slate-600 sm:col-span-2">Catégories d’erreurs définies par le professeur
+                          <input value={(q.error_categories || []).join(', ')} onChange={e => { const updated=[...questions]; const values=e.target.value.split(',').map(v=>v.trim()).filter(Boolean); updated[idx]={...updated[idx],error_categories:values}; setQuestions(updated); }} placeholder="Séparez les catégories par des virgules" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs" />
+                        </label>
+                        <label className="text-[10px] font-bold text-slate-600 sm:col-span-2">Correspondance réponse incorrecte → catégorie (JSON)
+                          <textarea key={q.id} defaultValue={JSON.stringify(q.error_category_map || {}, null, 2)} onBlur={e => { try { const parsed=JSON.parse(e.currentTarget.value || '{}'); if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error('Objet attendu'); const updated=[...questions]; updated[idx]={...updated[idx],error_category_map:parsed}; setQuestions(updated); } catch { e.currentTarget.setCustomValidity('JSON invalide : saisissez un objet JSON.'); e.currentTarget.reportValidity(); } }} onChange={e=>e.currentTarget.setCustomValidity('')} spellCheck={false} rows={3} placeholder={'{ "avere": "Confusion essere/avere" }'} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 font-mono text-[11px]" />
+                        </label>
+                      </div>
+                      <p className="mt-2 text-[10px] leading-relaxed text-indigo-900">Seules les causes explicitement associées à une réponse sont comptabilisées. Une réponse non associée reste non catégorisée ; aucune cause n’est devinée.</p>
+                    </details>
 
                     {/* Options if QCM */}
                     {q.type === 'qcm' && (
