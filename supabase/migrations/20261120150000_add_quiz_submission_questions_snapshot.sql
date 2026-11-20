@@ -440,3 +440,64 @@ REVOKE ALL ON FUNCTION public.get_teacher_quiz_submissions() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_teacher_quiz_submissions() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+
+-- Le mapping réponse → catégorie est réservé au diagnostic enseignant.
+-- Ne jamais l'inclure dans la question remise à l'élève pendant un exercice.
+create or replace function public.exercise_question_for_student(p_attempt_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $exercise$
+declare
+  v_attempt public.exercise_attempts%rowtype;
+  v_content jsonb;
+  v_question jsonb;
+  v_question_id text;
+  v_safe jsonb;
+begin
+  select * into v_attempt from public.exercise_attempts where id = p_attempt_id;
+  if not found or (v_attempt.student_id <> public.exercise_current_student_id() and not public.exercise_is_teacher()) then
+    raise exception 'Tentative introuvable ou accès interdit.';
+  end if;
+  if v_attempt.status <> 'in_progress' then raise exception 'Cette tentative est terminée.'; end if;
+
+  select content into v_content from public.exercise_versions where id = v_attempt.version_id;
+  v_question_id := v_attempt.question_order ->> v_attempt.current_question_index;
+  select q.value into v_question
+  from jsonb_array_elements(v_content -> 'questions') q(value)
+  where q.value ->> 'id' = v_question_id;
+  if v_question is null then raise exception 'Question introuvable dans la version de l’exercice.'; end if;
+
+  v_safe := v_question - 'correct_answer' - 'answers' - 'explanation' - 'error_category_map';
+  if v_question -> 'verbes_trous' is not null then
+    v_safe := jsonb_set(v_safe, '{verbes_trous}',
+      jsonb_build_object(
+        'titre', v_question #> '{verbes_trous,titre}',
+        'consigne', v_question #> '{verbes_trous,consigne}',
+        'points_par_phrase', v_question #> '{verbes_trous,points_par_phrase}',
+        'banque', v_question #> '{verbes_trous,banque}',
+        'phrases', coalesce((
+          select jsonb_agg(jsonb_build_object('id', p.value -> 'id','debut',p.value -> 'debut','fin',p.value -> 'fin') order by p.ordinality)
+          from jsonb_array_elements(v_question #> '{verbes_trous,phrases}') with ordinality p(value, ordinality)
+        ), '[]'::jsonb)
+      )
+    );
+  end if;
+  return jsonb_build_object(
+    'attempt_id', v_attempt.id,
+    'question', v_safe,
+    'question_number', v_attempt.current_question_index + 1,
+    'question_count', jsonb_array_length(v_attempt.question_order),
+    'deadline_at', v_attempt.current_question_deadline_at,
+    'seconds_remaining', greatest(0, floor(extract(epoch from (v_attempt.current_question_deadline_at - now())))::integer),
+    'server_now', now()
+  );
+end;
+$exercise$;
+
+REVOKE ALL ON FUNCTION public.exercise_question_for_student(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.exercise_question_for_student(uuid) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
