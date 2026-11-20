@@ -169,7 +169,7 @@ Les éléments ci-dessous sont extraits de la leçon et constituent la seule sou
 ${courseContent}`;
 
     if (generatedPrompt.length <= MAX_PROMPT_CHARACTERS) return generatedPrompt;
-    const notice = '\\n\\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
+    const notice = '\n\n[CONTENU TRONQUÉ : la limite de 32 000 caractères est atteinte. Réduisez le contenu du cours pour inclure tous les éléments.]';
     return generatedPrompt.slice(0, MAX_PROMPT_CHARACTERS - notice.length).trimEnd() + notice;
   }, [parsed, language]);
 
