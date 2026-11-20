@@ -362,7 +362,7 @@ test('pedagogical diagnostic uses best attempt details and the 70 percent thresh
   assert.equal(result.studentsNeedingSupport, 0);
   assert.equal(result.globalMasteryRate, 70);
   assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.masteryRate, 40);
-  assert.equal(result.questions.find(q => q.id === 'q1')?.studentsNeedingSupport.length, 1);
+  assert.equal(result.questions.find(q => q.id.endsWith(':q1'))?.studentsNeedingSupport.length, 1);
   assert.equal(result.questions.find(q => q.id === 'q1')?.errorPatterns[0]?.category, 'Confusion essere/avere');
   assert.equal(result.questions.find(q => q.id.endsWith(':q2'))?.masteryRate, 100);
 });
