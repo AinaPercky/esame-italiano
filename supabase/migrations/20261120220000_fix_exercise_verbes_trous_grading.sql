@@ -27,10 +27,9 @@ BEGIN
   -- Replace the complete verb-bank branch, regardless of whether the installed
   -- scorer is the original array-only implementation or the later object-map one.
   v_branch_start := position('  elsif v_type = ''verbes_trous'' then' IN v_definition);
-  v_outer_else := position(
-    '  else' || chr(10) || '    raise exception ''Type de question non pris en charge: %'', v_type;'
-    IN v_definition
-  );
+  v_outer_else := v_branch_start + position(
+    '  else' IN substring(v_definition FROM v_branch_start + 1)
+  ) - 1;
   IF v_branch_start = 0 OR v_outer_else <= v_branch_start THEN
     RAISE EXCEPTION 'Branche verbes_trous du correcteur inattendue; migration annulée.';
   END IF;
