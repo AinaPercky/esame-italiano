@@ -220,6 +220,8 @@ end;
 $$;
 
 
+reset role;
+
 -- Verb-bank exercises must score verb selection and conjugation independently.
 DO $verbes_trous_grading$
 DECLARE
