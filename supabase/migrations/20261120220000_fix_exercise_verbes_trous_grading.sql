@@ -76,16 +76,28 @@ BEGIN
         v_used_verbs := array_append(v_used_verbs, v_chosen_verb);
       END IF;
 
-      IF v_chosen_verb <> '' AND v_chosen_verb = v_expected_verb THEN
-        v_awarded := v_awarded + (v_phrase_points / 3);
-      END IF;
+      IF v_expected_verb = '' THEN
+        -- Legacy verb-bank questions without an explicit verb selector are
+        -- text-only cloze items: keep their historical full per-blank credit.
+        IF v_typed_text <> '' AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements_text(v_responses) r(value)
+          WHERE lower(regexp_replace(trim(r.value), '[[:space:]]+', ' ', 'g')) = v_typed_text
+        ) THEN
+          v_awarded := v_awarded + v_phrase_points;
+        END IF;
+      ELSE
+        IF v_chosen_verb <> '' AND v_chosen_verb = v_expected_verb THEN
+          v_awarded := v_awarded + (v_phrase_points / 3);
+        END IF;
 
-      IF v_chosen_verb <> '' AND v_typed_text <> '' AND EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements_text(v_responses) r(value)
-        WHERE lower(regexp_replace(trim(r.value), '[[:space:]]+', ' ', 'g')) = v_typed_text
-      ) THEN
-        v_awarded := v_awarded + (v_phrase_points * 2 / 3);
+        IF v_chosen_verb <> '' AND v_typed_text <> '' AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements_text(v_responses) r(value)
+          WHERE lower(regexp_replace(trim(r.value), '[[:space:]]+', ' ', 'g')) = v_typed_text
+        ) THEN
+          v_awarded := v_awarded + (v_phrase_points * 2 / 3);
+        END IF;
       END IF;
     end loop;
     v_correct := case when v_awarded >= v_points then 1 else 0 end;
