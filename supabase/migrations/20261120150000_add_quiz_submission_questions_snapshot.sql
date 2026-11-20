@@ -153,12 +153,13 @@ BEGIN
   SELECT jsonb_build_object(
     'launch',
     (to_jsonb(l) - 'questions_snapshot')
-      || jsonb_build_object('questions_snapshot', public.quiz_sanitize_questions(l.questions_snapshot)),
+      || jsonb_build_object('questions_snapshot', public.quiz_sanitize_questions(coalesce(l.questions_snapshot, q.questions))),
     'participant', to_jsonb(p)
   )
   INTO v_row
   FROM public.quiz_launches l
   JOIN public.quiz_participants p ON p.launch_id = l.id
+  JOIN public.quizzes q ON q.id = l.quiz_id
   WHERE l.quiz_id = p_quiz_id
     AND l.status = 'launched'
     AND p.student_id = v_student
