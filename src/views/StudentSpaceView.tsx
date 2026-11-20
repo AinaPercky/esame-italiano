@@ -1450,7 +1450,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-bold text-emerald-950 text-sm">
-                      Quiz validé et corrigé avec succès !
+                      Quiz terminé !
                     </h3>
                     <p className="text-xs text-emerald-800">
                       Votre note finale : <strong className="text-base font-mono font-extrabold">{lastSubmissionResult.score_20} / 20</strong> ({lastSubmissionResult.score}/{lastSubmissionResult.max_score} pts).
