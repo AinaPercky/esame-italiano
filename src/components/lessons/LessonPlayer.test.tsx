@@ -167,8 +167,8 @@ test('les sélections multi-mots soulignées, encadrées et entourées sont rend
         emphasis_tokens: [
           { line_index: 0, word_index: 1, text: 'ho', style: 'underline', color: 'green' },
           { line_index: 0, word_index: 2, text: 'mangiato', style: 'underline', color: 'green' },
-          { line_index: 0, word_index: 4, text: 'una', style: 'outline', color: 'blue' },
-          { line_index: 0, word_index: 5, text: 'mela', style: 'outline', color: 'blue' }
+          { line_index: 0, word_index: 3, text: 'una', style: 'outline', color: 'blue' },
+          { line_index: 0, word_index: 4, text: 'mela', style: 'outline', color: 'blue' }
         ],
         lines: [{ speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }]
       }
