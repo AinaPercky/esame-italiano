@@ -361,7 +361,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
       const block = parsed.blocks?.[blockIndex];
       const line = block?.content?.lines?.[lineIndex];
       if (!block || block.type !== 'dialogue' || !line) return;
-      const words = String(line.it || '').split(/(\\s+|[^\\p{L}\\p{M}]+)/u).filter((token: string) => /^[\\p{L}\\p{M}]+$/u.test(token));
+      const words = String(line.it || '').split(/(\s+|[^\p{L}\p{M}]+)/u).filter((token: string) => /^[\\p{L}\\p{M}]+$/u.test(token));
       if (endIndex - startIndex + 1 < 2) {
         setDialogueRangeStart(null);
         return;
