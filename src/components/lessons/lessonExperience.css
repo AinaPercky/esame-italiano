@@ -139,6 +139,36 @@
   color: #765600;
 }
 
+.lesson-word-verb {
+  border-radius: 5px;
+  padding: 0 3px;
+  background: #c9f1dd;
+  color: #087346;
+  font-weight: 800;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.lesson-word-auxiliary {
+  border-radius: 5px;
+  padding: 0 3px;
+  background: #fff1af;
+  color: #765600;
+  font-weight: 850;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.lesson-word-preposition {
+  border-radius: 4px;
+  padding: 0 2px;
+  background: #e8e2ff;
+  color: #6041a5;
+  font-weight: 750;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .lesson-word-green {
   border-radius: 6px;
   padding: 0 4px;
@@ -772,6 +802,21 @@
   .lesson-highlight-token.is-target {
     background: #65531c;
     color: #ffe89a;
+  }
+
+  .lesson-word-verb {
+    background: #17433a;
+    color: #b8f3d5;
+  }
+
+  .lesson-word-auxiliary {
+    background: #65531c;
+    color: #ffe89a;
+  }
+
+  .lesson-word-preposition {
+    background: #392e57;
+    color: #d8c9ff;
   }
 
   .lesson-word-green,
