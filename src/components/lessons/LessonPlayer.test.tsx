@@ -175,7 +175,7 @@ test('les sélections multi-mots soulignées, encadrées et entourées sont rend
     }]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: rangeLesson, revealAll: true }));
-  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-green">ho<\\/span> <span class="lesson-word-emphasis lesson-word-emphasis-underline lesson-word-emphasis-green">mangiato/);
+  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-green">ho<\/span> <span class="lesson-word-emphasis lesson-word-emphasis-underline lesson-word-emphasis-green">mangiato/);
   assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">una/);
   assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">mela/);
 });
