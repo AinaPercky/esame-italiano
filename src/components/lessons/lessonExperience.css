@@ -149,6 +149,26 @@
   -webkit-box-decoration-break: clone;
 }
 
+.lesson-word-vocabulary {
+  border-radius: 5px;
+  padding: 0 3px;
+  background: #c9f1dd;
+  color: #087346;
+  font-weight: 800;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.lesson-word-possessive {
+  border-radius: 5px;
+  padding: 0 3px;
+  background: #fff1af;
+  color: #765600;
+  font-weight: 850;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .lesson-word-auxiliary {
   border-radius: 5px;
   padding: 0 3px;
@@ -807,6 +827,16 @@
   .lesson-word-verb {
     background: #17433a;
     color: #b8f3d5;
+  }
+
+  .lesson-word-vocabulary {
+    background: rgba(47, 163, 107, 0.24);
+    color: #8fe0b5;
+  }
+
+  .lesson-word-possessive {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffe08a;
   }
 
   .lesson-word-auxiliary {
