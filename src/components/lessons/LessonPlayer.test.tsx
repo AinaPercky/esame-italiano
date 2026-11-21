@@ -99,8 +99,8 @@ test('la couleur secondaire est conservée pour les auxiliaires sélectionnés',
     }]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: auxiliaryLesson, revealAll: true }));
-  assert.match(html, /Ieri <span class="lesson-word lesson-word-manual lesson-word-manual-amber">ho<\\/span>/);
-  assert.doesNotMatch(html, /mangiato<\\/span>/);
+  assert.match(html, /Ieri <span class="lesson-word lesson-word-manual lesson-word-manual-amber">ho<\/span>/);
+  assert.doesNotMatch(html, /mangiato<\/span>/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
