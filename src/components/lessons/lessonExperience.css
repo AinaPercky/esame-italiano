@@ -139,6 +139,17 @@
   color: #765600;
 }
 
+.lesson-word-manual {
+  display: inline;
+  border-radius: 0.3rem;
+  padding: 0.08em 0.22em;
+  background: #d8f3e4;
+  color: #075b39;
+  font-weight: 750;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 .lesson-word-verb {
   border-radius: 5px;
   padding: 0 3px;
@@ -822,6 +833,11 @@
   .lesson-highlight-token.is-target {
     background: #65531c;
     color: #ffe89a;
+  }
+
+  .lesson-word-manual {
+    background: rgba(47, 163, 107, 0.28);
+    color: #a8edc7;
   }
 
   .lesson-word-verb {

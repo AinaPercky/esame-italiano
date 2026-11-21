@@ -20,7 +20,7 @@ const lesson: Lesson = {
   title_it: 'Il passato prossimo', title_fr: 'Le passé composé', objective: 'Comprendre la formation',
   status: 'published', method: 'inductive', sort_order: 0, access: 'free', created_at: '', updated_at: '',
   blocks: [
-    { id: 'dialogue', type: 'dialogue', content: { highlight_mode: 'present-indicative', lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho ==mangiato== una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
+    { id: 'dialogue', type: 'dialogue', content: { highlight_tokens: [{ line_index: 0, word_index: 2, text: 'mangiato' }], lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
     { id: 'discovery', type: 'discovery', content: { source: 'dialogue', steps } },
     { id: 'formula', type: 'formula', content: { title: 'Formule', formulas: [{ parts: [{ text: 'essere/avere', kind: 'slot' }, { text: '+', kind: 'operator' }, { text: 'participio', kind: 'slot' }] }] } },
     { id: 'exceptions', type: 'exceptions', content: { title: 'Exceptions', items: [] } },
@@ -53,9 +53,9 @@ function renderCustomStep(step: any) {
 test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de cours ni quiz', () => {
   const html = renderAt(0);
   assert.match(html, /lesson-dialogue/);
-  assert.match(html, /Ieri <span class="lesson-word lesson-word-auxiliary">ho/);
+  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual">mangiato<\/span>/);
   assert.doesNotMatch(html, /lesson-player-question|lesson-discovery|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
-  assert.match(html, /class="lesson-word lesson-word-auxiliary">ho/);
+  assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
 });
 
 
@@ -69,16 +69,21 @@ test('aucune surbrillance grammaticale ne se déclenche automatiquement selon le
   assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
 });
 
-test('les mots personnalisés sont surlignés uniquement dans le dialogue', () => {
+test('seules les occurrences choisies mot par mot sont surlignées dans le dialogue', () => {
   const customLesson: Lesson = {
     ...lesson,
     blocks: [
-      { id: 'dialogue', type: 'dialogue', content: { highlight_terms: ['mela'], lines: [{ speaker: 'Anna', it: 'Ho una mela.', fr: 'J’ai une pomme.' }] } },
+      { id: 'dialogue', type: 'dialogue', content: {
+        highlight_tokens: [{ line_index: 0, word_index: 2, text: 'mela' }],
+        lines: [{ speaker: 'Anna', it: 'Ho una mela e una mela.', fr: 'J’ai une pomme et une pomme.' }]
+      } },
       { id: 'example', type: 'example_list', content: { examples: [{ it: 'La mela è rossa.', fr: 'La pomme est rouge.' }] } }
     ]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: customLesson, revealAll: true }));
-  assert.equal((html.match(/lesson-word-vocabulary/g) || []).length, 1);
+  assert.equal((html.match(/lesson-word-manual/g) || []).length, 1);
+  assert.match(html, /Ho una <span class="lesson-word lesson-word-manual">mela<\/span> e una mela/);
+  assert.match(html, /La mela è rossa/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
