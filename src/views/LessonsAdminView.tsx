@@ -306,24 +306,40 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     }
   }, [json]);
 
-  const updateDialogueHighlight = (blockIndex: number, field: 'highlight_mode' | 'highlight_terms', value: any) => {
+  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string) => {
     try {
       const parsed = JSON.parse(json);
       const block = parsed.blocks?.[blockIndex];
       if (!block || block.type !== 'dialogue') return;
       block.content = { ...(block.content || {}) };
-      if (field === 'highlight_terms') {
-        const terms = String(value).split(',').map(term => term.trim()).filter(Boolean);
-        if (terms.length) block.content.highlight_terms = terms;
-        else delete block.content.highlight_terms;
-      } else if (value) {
-        block.content.highlight_mode = value;
-      } else {
-        delete block.content.highlight_mode;
-      }
+      // The teacher now selects exact word occurrences; legacy automatic modes are intentionally retired.
+      delete block.content.highlight_mode;
+      delete block.content.highlight_terms;
+      const marks = Array.isArray(block.content.highlight_tokens) ? [...block.content.highlight_tokens] : [];
+      const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === wordIndex);
+      if (existing >= 0) marks.splice(existing, 1);
+      else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word });
+      block.content.highlight_tokens = marks;
       setJson(JSON.stringify(parsed, null, 2));
+      setError('');
     } catch {
-      setError('Le JSON doit être valide avant de modifier les options de surbrillance.');
+      setError('Le JSON doit être valide avant de sélectionner les mots du dialogue.');
+    }
+  };
+
+  const clearDialogueHighlights = (blockIndex: number) => {
+    try {
+      const parsed = JSON.parse(json);
+      const block = parsed.blocks?.[blockIndex];
+      if (!block || block.type !== 'dialogue') return;
+      block.content = { ...(block.content || {}) };
+      delete block.content.highlight_tokens;
+      delete block.content.highlight_mode;
+      delete block.content.highlight_terms;
+      setJson(JSON.stringify(parsed, null, 2));
+      setError('');
+    } catch {
+      setError('Le JSON doit être valide avant de modifier les surbrillances.');
     }
   };
 
@@ -497,42 +513,71 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             </button>
           </div>
 
-          <section className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
-            <div className="mb-3">
-              <h3 className="text-sm font-bold text-slate-900">Surbrillance du dialogue</h3>
-              <p className="mt-1 text-xs text-slate-600">Le professeur choisit manuellement la notion à mettre en évidence. La surbrillance apparaît uniquement dans les répliques en italien du dialogue.</p>
+          <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Sélection manuelle des mots à surligner</h3>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Touchez chaque mot italien directement dans le dialogue. Chaque occurrence est sélectionnée individuellement ; seules les occurrences choisies seront surlignées pour les élèves.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {dialogueBlocksForEditor.reduce((total: number, item: any) => total + (item.block.content?.highlight_tokens || []).length, 0)} mot(s) sélectionné(s)
+              </span>
             </div>
             {dialogueBlocksForEditor.length === 0 ? (
-              <p className="text-xs text-slate-500">Ajoutez d’abord un bloc « dialogue » dans le JSON pour configurer sa surbrillance.</p>
-            ) : dialogueBlocksForEditor.map(({ block, index }: any, dialogueIndex: number) => (
-              <div key={block.id || index} className="grid grid-cols-1 gap-3 border-t border-sky-100 py-3 sm:grid-cols-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  {dialogueBlocksForEditor.length > 1 ? `Dialogue ${dialogueIndex + 1} · ` : ''}Notion à surligner
-                  <select
-                    value={block.content?.highlight_mode || ''}
-                    onChange={event => updateDialogueHighlight(index, 'highlight_mode', event.target.value)}
-                    className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800"
-                  >
-                    <option value="">Aucune surbrillance automatique</option>
-                    <option value="present-indicative">Verbes réguliers au présent (-ARE, -ERE, -IRE)</option>
-                    <option value="passato-prossimo">Passato prossimo (auxiliaires + participes passés)</option>
-                    <option value="professions">Vocabulaire des métiers</option>
-                    <option value="possessives">Aggettivi possessivi</option>
-                  </select>
-                </label>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Mots personnalisés (facultatif)
-                  <input
-                    type="text"
-                    value={(block.content?.highlight_terms || []).join(', ')}
-                    onChange={event => updateDialogueHighlight(index, 'highlight_terms', event.target.value)}
-                    placeholder="Ex. biblioteca, farmacista, nostro"
-                    className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800"
-                  />
-                  <span className="mt-1 block font-normal text-slate-500">Séparez les mots par des virgules. Ils seront ajoutés à la surbrillance du dialogue.</span>
-                </label>
-              </div>
-            ))}
+              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
+            ) : dialogueBlocksForEditor.map(({ block, index }: any, dialogueIndex: number) => {
+              const lines = block.content?.lines || [];
+              const marks = block.content?.highlight_tokens || [];
+              return (
+                <div key={block.id || index} className="border-t border-slate-200 py-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-800">{dialogueBlocksForEditor.length > 1 ? `Dialogue ${dialogueIndex + 1}` : 'Dialogue de la leçon'}</h4>
+                      <p className="text-xs text-slate-500">{marks.length} occurrence(s) sélectionnée(s)</p>
+                    </div>
+                    <button type="button" onClick={() => clearDialogueHighlights(index)} disabled={!marks.length}
+                      className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                      Tout effacer
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {lines.map((line: any, lineIndex: number) => {
+                      let wordIndex = 0;
+                      const tokens = String(line.it || '').split(/(\s+|[^\p{L}\p{M}]+)/u);
+                      return (
+                        <div key={lineIndex} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{String(line.speaker || '?').trim().charAt(0).toUpperCase()}</span>
+                            <span className="text-xs font-semibold text-slate-700">{line.speaker || `Intervenant ${lineIndex + 1}`}</span>
+                            <span className="ml-auto text-[11px] text-slate-400">Réplique {lineIndex + 1}</span>
+                          </div>
+                          <p className="text-[15px] leading-8 text-slate-900">
+                            {tokens.map((token: string, tokenIndex: number) => {
+                              if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={tokenIndex}>{token}</React.Fragment>;
+                              const currentWordIndex = wordIndex++;
+                              const selected = marks.some((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex);
+                              return <React.Fragment key={tokenIndex}><button type="button"
+                                aria-pressed={selected}
+                                aria-label={`${selected ? 'Retirer' : 'Surligner'} le mot ${token}, réplique ${lineIndex + 1}`}
+                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token)}
+                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400' : 'text-slate-800 hover:bg-emerald-50 hover:text-emerald-900'}`}>
+                                {token}
+                              </button></React.Fragment>;
+                            })}
+                          </p>
+                          {line.fr && <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-500">{line.fr}</p>}
+                        </div>
+                      );
+                    })}
+                    {!lines.length && <p className="text-xs text-slate-500">Ce dialogue ne contient pas encore de répliques.</p>}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span className="inline-block rounded-md bg-emerald-200 px-2 py-1 font-semibold text-emerald-950">Mot sélectionné</span>
+              <span>Appuyez de nouveau sur un mot sélectionné pour retirer sa surbrillance.</span>
+            </div>
           </section>
 
           <textarea
