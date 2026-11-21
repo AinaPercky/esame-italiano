@@ -108,6 +108,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [json, setJson] = useState('');
   const [dialogueHighlightColor, setDialogueHighlightColor] = useState<'green' | 'amber' | 'blue' | 'purple' | 'rose' | 'teal'>('green');
   const [dialogueMarkMode, setDialogueMarkMode] = useState<'highlight' | 'underline' | 'outline' | 'circle'>('highlight');
+  const [dialogueRangeStart, setDialogueRangeStart] = useState<{ blockIndex: number; lineIndex: number; wordIndex: number; word: string } | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [mindMapFile, setMindMapFile] = useState<File | null>(null);
@@ -337,7 +338,55 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     }
   };
 
+  const handleDialogueWordClick = (blockIndex: number, lineIndex: number, wordIndex: number, word: string) => {
+    if (dialogueMarkMode === 'highlight') {
+      toggleDialogueWord(blockIndex, lineIndex, wordIndex, word, dialogueHighlightColor, 'highlight');
+      return;
+    }
+
+    if (!dialogueRangeStart || dialogueRangeStart.blockIndex !== blockIndex || dialogueRangeStart.lineIndex !== lineIndex) {
+      setDialogueRangeStart({ blockIndex, lineIndex, wordIndex, word });
+      return;
+    }
+
+    if (dialogueRangeStart.wordIndex === wordIndex) {
+      setDialogueRangeStart(null);
+      return;
+    }
+
+    const startIndex = Math.min(dialogueRangeStart.wordIndex, wordIndex);
+    const endIndex = Math.max(dialogueRangeStart.wordIndex, wordIndex);
+    try {
+      const parsed = JSON.parse(json);
+      const block = parsed.blocks?.[blockIndex];
+      const line = block?.content?.lines?.[lineIndex];
+      if (!block || block.type !== 'dialogue' || !line) return;
+      const words = String(line.it || '').split(/(\\s+|[^\\p{L}\\p{M}]+)/u).filter((token: string) => /^[\\p{L}\\p{M}]+$/u.test(token));
+      if (endIndex - startIndex + 1 < 2) {
+        setDialogueRangeStart(null);
+        return;
+      }
+      const marks = Array.isArray(block.content.emphasis_tokens) ? [...block.content.emphasis_tokens] : [];
+      for (let index = startIndex; index <= endIndex; index += 1) {
+        const selectedWord = words[index];
+        if (!selectedWord) continue;
+        const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === index);
+        const nextMark = { line_index: lineIndex, word_index: index, text: selectedWord, color: dialogueHighlightColor, style: dialogueMarkMode };
+        if (existing >= 0) marks[existing] = nextMark;
+        else marks.push(nextMark);
+      }
+      block.content = { ...(block.content || {}), emphasis_tokens: marks };
+      setJson(JSON.stringify(parsed, null, 2));
+      setError('');
+    } catch {
+      setError('Le JSON doit être valide avant de sélectionner une expression du dialogue.');
+    } finally {
+      setDialogueRangeStart(null);
+    }
+  };
+
   const clearDialogueHighlights = (blockIndex: number) => {
+    setDialogueRangeStart(null);
     try {
       const parsed = JSON.parse(json);
       const block = parsed.blocks?.[blockIndex];
@@ -528,7 +577,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Mise en valeur manuelle du dialogue</h3>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Choisissez un effet et une couleur, puis touchez les mots italiens un par un. Vous pouvez combiner plusieurs effets et couleurs dans une même expression.</p>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Choisissez un effet et une couleur. Le surlignage s’applique à un seul mot ; pour les autres effets, cliquez sur le premier puis le dernier mot de l’expression (au moins deux mots).</p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {dialogueBlocksForEditor.reduce((total: number, item: any) => total + (item.block.content?.highlight_tokens || []).length + (item.block.content?.emphasis_tokens || []).length, 0)} mise(s) en valeur
@@ -538,10 +587,10 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">1. Choisir l'effet</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {([
-                  { id: 'highlight', label: 'Surligner', symbol: '▰', description: 'Fond coloré' },
-                  { id: 'underline', label: 'Souligner', symbol: 'U̲', description: 'Trait sous le mot' },
-                  { id: 'outline', label: 'Encadrer', symbol: '□', description: 'Cadre rectangulaire' },
-                  { id: 'circle', label: 'Entourer', symbol: '◯', description: 'Contour arrondi' }
+                  { id: 'highlight', label: 'Surligner', symbol: '▰', description: '1 mot' },
+                  { id: 'underline', label: 'Souligner', symbol: 'U̲', description: '2 mots ou +' },
+                  { id: 'outline', label: 'Encadrer', symbol: '□', description: '2 mots ou +' },
+                  { id: 'circle', label: 'Entourer', symbol: '◯', description: '2 mots ou +' }
                 ] as const).map(mode => (
                   <button key={mode.id} type="button" aria-pressed={dialogueMarkMode === mode.id} onClick={() => setDialogueMarkMode(mode.id)}
                     className={`flex min-h-14 items-center gap-2 rounded-lg border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] ${dialogueMarkMode === mode.id ? 'border-[#0b3c5d] bg-[#e6f0f7] text-[#072a3f] ring-1 ring-[#0b3c5d]' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
@@ -567,7 +616,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">Choisissez un effet et une couleur, puis cliquez sur chaque mot à mettre en valeur. Pour « ho mangiato », sélectionnez « Souligner », puis choisissez une couleur pour « ho » et une autre pour « mangiato ». Cliquez à nouveau sur un mot avec le même effet pour le retirer.</p>
+              <p className="mt-2 text-xs text-slate-500">Le surlignage concerne un seul mot. Pour souligner, encadrer ou entourer une expression, choisissez l’effet et la couleur, puis cliquez sur son premier et son dernier mot. Sélectionnez au moins deux mots.</p>
             </div>
             {dialogueBlocksForEditor.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
@@ -610,7 +659,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                               return <React.Fragment key={tokenIndex}><button type="button"
                                 aria-pressed={selected}
                                 aria-label={`${selected ? 'Retirer' : 'Appliquer'} l'effet ${dialogueMarkMode} au mot ${token}, réplique ${lineIndex + 1}`}
-                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token, dialogueHighlightColor, dialogueMarkMode)}
+                                onClick={() => handleDialogueWordClick(index, lineIndex, currentWordIndex, token)}
                                 className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${highlightClass} ${emphasisClass} ${selected ? '' : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
                                 {token}
                               </button></React.Fragment>;
@@ -632,7 +681,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               <span className="inline-block rounded-md bg-violet-200 px-2 py-1 font-semibold text-violet-950">Violet</span>
               <span className="inline-block rounded-md bg-rose-200 px-2 py-1 font-semibold text-rose-950">Rose</span>
               <span className="inline-block rounded-md bg-teal-200 px-2 py-1 font-semibold text-teal-950">Turquoise</span>
-              <span>Les effets sont indépendants : un mot peut être à la fois surligné et souligné.</span>
+              <span>Le surlignage s’applique à un mot ; soulignement, encadrement et entourage s’appliquent à une sélection d’au moins deux mots. Cliquez sur le premier puis le dernier mot.</span>
             </div>
           </section>
 
