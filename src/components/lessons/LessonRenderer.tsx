@@ -94,13 +94,13 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
     if (marked) {
       if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
-      return <span key={i} className={\`lesson-word \${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}\`}>{marked[2]}</span>;
+      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
     }
     return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
       const highlightClass = /^[\p{L}\p{M}]+$/u.test(token) ? getItalianHighlightClass(token) : null;
       return highlightClass
-        ? <span key={\`\${i}-\${tokenIndex}\`} className={\`lesson-word \${highlightClass}\`}>{token}</span>
-        : <React.Fragment key={\`\${i}-\${tokenIndex}\`}>{token}</React.Fragment>;
+        ? <span key={`${i}-${tokenIndex}`} className={`lesson-word ${highlightClass}`}>{token}</span>
+        : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
     });
   })}</>;
 };
