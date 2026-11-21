@@ -56,8 +56,8 @@ const ITALIAN_AUXILIARIES = new Set([
 const REGULAR_ITALIAN_INFINITIVES = [
   'abitare', 'ascoltare', 'camminare', 'cantare', 'cercare', 'comprare',
   'dimenticare', 'disegnare', 'dormire', 'entrare', 'frequentare', 'guardare',
-  'imparare', 'incontrare', 'insegnare', 'lavorare', 'leggere', 'mangiare',
-  'nuotare', 'parlare', 'partire', 'passare', 'pensare', 'portare', 'praticare', 'vendere', 'credere', 'dormire', 'aprire', 'sentire', 'scrivere',
+  'imparare', 'incontrare', 'insegnare', 'lavorare', 'mangiare',
+  'nuotare', 'parlare', 'partire', 'passare', 'pensare', 'portare', 'praticare', 'vendere', 'credere', 'ricevere', 'dormire', 'aprire', 'sentire', 'scrivere', 'consigliare',
   'preparare', 'prendere', 'restare', 'ripassare', 'studiare', 'telefonare',
   'visitare', 'arrivare', 'fotografare', 'spiegare', 'pronunciare'
 ];
