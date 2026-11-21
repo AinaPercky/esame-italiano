@@ -86,12 +86,12 @@ test('après le dialogue, le DOM ne contient qu’une question de découverte', 
   assert.match(html, /lesson-player-question/);
   assert.match(html, /Question 1 \?/);
   assert.doesNotMatch(html, /Question 2 \?|lesson-dialogue|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
-  assert.match(html, /class="lesson-word lesson-word-auxiliary">ho/);
+  assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
 });
 
-test('le marqueur du dialogue se colore seulement après réussite de l’étape liée', () => {
+test('le marqueur du dialogue ne se colore pas dans les écrans de découverte', () => {
   const html = renderAt(1, 'started', ['q-1']);
-  assert.match(html, /lesson-word-yellow/);
+  assert.doesNotMatch(html, /lesson-word-yellow/);
   assert.match(html, /mangiato/);
 });
 
