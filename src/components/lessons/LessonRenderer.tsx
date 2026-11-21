@@ -38,8 +38,8 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordMarks?: Array<{ word_index: number; text?: string }> }> = ({ text, revealHighlights = false, highlightWordMarks = [] }) => {
-  const selectedWords = new Map(highlightWordMarks.map(mark => [mark.word_index, mark.text?.toLocaleLowerCase('it-IT')]));
+const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordMarks?: Array<{ word_index: number; text?: string; color?: 'green' | 'amber' }> }> = ({ text, revealHighlights = false, highlightWordMarks = [] }) => {
+  const selectedWords = new Map(highlightWordMarks.map(mark => [mark.word_index, { text: mark.text?.toLocaleLowerCase('it-IT'), color: mark.color === 'amber' ? 'amber' : 'green' }]));
   let wordIndex = 0;
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
@@ -51,8 +51,9 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWo
     return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
       if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
       const currentWordIndex = wordIndex++;
-      return selectedWords.has(currentWordIndex) && (!selectedWords.get(currentWordIndex) || selectedWords.get(currentWordIndex) === token.toLocaleLowerCase('it-IT'))
-        ? <span key={`${i}-${tokenIndex}`} className="lesson-word lesson-word-manual">{token}</span>
+      const selectedMark = selectedWords.get(currentWordIndex);
+      return selectedMark && (!selectedMark.text || selectedMark.text === token.toLocaleLowerCase('it-IT'))
+        ? <span key={`${i}-${tokenIndex}`} className={`lesson-word lesson-word-manual lesson-word-manual-${selectedMark.color}`}>{token}</span>
         : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
     });
   })}</>;
@@ -64,7 +65,7 @@ const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} revealHighlights={(content.highlight_tokens || []).some((mark: any) => mark.line_index === i)} highlightWordMarks={(content.highlight_tokens || []).filter((mark: any) => mark.line_index === i).map((mark: any) => ({ word_index: mark.word_index, text: mark.text }))} /></span>
+          <span className="lesson-italian"><RichText text={line.it} revealHighlights={(content.highlight_tokens || []).some((mark: any) => mark.line_index === i)} highlightWordMarks={(content.highlight_tokens || []).filter((mark: any) => mark.line_index === i).map((mark: any) => ({ word_index: mark.word_index, text: mark.text, color: mark.color }))} /></span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
