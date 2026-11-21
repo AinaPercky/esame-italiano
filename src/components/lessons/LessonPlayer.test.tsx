@@ -53,7 +53,7 @@ function renderCustomStep(step: any) {
 test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de cours ni quiz', () => {
   const html = renderAt(0);
   assert.match(html, /lesson-dialogue/);
-  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual">mangiato<\/span>/);
+  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual lesson-word-manual-green">mangiato<\/span>/);
   assert.doesNotMatch(html, /lesson-player-question|lesson-discovery|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
   assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
 });
@@ -81,9 +81,54 @@ test('seules les occurrences choisies mot par mot sont surlignées dans le dialo
     ]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: customLesson, revealAll: true }));
-  assert.equal((html.match(/lesson-word-manual/g) || []).length, 1);
-  assert.match(html, /Ho una <span class="lesson-word lesson-word-manual">mela<\/span> e una mela/);
+  assert.equal((html.match(/lesson-word-manual-green/g) || []).length, 1);
+  assert.match(html, /Ho una <span class="lesson-word lesson-word-manual lesson-word-manual-green">mela<\/span> e una mela/);
   assert.match(html, /La mela è rossa/);
+});
+
+test('la couleur secondaire est conservée pour les auxiliaires sélectionnés', () => {
+  const auxiliaryLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'dialogue',
+      type: 'dialogue',
+      content: {
+        highlight_tokens: [{ line_index: 0, word_index: 1, text: 'ho', color: 'amber' }],
+        lines: [{ speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }]
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: auxiliaryLesson, revealAll: true }));
+  assert.match(html, /Ieri <span class="lesson-word lesson-word-manual lesson-word-manual-amber">ho<\/span>/);
+  assert.doesNotMatch(html, /mangiato<\/span>/);
+});
+
+test('les cinq couleurs manuelles sont rendues uniquement sur les mots sélectionnés du dialogue', () => {
+  const multiColorLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'dialogue',
+      type: 'dialogue',
+      content: {
+        highlight_tokens: [
+          { line_index: 0, word_index: 1, text: 'ho', color: 'amber' },
+          { line_index: 0, word_index: 2, text: 'mangiato', color: 'blue' },
+          { line_index: 0, word_index: 4, text: 'mela', color: 'purple' },
+          { line_index: 1, word_index: 0, text: 'Domani', color: 'rose' },
+          { line_index: 1, word_index: 1, text: 'parto', color: 'green' }
+        ],
+        lines: [
+          { speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' },
+          { speaker: 'Sara', it: 'Domani parto presto.', fr: 'Demain, je pars tôt.' }
+        ]
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: multiColorLesson, revealAll: true }));
+  for (const color of ['green', 'amber', 'blue', 'purple', 'rose']) {
+    assert.match(html, new RegExp('lesson-word-manual-' + color));
+  }
+  assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {

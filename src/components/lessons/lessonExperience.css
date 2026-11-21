@@ -143,11 +143,34 @@
   display: inline;
   border-radius: 0.3rem;
   padding: 0.08em 0.22em;
-  background: #d8f3e4;
-  color: #075b39;
   font-weight: 750;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+
+.lesson-word-manual-green {
+  background: #d8f3e4;
+  color: #075b39;
+}
+
+.lesson-word-manual-amber {
+  background: #ffedbd;
+  color: #704b00;
+}
+
+.lesson-word-manual-blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.lesson-word-manual-purple {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.lesson-word-manual-rose {
+  background: #ffe4e6;
+  color: #9f1239;
 }
 
 .lesson-word-verb {
@@ -835,9 +858,29 @@
     color: #ffe89a;
   }
 
-  .lesson-word-manual {
+  .lesson-word-manual-green {
     background: rgba(47, 163, 107, 0.28);
     color: #a8edc7;
+  }
+
+  .lesson-word-manual-amber {
+    background: rgba(232, 168, 45, 0.24);
+    color: #ffdf91;
+  }
+
+  .lesson-word-manual-blue {
+    background: rgba(59, 130, 246, 0.24);
+    color: #bfdbfe;
+  }
+
+  .lesson-word-manual-purple {
+    background: rgba(139, 92, 246, 0.24);
+    color: #ddd6fe;
+  }
+
+  .lesson-word-manual-rose {
+    background: rgba(244, 63, 94, 0.22);
+    color: #fecdd3;
   }
 
   .lesson-word-verb {
