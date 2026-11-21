@@ -53,9 +53,9 @@ function renderCustomStep(step: any) {
 test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de cours ni quiz', () => {
   const html = renderAt(0);
   assert.match(html, /lesson-dialogue/);
-  assert.match(html, /Ieri ho/);
+  assert.match(html, /Ieri <span class="lesson-word lesson-word-auxiliary">ho/);
   assert.doesNotMatch(html, /lesson-player-question|lesson-discovery|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
-  assert.doesNotMatch(html, /class="lesson-word/);
+  assert.match(html, /class="lesson-word lesson-word-auxiliary">ho/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
@@ -63,7 +63,7 @@ test('après le dialogue, le DOM ne contient qu’une question de découverte', 
   assert.match(html, /lesson-player-question/);
   assert.match(html, /Question 1 \?/);
   assert.doesNotMatch(html, /Question 2 \?|lesson-dialogue|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
-  assert.doesNotMatch(html, /class="lesson-word/);
+  assert.match(html, /class="lesson-word lesson-word-auxiliary">ho/);
 });
 
 test('le marqueur du dialogue se colore seulement après réussite de l’étape liée', () => {
@@ -140,8 +140,9 @@ test('la synthèse affiche les repères et sépare visuellement la phrase modèl
   assert.match(html, /lesson-recap-header/);
   assert.match(html, /Fiche mémo/);
   assert.match(html, /2 repères/);
-  assert.match(html, /Avere ou essere au présent/);
+  const textContent = html.replace(/<[^>]*>/g, '');
+  assert.match(textContent, /Avere ou essere au présent/);
   assert.match(html, /Phrase modèle/);
-  assert.match(html, /Ieri sono andata a Roma/);
-  assert.match(html, /Hier, je suis allée à Rome/);
+  assert.match(textContent, /Ieri sono andata a Roma/);
+  assert.match(textContent, /Hier, je suis allée à Rome/);
 });

@@ -38,13 +38,79 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
+const ITALIAN_PREPOSITIONS = new Set([
+  'a', 'ad', 'da', 'di', 'in', 'con', 'su', 'per', 'tra', 'fra',
+  'al', 'allo', 'alla', 'ai', 'agli', 'alle',
+  'del', 'dello', 'della', 'dei', 'degli', 'delle',
+  'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle',
+  'nel', 'nello', 'nella', 'nei', 'negli', 'nelle',
+  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'col', 'coi', 'all', 'dell', 'dall', 'nell', 'sull', 'coll'
+]);
+
+const ITALIAN_AUXILIARIES = new Set([
+  'essere', 'avere', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
+]);
+
+// Verbi regolari frequenti: le forme sono generate secondo le tre coniugazioni.
+// La lista può essere estesa senza modificare il renderer.
+const REGULAR_ITALIAN_INFINITIVES = [
+  'abitare', 'ascoltare', 'camminare', 'cantare', 'cercare', 'comprare',
+  'dimenticare', 'disegnare', 'dormire', 'entrare', 'frequentare', 'guardare',
+  'imparare', 'incontrare', 'insegnare', 'lavorare', 'leggere', 'mangiare',
+  'nuotare', 'parlare', 'partire', 'passare', 'pensare', 'portare', 'praticare',
+  'preparare', 'prendere', 'restare', 'ripassare', 'studiare', 'telefonare',
+  'visitare', 'arrivare', 'fotografare', 'spiegare', 'pronunciare'
+];
+
+function buildRegularVerbForms() {
+  const forms = new Set<string>();
+  const endings: Record<string, string[]> = {
+    are: ['o', 'i', 'a', 'iamo', 'ate', 'ano'],
+    ere: ['o', 'i', 'e', 'iamo', 'ete', 'ono'],
+    ire: ['o', 'i', 'e', 'iamo', 'ite', 'ono']
+  };
+  REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
+    forms.add(infinitive);
+    if (infinitive.endsWith('iare')) {
+      const stem = infinitive.slice(0, -4);
+      [stem + 'io', stem + 'i', stem + 'ia', stem + 'iamo', stem + 'iate', stem + 'iano'].forEach(form => forms.add(form));
+      return;
+    }
+    const conjugation = infinitive.slice(-3);
+    const stem = infinitive.slice(0, -3);
+    if (conjugation === 'are' && (stem.endsWith('c') || stem.endsWith('g'))) {
+      [stem + 'o', stem + 'h' + 'i', stem + 'a', stem + 'h' + 'iamo', stem + 'ate', stem + 'ano'].forEach(form => forms.add(form));
+      return;
+    }
+    (endings[conjugation] || []).forEach(ending => forms.add(stem + ending));
+  });
+  return forms;
+}
+
+const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
+
+function getItalianHighlightClass(token: string): string | null {
+  const normalized = token.toLocaleLowerCase('it-IT');
+  if (ITALIAN_AUXILIARIES.has(normalized)) return 'lesson-word-auxiliary';
+  if (REGULAR_ITALIAN_VERB_FORMS.has(normalized)) return 'lesson-word-verb';
+  if (ITALIAN_PREPOSITIONS.has(normalized)) return 'lesson-word-preposition';
+  return null;
+}
+
 const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text, revealHighlights = false }) => {
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
-    if (!marked) return <React.Fragment key={i}>{part}</React.Fragment>;
-    if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
-    return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
+    if (marked) {
+      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
+    }
+    return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
+      const highlightClass = /^[\p{L}\p{M}]+$/u.test(token) ? getItalianHighlightClass(token) : null;
+      return highlightClass
+        ? <span key={`${i}-${tokenIndex}`} className={`lesson-word ${highlightClass}`}>{token}</span>
+        : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
+    });
   })}</>;
 };
 
@@ -95,14 +161,14 @@ function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revea
   if (!isBlockVisible(block, guidedComplete)) return null;
   const c = block.content || {};
   if (block.type === 'dialogue') return <DialogueBlock content={c} revealHighlights={revealHighlights} />;
-  if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b>{x.it}</b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
+  if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b><RichText text={x.it} revealHighlights /></b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
   if (block.type === 'rules_table') return <section className="lesson-table-section">{c.title && <h3>{c.title}</h3>}<div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th>{c.label || ''}</th>{(c.columns || []).map((x: string) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(c.rows || []).map((row: any, i: number) => <tr key={i}><th>{row.label}</th>{(row.cells || []).map((cell: string, j: number) => <td key={j}><button type="button" onClick={() => speak(cell)}>{cell}</button></td>)}</tr>)}</tbody></table></div></section>;
-  if (block.type === 'rule_cards') return <div className="lesson-card-grid">{(c.cards || []).map((card: any, i: number) => <article className="lesson-rule-card" key={i}><h4>{card.title}</h4><p>{card.text}</p>{(card.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</article>)}</div>;
-  if (block.type === 'example_list') return <div className="lesson-example-list">{(c.examples || []).map((e: any, i: number) => <button className="lesson-example" type="button" key={i} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</div>;
-  if (block.type === 'steps_text') return <ol className="lesson-steps">{(c.steps || []).map((x: any, i: number) => <li key={i}><strong>{x.title}</strong><button type="button" onClick={() => speak(x.it)}>{x.it}</button><small>{x.fr}</small></li>)}</ol>;
-  if (block.type === 'key_value_list') return <dl className="lesson-key-values">{(c.rows || []).map((x: any, i: number) => <React.Fragment key={i}><dt>{x.key}</dt><dd>{x.it}{x.fr && <small>{x.fr}</small>}</dd></React.Fragment>)}</dl>;
-  if (block.type === 'chips') return <div className="lesson-chips">{(c.items || []).map((x: any, i: number) => <button type="button" key={i} onClick={() => speak(x.it)}><b>{x.it}</b><small>{x.fr}</small></button>)}</div>;
-  if (block.type === 'tip' || block.type === 'warning') return <aside className={`lesson-callout ${block.type}`}><Lightbulb size={20} /><p>{c.text || ''}</p></aside>;
+  if (block.type === 'rule_cards') return <div className="lesson-card-grid">{(c.cards || []).map((card: any, i: number) => <article className="lesson-rule-card" key={i}><h4>{card.title}</h4><p><RichText text={card.text} revealHighlights /></p>{(card.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</article>)}</div>;
+  if (block.type === 'example_list') return <div className="lesson-example-list">{(c.examples || []).map((e: any, i: number) => <button className="lesson-example" type="button" key={i} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</div>;
+  if (block.type === 'steps_text') return <ol className="lesson-steps">{(c.steps || []).map((x: any, i: number) => <li key={i}><strong>{x.title}</strong><button type="button" onClick={() => speak(x.it)}><RichText text={x.it} revealHighlights /></button><small>{x.fr}</small></li>)}</ol>;
+  if (block.type === 'key_value_list') return <dl className="lesson-key-values">{(c.rows || []).map((x: any, i: number) => <React.Fragment key={i}><dt>{x.key}</dt><dd><RichText text={x.it} revealHighlights />{x.fr && <small>{x.fr}</small>}</dd></React.Fragment>)}</dl>;
+  if (block.type === 'chips') return <div className="lesson-chips">{(c.items || []).map((x: any, i: number) => <button type="button" key={i} onClick={() => speak(x.it)}><b><RichText text={x.it} revealHighlights /></b><small>{x.fr}</small></button>)}</div>;
+  if (block.type === 'tip' || block.type === 'warning') return <aside className={`lesson-callout ${block.type}`}><Lightbulb size={20} /><p><RichText text={c.text || ''} revealHighlights /></p></aside>;
   if (block.type === 'recap') {
     const keyPoints: string[] = Array.isArray(c.bullets) ? c.bullets : [];
     return <aside className="lesson-recap" aria-label="À retenir">
@@ -118,18 +184,18 @@ function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revea
       {keyPoints.length > 0 && <ul className="lesson-recap-list">
         {keyPoints.map((point, index) => <li key={`${index}-${point}`}>
           <span className="lesson-recap-marker" aria-hidden="true"><Check size={15} /></span>
-          <span>{point}</span>
+          <span><RichText text={point} revealHighlights /></span>
         </li>)}
       </ul>}
       {c.model && <section className="lesson-recap-model" aria-label="Phrase modèle">
         <span className="lesson-recap-model-label"><BookOpen size={15} /> Phrase modèle</span>
-        {c.model.it && <p className="lesson-recap-model-italian">{c.model.it}</p>}
+        {c.model.it && <p className="lesson-recap-model-italian"><RichText text={c.model.it} revealHighlights /></p>}
         {c.model.fr && <p className="lesson-recap-model-french">{c.model.fr}</p>}
       </section>}
     </aside>;
   }
-  if (block.type === 'formula') return <section className="lesson-formula"><h3>{c.title || 'Formule générale'}</h3>{(c.formulas || []).map((f: any, i: number) => <div key={i} className="lesson-formula-item"><b>{f.label}</b><div className="lesson-formula-parts">{(f.parts || []).map((part: any, j: number) => <span key={j} className={`formula-${part.kind}`}>{part.text}{part.hint && <small>{part.hint}</small>}</span>)}</div>{(f.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</div>)}</section>;
-  if (block.type === 'exceptions') return <section className="lesson-exceptions"><h3>{c.title || 'Exceptions'}</h3>{(c.items || []).map((x: any, i: number) => <article key={i}><strong>{x.rule}</strong><p>{x.explanation}</p>{(x.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b>{e.it}</b><small>{e.fr}</small></button>)}</article>)}</section>;
+  if (block.type === 'formula') return <section className="lesson-formula"><h3>{c.title || 'Formule générale'}</h3>{(c.formulas || []).map((f: any, i: number) => <div key={i} className="lesson-formula-item"><b>{f.label}</b><div className="lesson-formula-parts">{(f.parts || []).map((part: any, j: number) => <span key={j} className={`formula-${part.kind}`}>{part.text}{part.hint && <small>{part.hint}</small>}</span>)}</div>{(f.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</div>)}</section>;
+  if (block.type === 'exceptions') return <section className="lesson-exceptions"><h3>{c.title || 'Exceptions'}</h3>{(c.items || []).map((x: any, i: number) => <article key={i}><strong>{x.rule}</strong><p>{x.explanation}</p>{(x.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</article>)}</section>;
   if (block.type === 'module') return <ModuleBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} guidedComplete={guidedComplete} />;
   if (block.type === 'discovery') return <DiscoveryBlock content={c} discovery={discovery} onDiscovery={onDiscovery} allBlocks={allBlocks} />;
   return null;
