@@ -106,6 +106,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [preview, setPreview] = useState<Lesson | null>(null);
   const [previewTab, setPreviewTab] = useState<'student' | 'full'>('student');
   const [json, setJson] = useState('');
+  const [dialogueHighlightColor, setDialogueHighlightColor] = useState<'green' | 'amber'>('green');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [mindMapFile, setMindMapFile] = useState<File | null>(null);
@@ -306,7 +307,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     }
   }, [json]);
 
-  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string) => {
+  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string, color: 'green' | 'amber') => {
     try {
       const parsed = JSON.parse(json);
       const block = parsed.blocks?.[blockIndex];
@@ -318,7 +319,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
       const marks = Array.isArray(block.content.highlight_tokens) ? [...block.content.highlight_tokens] : [];
       const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === wordIndex);
       if (existing >= 0) marks.splice(existing, 1);
-      else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word });
+      else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word, color });
       block.content.highlight_tokens = marks;
       setJson(JSON.stringify(parsed, null, 2));
       setError('');
@@ -517,11 +518,23 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Sélection manuelle des mots à surligner</h3>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Touchez chaque mot italien directement dans le dialogue. Chaque occurrence est sélectionnée individuellement ; seules les occurrences choisies seront surlignées pour les élèves.</p>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Choisissez une couleur, puis touchez chaque mot italien à surligner. Chaque occurrence peut avoir sa propre couleur.</p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 {dialogueBlocksForEditor.reduce((total: number, item: any) => total + (item.block.content?.highlight_tokens || []).length, 0)} mot(s) sélectionné(s)
               </span>
+            </div>
+            <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Couleur à appliquer aux prochains mots</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" aria-pressed={dialogueHighlightColor === 'green'} onClick={() => setDialogueHighlightColor('green')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${dialogueHighlightColor === 'green' ? 'border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-300' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  <span className="h-4 w-4 rounded border border-emerald-500 bg-emerald-300" /> Notion principale
+                </button>
+                <button type="button" aria-pressed={dialogueHighlightColor === 'amber'} onClick={() => setDialogueHighlightColor('amber')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 ${dialogueHighlightColor === 'amber' ? 'border-amber-600 bg-amber-100 text-amber-950 ring-2 ring-amber-300' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  <span className="h-4 w-4 rounded border border-amber-500 bg-amber-300" /> Auxiliaire / notion secondaire
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">La couleur choisie s'applique uniquement aux nouveaux mots sélectionnés. Pour changer la couleur d'un mot déjà sélectionné, retirez-le puis sélectionnez-le avec l'autre couleur.</p>
             </div>
             {dialogueBlocksForEditor.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
@@ -555,12 +568,13 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                             {tokens.map((token: string, tokenIndex: number) => {
                               if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={tokenIndex}>{token}</React.Fragment>;
                               const currentWordIndex = wordIndex++;
-                              const selected = marks.some((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex && String(mark.text || '').toLocaleLowerCase('it-IT') === token.toLocaleLowerCase('it-IT'));
+                              const selectedMark = marks.find((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex && String(mark.text || '').toLocaleLowerCase('it-IT') === token.toLocaleLowerCase('it-IT'));
+                              const selected = Boolean(selectedMark);
                               return <React.Fragment key={tokenIndex}><button type="button"
                                 aria-pressed={selected}
                                 aria-label={`${selected ? 'Retirer' : 'Surligner'} le mot ${token}, réplique ${lineIndex + 1}`}
-                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token)}
-                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400' : 'text-slate-800 hover:bg-emerald-50 hover:text-emerald-900'}`}>
+                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token, dialogueHighlightColor)}
+                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? (selectedMark.color === 'amber' ? 'bg-amber-200 text-amber-950 ring-1 ring-amber-400' : 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400') : 'text-slate-800 hover:bg-emerald-50 hover:text-emerald-900'}`}>
                                 {token}
                               </button></React.Fragment>;
                             })}
@@ -575,7 +589,8 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               );
             })}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span className="inline-block rounded-md bg-emerald-200 px-2 py-1 font-semibold text-emerald-950">Mot sélectionné</span>
+              <span className="inline-block rounded-md bg-emerald-200 px-2 py-1 font-semibold text-emerald-950">Notion principale</span>
+              <span className="inline-block rounded-md bg-amber-200 px-2 py-1 font-semibold text-amber-950">Auxiliaire / secondaire</span>
               <span>Appuyez de nouveau sur un mot sélectionné pour retirer sa surbrillance.</span>
             </div>
           </section>
