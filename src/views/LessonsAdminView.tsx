@@ -297,6 +297,36 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     });
   }, [lessons, searchTerm, statusFilter, typeFilter]);
 
+  const dialogueBlocksForEditor = useMemo(() => {
+    try {
+      const parsed = JSON.parse(json);
+      return (parsed.blocks || []).map((block: any, index: number) => ({ block, index })).filter(({ block }: any) => block.type === 'dialogue');
+    } catch {
+      return [];
+    }
+  }, [json]);
+
+  const updateDialogueHighlight = (blockIndex: number, field: 'highlight_mode' | 'highlight_terms', value: any) => {
+    try {
+      const parsed = JSON.parse(json);
+      const block = parsed.blocks?.[blockIndex];
+      if (!block || block.type !== 'dialogue') return;
+      block.content = { ...(block.content || {}) };
+      if (field === 'highlight_terms') {
+        const terms = String(value).split(',').map(term => term.trim()).filter(Boolean);
+        if (terms.length) block.content.highlight_terms = terms;
+        else delete block.content.highlight_terms;
+      } else if (value) {
+        block.content.highlight_mode = value;
+      } else {
+        delete block.content.highlight_mode;
+      }
+      setJson(JSON.stringify(parsed, null, 2));
+    } catch {
+      setError('Le JSON doit être valide avant de modifier les options de surbrillance.');
+    }
+  };
+
   const publishedCount = lessons.filter(l => l.status === 'published').length;
   const draftCount = lessons.filter(l => l.status === 'draft').length;
 
@@ -466,6 +496,44 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               <X size={18} />
             </button>
           </div>
+
+          <section className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3 sm:p-4">
+            <div className="mb-3">
+              <h3 className="text-sm font-bold text-slate-900">Surbrillance du dialogue</h3>
+              <p className="mt-1 text-xs text-slate-600">Le professeur choisit manuellement la notion à mettre en évidence. La surbrillance apparaît uniquement dans les répliques en italien du dialogue.</p>
+            </div>
+            {dialogueBlocksForEditor.length === 0 ? (
+              <p className="text-xs text-slate-500">Ajoutez d’abord un bloc « dialogue » dans le JSON pour configurer sa surbrillance.</p>
+            ) : dialogueBlocksForEditor.map(({ block, index }: any, dialogueIndex: number) => (
+              <div key={block.id || index} className="grid grid-cols-1 gap-3 border-t border-sky-100 py-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  {dialogueBlocksForEditor.length > 1 ? `Dialogue ${dialogueIndex + 1} · ` : ''}Notion à surligner
+                  <select
+                    value={block.content?.highlight_mode || ''}
+                    onChange={event => updateDialogueHighlight(index, 'highlight_mode', event.target.value)}
+                    className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800"
+                  >
+                    <option value="">Aucune surbrillance automatique</option>
+                    <option value="present-indicative">Verbes réguliers au présent (-ARE, -ERE, -IRE)</option>
+                    <option value="passato-prossimo">Passato prossimo (auxiliaires + participes passés)</option>
+                    <option value="professions">Vocabulaire des métiers</option>
+                    <option value="possessives">Aggettivi possessivi</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Mots personnalisés (facultatif)
+                  <input
+                    type="text"
+                    value={(block.content?.highlight_terms || []).join(', ')}
+                    onChange={event => updateDialogueHighlight(index, 'highlight_terms', event.target.value)}
+                    placeholder="Ex. biblioteca, farmacista, nostro"
+                    className="mt-1.5 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800"
+                  />
+                  <span className="mt-1 block font-normal text-slate-500">Séparez les mots par des virgules. Ils seront ajoutés à la surbrillance du dialogue.</span>
+                </label>
+              </div>
+            ))}
+          </section>
 
           <textarea
             value={json}

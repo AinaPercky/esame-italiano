@@ -38,28 +38,16 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const ITALIAN_PREPOSITIONS = new Set([
-  'a', 'ad', 'da', 'di', 'in', 'con', 'su', 'per', 'tra', 'fra',
-  'al', 'allo', 'alla', 'ai', 'agli', 'alle',
-  'del', 'dello', 'della', 'dei', 'degli', 'delle',
-  'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle',
-  'nel', 'nello', 'nella', 'nei', 'negli', 'nelle',
-  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'col', 'coi', 'all', 'dell', 'dall', 'nell', 'sull', 'coll'
-]);
-
 const ITALIAN_AUXILIARIES = new Set([
   'essere', 'avere', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
 ]);
 
-// Verbi regolari frequenti: le forme sono generate secondo le tre coniugazioni.
-// La lista può essere estesa senza modificare il renderer.
 const REGULAR_ITALIAN_INFINITIVES = [
-  'abitare', 'ascoltare', 'camminare', 'cantare', 'cercare', 'comprare',
-  'dimenticare', 'disegnare', 'dormire', 'entrare', 'frequentare', 'guardare',
-  'imparare', 'incontrare', 'insegnare', 'lavorare', 'leggere', 'mangiare',
-  'nuotare', 'parlare', 'partire', 'passare', 'pensare', 'portare', 'praticare',
-  'preparare', 'prendere', 'restare', 'ripassare', 'studiare', 'telefonare',
-  'visitare', 'arrivare', 'fotografare', 'spiegare', 'pronunciare'
+  'abitare', 'ascoltare', 'camminare', 'cantare', 'cercare', 'comprare', 'dimenticare',
+  'disegnare', 'dormire', 'entrare', 'frequentare', 'guardare', 'imparare', 'incontrare',
+  'insegnare', 'lavorare', 'mangiare', 'nuotare', 'parlare', 'partire', 'passare',
+  'pensare', 'portare', 'praticare', 'preparare', 'ricevere', 'restare', 'ripassare',
+  'studiare', 'telefonare', 'vendere', 'credere', 'aprire', 'sentire', 'consigliare'
 ];
 
 function buildRegularVerbForms() {
@@ -71,42 +59,52 @@ function buildRegularVerbForms() {
   };
   REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
     forms.add(infinitive);
-    if (infinitive.endsWith('iare')) {
-      const stem = infinitive.slice(0, -4);
-      [stem + 'io', stem + 'i', stem + 'ia', stem + 'iamo', stem + 'iate', stem + 'iano'].forEach(form => forms.add(form));
-      return;
-    }
     const conjugation = infinitive.slice(-3);
     const stem = infinitive.slice(0, -3);
-    if (conjugation === 'are' && (stem.endsWith('c') || stem.endsWith('g'))) {
-      [stem + 'o', stem + 'h' + 'i', stem + 'a', stem + 'h' + 'iamo', stem + 'ate', stem + 'ano'].forEach(form => forms.add(form));
-      return;
-    }
     (endings[conjugation] || []).forEach(ending => forms.add(stem + ending));
   });
   return forms;
 }
-
 const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
 
-function getItalianHighlightClass(token: string): string | null {
-  const normalized = token.toLocaleLowerCase('it-IT');
-  if (ITALIAN_AUXILIARIES.has(normalized)) return 'lesson-word-auxiliary';
-  if (REGULAR_ITALIAN_VERB_FORMS.has(normalized)) return 'lesson-word-verb';
-  if (ITALIAN_PREPOSITIONS.has(normalized)) return 'lesson-word-preposition';
+const ITALIAN_POSSESSIVES = new Set('mio mia miei mie tuo tua tuoi tue suo sua suoi sue nostro nostra nostri nostre vostro vostra vostri vostre loro'.split(' '));
+const ITALIAN_PROFESSIONS = new Set('insegnante insegnanti studente studentessa studenti studentesse medico medica medici mediche infermiere infermiera avvocato avvocata ingegnere ingegnera commesso commessa cuoco cuoca cameriere cameriera poliziotto poliziotta operaio operaia impiegato impiegata architetto architetta dentista giornalista musicista artista parrucchiere parrucchiera meccanico meccanica elettricista contadino contadina segretario segretaria direttore direttrice autista barista libraio libraia farmacista fotografo fotografa'.split(' '));
+const ITALIAN_IRREGULAR_PARTICIPLES = new Set('fatto detto scritto letto visto preso messo chiesto risposto aperto chiuso nato morto rimasto scelto bevuto conosciuto concluso corso corretto deciso discusso diviso offerto perso proposto rotto tradotto venuto stato avuto andato uscito entrato successo'.split(' '));
+
+function buildRegularParticiples() {
+  const forms = new Set<string>();
+  REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
+    forms.add(infinitive.slice(0, -3) + (infinitive.endsWith('are') ? 'ato' : infinitive.endsWith('ere') ? 'uto' : 'ito'));
+  });
+  return forms;
+}
+const ITALIAN_REGULAR_PARTICIPLES = buildRegularParticiples();
+
+function getItalianHighlightClass(token: string, mode?: string, customTerms: Set<string> = new Set()): string | null {
+  const word = token.toLocaleLowerCase('it-IT');
+  if (customTerms.has(word)) return 'lesson-word-vocabulary';
+  if (mode === 'present-indicative') {
+    if (ITALIAN_AUXILIARIES.has(word)) return 'lesson-word-auxiliary';
+    if (REGULAR_ITALIAN_VERB_FORMS.has(word)) return 'lesson-word-verb';
+  }
+  if (mode === 'passato-prossimo' && (ITALIAN_AUXILIARIES.has(word) || ITALIAN_IRREGULAR_PARTICIPLES.has(word) || ITALIAN_REGULAR_PARTICIPLES.has(word))) return 'lesson-word-verb';
+  if (mode === 'professions' && ITALIAN_PROFESSIONS.has(word)) return 'lesson-word-vocabulary';
+  if (mode === 'possessives' && ITALIAN_POSSESSIVES.has(word)) return 'lesson-word-possessive';
   return null;
 }
 
-const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text, revealHighlights = false }) => {
+const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMode?: string; highlightTerms?: string[] }> = ({ text, revealHighlights = false, highlightMode, highlightTerms = [] }) => {
+  const customTerms = new Set(highlightTerms.map(term => term.trim().toLocaleLowerCase('it-IT')).filter(Boolean));
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
     if (marked) {
-      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      if (!revealHighlights || (!highlightMode && customTerms.size === 0)) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
       return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
     }
     return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
-      const highlightClass = /^[\p{L}\p{M}]+$/u.test(token) ? getItalianHighlightClass(token) : null;
+      const highlightClass = revealHighlights && (highlightMode || customTerms.size > 0) && /^[\p{L}\p{M}]+$/u.test(token)
+        ? getItalianHighlightClass(token, highlightMode, customTerms) : null;
       return highlightClass
         ? <span key={`${i}-${tokenIndex}`} className={`lesson-word ${highlightClass}`}>{token}</span>
         : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
@@ -114,13 +112,13 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text
   })}</>;
 };
 
-const DialogueBlock: React.FC<{ content: any; revealHighlights?: boolean }> = ({ content, revealHighlights = false }) => (
+const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
   <section className="lesson-dialogue" aria-label="Dialogue en italien">
     {(content.lines || []).map((line: any, i: number) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} revealHighlights={revealHighlights} /></span>
+          <span className="lesson-italian"><RichText text={line.it} revealHighlights={Boolean(content.highlight_mode || (content.highlight_terms || []).length)} highlightMode={content.highlight_mode} highlightTerms={content.highlight_terms || []} /></span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
@@ -160,7 +158,7 @@ function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revea
 }) {
   if (!isBlockVisible(block, guidedComplete)) return null;
   const c = block.content || {};
-  if (block.type === 'dialogue') return <DialogueBlock content={c} revealHighlights={revealHighlights} />;
+  if (block.type === 'dialogue') return <DialogueBlock content={c} />;
   if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b><RichText text={x.it} revealHighlights /></b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
   if (block.type === 'rules_table') return <section className="lesson-table-section">{c.title && <h3>{c.title}</h3>}<div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th>{c.label || ''}</th>{(c.columns || []).map((x: string) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(c.rows || []).map((row: any, i: number) => <tr key={i}><th>{row.label}</th>{(row.cells || []).map((cell: string, j: number) => <td key={j}><button type="button" onClick={() => speak(cell)}>{cell}</button></td>)}</tr>)}</tbody></table></div></section>;
   if (block.type === 'rule_cards') return <div className="lesson-card-grid">{(c.cards || []).map((card: any, i: number) => <article className="lesson-rule-card" key={i}><h4>{card.title}</h4><p><RichText text={card.text} revealHighlights /></p>{(card.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</article>)}</div>;
