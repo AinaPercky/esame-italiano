@@ -108,11 +108,11 @@ function getItalianHighlightClass(token: string, highlightMode?: string): string
 }
 
 function getLessonHighlightMode(title: string): string | undefined {
-  const normalized = title.toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
-  if (/\\b(passato prossimo|passe compose)\\b/.test(normalized)) return 'passato-prossimo';
-  if (/\\b(mestieri|professioni|metiers|professions)\\b/.test(normalized)) return 'professions';
-  if (/\\b(aggettivi possessivi|adjectifs possessifs)\\b/.test(normalized)) return 'possessives';
-  if (/\\b(presente indicativo|present indicatif|verbi regolari|verbes reguliers)\\b/.test(normalized)) return 'present-indicative';
+  const normalized = title.toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/\b(passato prossimo|passe compose)\b/.test(normalized)) return 'passato-prossimo';
+  if (/\b(mestieri|professioni|metiers|professions)\b/.test(normalized)) return 'professions';
+  if (/\b(aggettivi possessivi|adjectifs possessifs)\b/.test(normalized)) return 'possessives';
+  if (/\b(presente indicativo|present indicatif|verbi regolari|verbes reguliers)\b/.test(normalized)) return 'present-indicative';
   return undefined;
 }
 
