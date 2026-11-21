@@ -81,7 +81,7 @@ test('seules les occurrences choisies mot par mot sont surlignées dans le dialo
     ]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: customLesson, revealAll: true }));
-  assert.equal((html.match(/lesson-word-manual/g) || []).length, 1);
+  assert.equal((html.match(/lesson-word-manual-green/g) || []).length, 1);
   assert.match(html, /Ho una <span class="lesson-word lesson-word-manual lesson-word-manual-green">mela<\/span> e una mela/);
   assert.match(html, /La mela è rossa/);
 });
