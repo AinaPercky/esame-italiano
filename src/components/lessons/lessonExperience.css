@@ -178,6 +178,42 @@
   color: #115e59;
 }
 
+
+.lesson-word-emphasis {
+  display: inline-block;
+  position: relative;
+  padding: 0 0.12em;
+  font-weight: 800;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.lesson-word-emphasis-green { --lesson-emphasis-color: #16834f; }
+.lesson-word-emphasis-amber { --lesson-emphasis-color: #b77908; }
+.lesson-word-emphasis-blue { --lesson-emphasis-color: #2563eb; }
+.lesson-word-emphasis-purple { --lesson-emphasis-color: #7c3aed; }
+.lesson-word-emphasis-rose { --lesson-emphasis-color: #e11d48; }
+.lesson-word-emphasis-teal { --lesson-emphasis-color: #0f9488; }
+
+.lesson-word-emphasis-underline {
+  text-decoration-line: underline;
+  text-decoration-color: var(--lesson-emphasis-color);
+  text-decoration-thickness: 2.5px;
+  text-underline-offset: 0.2em;
+}
+
+.lesson-word-emphasis-outline {
+  border: 2px solid var(--lesson-emphasis-color);
+  border-radius: 5px;
+  padding: 0.02em 0.22em;
+}
+
+.lesson-word-emphasis-circle {
+  border: 2px solid var(--lesson-emphasis-color);
+  border-radius: 999px;
+  padding: 0.02em 0.34em;
+}
+
 .lesson-word-verb {
   border-radius: 5px;
   padding: 0 3px;
@@ -892,6 +928,13 @@
     background: rgba(20, 184, 166, 0.22);
     color: #99f6e4;
   }
+
+  .lesson-word-emphasis-green { --lesson-emphasis-color: #6ee7a7; }
+  .lesson-word-emphasis-amber { --lesson-emphasis-color: #fcd34d; }
+  .lesson-word-emphasis-blue { --lesson-emphasis-color: #93c5fd; }
+  .lesson-word-emphasis-purple { --lesson-emphasis-color: #c4b5fd; }
+  .lesson-word-emphasis-rose { --lesson-emphasis-color: #fda4af; }
+  .lesson-word-emphasis-teal { --lesson-emphasis-color: #5eead4; }
 
   .lesson-word-verb {
     background: #17433a;

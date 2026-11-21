@@ -133,6 +133,53 @@ test('les cinq couleurs manuelles sont rendues uniquement sur les mots sélectio
   assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
 });
 
+test('les effets typographiques du dialogue sont rendus mot par mot avec leur style et leur couleur', () => {
+  const emphasisLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'dialogue',
+      type: 'dialogue',
+      content: {
+        emphasis_tokens: [
+          { line_index: 0, word_index: 1, text: 'ho', style: 'underline', color: 'green' },
+          { line_index: 0, word_index: 2, text: 'mangiato', style: 'underline', color: 'rose' },
+          { line_index: 0, word_index: 4, text: 'mela', style: 'outline', color: 'blue' },
+          { line_index: 0, word_index: 5, text: 'rossa', style: 'circle', color: 'purple' }
+        ],
+        lines: [{ speaker: 'Marco', it: 'Ieri ho mangiato una mela rossa.', fr: 'Hier, j’ai mangé une pomme rouge.' }]
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: emphasisLesson, revealAll: true }));
+  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-green">ho/);
+  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-rose">mangiato/);
+  assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">mela/);
+  assert.match(html, /lesson-word-emphasis-circle lesson-word-emphasis-purple">rossa/);
+});
+
+test('les sélections multi-mots soulignées, encadrées et entourées sont rendues sur chaque mot de la plage', () => {
+  const rangeLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'dialogue',
+      type: 'dialogue',
+      content: {
+        emphasis_tokens: [
+          { line_index: 0, word_index: 1, text: 'ho', style: 'underline', color: 'green' },
+          { line_index: 0, word_index: 2, text: 'mangiato', style: 'underline', color: 'green' },
+          { line_index: 0, word_index: 4, text: 'una', style: 'outline', color: 'blue' },
+          { line_index: 0, word_index: 5, text: 'mela', style: 'outline', color: 'blue' }
+        ],
+        lines: [{ speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }]
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: rangeLesson, revealAll: true }));
+  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-green">ho<\/span> <span class="lesson-word-emphasis lesson-word-emphasis-underline lesson-word-emphasis-green">mangiato/);
+  assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">una/);
+  assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">mela/);
+});
+
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
   const html = renderAt(1);
   assert.match(html, /lesson-player-question/);
