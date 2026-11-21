@@ -582,7 +582,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                       <h4 className="text-sm font-semibold text-slate-800">{dialogueBlocksForEditor.length > 1 ? `Dialogue ${dialogueIndex + 1}` : 'Dialogue de la leçon'}</h4>
                       <p className="text-xs text-slate-500">{marks.length + emphasisMarks.length} effet(s) appliqué(s)</p>
                     </div>
-                    <button type="button" onClick={() => clearDialogueHighlights(index)} disabled={!marks.length}
+                    <button type="button" onClick={() => clearDialogueHighlights(index)} disabled={!marks.length && !emphasisMarks.length}
                       className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
                       Tout effacer
                     </button>
