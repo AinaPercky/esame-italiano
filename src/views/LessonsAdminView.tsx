@@ -106,7 +106,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [preview, setPreview] = useState<Lesson | null>(null);
   const [previewTab, setPreviewTab] = useState<'student' | 'full'>('student');
   const [json, setJson] = useState('');
-  const [dialogueHighlightColor, setDialogueHighlightColor] = useState<'green' | 'amber'>('green');
+  const [dialogueHighlightColor, setDialogueHighlightColor] = useState<'green' | 'amber' | 'blue' | 'purple' | 'rose'>('green');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [mindMapFile, setMindMapFile] = useState<File | null>(null);
@@ -307,7 +307,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     }
   }, [json]);
 
-  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string, color: 'green' | 'amber') => {
+  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string, color: 'green' | 'amber' | 'blue' | 'purple' | 'rose') => {
     try {
       const parsed = JSON.parse(json);
       const block = parsed.blocks?.[blockIndex];
@@ -526,15 +526,22 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
             </div>
             <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Couleur à appliquer aux prochains mots</p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" aria-pressed={dialogueHighlightColor === 'green'} onClick={() => setDialogueHighlightColor('green')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${dialogueHighlightColor === 'green' ? 'border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-300' : 'border-slate-300 bg-white text-slate-700'}`}>
-                  <span className="h-4 w-4 rounded border border-emerald-500 bg-emerald-300" /> Notion principale
-                </button>
-                <button type="button" aria-pressed={dialogueHighlightColor === 'amber'} onClick={() => setDialogueHighlightColor('amber')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 ${dialogueHighlightColor === 'amber' ? 'border-amber-600 bg-amber-100 text-amber-950 ring-2 ring-amber-300' : 'border-slate-300 bg-white text-slate-700'}`}>
-                  <span className="h-4 w-4 rounded border border-amber-500 bg-amber-300" /> Auxiliaire / notion secondaire
-                </button>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {([
+                  { id: 'green', label: 'Vert', hint: 'Notion principale', swatch: 'bg-emerald-300 border-emerald-500', active: 'border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-300' },
+                  { id: 'amber', label: 'Ambre', hint: 'Auxiliaire', swatch: 'bg-amber-300 border-amber-500', active: 'border-amber-600 bg-amber-100 text-amber-950 ring-2 ring-amber-300' },
+                  { id: 'blue', label: 'Bleu', hint: 'Autre notion', swatch: 'bg-sky-300 border-sky-500', active: 'border-sky-600 bg-sky-100 text-sky-950 ring-2 ring-sky-300' },
+                  { id: 'purple', label: 'Violet', hint: 'Autre notion', swatch: 'bg-violet-300 border-violet-500', active: 'border-violet-600 bg-violet-100 text-violet-950 ring-2 ring-violet-300' },
+                  { id: 'rose', label: 'Rose', hint: 'Autre notion', swatch: 'bg-rose-300 border-rose-500', active: 'border-rose-600 bg-rose-100 text-rose-950 ring-2 ring-rose-300' }
+                ] as const).map(color => (
+                  <button key={color.id} type="button" aria-pressed={dialogueHighlightColor === color.id} onClick={() => setDialogueHighlightColor(color.id)}
+                    className={`inline-flex min-h-12 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${dialogueHighlightColor === color.id ? color.active : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                    <span className={`h-4 w-4 shrink-0 rounded border ${color.swatch}`} />
+                    <span><span className="block">{color.label}</span><span className="block text-[10px] font-normal opacity-75">{color.hint}</span></span>
+                  </button>
+                ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">La couleur choisie s'applique uniquement aux nouveaux mots sélectionnés. Pour changer la couleur d'un mot déjà sélectionné, retirez-le puis sélectionnez-le avec l'autre couleur.</p>
+              <p className="mt-2 text-xs text-slate-500">Choisissez l'une des cinq couleurs, puis sélectionnez les mots. La couleur choisie s'applique aux prochaines sélections ; cliquez sur un mot déjà sélectionné pour le retirer, puis sélectionnez-le à nouveau pour changer sa couleur.</p>
             </div>
             {dialogueBlocksForEditor.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
@@ -574,7 +581,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                                 aria-pressed={selected}
                                 aria-label={`${selected ? 'Retirer' : 'Surligner'} le mot ${token}, réplique ${lineIndex + 1}`}
                                 onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token, dialogueHighlightColor)}
-                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? (selectedMark.color === 'amber' ? 'bg-amber-200 text-amber-950 ring-1 ring-amber-400' : 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400') : 'text-slate-800 hover:bg-emerald-50 hover:text-emerald-900'}`}>
+                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? ({ green: 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400', amber: 'bg-amber-200 text-amber-950 ring-1 ring-amber-400', blue: 'bg-sky-200 text-sky-950 ring-1 ring-sky-400', purple: 'bg-violet-200 text-violet-950 ring-1 ring-violet-400', rose: 'bg-rose-200 text-rose-950 ring-1 ring-rose-400' }[selectedMark.color] || 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400') : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
                                 {token}
                               </button></React.Fragment>;
                             })}
@@ -589,8 +596,11 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               );
             })}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span className="inline-block rounded-md bg-emerald-200 px-2 py-1 font-semibold text-emerald-950">Notion principale</span>
-              <span className="inline-block rounded-md bg-amber-200 px-2 py-1 font-semibold text-amber-950">Auxiliaire / secondaire</span>
+              <span className="inline-block rounded-md bg-emerald-200 px-2 py-1 font-semibold text-emerald-950">Vert</span>
+              <span className="inline-block rounded-md bg-amber-200 px-2 py-1 font-semibold text-amber-950">Ambre</span>
+              <span className="inline-block rounded-md bg-sky-200 px-2 py-1 font-semibold text-sky-950">Bleu</span>
+              <span className="inline-block rounded-md bg-violet-200 px-2 py-1 font-semibold text-violet-950">Violet</span>
+              <span className="inline-block rounded-md bg-rose-200 px-2 py-1 font-semibold text-rose-950">Rose</span>
               <span>Appuyez de nouveau sur un mot sélectionné pour retirer sa surbrillance.</span>
             </div>
           </section>
