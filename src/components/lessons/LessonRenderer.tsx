@@ -89,15 +89,22 @@ function buildRegularVerbForms() {
 
 const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
 
-function getItalianHighlightClass(token: string): string | null {
+function getItalianHighlightClass(token: string, highlightMode?: string): string | null {
+  if (highlightMode !== 'present-indicative') return null;
   const normalized = token.toLocaleLowerCase('it-IT');
   if (ITALIAN_AUXILIARIES.has(normalized)) return 'lesson-word-auxiliary';
   if (REGULAR_ITALIAN_VERB_FORMS.has(normalized)) return 'lesson-word-verb';
-  if (ITALIAN_PREPOSITIONS.has(normalized)) return 'lesson-word-preposition';
   return null;
 }
 
-const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text, revealHighlights = false }) => {
+function getLessonHighlightMode(title: string): string | undefined {
+  const normalized = title.toLocaleLowerCase('it-IT');
+  return normalized.includes('presente indicativo') || normalized.includes('present indicatif')
+    ? 'present-indicative'
+    : undefined;
+}
+
+const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMode?: string }> = ({ text, revealHighlights = false, highlightMode }) => {
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
@@ -114,13 +121,13 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean }> = ({ text
   })}</>;
 };
 
-const DialogueBlock: React.FC<{ content: any; revealHighlights?: boolean }> = ({ content, revealHighlights = false }) => (
+const DialogueBlock: React.FC<{ content: any; revealHighlights?: boolean; highlightMode?: string }> = ({ content, revealHighlights = false, highlightMode }) => (
   <section className="lesson-dialogue" aria-label="Dialogue en italien">
     {(content.lines || []).map((line: any, i: number) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} revealHighlights={revealHighlights} /></span>
+          <span className="lesson-italian"><RichText text={line.it} revealHighlights={revealHighlights} highlightMode={highlightMode} /></span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
@@ -150,17 +157,18 @@ function isBlockVisible(block: LessonBlock, guidedComplete: boolean): boolean {
   return true;
 }
 
-function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revealHighlights }: {
+function Block({ block, discovery, onDiscovery, allBlocks, guidedComplete, revealHighlights, highlightMode }: {
   block: LessonBlock;
   discovery: DiscoveryState;
   onDiscovery: DiscoveryCallback;
   allBlocks: LessonBlock[];
   guidedComplete: boolean;
   revealHighlights?: boolean;
+  highlightMode?: string;
 }) {
   if (!isBlockVisible(block, guidedComplete)) return null;
   const c = block.content || {};
-  if (block.type === 'dialogue') return <DialogueBlock content={c} revealHighlights={revealHighlights} />;
+  if (block.type === 'dialogue') return <DialogueBlock content={c} revealHighlights={revealHighlights} highlightMode={highlightMode} />;
   if (block.type === 'vocab_cards') return <div className="lesson-card-grid">{(c.items || []).map((x: any, i: number) => <button type="button" className="lesson-vocab-card" key={i} onClick={() => speak(x.it)}><b><RichText text={x.it} revealHighlights /></b><small>{x.fr}</small><span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span></button>)}</div>;
   if (block.type === 'rules_table') return <section className="lesson-table-section">{c.title && <h3>{c.title}</h3>}<div className="lesson-table-wrap"><table className="lesson-table"><thead><tr><th>{c.label || ''}</th>{(c.columns || []).map((x: string) => <th key={x}>{x}</th>)}</tr></thead><tbody>{(c.rows || []).map((row: any, i: number) => <tr key={i}><th>{row.label}</th>{(row.cells || []).map((cell: string, j: number) => <td key={j}><button type="button" onClick={() => speak(cell)}>{cell}</button></td>)}</tr>)}</tbody></table></div></section>;
   if (block.type === 'rule_cards') return <div className="lesson-card-grid">{(c.cards || []).map((card: any, i: number) => <article className="lesson-rule-card" key={i}><h4>{card.title}</h4><p><RichText text={card.text} revealHighlights /></p>{(card.examples || []).map((e: any, j: number) => <button className="lesson-example" type="button" key={j} onClick={() => speak(e.it)}><b><RichText text={e.it} revealHighlights /></b><small>{e.fr}</small></button>)}</article>)}</div>;
@@ -470,6 +478,7 @@ export const LessonFullPreview: React.FC<{
   onNext?: () => void;
 }> = ({ lesson, progress, revealAll = false, onProgress, onQuiz, onNext }) => {
   const meta = lessonTypeMeta(lesson.type);
+  const highlightMode = getLessonHighlightMode(lesson.title_it || '');
   const savedState = progress?.discovery_state || {};
   const [discovery, setDiscovery] = useState<DiscoveryState>({
     completed: savedState.completedSteps || [],
@@ -746,9 +755,9 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
 
   const renderExtraBlocks = (extras: LessonBlock[]) => extras.map((extra, index) => <Block key={extra.id || `extra-${index}`} block={extra} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} />);
   const renderScreen = (current: LessonScreen) => {
-    if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
+    if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} highlightMode={highlightMode} />{renderExtraBlocks(current.extras)}</>;
     if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
-    if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
+    if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} highlightMode={highlightMode} />{renderExtraBlocks(current.extras)}</>;
     return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
       <div className="lesson-player-completion-actions">
         <button type="button" className="lesson-player-restart-guide" onClick={restartGuidedFromBeginning}><RotateCcw size={17} /> Reprendre le parcours guidé depuis le début</button>
