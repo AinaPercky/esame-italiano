@@ -112,7 +112,7 @@ const RichText: React.FC<{
   );
 };
 
-const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
+const DialogueBlock: React.FC<{ content: any; showTranslation?: boolean }> = ({ content, showTranslation = true }) => (
   <section className="lesson-dialogue" aria-label="Dialogue en italien">
     {(content.lines || []).map((line: any, i: number) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
@@ -136,7 +136,7 @@ const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
                 }))}
             />
           </span>
-          <span className="lesson-translation">{line.fr}</span>
+          {showTranslation && line.fr && <span className="lesson-translation">{line.fr}</span>}
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
       </div>
@@ -553,20 +553,82 @@ type LessonPlayerProps = {
   onQuiz?: (quizRef: string) => void;
   onExit?: () => void;
   showClose?: boolean;
+  defaultDialogueReviewOpen?: boolean;
 };
 
 type StepScreen = Extract<LessonScreen, { kind: 'step' }>;
+
+const LessonDialogueReviewModal: React.FC<{
+  blocks: LessonBlock[];
+  onClose: () => void;
+}> = ({ blocks, onClose }) => {
+  const titleId = useId();
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="lesson-review-backdrop"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="lesson-review-modal" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <header className="lesson-review-header">
+          <div className="lesson-review-title-wrap">
+            <span className="lesson-review-icon" aria-hidden="true">
+              <MessageCircle size={18} />
+            </span>
+            <div>
+              <h2 id={titleId}>Dialogue de la leçon</h2>
+              <p>Touchez une réplique pour l’écouter en italien</p>
+            </div>
+          </div>
+          <button type="button" className="lesson-review-close" onClick={onClose} aria-label="Fermer le dialogue">
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="lesson-review-body">
+          {blocks.map((block, index) => (
+            <DialogueBlock key={block.id || `review-dialogue-${index}`} content={block.content || {}} showTranslation={false} />
+          ))}
+        </div>
+
+        <footer className="lesson-review-footer">
+          <button type="button" className="lesson-review-done-btn" onClick={onClose}>
+            Fermer le dialogue
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+};
 
 const LessonQuestionScreen: React.FC<{
   screen: StepScreen;
   allBlocks: LessonBlock[];
   completed: boolean;
   verifySignal: number;
+  defaultDialogueReviewOpen?: boolean;
   onResult: (correct: boolean, answer: unknown, feedback: string, insight?: string) => void;
-}> = ({ screen, allBlocks, completed, verifySignal, onResult }) => {
+}> = ({ screen, allBlocks, completed, verifySignal, defaultDialogueReviewOpen = false, onResult }) => {
   const { step, block, stepIndex, total } = screen;
   const sourceId = block.content?.source || step.data?.source;
   const sourceBlock = sourceId ? allBlocks.find(candidate => candidate.id === sourceId) : undefined;
+  const reviewDialogueBlocks = useMemo(
+    () =>
+      sourceBlock?.type === 'dialogue'
+        ? [sourceBlock]
+        : allBlocks.filter(candidate => candidate.type === 'dialogue'),
+    [allBlocks, sourceBlock]
+  );
   const sourceLines = sourceBlock?.type === 'dialogue'
     ? (sourceBlock.content?.lines || []).map((line: any) => ({ speaker: line.speaker, text: line.it }))
     : step.data?.text ? [{ speaker: '', text: step.data.text }] : [];
@@ -576,6 +638,11 @@ const LessonQuestionScreen: React.FC<{
   const contextWords = sourceLines.flatMap((line: any) => cleanLessonSpeechText(line.text).match(/[\p{L}\p{M}]+/gu) || []);
   const choices = buildLessonQuizChoices(step, contextWords, formulaText);
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
+  const [dialogueReviewOpen, setDialogueReviewOpen] = useState(defaultDialogueReviewOpen);
+
+  useEffect(() => {
+    setDialogueReviewOpen(defaultDialogueReviewOpen);
+  }, [step.id, defaultDialogueReviewOpen]);
 
   const report = (answer: unknown, correct: boolean, choiceReply?: string) => {
     const message = correct
@@ -609,7 +676,21 @@ const LessonQuestionScreen: React.FC<{
   };
 
   return <section className="lesson-player-question" aria-labelledby={`player-question-${step.id}`}>
-    <div className="lesson-player-kicker">Découverte · Question {stepIndex} sur {total}</div>
+    <div className="lesson-player-question-top">
+      <div className="lesson-player-kicker">Découverte · Question {stepIndex} sur {total}</div>
+      {reviewDialogueBlocks.length > 0 && (
+        <button
+          type="button"
+          className="lesson-player-review-btn"
+          onClick={() => setDialogueReviewOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={dialogueReviewOpen}
+        >
+          <MessageCircle size={15} aria-hidden="true" />
+          <span>Revoir le dialogue</span>
+        </button>
+      )}
+    </div>
     <h1 id={`player-question-${step.id}`}>{step.prompt}</h1>
     {step.kind === 'highlight' && sourceLines.length > 0 && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, index: number) => <p className="lesson-highlight-phrase" key={index}>{line.speaker && <strong>{line.speaker}</strong>}<RichText text={line.text} revealHighlights={completed} /></p>)}</div>}
     {step.kind === 'complete_table'
@@ -621,10 +702,13 @@ const LessonQuestionScreen: React.FC<{
           : <QuizDropdown key={step.id} choices={choices} onSubmit={handleChoice} disabled={completed} verifySignal={verifySignal} hideCheck />}
     {feedback && <Feedback good={feedback.good}>{feedback.text}</Feedback>}
     {completed && !feedback?.good && <Feedback good>Réponse déjà validée. Continuez.</Feedback>}
+    {dialogueReviewOpen && reviewDialogueBlocks.length > 0 && (
+      <LessonDialogueReviewModal blocks={reviewDialogueBlocks} onClose={() => setDialogueReviewOpen(false)} />
+    )}
   </section>;
 };
 
-export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, avatarUrl, profileName, onProgress, onQuiz, onExit, showClose = true }) => {
+export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, avatarUrl, profileName, onProgress, onQuiz, onExit, showClose = true, defaultDialogueReviewOpen = false }) => {
   const screens = useMemo(() => buildScreens(lesson), [lesson]);
   const savedState = progress?.discovery_state || {};
   const [discovery, setDiscovery] = useState<DiscoveryState>({
@@ -762,7 +846,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
   const renderExtraBlocks = (extras: LessonBlock[]) => extras.map((extra, index) => <Block key={extra.id || `extra-${index}`} block={extra} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} />);
   const renderScreen = (current: LessonScreen) => {
     if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
-    if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
+    if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} defaultDialogueReviewOpen={defaultDialogueReviewOpen} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
     if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
     return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
       <div className="lesson-player-completion-actions">

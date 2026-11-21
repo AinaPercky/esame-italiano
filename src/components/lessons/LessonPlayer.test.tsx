@@ -299,3 +299,30 @@ test('la synthèse affiche les repères et sépare visuellement la phrase modèl
   assert.match(textContent, /Ieri sono andata a Roma/);
   assert.match(textContent, /Hier, je suis allée à Rome/);
 });
+
+test('les questions de découverte proposent un bouton Revoir le dialogue fermé par défaut', () => {
+  const html = renderAt(1);
+  assert.match(html, /lesson-player-review-btn/);
+  assert.match(html, /Revoir le dialogue/);
+  assert.doesNotMatch(html, /lesson-review-modal|Fermer le dialogue/);
+});
+
+test('l’ouverture de Revoir le dialogue affiche uniquement le dialogue italien sans traduction française et propose de le fermer', () => {
+  const html = renderToStaticMarkup(React.createElement(LessonPlayer, {
+    lesson,
+    defaultDialogueReviewOpen: true,
+    progress: {
+      user_id: 'student-1',
+      lesson_id: lesson.id,
+      status: 'started',
+      discovery_state: { screen: 1, completedSteps: [] },
+      updated_at: ''
+    }
+  }));
+  assert.match(html, /lesson-review-modal/);
+  assert.match(html, /role="dialog"/);
+  assert.match(html, /Fermer le dialogue/);
+  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual lesson-word-manual-green">mangiato<\/span> una mela\./);
+  assert.doesNotMatch(html, /lesson-translation|Hier, j’ai mangé une pomme/);
+});
+
