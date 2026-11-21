@@ -115,7 +115,8 @@ test('les cinq couleurs manuelles sont rendues uniquement sur les mots sélectio
           { line_index: 0, word_index: 2, text: 'mangiato', color: 'blue' },
           { line_index: 0, word_index: 4, text: 'mela', color: 'purple' },
           { line_index: 1, word_index: 0, text: 'Domani', color: 'rose' },
-          { line_index: 1, word_index: 1, text: 'parto', color: 'green' }
+          { line_index: 1, word_index: 1, text: 'parto', color: 'green' },
+          { line_index: 1, word_index: 2, text: 'presto', color: 'teal' }
         ],
         lines: [
           { speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' },
@@ -128,7 +129,8 @@ test('les cinq couleurs manuelles sont rendues uniquement sur les mots sélectio
   for (const color of ['green', 'amber', 'blue', 'purple', 'rose', 'teal']) {
     assert.match(html, new RegExp('lesson-word-manual-' + color));
   }
-  assert.match(html, /lesson-word-manual-teal/);\n  assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
+  assert.match(html, /lesson-word-manual-teal/);
+  assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
