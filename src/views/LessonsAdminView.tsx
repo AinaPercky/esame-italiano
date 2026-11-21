@@ -555,7 +555,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                             {tokens.map((token: string, tokenIndex: number) => {
                               if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={tokenIndex}>{token}</React.Fragment>;
                               const currentWordIndex = wordIndex++;
-                              const selected = marks.some((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex);
+                              const selected = marks.some((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex && String(mark.text || '').toLocaleLowerCase('it-IT') === token.toLocaleLowerCase('it-IT'));
                               return <React.Fragment key={tokenIndex}><button type="button"
                                 aria-pressed={selected}
                                 aria-label={`${selected ? 'Retirer' : 'Surligner'} le mot ${token}, réplique ${lineIndex + 1}`}
