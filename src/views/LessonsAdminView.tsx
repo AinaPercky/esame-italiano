@@ -107,6 +107,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
   const [previewTab, setPreviewTab] = useState<'student' | 'full'>('student');
   const [json, setJson] = useState('');
   const [dialogueHighlightColor, setDialogueHighlightColor] = useState<'green' | 'amber' | 'blue' | 'purple' | 'rose' | 'teal'>('green');
+  const [dialogueMarkMode, setDialogueMarkMode] = useState<'highlight' | 'underline' | 'outline' | 'circle'>('highlight');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [mindMapFile, setMindMapFile] = useState<File | null>(null);
@@ -307,20 +308,28 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
     }
   }, [json]);
 
-  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string, color: 'green' | 'amber' | 'blue' | 'purple' | 'rose' | 'teal') => {
+  const toggleDialogueWord = (blockIndex: number, lineIndex: number, wordIndex: number, word: string, color: 'green' | 'amber' | 'blue' | 'purple' | 'rose' | 'teal', mode: 'highlight' | 'underline' | 'outline' | 'circle') => {
     try {
       const parsed = JSON.parse(json);
       const block = parsed.blocks?.[blockIndex];
       if (!block || block.type !== 'dialogue') return;
       block.content = { ...(block.content || {}) };
-      // The teacher now selects exact word occurrences; legacy automatic modes are intentionally retired.
       delete block.content.highlight_mode;
       delete block.content.highlight_terms;
-      const marks = Array.isArray(block.content.highlight_tokens) ? [...block.content.highlight_tokens] : [];
-      const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === wordIndex);
-      if (existing >= 0) marks.splice(existing, 1);
-      else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word, color });
-      block.content.highlight_tokens = marks;
+      if (mode === 'highlight') {
+        const marks = Array.isArray(block.content.highlight_tokens) ? [...block.content.highlight_tokens] : [];
+        const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === wordIndex);
+        if (existing >= 0) marks.splice(existing, 1);
+        else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word, color });
+        block.content.highlight_tokens = marks;
+      } else {
+        const marks = Array.isArray(block.content.emphasis_tokens) ? [...block.content.emphasis_tokens] : [];
+        const existing = marks.findIndex((mark: any) => mark.line_index === lineIndex && mark.word_index === wordIndex);
+        if (existing >= 0 && marks[existing].style === mode) marks.splice(existing, 1);
+        else if (existing >= 0) marks[existing] = { line_index: lineIndex, word_index: wordIndex, text: word, color, style: mode };
+        else marks.push({ line_index: lineIndex, word_index: wordIndex, text: word, color, style: mode });
+        block.content.emphasis_tokens = marks;
+      }
       setJson(JSON.stringify(parsed, null, 2));
       setError('');
     } catch {
@@ -335,6 +344,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
       if (!block || block.type !== 'dialogue') return;
       block.content = { ...(block.content || {}) };
       delete block.content.highlight_tokens;
+      delete block.content.emphasis_tokens;
       delete block.content.highlight_mode;
       delete block.content.highlight_terms;
       setJson(JSON.stringify(parsed, null, 2));
@@ -517,15 +527,30 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
           <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Sélection manuelle des mots à surligner</h3>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Choisissez une couleur, puis touchez chaque mot italien à surligner. Chaque occurrence peut avoir sa propre couleur.</p>
+                <h3 className="text-sm font-bold text-slate-900">Mise en valeur manuelle du dialogue</h3>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">Choisissez un effet et une couleur, puis touchez les mots italiens un par un. Vous pouvez combiner plusieurs effets et couleurs dans une même expression.</p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {dialogueBlocksForEditor.reduce((total: number, item: any) => total + (item.block.content?.highlight_tokens || []).length, 0)} mot(s) sélectionné(s)
+                {dialogueBlocksForEditor.reduce((total: number, item: any) => total + (item.block.content?.highlight_tokens || []).length + (item.block.content?.emphasis_tokens || []).length, 0)} mise(s) en valeur
               </span>
             </div>
             <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Couleur à appliquer aux prochains mots</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">1. Choisir l'effet</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {([
+                  { id: 'highlight', label: 'Surligner', symbol: '▰', description: 'Fond coloré' },
+                  { id: 'underline', label: 'Souligner', symbol: 'U̲', description: 'Trait sous le mot' },
+                  { id: 'outline', label: 'Encadrer', symbol: '□', description: 'Cadre rectangulaire' },
+                  { id: 'circle', label: 'Entourer', symbol: '◯', description: 'Contour arrondi' }
+                ] as const).map(mode => (
+                  <button key={mode.id} type="button" aria-pressed={dialogueMarkMode === mode.id} onClick={() => setDialogueMarkMode(mode.id)}
+                    className={`flex min-h-14 items-center gap-2 rounded-lg border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] ${dialogueMarkMode === mode.id ? 'border-[#0b3c5d] bg-[#e6f0f7] text-[#072a3f] ring-1 ring-[#0b3c5d]' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                    <span aria-hidden="true" className="text-xl font-bold">{mode.symbol}</span>
+                    <span><span className="block text-xs font-bold">{mode.label}</span><span className="block text-[10px] opacity-70">{mode.description}</span></span>
+                  </button>
+                ))}
+              </div>
+              <p className="mb-2 mt-4 text-xs font-bold uppercase tracking-wide text-slate-600">2. Choisir la couleur</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                 {([
                   { id: 'green', label: 'Vert', hint: 'Notion principale', swatch: 'bg-emerald-300 border-emerald-500', active: 'border-emerald-600 bg-emerald-100 text-emerald-950 ring-2 ring-emerald-300' },
@@ -542,19 +567,20 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-500">Choisissez l'une des six couleurs, puis sélectionnez les mots. La couleur choisie s'applique aux prochaines sélections ; cliquez sur un mot déjà sélectionné pour le retirer, puis sélectionnez-le à nouveau pour changer sa couleur.</p>
+              <p className="mt-2 text-xs text-slate-500">Choisissez un effet et une couleur, puis cliquez sur chaque mot à mettre en valeur. Pour « ho mangiato », sélectionnez « Souligner », puis choisissez une couleur pour « ho » et une autre pour « mangiato ». Cliquez à nouveau sur un mot avec le même effet pour le retirer.</p>
             </div>
             {dialogueBlocksForEditor.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
             ) : dialogueBlocksForEditor.map(({ block, index }: any, dialogueIndex: number) => {
               const lines = block.content?.lines || [];
               const marks = block.content?.highlight_tokens || [];
+              const emphasisMarks = block.content?.emphasis_tokens || [];
               return (
                 <div key={block.id || index} className="border-t border-slate-200 py-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <h4 className="text-sm font-semibold text-slate-800">{dialogueBlocksForEditor.length > 1 ? `Dialogue ${dialogueIndex + 1}` : 'Dialogue de la leçon'}</h4>
-                      <p className="text-xs text-slate-500">{marks.length} occurrence(s) sélectionnée(s)</p>
+                      <p className="text-xs text-slate-500">{marks.length + emphasisMarks.length} effet(s) appliqué(s)</p>
                     </div>
                     <button type="button" onClick={() => clearDialogueHighlights(index)} disabled={!marks.length}
                       className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
@@ -577,12 +603,15 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                               if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={tokenIndex}>{token}</React.Fragment>;
                               const currentWordIndex = wordIndex++;
                               const selectedMark = marks.find((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex && String(mark.text || '').toLocaleLowerCase('it-IT') === token.toLocaleLowerCase('it-IT'));
-                              const selected = Boolean(selectedMark);
+                              const selectedEmphasis = emphasisMarks.find((mark: any) => mark.line_index === lineIndex && mark.word_index === currentWordIndex && String(mark.text || '').toLocaleLowerCase('it-IT') === token.toLocaleLowerCase('it-IT'));
+                              const selected = dialogueMarkMode === 'highlight' ? Boolean(selectedMark) : Boolean(selectedEmphasis && selectedEmphasis.style === dialogueMarkMode);
+                              const emphasisClass = selectedEmphasis ? `lesson-word-emphasis lesson-word-emphasis-${selectedEmphasis.style} lesson-word-emphasis-${selectedEmphasis.color || 'green'}` : '';
+                              const highlightClass = selectedMark ? (({ green: 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400', amber: 'bg-amber-200 text-amber-950 ring-1 ring-amber-400', blue: 'bg-sky-200 text-sky-950 ring-1 ring-sky-400', purple: 'bg-violet-200 text-violet-950 ring-1 ring-violet-400', rose: 'bg-rose-200 text-rose-950 ring-1 ring-rose-400', teal: 'bg-teal-200 text-teal-950 ring-1 ring-teal-400' } as Record<string, string>)[String(selectedMark.color)] || 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400') : '';
                               return <React.Fragment key={tokenIndex}><button type="button"
                                 aria-pressed={selected}
-                                aria-label={`${selected ? 'Retirer' : 'Surligner'} le mot ${token}, réplique ${lineIndex + 1}`}
-                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token, dialogueHighlightColor)}
-                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold underline decoration-dotted underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${selected ? (({ green: 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400', amber: 'bg-amber-200 text-amber-950 ring-1 ring-amber-400', blue: 'bg-sky-200 text-sky-950 ring-1 ring-sky-400', purple: 'bg-violet-200 text-violet-950 ring-1 ring-violet-400', rose: 'bg-rose-200 text-rose-950 ring-1 ring-rose-400', teal: 'bg-teal-200 text-teal-950 ring-1 ring-teal-400' } as Record<string, string>)[String(selectedMark.color)] || 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-400') : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
+                                aria-label={`${selected ? 'Retirer' : 'Appliquer'} l'effet ${dialogueMarkMode} au mot ${token}, réplique ${lineIndex + 1}`}
+                                onClick={() => toggleDialogueWord(index, lineIndex, currentWordIndex, token, dialogueHighlightColor, dialogueMarkMode)}
+                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${highlightClass} ${emphasisClass} ${selected ? '' : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
                                 {token}
                               </button></React.Fragment>;
                             })}
@@ -603,7 +632,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               <span className="inline-block rounded-md bg-violet-200 px-2 py-1 font-semibold text-violet-950">Violet</span>
               <span className="inline-block rounded-md bg-rose-200 px-2 py-1 font-semibold text-rose-950">Rose</span>
               <span className="inline-block rounded-md bg-teal-200 px-2 py-1 font-semibold text-teal-950">Turquoise</span>
-              <span>Appuyez de nouveau sur un mot sélectionné pour retirer sa surbrillance.</span>
+              <span>Les effets sont indépendants : un mot peut être à la fois surligné et souligné.</span>
             </div>
           </section>
 
