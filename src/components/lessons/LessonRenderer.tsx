@@ -44,11 +44,11 @@ const ITALIAN_PREPOSITIONS = new Set([
   'del', 'dello', 'della', 'dei', 'degli', 'delle',
   'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle',
   'nel', 'nello', 'nella', 'nei', 'negli', 'nelle',
-  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'col', 'coi'
+  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'col', 'coi', 'all', 'dell', 'dall', 'nell', 'sull', 'coll'
 ]);
 
 const ITALIAN_AUXILIARIES = new Set([
-  'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
+  'essere', 'avere', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
 ]);
 
 // Verbi regolari frequenti: le forme sono generate secondo le tre coniugazioni.
@@ -70,9 +70,18 @@ function buildRegularVerbForms() {
     ire: ['o', 'i', 'e', 'iamo', 'ite', 'ono']
   };
   REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
+    forms.add(infinitive);
+    if (infinitive.endsWith('iare')) {
+      const stem = infinitive.slice(0, -4);
+      [stem + 'io', stem + 'i', stem + 'ia', stem + 'iamo', stem + 'iate', stem + 'iano'].forEach(form => forms.add(form));
+      return;
+    }
     const conjugation = infinitive.slice(-3);
     const stem = infinitive.slice(0, -3);
-    forms.add(infinitive);
+    if (conjugation === 'are' && (stem.endsWith('c') || stem.endsWith('g'))) {
+      [stem + 'o', stem + 'h' + 'i', stem + 'a', stem + 'h' + 'iamo', stem + 'ate', stem + 'ano'].forEach(form => forms.add(form));
+      return;
+    }
     (endings[conjugation] || []).forEach(ending => forms.add(stem + ending));
   });
   return forms;
