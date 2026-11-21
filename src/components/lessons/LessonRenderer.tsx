@@ -70,39 +70,19 @@ const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
 const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordIndexes?: number[] }> = ({ text, revealHighlights = false, highlightWordIndexes = [] }) => {
   const selectedWords = new Set(highlightWordIndexes);
   let wordIndex = 0;
-  const parts = text.split(/(==[^=]+==|\\+\\+[^+]+\\+\\+)/g);
-  return <>{parts.map((part, i) => {
-    const marked = part.match(/^(==|\\+\\+)(.*)\\1$/);
-    if (marked) {
-      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
-      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
-    }
-    return part.split(/(\\s+|[^\\p{L}\\p{M}]+)/u).map((token, tokenIndex) => {
-      if (!/^[\\p{L}\\p{M}]+$/u.test(token)) return <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
-      const currentWordIndex = wordIndex++;
-      return selectedWords.has(currentWordIndex)
-        ? <span key={`${i}-${tokenIndex}`} className="lesson-word lesson-word-manual">{token}</span>
-        : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
-    });
-  })}</>;
-};
-
-
-const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMode?: string; highlightTerms?: string[] }> = ({ text, revealHighlights = false, highlightMode, highlightTerms = [] }) => {
-  const customTerms = new Set(highlightTerms.map(term => term.trim().toLocaleLowerCase('it-IT')).filter(Boolean));
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
     if (marked) {
-      if (!revealHighlights || (!highlightMode && customTerms.size === 0)) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
-      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
+      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      return <span key={i} className={\`lesson-word \${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}\`}>{marked[2]}</span>;
     }
     return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
-      const highlightClass = revealHighlights && (highlightMode || customTerms.size > 0) && /^[\p{L}\p{M}]+$/u.test(token)
-        ? getItalianHighlightClass(token, highlightMode, customTerms) : null;
-      return highlightClass
-        ? <span key={`${i}-${tokenIndex}`} className={`lesson-word ${highlightClass}`}>{token}</span>
-        : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
+      if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={\`\${i}-\${tokenIndex}\`}>{token}</React.Fragment>;
+      const currentWordIndex = wordIndex++;
+      return selectedWords.has(currentWordIndex)
+        ? <span key={\`\${i}-\${tokenIndex}\`} className="lesson-word lesson-word-manual">{token}</span>
+        : <React.Fragment key={\`\${i}-\${tokenIndex}\`}>{token}</React.Fragment>;
     });
   })}</>;
 };
