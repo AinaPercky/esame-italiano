@@ -601,7 +601,8 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               <span className="inline-block rounded-md bg-amber-200 px-2 py-1 font-semibold text-amber-950">Ambre</span>
               <span className="inline-block rounded-md bg-sky-200 px-2 py-1 font-semibold text-sky-950">Bleu</span>
               <span className="inline-block rounded-md bg-violet-200 px-2 py-1 font-semibold text-violet-950">Violet</span>
-              <span className="inline-block rounded-md bg-rose-200 px-2 py-1 font-semibold text-rose-950">Rose</span>\n              <span className="inline-block rounded-md bg-teal-200 px-2 py-1 font-semibold text-teal-950">Turquoise</span>
+              <span className="inline-block rounded-md bg-rose-200 px-2 py-1 font-semibold text-rose-950">Rose</span>
+              <span className="inline-block rounded-md bg-teal-200 px-2 py-1 font-semibold text-teal-950">Turquoise</span>
               <span>Appuyez de nouveau sur un mot sélectionné pour retirer sa surbrillance.</span>
             </div>
           </section>
