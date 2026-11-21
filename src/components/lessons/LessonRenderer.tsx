@@ -38,8 +38,8 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordMarks?: Array<{ word_index: number; text?: string; color?: 'green' | 'amber' }> }> = ({ text, revealHighlights = false, highlightWordMarks = [] }) => {
-  const selectedWords = new Map(highlightWordMarks.map(mark => [mark.word_index, { text: mark.text?.toLocaleLowerCase('it-IT'), color: mark.color === 'amber' ? 'amber' : 'green' }]));
+const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordMarks?: Array<{ word_index: number; text?: string; color?: 'green' | 'amber' | 'blue' | 'purple' | 'rose' }> }> = ({ text, revealHighlights = false, highlightWordMarks = [] }) => {
+  const selectedWords = new Map(highlightWordMarks.map(mark => [mark.word_index, { text: mark.text?.toLocaleLowerCase('it-IT'), color: ['green', 'amber', 'blue', 'purple', 'rose'].includes(mark.color || '') ? mark.color : 'green' }]));
   let wordIndex = 0;
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
   return <>{parts.map((part, i) => {
