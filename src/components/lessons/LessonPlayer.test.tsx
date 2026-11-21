@@ -53,7 +53,7 @@ function renderCustomStep(step: any) {
 test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de cours ni quiz', () => {
   const html = renderAt(0);
   assert.match(html, /lesson-dialogue/);
-  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual">mangiato<\\/span>/);
+  assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual">mangiato<\/span>/);
   assert.doesNotMatch(html, /lesson-player-question|lesson-discovery|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
   assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
 });
@@ -82,7 +82,7 @@ test('seules les occurrences choisies mot par mot sont surlignées dans le dialo
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: customLesson, revealAll: true }));
   assert.equal((html.match(/lesson-word-manual/g) || []).length, 1);
-  assert.match(html, /Ho una <span class="lesson-word lesson-word-manual">mela<\\/span> e una mela/);
+  assert.match(html, /Ho una <span class="lesson-word lesson-word-manual">mela<\/span> e una mela/);
   assert.match(html, /La mela è rossa/);
 });
 
