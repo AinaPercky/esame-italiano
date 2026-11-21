@@ -616,19 +616,14 @@ const LessonQuestionScreen: React.FC<{
   allBlocks: LessonBlock[];
   completed: boolean;
   verifySignal: number;
-  defaultDialogueReviewOpen?: boolean;
+  hasReviewDialogue: boolean;
+  dialogueReviewOpen: boolean;
+  onOpenDialogueReview: () => void;
   onResult: (correct: boolean, answer: unknown, feedback: string, insight?: string) => void;
-}> = ({ screen, allBlocks, completed, verifySignal, defaultDialogueReviewOpen = false, onResult }) => {
+}> = ({ screen, allBlocks, completed, verifySignal, hasReviewDialogue, dialogueReviewOpen, onOpenDialogueReview, onResult }) => {
   const { step, block, stepIndex, total } = screen;
   const sourceId = block.content?.source || step.data?.source;
   const sourceBlock = sourceId ? allBlocks.find(candidate => candidate.id === sourceId) : undefined;
-  const reviewDialogueBlocks = useMemo(
-    () =>
-      sourceBlock?.type === 'dialogue'
-        ? [sourceBlock]
-        : allBlocks.filter(candidate => candidate.type === 'dialogue'),
-    [allBlocks, sourceBlock]
-  );
   const sourceLines = sourceBlock?.type === 'dialogue'
     ? (sourceBlock.content?.lines || []).map((line: any) => ({ speaker: line.speaker, text: line.it }))
     : step.data?.text ? [{ speaker: '', text: step.data.text }] : [];
@@ -638,11 +633,6 @@ const LessonQuestionScreen: React.FC<{
   const contextWords = sourceLines.flatMap((line: any) => cleanLessonSpeechText(line.text).match(/[\p{L}\p{M}]+/gu) || []);
   const choices = buildLessonQuizChoices(step, contextWords, formulaText);
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
-  const [dialogueReviewOpen, setDialogueReviewOpen] = useState(defaultDialogueReviewOpen);
-
-  useEffect(() => {
-    setDialogueReviewOpen(defaultDialogueReviewOpen);
-  }, [step.id, defaultDialogueReviewOpen]);
 
   const report = (answer: unknown, correct: boolean, choiceReply?: string) => {
     const message = correct
@@ -678,11 +668,11 @@ const LessonQuestionScreen: React.FC<{
   return <section className="lesson-player-question" aria-labelledby={`player-question-${step.id}`}>
     <div className="lesson-player-question-top">
       <div className="lesson-player-kicker">Découverte · Question {stepIndex} sur {total}</div>
-      {reviewDialogueBlocks.length > 0 && (
+      {hasReviewDialogue && (
         <button
           type="button"
           className="lesson-player-review-btn"
-          onClick={() => setDialogueReviewOpen(true)}
+          onClick={onOpenDialogueReview}
           aria-haspopup="dialog"
           aria-expanded={dialogueReviewOpen}
         >
@@ -702,9 +692,6 @@ const LessonQuestionScreen: React.FC<{
           : <QuizDropdown key={step.id} choices={choices} onSubmit={handleChoice} disabled={completed} verifySignal={verifySignal} hideCheck />}
     {feedback && <Feedback good={feedback.good}>{feedback.text}</Feedback>}
     {completed && !feedback?.good && <Feedback good>Réponse déjà validée. Continuez.</Feedback>}
-    {dialogueReviewOpen && reviewDialogueBlocks.length > 0 && (
-      <LessonDialogueReviewModal blocks={reviewDialogueBlocks} onClose={() => setDialogueReviewOpen(false)} />
-    )}
   </section>;
 };
 
@@ -725,6 +712,7 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
   const [verifySignal, setVerifySignal] = useState(0);
   const [questionPassed, setQuestionPassed] = useState(false);
   const [questionAttempted, setQuestionAttempted] = useState(false);
+  const [dialogueReviewOpen, setDialogueReviewOpen] = useState(defaultDialogueReviewOpen);
   const [directReading, setDirectReading] = useState(progress?.status === 'done');
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [pdfError, setPdfError] = useState('');
@@ -739,6 +727,10 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
   useEffect(() => {
     setQuestionPassed(screen?.kind === 'step' && discovery.completed.includes(screen.step.id));
   }, [screenIndex, screen?.kind, screen?.kind === 'step' ? screen.step.id : '', discovery.completed]);
+
+  useEffect(() => {
+    setDialogueReviewOpen(defaultDialogueReviewOpen);
+  }, [screenIndex, defaultDialogueReviewOpen]);
 
   const serialize = (state: DiscoveryState, index: number) => ({
     screen: index,
@@ -843,10 +835,19 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
     return Boolean(source && (source.content?.steps || []).some((step: DiscoveryStep) => step.kind === 'highlight' && (discovery.completed.includes(step.id) || discovery.revealed.includes(step.id))));
   };
 
+  const currentQuestionDialogueBlocks = useMemo(() => {
+    if (screen?.kind !== 'step') return [];
+    const sourceId = screen.block.content?.source || screen.step.data?.source;
+    const sourceBlock = sourceId ? allBlocks.find(candidate => candidate.id === sourceId) : undefined;
+    return sourceBlock?.type === 'dialogue'
+      ? [sourceBlock]
+      : allBlocks.filter(candidate => candidate.type === 'dialogue');
+  }, [allBlocks, screen]);
+
   const renderExtraBlocks = (extras: LessonBlock[]) => extras.map((extra, index) => <Block key={extra.id || `extra-${index}`} block={extra} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} />);
   const renderScreen = (current: LessonScreen) => {
     if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
-    if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} defaultDialogueReviewOpen={defaultDialogueReviewOpen} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
+    if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} hasReviewDialogue={currentQuestionDialogueBlocks.length > 0} dialogueReviewOpen={dialogueReviewOpen} onOpenDialogueReview={() => setDialogueReviewOpen(true)} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
     if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} />{renderExtraBlocks(current.extras)}</>;
     return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
       <div className="lesson-player-completion-actions">
@@ -899,5 +900,8 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
         </div>
       </footer>
     </div>
+    {dialogueReviewOpen && currentQuestionDialogueBlocks.length > 0 && (
+      <LessonDialogueReviewModal blocks={currentQuestionDialogueBlocks} onClose={() => setDialogueReviewOpen(false)} />
+    )}
   </div>;
 };

@@ -324,5 +324,6 @@ test('l’ouverture de Revoir le dialogue affiche uniquement le dialogue italien
   assert.match(html, /Fermer le dialogue/);
   assert.match(html, /Ieri ho <span class="lesson-word lesson-word-manual lesson-word-manual-green">mangiato<\/span> una mela\./);
   assert.doesNotMatch(html, /lesson-translation|Hier, j’ai mangé une pomme/);
+  assert.ok(html.indexOf('lesson-review-backdrop') > html.indexOf('lesson-player-actionbar'));
 });
 
