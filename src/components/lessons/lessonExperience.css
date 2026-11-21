@@ -173,6 +173,11 @@
   color: #9f1239;
 }
 
+.lesson-word-manual-teal {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
 .lesson-word-verb {
   border-radius: 5px;
   padding: 0 3px;
@@ -881,6 +886,11 @@
   .lesson-word-manual-rose {
     background: rgba(244, 63, 94, 0.22);
     color: #fecdd3;
+  }
+
+  .lesson-word-manual-teal {
+    background: rgba(20, 184, 166, 0.22);
+    color: #99f6e4;
   }
 
   .lesson-word-verb {
