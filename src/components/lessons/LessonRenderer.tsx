@@ -99,11 +99,11 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMo
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\\+\\+)(.*)\\1$/);
     if (marked) {
-      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      if (!revealHighlights || (!highlightMode && customTerms.size === 0)) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
       return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
     }
     return part.split(/(\\s+|[^\\p{L}\\p{M}]+)/u).map((token, tokenIndex) => {
-      const highlightClass = revealHighlights && /^[\\p{L}\\p{M}]+$/u.test(token)
+      const highlightClass = revealHighlights && (highlightMode || customTerms.size > 0) && /^[\\p{L}\\p{M}]+$/u.test(token)
         ? getItalianHighlightClass(token, highlightMode, customTerms) : null;
       return highlightClass
         ? <span key={`${i}-${tokenIndex}`} className={`lesson-word ${highlightClass}`}>{token}</span>
