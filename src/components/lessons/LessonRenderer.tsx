@@ -67,31 +67,26 @@ function buildRegularVerbForms() {
 }
 const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
 
-const ITALIAN_POSSESSIVES = new Set('mio mia miei mie tuo tua tuoi tue suo sua suoi sue nostro nostra nostri nostre vostro vostra vostri vostre loro'.split(' '));
-const ITALIAN_PROFESSIONS = new Set('insegnante insegnanti studente studentessa studenti studentesse medico medica medici mediche infermiere infermiera avvocato avvocata ingegnere ingegnera commesso commessa cuoco cuoca cameriere cameriera poliziotto poliziotta operaio operaia impiegato impiegata architetto architetta dentista giornalista musicista artista parrucchiere parrucchiera meccanico meccanica elettricista contadino contadina segretario segretaria direttore direttrice autista barista libraio libraia farmacista fotografo fotografa'.split(' '));
-const ITALIAN_IRREGULAR_PARTICIPLES = new Set('fatto detto scritto letto visto preso messo chiesto risposto aperto chiuso nato morto rimasto scelto bevuto conosciuto concluso corso corretto deciso discusso diviso offerto perso proposto rotto tradotto venuto stato avuto andato uscito entrato successo'.split(' '));
+const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordIndexes?: number[] }> = ({ text, revealHighlights = false, highlightWordIndexes = [] }) => {
+  const selectedWords = new Set(highlightWordIndexes);
+  let wordIndex = 0;
+  const parts = text.split(/(==[^=]+==|\\+\\+[^+]+\\+\\+)/g);
+  return <>{parts.map((part, i) => {
+    const marked = part.match(/^(==|\\+\\+)(.*)\\1$/);
+    if (marked) {
+      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
+    }
+    return part.split(/(\\s+|[^\\p{L}\\p{M}]+)/u).map((token, tokenIndex) => {
+      if (!/^[\\p{L}\\p{M}]+$/u.test(token)) return <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
+      const currentWordIndex = wordIndex++;
+      return selectedWords.has(currentWordIndex)
+        ? <span key={`${i}-${tokenIndex}`} className="lesson-word lesson-word-manual">{token}</span>
+        : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
+    });
+  })}</>;
+};
 
-function buildRegularParticiples() {
-  const forms = new Set<string>();
-  REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
-    forms.add(infinitive.slice(0, -3) + (infinitive.endsWith('are') ? 'ato' : infinitive.endsWith('ere') ? 'uto' : 'ito'));
-  });
-  return forms;
-}
-const ITALIAN_REGULAR_PARTICIPLES = buildRegularParticiples();
-
-function getItalianHighlightClass(token: string, mode?: string, customTerms: Set<string> = new Set()): string | null {
-  const word = token.toLocaleLowerCase('it-IT');
-  if (customTerms.has(word)) return 'lesson-word-vocabulary';
-  if (mode === 'present-indicative') {
-    if (ITALIAN_AUXILIARIES.has(word)) return 'lesson-word-auxiliary';
-    if (REGULAR_ITALIAN_VERB_FORMS.has(word)) return 'lesson-word-verb';
-  }
-  if (mode === 'passato-prossimo' && (ITALIAN_AUXILIARIES.has(word) || ITALIAN_IRREGULAR_PARTICIPLES.has(word) || ITALIAN_REGULAR_PARTICIPLES.has(word))) return 'lesson-word-verb';
-  if (mode === 'professions' && ITALIAN_PROFESSIONS.has(word)) return 'lesson-word-vocabulary';
-  if (mode === 'possessives' && ITALIAN_POSSESSIVES.has(word)) return 'lesson-word-possessive';
-  return null;
-}
 
 const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMode?: string; highlightTerms?: string[] }> = ({ text, revealHighlights = false, highlightMode, highlightTerms = [] }) => {
   const customTerms = new Set(highlightTerms.map(term => term.trim().toLocaleLowerCase('it-IT')).filter(Boolean));
@@ -118,7 +113,7 @@ const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} revealHighlights={Boolean(content.highlight_mode || (content.highlight_terms || []).length)} highlightMode={content.highlight_mode} highlightTerms={content.highlight_terms || []} /></span>
+          <span className="lesson-italian"><RichText text={line.it} revealHighlights={(content.highlight_tokens || []).some((mark: any) => mark.line_index === i)} highlightWordIndexes={(content.highlight_tokens || []).filter((mark: any) => mark.line_index === i).map((mark: any) => mark.word_index)} /></span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>
