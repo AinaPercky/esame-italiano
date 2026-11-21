@@ -38,15 +38,6 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const ITALIAN_PREPOSITIONS = new Set([
-  'a', 'ad', 'da', 'di', 'in', 'con', 'su', 'per', 'tra', 'fra',
-  'al', 'allo', 'alla', 'ai', 'agli', 'alle',
-  'del', 'dello', 'della', 'dei', 'degli', 'delle',
-  'dal', 'dallo', 'dalla', 'dai', 'dagli', 'dalle',
-  'nel', 'nello', 'nella', 'nei', 'negli', 'nelle',
-  'sul', 'sullo', 'sulla', 'sui', 'sugli', 'sulle', 'col', 'coi', 'all', 'dell', 'dall', 'nell', 'sull', 'coll'
-]);
-
 const ITALIAN_AUXILIARIES = new Set([
   'essere', 'avere', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
 ]);
