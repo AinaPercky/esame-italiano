@@ -158,6 +158,21 @@
   color: #704b00;
 }
 
+.lesson-word-manual-blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.lesson-word-manual-purple {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.lesson-word-manual-rose {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
 .lesson-word-verb {
   border-radius: 5px;
   padding: 0 3px;
@@ -851,6 +866,21 @@
   .lesson-word-manual-amber {
     background: rgba(232, 168, 45, 0.24);
     color: #ffdf91;
+  }
+
+  .lesson-word-manual-blue {
+    background: rgba(59, 130, 246, 0.24);
+    color: #bfdbfe;
+  }
+
+  .lesson-word-manual-purple {
+    background: rgba(139, 92, 246, 0.24);
+    color: #ddd6fe;
+  }
+
+  .lesson-word-manual-rose {
+    background: rgba(244, 63, 94, 0.22);
+    color: #fecdd3;
   }
 
   .lesson-word-verb {
