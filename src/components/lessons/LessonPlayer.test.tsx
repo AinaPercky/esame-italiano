@@ -20,7 +20,7 @@ const lesson: Lesson = {
   title_it: 'Il passato prossimo', title_fr: 'Le passé composé', objective: 'Comprendre la formation',
   status: 'published', method: 'inductive', sort_order: 0, access: 'free', created_at: '', updated_at: '',
   blocks: [
-    { id: 'dialogue', type: 'dialogue', content: { highlight_mode: 'passato-prossimo', lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho ==mangiato== una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
+    { id: 'dialogue', type: 'dialogue', content: { highlight_mode: 'present-indicative', lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho ==mangiato== una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
     { id: 'discovery', type: 'discovery', content: { source: 'dialogue', steps } },
     { id: 'formula', type: 'formula', content: { title: 'Formule', formulas: [{ parts: [{ text: 'essere/avere', kind: 'slot' }, { text: '+', kind: 'operator' }, { text: 'participio', kind: 'slot' }] }] } },
     { id: 'exceptions', type: 'exceptions', content: { title: 'Exceptions', items: [] } },
