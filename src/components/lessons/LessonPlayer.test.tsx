@@ -125,10 +125,10 @@ test('les cinq couleurs manuelles sont rendues uniquement sur les mots sélectio
     }]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: multiColorLesson, revealAll: true }));
-  for (const color of ['green', 'amber', 'blue', 'purple', 'rose']) {
+  for (const color of ['green', 'amber', 'blue', 'purple', 'rose', 'teal']) {
     assert.match(html, new RegExp('lesson-word-manual-' + color));
   }
-  assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
+  assert.match(html, /lesson-word-manual-teal/);\n  assert.doesNotMatch(html, /lesson-word-manual-(?:cyan|yellow)/);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
