@@ -80,19 +80,40 @@ function buildRegularVerbForms() {
 
 const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
 
+
+const ITALIAN_POSSESSIVES = new Set('mio mia miei mie tuo tua tuoi tue suo sua suoi sue nostro nostra nostri nostre vostro vostra vostri vostre loro'.split(' '));
+const ITALIAN_PROFESSIONS = new Set('insegnante insegnanti studente studentessa studenti studentesse medico medica medici mediche infermiere infermiera avvocato avvocata avvocati avvocate ingegnere ingegnera ingegneri commesso commessa commessi commesse cuoco cuoca cuochi cuoche cameriere cameriera poliziotto poliziotta operaio operaia impiegato impiegata architetto architetta dentista dentisti giornalista giornalisti musicista musicisti artista artisti parrucchiere parrucchiera meccanico meccanica elettricista contadino contadina segretario segretaria direttore direttrice autista barista libraio libraia farmacista fotografo fotografa'.split(' '));
+const ITALIAN_IRREGULAR_PARTICIPLES = new Set('fatto detto scritto letto visto preso messo chiesto risposto aperto chiuso nato morto rimasto scelto bevuto conosciuto concluso corso corretto deciso discusso diviso offerto perso proposto rotto tradotto venuto stato avuto andato uscito entrato successo'.split(' '));
+function buildRegularParticiples() {
+  const forms = new Set<string>();
+  REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
+    const stem = infinitive.slice(0, -3);
+    forms.add(stem + (infinitive.endsWith('are') ? 'ato' : infinitive.endsWith('ere') ? 'uto' : 'ito'));
+  });
+  return forms;
+}
+const ITALIAN_REGULAR_PARTICIPLES = buildRegularParticiples();
+
 function getItalianHighlightClass(token: string, highlightMode?: string): string | null {
-  if (highlightMode !== 'present-indicative') return null;
-  const normalized = token.toLocaleLowerCase('it-IT');
-  if (ITALIAN_AUXILIARIES.has(normalized)) return 'lesson-word-auxiliary';
-  if (REGULAR_ITALIAN_VERB_FORMS.has(normalized)) return 'lesson-word-verb';
+  const word = token.toLocaleLowerCase('it-IT');
+  if (highlightMode === 'present-indicative') {
+    if (ITALIAN_AUXILIARIES.has(word)) return 'lesson-word-auxiliary';
+    if (REGULAR_ITALIAN_VERB_FORMS.has(word)) return 'lesson-word-verb';
+  }
+  if (highlightMode === 'passato-prossimo' &&
+      (ITALIAN_AUXILIARIES.has(word) || ITALIAN_IRREGULAR_PARTICIPLES.has(word) || ITALIAN_REGULAR_PARTICIPLES.has(word))) return 'lesson-word-verb';
+  if (highlightMode === 'professions' && ITALIAN_PROFESSIONS.has(word)) return 'lesson-word-vocabulary';
+  if (highlightMode === 'possessives' && ITALIAN_POSSESSIVES.has(word)) return 'lesson-word-possessive';
   return null;
 }
 
 function getLessonHighlightMode(title: string): string | undefined {
-  const normalized = title.toLocaleLowerCase('it-IT');
-  return normalized.includes('presente indicativo') || normalized.includes('present indicatif')
-    ? 'present-indicative'
-    : undefined;
+  const normalized = title.toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+  if (/\\b(passato prossimo|passe compose)\\b/.test(normalized)) return 'passato-prossimo';
+  if (/\\b(mestieri|professioni|metiers|professions)\\b/.test(normalized)) return 'professions';
+  if (/\\b(aggettivi possessivi|adjectifs possessifs)\\b/.test(normalized)) return 'possessives';
+  if (/\\b(presente indicativo|present indicatif|verbi regolari|verbes reguliers)\\b/.test(normalized)) return 'present-indicative';
+  return undefined;
 }
 
 const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMode?: string }> = ({ text, revealHighlights = false, highlightMode }) => {
@@ -100,7 +121,7 @@ const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightMo
   return <>{parts.map((part, i) => {
     const marked = part.match(/^(==|\+\+)(.*)\1$/);
     if (marked) {
-      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+      if (!revealHighlights || !highlightMode) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
       return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
     }
     return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
@@ -746,9 +767,9 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({ lesson, progress, av
 
   const renderExtraBlocks = (extras: LessonBlock[]) => extras.map((extra, index) => <Block key={extra.id || `extra-${index}`} block={extra} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} />);
   const renderScreen = (current: LessonScreen) => {
-    if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={highlightsRevealedFor(current.block)} highlightMode={highlightMode} />{renderExtraBlocks(current.extras)}</>;
+    if (current.kind === 'dialogue') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={Boolean(highlightMode)} highlightMode={highlightMode} />{renderExtraBlocks(current.extras)}</>;
     if (current.kind === 'step') return <LessonQuestionScreen key={current.step.id} screen={current} allBlocks={allBlocks} completed={discovery.completed.includes(current.step.id)} verifySignal={verifySignal} onResult={(correct, answer) => handleStepResult(current, correct, answer)} />;
-    if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && highlightsRevealedFor(current.block)} highlightMode={highlightMode} />{renderExtraBlocks(current.extras)}</>;
+    if (current.kind === 'part') return <><Block block={current.block} discovery={discovery} onDiscovery={() => undefined} allBlocks={allBlocks} guidedComplete={true} revealHighlights={current.block.type === 'dialogue' && Boolean(highlightMode)} highlightMode={current.block.type === 'dialogue' ? highlightMode : undefined} />{renderExtraBlocks(current.extras)}</>;
     return <section className="lesson-player-done"><span className="lesson-player-done-mark"><Check size={30} /></span><p className="lesson-player-kicker">Parcours terminé</p><h1>Ottimo lavoro!</h1><p>Vous avez parcouru cette leçon. Vous pouvez maintenant relire le cours sans refaire le guide.</p>
       <div className="lesson-player-completion-actions">
         <button type="button" className="lesson-player-restart-guide" onClick={restartGuidedFromBeginning}><RotateCcw size={17} /> Reprendre le parcours guidé depuis le début</button>
