@@ -618,6 +618,11 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
               </div>
               <p className="mt-2 text-xs text-slate-500">Le surlignage concerne un seul mot. Pour souligner, encadrer ou entourer une expression, choisissez l’effet et la couleur, puis cliquez sur son premier et son dernier mot. Sélectionnez au moins deux mots.</p>
             </div>
+            {dialogueRangeStart && (
+              <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900" role="status">
+                Premier mot sélectionné : « {dialogueRangeStart.word} ». Cliquez maintenant sur le dernier mot de l’expression dans la même réplique.
+              </p>
+            )}
             {dialogueBlocksForEditor.length === 0 ? (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Ajoutez un bloc « dialogue » pour sélectionner les mots à mettre en évidence.</p>
             ) : dialogueBlocksForEditor.map(({ block, index }: any, dialogueIndex: number) => {
@@ -660,7 +665,7 @@ export const LessonsAdminView: React.FC<{ currentUser: AuthUser }> = ({ currentU
                                 aria-pressed={selected}
                                 aria-label={`${selected ? 'Retirer' : 'Appliquer'} l'effet ${dialogueMarkMode} au mot ${token}, réplique ${lineIndex + 1}`}
                                 onClick={() => handleDialogueWordClick(index, lineIndex, currentWordIndex, token)}
-                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${highlightClass} ${emphasisClass} ${selected ? '' : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
+                                className={`mx-0.5 inline rounded-md px-1 py-0.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 ${highlightClass} ${emphasisClass} ${dialogueRangeStart?.blockIndex === index && dialogueRangeStart?.lineIndex === lineIndex && dialogueRangeStart?.wordIndex === currentWordIndex ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-500' : ''} ${selected ? '' : 'text-slate-800 hover:bg-slate-100 hover:text-slate-900'}`}>
                                 {token}
                               </button></React.Fragment>;
                             })}
