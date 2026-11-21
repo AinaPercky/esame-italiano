@@ -20,7 +20,7 @@ const lesson: Lesson = {
   title_it: 'Il passato prossimo', title_fr: 'Le passé composé', objective: 'Comprendre la formation',
   status: 'published', method: 'inductive', sort_order: 0, access: 'free', created_at: '', updated_at: '',
   blocks: [
-    { id: 'dialogue', type: 'dialogue', content: { lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho ==mangiato== una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
+    { id: 'dialogue', type: 'dialogue', content: { highlight_mode: 'passato-prossimo', lines: [{ speaker: 'Anna', side: 'left', it: 'Ieri ho ==mangiato== una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } },
     { id: 'discovery', type: 'discovery', content: { source: 'dialogue', steps } },
     { id: 'formula', type: 'formula', content: { title: 'Formule', formulas: [{ parts: [{ text: 'essere/avere', kind: 'slot' }, { text: '+', kind: 'operator' }, { text: 'participio', kind: 'slot' }] }] } },
     { id: 'exceptions', type: 'exceptions', content: { title: 'Exceptions', items: [] } },
@@ -56,6 +56,29 @@ test('à l’ouverture, le DOM étudiant contient le dialogue et aucun bloc de c
   assert.match(html, /Ieri <span class="lesson-word lesson-word-auxiliary">ho/);
   assert.doesNotMatch(html, /lesson-player-question|lesson-discovery|lesson-formula|lesson-exceptions|lesson-chips|lesson-recap/);
   assert.match(html, /class="lesson-word lesson-word-auxiliary">ho/);
+});
+
+
+test('aucune surbrillance grammaticale ne se déclenche automatiquement selon le titre', () => {
+  const noHighlightLesson: Lesson = {
+    ...lesson,
+    blocks: [{ id: 'dialogue', type: 'dialogue', content: { lines: [{ speaker: 'Anna', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }] } }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonPlayer, { lesson: noHighlightLesson }));
+  assert.match(html, /Ieri ho mangiato una mela/);
+  assert.doesNotMatch(html, /lesson-word-(?:verb|auxiliary|vocabulary|possessive)/);
+});
+
+test('les mots personnalisés sont surlignés uniquement dans le dialogue', () => {
+  const customLesson: Lesson = {
+    ...lesson,
+    blocks: [
+      { id: 'dialogue', type: 'dialogue', content: { highlight_terms: ['mela'], lines: [{ speaker: 'Anna', it: 'Ho una mela.', fr: 'J’ai une pomme.' }] } },
+      { id: 'example', type: 'example_list', content: { examples: [{ it: 'La mela è rossa.', fr: 'La pomme est rouge.' }] } }
+    ]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: customLesson, revealAll: true }));
+  assert.equal((html.match(/lesson-word-vocabulary/g) || []).length, 1);
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {
