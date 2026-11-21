@@ -38,35 +38,6 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const ITALIAN_AUXILIARIES = new Set([
-  'essere', 'avere', 'sono', 'sei', 'è', 'siamo', 'siete', 'ho', 'hai', 'ha', 'abbiamo', 'avete', 'hanno'
-]);
-
-const REGULAR_ITALIAN_INFINITIVES = [
-  'abitare', 'ascoltare', 'camminare', 'cantare', 'cercare', 'comprare', 'dimenticare',
-  'disegnare', 'dormire', 'entrare', 'frequentare', 'guardare', 'imparare', 'incontrare',
-  'insegnare', 'lavorare', 'mangiare', 'nuotare', 'parlare', 'partire', 'passare',
-  'pensare', 'portare', 'praticare', 'preparare', 'ricevere', 'restare', 'ripassare',
-  'studiare', 'telefonare', 'vendere', 'credere', 'aprire', 'sentire', 'consigliare'
-];
-
-function buildRegularVerbForms() {
-  const forms = new Set<string>();
-  const endings: Record<string, string[]> = {
-    are: ['o', 'i', 'a', 'iamo', 'ate', 'ano'],
-    ere: ['o', 'i', 'e', 'iamo', 'ete', 'ono'],
-    ire: ['o', 'i', 'e', 'iamo', 'ite', 'ono']
-  };
-  REGULAR_ITALIAN_INFINITIVES.forEach(infinitive => {
-    forms.add(infinitive);
-    const conjugation = infinitive.slice(-3);
-    const stem = infinitive.slice(0, -3);
-    (endings[conjugation] || []).forEach(ending => forms.add(stem + ending));
-  });
-  return forms;
-}
-const REGULAR_ITALIAN_VERB_FORMS = buildRegularVerbForms();
-
 const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordIndexes?: number[] }> = ({ text, revealHighlights = false, highlightWordIndexes = [] }) => {
   const selectedWords = new Set(highlightWordIndexes);
   let wordIndex = 0;
