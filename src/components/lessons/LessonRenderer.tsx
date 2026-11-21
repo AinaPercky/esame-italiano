@@ -6,6 +6,13 @@ import { buildLessonOrderItems, buildLessonQuizChoices, getLessonExpectedOrder, 
 import { isGuidedQuizComplete } from '../../utils/lessonProgress';
 import { buildScreens, getFirstDiscoveryScreenIndex, getFirstLessonScreenIndex, lessonScreenSegment, LessonScreen } from '../../utils/lessonScreens';
 import { downloadLessonPdf } from '../../utils/lessonPdf';
+import {
+  buildDialogueSegments,
+  DialogueEmphasisMark,
+  DialogueHighlightMark,
+  DialogueToken,
+  normalizeDialogueColor
+} from '../../utils/lessonDialogueText';
 
 const TYPE_META: Record<string, { label: string; color: string; soft: string }> = {
   grammaire: { label: 'Grammaire', color: '#2f6fd6', soft: '#e8f1ff' },
@@ -38,31 +45,71 @@ export const TypeTag: React.FC<{ type: string }> = ({ type }) => {
   return <span className="lesson-type-tag" style={{ background: meta.color }}>{meta.label}</span>;
 };
 
-const RichText: React.FC<{ text: string; revealHighlights?: boolean; highlightWordMarks?: Array<{ word_index: number; text?: string; color?: 'green' | 'amber' | 'blue' | 'purple' | 'rose' | 'teal' }>; emphasisWordMarks?: Array<{ word_index: number; text?: string; color?: string; style?: 'underline' | 'outline' | 'circle' }> }> = ({ text, revealHighlights = false, highlightWordMarks = [], emphasisWordMarks = [] }) => {
-  const selectedWords = new Map(highlightWordMarks.map(mark => [mark.word_index, { text: mark.text?.toLocaleLowerCase('it-IT'), color: ['green', 'amber', 'blue', 'purple', 'rose', 'teal'].includes(mark.color || '') ? mark.color : 'green' }]));
-  const emphasizedWords = new Map(emphasisWordMarks.map(mark => [mark.word_index, { text: mark.text?.toLocaleLowerCase('it-IT'), color: ['green', 'amber', 'blue', 'purple', 'rose', 'teal'].includes(mark.color || '') ? mark.color : 'green', style: ['underline', 'outline', 'circle'].includes(mark.style || '') ? mark.style : 'underline' }]));
+const RichText: React.FC<{
+  text: string;
+  revealHighlights?: boolean;
+  highlightWordMarks?: DialogueHighlightMark[];
+  emphasisWordMarks?: DialogueEmphasisMark[];
+}> = ({ text, revealHighlights = false, highlightWordMarks = [], emphasisWordMarks = [] }) => {
+  const selectedWords = new Map(
+    highlightWordMarks.map(mark => [
+      mark.word_index,
+      {
+        text: mark.text?.toLocaleLowerCase('it-IT'),
+        color: normalizeDialogueColor(mark.color)
+      }
+    ])
+  );
+
+  const renderToken = (token: DialogueToken, key: string) => {
+    if (!token.isWord || token.wordIndex === null) {
+      return <React.Fragment key={key}>{token.raw}</React.Fragment>;
+    }
+    const selectedMark = selectedWords.get(token.wordIndex);
+    const validHighlight =
+      selectedMark && (!selectedMark.text || selectedMark.text === token.raw.toLocaleLowerCase('it-IT'));
+    if (!validHighlight) {
+      return <React.Fragment key={key}>{token.raw}</React.Fragment>;
+    }
+    return (
+      <span key={key} className={`lesson-word lesson-word-manual lesson-word-manual-${selectedMark.color}`}>
+        {token.raw}
+      </span>
+    );
+  };
+
   let wordIndex = 0;
   const parts = text.split(/(==[^=]+==|\+\+[^+]+\+\+)/g);
-  return <>{parts.map((part, i) => {
-    const marked = part.match(/^(==|\+\+)(.*)\1$/);
-    if (marked) {
-      if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
-      return <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>{marked[2]}</span>;
-    }
-    return part.split(/(\s+|[^\p{L}\p{M}]+)/u).map((token, tokenIndex) => {
-      if (!/^[\p{L}\p{M}]+$/u.test(token)) return <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
-      const currentWordIndex = wordIndex++;
-      const selectedMark = selectedWords.get(currentWordIndex);
-      const emphasizedMark = emphasizedWords.get(currentWordIndex);
-      const validHighlight = selectedMark && (!selectedMark.text || selectedMark.text === token.toLocaleLowerCase('it-IT'));
-      const validEmphasis = emphasizedMark && (!emphasizedMark.text || emphasizedMark.text === token.toLocaleLowerCase('it-IT'));
-      const classes = [
-        validHighlight ? `lesson-word lesson-word-manual lesson-word-manual-${selectedMark.color}` : '',
-        validEmphasis ? `lesson-word-emphasis lesson-word-emphasis-${emphasizedMark.style} lesson-word-emphasis-${emphasizedMark.color}` : ''
-      ].filter(Boolean).join(' ');
-      return classes ? <span key={`${i}-${tokenIndex}`} className={classes}>{token}</span> : <React.Fragment key={`${i}-${tokenIndex}`}>{token}</React.Fragment>;
-    });
-  })}</>;
+  return (
+    <>
+      {parts.map((part, i) => {
+        const marked = part.match(/^(==|\+\+)(.*)\1$/);
+        if (marked) {
+          if (!revealHighlights) return <React.Fragment key={i}>{marked[2]}</React.Fragment>;
+          return (
+            <span key={i} className={`lesson-word ${part.startsWith('==') ? 'lesson-word-yellow' : 'lesson-word-green'}`}>
+              {marked[2]}
+            </span>
+          );
+        }
+        const { segments, nextWordIndex } = buildDialogueSegments(part, emphasisWordMarks, wordIndex);
+        wordIndex = nextWordIndex;
+        return segments.map((segment, segIdx) => {
+          if (segment.kind === 'token') {
+            return renderToken(segment.token, `${i}-t-${segIdx}`);
+          }
+          return (
+            <span
+              key={`${i}-g-${segIdx}`}
+              className={`lesson-word-emphasis lesson-word-emphasis-${segment.style} lesson-word-emphasis-${segment.color}`}
+            >
+              {segment.tokens.map((token, tokIdx) => renderToken(token, `${i}-g-${segIdx}-${tokIdx}`))}
+            </span>
+          );
+        });
+      })}
+    </>
+  );
 };
 
 const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
@@ -71,7 +118,24 @@ const DialogueBlock: React.FC<{ content: any }> = ({ content }) => (
       <div key={i} className={`lesson-dialogue-line ${line.side === 'right' ? 'right' : ''}`}>
         <div className="lesson-dialogue-speaker">{line.speaker}</div>
         <button type="button" onClick={() => speak(line.it)} className="lesson-bubble" aria-label={`Écouter : ${cleanLessonSpeechText(line.it)}`}>
-          <span className="lesson-italian"><RichText text={line.it} revealHighlights={(content.highlight_tokens || []).some((mark: any) => mark.line_index === i)} highlightWordMarks={(content.highlight_tokens || []).filter((mark: any) => mark.line_index === i).map((mark: any) => ({ word_index: mark.word_index, text: mark.text, color: mark.color }))} emphasisWordMarks={(content.emphasis_tokens || []).filter((mark: any) => mark.line_index === i).map((mark: any) => ({ word_index: mark.word_index, text: mark.text, color: mark.color, style: mark.style }))} /></span>
+          <span className="lesson-italian">
+            <RichText
+              text={line.it}
+              revealHighlights={(content.highlight_tokens || []).some((mark: any) => mark.line_index === i)}
+              highlightWordMarks={(content.highlight_tokens || [])
+                .filter((mark: any) => mark.line_index === i)
+                .map((mark: any) => ({ word_index: mark.word_index, text: mark.text, color: mark.color }))}
+              emphasisWordMarks={(content.emphasis_tokens || [])
+                .filter((mark: any) => mark.line_index === i)
+                .map((mark: any) => ({
+                  word_index: mark.word_index,
+                  text: mark.text,
+                  color: mark.color,
+                  style: mark.style,
+                  group_id: mark.group_id
+                }))}
+            />
+          </span>
           <span className="lesson-translation">{line.fr}</span>
           <span className="lesson-audio" aria-hidden="true"><Volume2 size={18} /></span>
         </button>

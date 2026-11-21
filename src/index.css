@@ -48,8 +48,9 @@
     font-family: var(--font-sans);
     color: #072a3f;
     background-color: #ffffff;
-    /* Prevent unwanted horizontal scrolling on mobile */
+    /* Prevent unwanted horizontal scrolling on mobile while preserving position: sticky */
     overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
   }
 

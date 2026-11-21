@@ -157,7 +157,7 @@ test('les effets typographiques du dialogue sont rendus mot par mot avec leur st
   assert.match(html, /lesson-word-emphasis-circle lesson-word-emphasis-purple">rossa/);
 });
 
-test('les sélections multi-mots soulignées, encadrées et entourées sont rendues sur chaque mot de la plage', () => {
+test('les sélections multi-mots soulignées, encadrées et entourées sont regroupées ensemble dans un seul conteneur', () => {
   const rangeLesson: Lesson = {
     ...lesson,
     blocks: [{
@@ -167,17 +167,48 @@ test('les sélections multi-mots soulignées, encadrées et entourées sont rend
         emphasis_tokens: [
           { line_index: 0, word_index: 1, text: 'ho', style: 'underline', color: 'green' },
           { line_index: 0, word_index: 2, text: 'mangiato', style: 'underline', color: 'green' },
-          { line_index: 0, word_index: 3, text: 'una', style: 'outline', color: 'blue' },
-          { line_index: 0, word_index: 4, text: 'mela', style: 'outline', color: 'blue' }
+          { line_index: 0, word_index: 3, text: 'una', style: 'outline', color: 'blue', group_id: 'g1' },
+          { line_index: 0, word_index: 4, text: 'mela', style: 'outline', color: 'blue', group_id: 'g1' },
+          { line_index: 1, word_index: 0, text: 'Ciao', style: 'circle', color: 'teal', group_id: 'g2' },
+          { line_index: 1, word_index: 1, text: 'Sara', style: 'circle', color: 'teal', group_id: 'g2' },
+          { line_index: 1, word_index: 2, text: 'Dove', style: 'circle', color: 'teal', group_id: 'g3' },
+          { line_index: 1, word_index: 3, text: 'vai', style: 'circle', color: 'teal', group_id: 'g3' }
         ],
-        lines: [{ speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' }]
+        lines: [
+          { speaker: 'Marco', it: 'Ieri ho mangiato una mela.', fr: 'Hier, j’ai mangé une pomme.' },
+          { speaker: 'Luca', it: 'Ciao, Sara! Dove vai?', fr: 'Salut Sara ! Où vas-tu ?' }
+        ]
       }
     }]
   };
   const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: rangeLesson, revealAll: true }));
-  assert.match(html, /lesson-word-emphasis-underline lesson-word-emphasis-green">ho<\/span> <span class="lesson-word-emphasis lesson-word-emphasis-underline lesson-word-emphasis-green">mangiato/);
-  assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">una/);
-  assert.match(html, /lesson-word-emphasis-outline lesson-word-emphasis-blue">mela/);
+  assert.match(html, /<span class="lesson-word-emphasis lesson-word-emphasis-underline lesson-word-emphasis-green">ho mangiato<\/span>/);
+  assert.match(html, /<span class="lesson-word-emphasis lesson-word-emphasis-outline lesson-word-emphasis-blue">una mela<\/span>/);
+  assert.match(html, /<span class="lesson-word-emphasis lesson-word-emphasis-circle lesson-word-emphasis-teal">Ciao, Sara<\/span>! <span class="lesson-word-emphasis lesson-word-emphasis-circle lesson-word-emphasis-teal">Dove vai<\/span>\?/);
+});
+
+test('un mot surligné à l’intérieur d’une expression soulignée ou entourée conserve son surlignage', () => {
+  const combinedLesson: Lesson = {
+    ...lesson,
+    blocks: [{
+      id: 'dialogue',
+      type: 'dialogue',
+      content: {
+        highlight_tokens: [{ line_index: 0, word_index: 2, text: 'studi', color: 'green' }],
+        emphasis_tokens: [
+          { line_index: 0, word_index: 0, text: 'Ciao', style: 'circle', color: 'green', group_id: 'g1' },
+          { line_index: 0, word_index: 1, text: 'Sara', style: 'circle', color: 'green', group_id: 'g1' },
+          { line_index: 0, word_index: 2, text: 'studi', style: 'circle', color: 'green', group_id: 'g1' }
+        ],
+        lines: [{ speaker: 'Luca', it: 'Ciao Sara! studi', fr: 'Salut Sara ! tu étudies' }]
+      }
+    }]
+  };
+  const html = renderToStaticMarkup(React.createElement(LessonFullPreview, { lesson: combinedLesson, revealAll: true }));
+  assert.match(
+    html,
+    /<span class="lesson-word-emphasis lesson-word-emphasis-circle lesson-word-emphasis-green">Ciao Sara! <span class="lesson-word lesson-word-manual lesson-word-manual-green">studi<\/span><\/span>/
+  );
 });
 
 test('après le dialogue, le DOM ne contient qu’une question de découverte', () => {

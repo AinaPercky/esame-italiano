@@ -373,7 +373,7 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="min-w-0 flex-1 overflow-x-hidden p-3 pb-24 sm:p-6 lg:p-8 lg:pb-8">
+        <main className="min-w-0 flex-1 overflow-x-clip p-3 pb-24 sm:p-6 lg:p-8 lg:pb-8">
           {currentTab === 'dashboard' && (
             <DashboardView
               exams={exams}

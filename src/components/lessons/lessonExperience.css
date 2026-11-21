@@ -114,7 +114,7 @@
 }
 
 .lesson-bubble .lesson-italian {
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
 .lesson-bubble .lesson-translation {
@@ -180,9 +180,8 @@
 
 
 .lesson-word-emphasis {
-  display: inline-block;
+  display: inline;
   position: relative;
-  padding: 0 0.12em;
   font-weight: 800;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
@@ -196,22 +195,24 @@
 .lesson-word-emphasis-teal { --lesson-emphasis-color: #0f9488; }
 
 .lesson-word-emphasis-underline {
+  padding: 0 0.06em;
   text-decoration-line: underline;
   text-decoration-color: var(--lesson-emphasis-color);
   text-decoration-thickness: 2.5px;
-  text-underline-offset: 0.2em;
+  text-underline-offset: 0.22em;
+  text-decoration-skip-ink: none;
 }
 
 .lesson-word-emphasis-outline {
   border: 2px solid var(--lesson-emphasis-color);
-  border-radius: 5px;
-  padding: 0.02em 0.22em;
+  border-radius: 6px;
+  padding: 0.08em 0.3em;
 }
 
 .lesson-word-emphasis-circle {
   border: 2px solid var(--lesson-emphasis-color);
   border-radius: 999px;
-  padding: 0.02em 0.34em;
+  padding: 0.08em 0.44em;
 }
 
 .lesson-word-verb {
