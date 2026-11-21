@@ -140,8 +140,9 @@ test('la synthèse affiche les repères et sépare visuellement la phrase modèl
   assert.match(html, /lesson-recap-header/);
   assert.match(html, /Fiche mémo/);
   assert.match(html, /2 repères/);
-  assert.match(html, /Avere ou essere au présent/);
+  const textContent = html.replace(/<[^>]*>/g, '');
+  assert.match(textContent, /Avere ou essere au présent/);
   assert.match(html, /Phrase modèle/);
-  assert.match(html.replace(/<[^>]*>/g, ''), /Ieri sono andata a Roma/);
-  assert.match(html, /Hier, je suis allée à Rome/);
+  assert.match(textContent, /Ieri sono andata a Roma/);
+  assert.match(textContent, /Hier, je suis allée à Rome/);
 });
