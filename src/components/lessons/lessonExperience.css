@@ -929,6 +929,13 @@
     color: #99f6e4;
   }
 
+  .lesson-word-emphasis-green { --lesson-emphasis-color: #6ee7a7; }
+  .lesson-word-emphasis-amber { --lesson-emphasis-color: #fcd34d; }
+  .lesson-word-emphasis-blue { --lesson-emphasis-color: #93c5fd; }
+  .lesson-word-emphasis-purple { --lesson-emphasis-color: #c4b5fd; }
+  .lesson-word-emphasis-rose { --lesson-emphasis-color: #fda4af; }
+  .lesson-word-emphasis-teal { --lesson-emphasis-color: #5eead4; }
+
   .lesson-word-verb {
     background: #17433a;
     color: #b8f3d5;
