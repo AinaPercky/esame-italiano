@@ -9,7 +9,7 @@
     "methods": ["inductive", "direct"],
     "access": ["free", "pass"],
     "block_format": "Le format canonique utilise { type, content }. Le format compact, avec les propriétés directement dans le bloc, est également accepté.",
-    "discovery_kinds": ["highlight", "choose", "compare", "complete_table", "guess_meaning", "build_formula", "free_text"],
+    "discovery_kinds": ["highlight", "choose", "compare", "complete_table", "guess_meaning", "build_formula", "free_text", "fill_blanks"],
     "hints": "Chaque étape peut contenir au maximum 3 hints.",
     "inline_markup": "Dans les phrases italiennes, ==mot== et ++mot++ peuvent servir à repérer des mots pendant la découverte."
   },
