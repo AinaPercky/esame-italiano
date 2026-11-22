@@ -251,9 +251,34 @@ const DiscoveryTableExercise: React.FC<{ data: any; onResult: (answers: Record<s
 
 const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: LessonQuizChoice | null) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ choices, onSubmit, disabled, verifySignal = 0, hideCheck = false }) => {
   const [selectedId, setSelectedId] = useState('');
+  const radioGroupId = useId();
   const selected = choices.find(choice => choice.id === selectedId);
   useEffect(() => { if (verifySignal > 0) onSubmit(selected || null); }, [verifySignal]);
-  return <div className="lesson-quiz-answer"><label><span>Choisissez une réponse</span><select value={selectedId} onChange={event => setSelectedId(event.target.value)} disabled={disabled || choices.length === 0}><option value="">Sélectionner…</option>{choices.map(choice => <option key={choice.id} value={choice.id}>{choice.label}</option>)}</select></label>{!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => onSubmit(selected || null)}>Vérifier ma réponse</button>}{choices.length === 0 && <small>Cette question ne contient aucun choix de réponse.</small>}</div>;
+  return (
+    <div className="lesson-quiz-answer lesson-quiz-radio-answer">
+      {choices.length > 0 ? (
+        <fieldset className="lesson-quiz-radio-group" disabled={disabled}>
+          <legend>Choisissez une réponse</legend>
+          <div className="lesson-quiz-radio-options">
+            {choices.map((choice, index) => {
+              const checked = selectedId === choice.id;
+              const inputId = `${radioGroupId}-${choice.id}`;
+              return (
+                <label key={choice.id} htmlFor={inputId} className={`lesson-quiz-radio-option ${checked ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''}`}>
+                  <input id={inputId} type="radio" name={radioGroupId} value={choice.id} checked={checked} onChange={() => setSelectedId(choice.id)} disabled={disabled} className="lesson-quiz-radio-input" />
+                  <span className="lesson-quiz-radio-marker" aria-hidden="true">{String.fromCharCode(65 + index)}</span>
+                  <span className="lesson-quiz-radio-label">{choice.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : (
+        <p className="lesson-quiz-empty" role="status">Cette question ne contient aucun choix de réponse.</p>
+      )}
+      {!hideCheck && <button type="button" className="lesson-discovery-check" disabled={disabled || !selected} onClick={() => onSubmit(selected || null)}>Vérifier ma réponse</button>}
+    </div>
+  );
 };
 
 const FillBlanksAnswer: React.FC<{
