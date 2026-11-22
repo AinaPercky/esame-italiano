@@ -49,7 +49,9 @@ export const MotsTrousQuestion: React.FC<Props> = ({
   const isExamMode = mode === 'exam';
   const bankInstruction = isExamMode
     ? 'Sélectionnez un mot, puis son emplacement. Vous pouvez modifier vos réponses avant de remettre la copie.'
-    : 'Touchez un mot, puis le trou correspondant. Le glisser-déposer fonctionne aussi.';
+    : mode === 'editor'
+      ? 'Aperçu de l’activité dans son format élève.'
+      : 'Touchez un mot, puis le trou correspondant. Le glisser-déposer fonctionne aussi.';
   const banque = definition.banque || [];
   const answers = useMemo(() => parseMotsTrousAnswers(answer, phrases), [answer, phrases]);
   const remaining = useMemo(() => banqueRestanteMots(banque, answers), [banque, answers]);
@@ -400,7 +402,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                       }}
                       onTouchStart={e => startTouchDrag(e, { source: 'bank', word })}
                       onClick={() => handleBankWordClick(word)}
-                      className={`inline-flex min-h-[44px] touch-manipulation select-none items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-bold shadow-xs transition active:scale-[.97] ${
+                      className={`inline-flex min-h-[44px] touch-manipulation select-none items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] focus-visible:ring-offset-2 active:scale-[.98] ${
                         disabled
                           ? 'cursor-default border-[#d8e6ee] bg-white/80 text-[#46657a]'
                           : isSelected
@@ -517,6 +519,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                       <div className="mx-1 inline-flex max-w-full items-center gap-1 align-middle">
                         <button
                           type="button"
+                          disabled={disabled}
                           draggable={!disabled}
                           aria-label={`Phrase ${index + 1}, mot placé : ${chosen}. Activer pour sélectionner ce mot.`}
                           onDragStart={e => {
@@ -567,7 +570,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                           selectedWord ? `. Cliquer pour placer « ${selectedWord} »` : ''
                         }`}
                         onClick={() => handleGapClick(id)}
-                        className={`mx-1.5 inline-flex min-h-[44px] min-w-[124px] max-w-full touch-manipulation items-center justify-center rounded-xl border-2 border-dashed px-3.5 py-1 align-middle text-xs font-bold transition ${
+                        className={`mx-1.5 inline-flex min-h-[44px] min-w-[124px] max-w-full touch-manipulation items-center justify-center rounded-lg border-2 border-dashed px-3.5 py-1 align-middle text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] focus-visible:ring-offset-2 ${
                           isDragHover
                             ? 'border-[#0b3c5d] bg-[#dcecf7] text-[#072a3f] scale-[1.02]'
                             : selectedWord
