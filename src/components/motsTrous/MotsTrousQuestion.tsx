@@ -418,7 +418,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                 })
               ) : (
                 <p className="py-1.5 text-sm font-medium text-[#46657a]">
-                  Tous les mots sont placés. Vous pouvez encore les déplacer.
+                  Banque vide. Déplacez un mot déjà placé pour modifier une réponse.
                 </p>
               )}
             </div>
