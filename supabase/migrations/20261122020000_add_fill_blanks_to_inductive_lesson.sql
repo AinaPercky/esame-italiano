@@ -100,12 +100,12 @@ BEGIN
   WHERE id = '2e360684-2867-4377-ae75-763e6726d58b';
   IF step_count <> 15 OR NOT EXISTS (
     SELECT 1 FROM public.lesson_blocks lb,
-      LATERAL jsonb_array_elements(lb.content->'steps') step
+      LATERAL jsonb_array_elements(lb.content->'steps') AS expanded(step)
     WHERE lb.id = '2e360684-2867-4377-ae75-763e6726d58b'
-      AND step->>'kind' = 'fill_blanks'
-      AND step->>'id' IN ('inductive_fill_are','inductive_fill_ere','inductive_fill_ire')
+      AND expanded.step->>'kind' = 'fill_blanks'
+      AND expanded.step->>'id' IN ('inductive_fill_are','inductive_fill_ere','inductive_fill_ire')
     GROUP BY lb.id
-    HAVING count(*) FILTER (WHERE step->>'kind' = 'fill_blanks') = 3
+    HAVING count(*) FILTER (WHERE expanded.step->>'kind' = 'fill_blanks') = 3
   ) THEN
     RAISE EXCEPTION 'Les trois exercices à trous ne sont pas correctement intégrés à la découverte guidée.';
   END IF;
