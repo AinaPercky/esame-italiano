@@ -196,3 +196,63 @@
     justify-content: center;
   }
 }
+
+
+/* Saisie ciblée des terminaisons dans les questions inductives */
+.lesson-fill-blanks {
+  display: grid;
+  gap: 0.7rem;
+  width: 100%;
+}
+.lesson-fill-blank-row {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, .7fr) minmax(7rem, 1fr) minmax(4rem, .55fr);
+  align-items: center;
+  gap: .65rem;
+  padding: .7rem .8rem;
+  border: 1px solid #d8e6ee;
+  border-radius: .85rem;
+  background: #fff;
+}
+.lesson-fill-blank-subject {
+  color: #46657a;
+  font-size: .9rem;
+  font-weight: 700;
+}
+.lesson-fill-blank-verb {
+  color: #072a3f;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.lesson-fill-blank-underscores {
+  color: #2fa36b;
+  letter-spacing: .12em;
+}
+.lesson-fill-blank-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.65rem;
+  border: 1px solid #b8cbd7;
+  border-radius: .65rem;
+  padding: .45rem .6rem;
+  color: #072a3f;
+  background: #f8fbfd;
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+}
+.lesson-fill-blank-row input:focus {
+  outline: 2px solid #2fa36b;
+  outline-offset: 1px;
+}
+.lesson-fill-blank-row input:disabled {
+  opacity: .75;
+}
+@media (max-width: 420px) {
+  .lesson-fill-blank-row {
+    grid-template-columns: 3.3rem minmax(5.5rem, 1fr) 3.5rem;
+    gap: .4rem;
+    padding: .55rem;
+  }
+}
