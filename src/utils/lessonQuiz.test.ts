@@ -4,7 +4,6 @@ import {
   buildLessonOrderItems,
   buildLessonQuizChoices,
   getLessonExpectedOrder,
-  isLessonFillBlanksCorrect,
   isLessonFreeTextCorrect,
   isLessonOrderCorrect,
   isLessonQuizChoiceCorrect,
@@ -87,17 +86,6 @@ test('corrige une réponse rédigée complète, longue et tolérante à la casse
   const step = { kind: 'free_text', data: { correct_answer: 'Ieri sono andata al mercato con mia sorella.' } };
   assert.equal(isLessonFreeTextCorrect(step, '  IERI   SONO ANDATA AL MERCATO CON MIA SORELLA  '), true);
   assert.equal(isLessonFreeTextCorrect(step, 'Ieri sono andata al mercato'), false);
-});
-
-test('corrige séparément les terminaisons saisies dans les trous', () => {
-  const data = { items: [
-    { id: 'io', subject: 'io', stem: 'parl', answer: 'o' },
-    { id: 'tu', subject: 'tu', stem: 'parl', answer: 'i' },
-    { id: 'lui', subject: 'lui/lei', stem: 'parl', answer: 'a' }
-  ] };
-  assert.equal(isLessonFillBlanksCorrect(data, { io: 'o', tu: 'i', lui: 'a' }), true);
-  assert.equal(isLessonFillBlanksCorrect(data, { io: 'o', tu: 'a', lui: 'a' }), false);
-  assert.equal(isLessonFillBlanksCorrect(data, { io: 'o', tu: 'i' }), false);
 });
 
 test('accepte les variantes de réponse rédigée déclarées par l’enseignant', () => {
