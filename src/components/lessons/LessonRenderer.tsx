@@ -260,13 +260,12 @@ const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: L
         <fieldset className="lesson-quiz-radio-group" disabled={disabled}>
           <legend>Choisissez une réponse</legend>
           <div className="lesson-quiz-radio-options">
-            {choices.map((choice, index) => {
+            {choices.map(choice => {
               const checked = selectedId === choice.id;
               const inputId = `${radioGroupId}-${choice.id}`;
               return (
                 <label key={choice.id} htmlFor={inputId} className={`lesson-quiz-radio-option ${checked ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''}`}>
                   <input id={inputId} type="radio" name={radioGroupId} value={choice.id} checked={checked} onChange={() => setSelectedId(choice.id)} disabled={disabled} className="lesson-quiz-radio-input" />
-                  <span className="lesson-quiz-radio-marker" aria-hidden="true">{String.fromCharCode(65 + index)}</span>
                   <span className="lesson-quiz-radio-label">{choice.label}</span>
                 </label>
               );
