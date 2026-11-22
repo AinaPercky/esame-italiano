@@ -300,6 +300,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
 
   // Données de l'élève
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [pendingLessonQuizRef, setPendingLessonQuizRef] = useState<string | null>(null);
   const [mySubmissions, setMySubmissions] = useState<QuizSubmission[]>([]);
   const [dailyGrades, setDailyGrades] = useState<DailyGrade[]>([]);
   const [studentRecord, setStudentRecord] = useState<Student | null>(null);
@@ -856,6 +857,15 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     startQuizSession(quiz, false);
   };
 
+  // Ouvrir directement le quiz associé à une leçon, dès qu'il est présent dans la liste synchronisée.
+  useEffect(() => {
+    if (!pendingLessonQuizRef || activeTab !== 'quizzes' || activeQuiz) return;
+    const linkedQuiz = quizzes.find(quiz => quiz.id === pendingLessonQuizRef);
+    if (!linkedQuiz) return;
+    setPendingLessonQuizRef(null);
+    void handleStartQuiz(linkedQuiz);
+  }, [pendingLessonQuizRef, activeTab, activeQuiz, quizzes]);
+
   const handleStartTutorial = () => {
     const { classId } = getStudentQueryInfo();
     const className = classesList.find((classRoom) => classRoom.id === classId)?.name || 'Entraînement';
@@ -1399,7 +1409,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         {activeTab === 'lessons' && (
           <LessonsStudentView
             currentUser={currentUser}
-            onOpenQuiz={() => setActiveTab('quizzes')}
+            onOpenQuiz={(quizRef) => {
+              setPendingLessonQuizRef(quizRef);
+              setActiveTab('quizzes');
+            }}
           />
         )}
 
