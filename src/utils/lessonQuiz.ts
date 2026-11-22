@@ -110,13 +110,6 @@ function acceptedTextAnswers(step: any): unknown[] {
   return marked.map(option => option.value ?? option.text ?? option.it ?? option.label ?? option.short_text).filter(Boolean);
 }
 
-export function isLessonFillBlanksCorrect(data: any, answers: Record<string, string>): boolean {
-  const items = Array.isArray(data?.items) ? data.items : [];
-  return items.length > 0 && items.every((item: any, index: number) =>
-    normalizeLessonAnswer(answers[String(item.id ?? index)] ?? '') === normalizeLessonAnswer(item.answer)
-  );
-}
-
 export function isLessonFreeTextCorrect(step: any, answer: string): boolean {
   const normalizedAnswer = normalizeLessonAnswer(answer);
   if (!normalizedAnswer) return false;
