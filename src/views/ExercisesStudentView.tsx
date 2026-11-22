@@ -525,6 +525,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           definition={question.mots_trous as any}
           answer={answer}
           onChange={updateAnswer}
+          mode="exercise"
         />
       );
     }
