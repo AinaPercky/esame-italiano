@@ -13,7 +13,7 @@ export interface DialogueLine { speaker: string; side?: 'left' | 'right'; it: st
 export interface FormulaPart { text: string; kind: 'slot' | 'fixed' | 'operator'; hint?: string; }
 export interface FormulaDefinition { label?: string; parts: FormulaPart[]; examples?: LessonExample[]; }
 export interface DiscoveryOption { text?: string; short_text?: string; label?: string; value?: string; correct?: boolean; reply?: string; }
-export type DiscoveryKind = 'highlight' | 'choose' | 'compare' | 'complete_table' | 'group' | 'guess_meaning' | 'build_formula' | 'free_text' | 'fill_blanks' | 'reorder' | 'order';
+export type DiscoveryKind = 'highlight' | 'choose' | 'compare' | 'complete_table' | 'group' | 'guess_meaning' | 'build_formula' | 'free_text' | 'fill_blanks' | 'mots_trous' | 'reorder' | 'order';
 export interface DiscoveryStep {
   id: string; kind: DiscoveryKind; prompt: string; data?: any; hints?: string[];
   ok?: string; ko?: string; insight?: string;
