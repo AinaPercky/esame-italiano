@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GripVertical, RotateCcw, X } from 'lucide-react';
+import { Check, RotateCcw, X } from 'lucide-react';
 import {
   banqueRestanteMots,
   deplacerOuEchangerMot,
@@ -514,8 +514,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                     {phrase.debut && <span>{phrase.debut}</span>}
 
                     {chosen ? (
-                      <span className="mx-1 inline-flex items-center align-middle">
-                        <div className="mx-1 inline-flex max-w-full items-center gap-1 align-middle">
+                      <div className="mx-1 inline-flex max-w-full items-center gap-1 align-middle">
                         <button
                           type="button"
                           draggable={!disabled}
