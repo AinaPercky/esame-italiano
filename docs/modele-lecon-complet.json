@@ -43,6 +43,7 @@
       "highlight": "data.source référence l’id d’un bloc dialogue; data.targets[] contient les mots à identifier. L’élève choisit un mot dans un menu.",
       "complete_table": "data.columns[], data.rows[] avec label/cells[] et given[] indiquant les cellules déjà données (true/false). Les cellules manquantes sont des menus.",
       "free_text": "Affiche une zone de texte libre sans limite de mots. Fournir correct_answer (chaîne ou tableau) ou accepted_answers[] pour corriger; la casse, les accents et les espaces superflus sont normalisés. Sans clé de correction, toute réponse non vide est acceptée afin de ne pas bloquer l’élève.",
+      "fill_blanks": "Affiche une série de champs à trous pour saisir uniquement les terminaisons. data.items[] contient id, subject, stem et answer; chaque terminaison est corrigée séparément.",
       "build_formula": "Question de compréhension de formule au format choix: fournir data.options[] ou formula_block/formula_index et correct_answer. Pour faire reconstruire une suite d’éléments, utiliser reorder.",
       "group": "Catégorisation convertie en choix: fournir data.options[] avec une option correcte; aucune interaction de glisser-déposer.",
       "reorder": "Réponse ordonnée par glisser-déposer: data.items[] (chaînes ou objets avec id/text/value) contient les éléments; data.correct_order[] définit l’ordre attendu (valeurs, identifiants ou indices de tableau zéro-based). La saisie fonctionne à la souris, au tactile et au clavier. Le type order est aussi accepté.",
