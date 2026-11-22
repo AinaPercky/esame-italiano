@@ -6,6 +6,8 @@ import { buildLessonOrderItems, buildLessonQuizChoices, getLessonExpectedOrder, 
 import { isGuidedQuizComplete } from '../../utils/lessonProgress';
 import { buildScreens, getFirstDiscoveryScreenIndex, getFirstLessonScreenIndex, lessonScreenSegment, LessonScreen } from '../../utils/lessonScreens';
 import { downloadLessonPdf } from '../../utils/lessonPdf';
+import { MotsTrousQuestion } from '../motsTrous/MotsTrousQuestion';
+import { noterMotsTrous, MotsTrousDefinition } from '../../utils/motsTrous';
 import {
   buildDialogueSegments,
   DialogueEmphasisMark,
@@ -288,6 +290,43 @@ const FillBlanksAnswer: React.FC<{
   </div>;
 };
 
+type LessonMotsTrousAnswerProps = {
+  definition: MotsTrousDefinition;
+  onResult: (answer: string, correct: boolean) => void;
+  disabled?: boolean;
+  verifySignal?: number;
+  hideCheck?: boolean;
+};
+
+/** Adaptateur commun entre le composant natif mots_trous et les questionnaires de leçon. */
+const LessonMotsTrousAnswer: React.FC<LessonMotsTrousAnswerProps> = ({
+  definition, onResult, disabled = false, verifySignal = 0, hideCheck = false
+}) => {
+  const [answer, setAnswer] = useState('');
+  const validate = () => {
+    const score = noterMotsTrous(definition, answer);
+    onResult(answer, score.maxScore > 0 && score.score === score.maxScore);
+  };
+  useEffect(() => {
+    if (verifySignal > 0) validate();
+  }, [verifySignal]);
+  return (
+    <div className="lesson-mots-trous-answer">
+      <MotsTrousQuestion
+        definition={definition}
+        answer={answer}
+        onChange={setAnswer}
+        disabled={disabled}
+      />
+      {!hideCheck && (
+        <button type="button" className="lesson-discovery-check" disabled={disabled} onClick={validate}>
+          Vérifier les réponses
+        </button>
+      )}
+    </div>
+  );
+};
+
 const FreeTextAnswer: React.FC<{ onSubmit: (answer: string) => void; disabled?: boolean; verifySignal?: number; hideCheck?: boolean }> = ({ onSubmit, disabled = false, verifySignal = 0, hideCheck = false }) => {
   const [answer, setAnswer] = useState('');
   const answerId = useId();
@@ -408,6 +447,7 @@ function getCorrectionEntries(step: DiscoveryStep, formulaPieces: string[], targ
   }
   if (step.kind === 'highlight') return targets.length ? targets.map(target => normalizeLessonText(target)) : ['Relisez les mots ciblés.'];
   if (step.kind === 'complete_table') return (data.rows || []).flatMap((row: any) => (row.cells || []).map((cell: string) => normalizeLessonText(cell)));
+  if (step.kind === 'mots_trous') return (data.mots_trous?.phrases || []).map((phrase: any) => normalizeLessonText(`${phrase.debut || ''}${phrase.mot || ''}${phrase.fin || ''}`));
   if (step.kind === 'fill_blanks') return (data.items || []).map((item: any) => normalizeLessonText(`${item.subject} ${item.stem}${item.answer}`));
   if (step.kind === 'build_formula') return formulaPieces.length ? [normalizeLessonText(formulaPieces.join(' '))] : ['Consultez la formule.'];
   if (step.kind === 'compare') {
@@ -466,6 +506,11 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     }
     prepareAnswer(answer, step.ok || step.insight || 'Réponse enregistrée. Vous pouvez continuer.');
   };
+  const answerMotsTrous = (answer: string, correct: boolean) => {
+    setHasAttempted(true);
+    if (correct) prepareAnswer(answer, step.ok || 'Toutes les réponses sont correctes.');
+    else setFeedback({ good: false, text: step.ko || 'Certaines réponses sont incorrectes. Réessayez.' });
+  };
   const answerFillBlanks = (answers: Record<string, string>, correct: boolean) => {
     setHasAttempted(true);
     if (correct) prepareAnswer(answers, step.ok || 'Toutes les terminaisons sont correctes.');
@@ -496,6 +541,7 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     {step.kind === 'highlight' && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, i: number) => <p className="lesson-highlight-phrase" key={i}>{line.speaker && <strong>{line.speaker}</strong>}{cleanLessonSpeechText(line.text)}</p>)}</div>}
     {step.kind === 'complete_table' && <DiscoveryTableExercise key={step.id} data={step.data} disabled={done} onResult={(answers, correct) => { setHasAttempted(true); if (correct) prepareAnswer(answers, step.ok || 'Le tableau est complet.'); else setFeedback({ good: false, text: step.ko || 'Certaines cases ne correspondent pas. Vérifiez les formes et réessayez.' }); }} />}
     {step.kind === 'free_text' && <FreeTextAnswer key={step.id} onSubmit={answerFreeText} disabled={done} />}
+    {step.kind === 'mots_trous' && step.data?.mots_trous && <LessonMotsTrousAnswer key={step.id} definition={step.data.mots_trous} onResult={answerMotsTrous} disabled={done} />}
     {step.kind === 'fill_blanks' && <FillBlanksAnswer key={step.id} data={step.data} onResult={answerFillBlanks} disabled={done} />}
     {(step.kind === 'reorder' || step.kind === 'order') && <ReorderAnswer key={step.id} data={step.data} onSubmit={answerOrder} disabled={done} />}
     {['choose', 'guess_meaning', 'compare', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />}
@@ -703,6 +749,7 @@ const LessonQuestionScreen: React.FC<{
   };
 
   const handleFillBlanks = (answers: Record<string, string>, correct: boolean) => report(answers, correct);
+  const handleMotsTrous = (answer: string, correct: boolean) => report(answer, correct);
 
   const handleTable = (answers: Record<string, string>, correct: boolean) => {
     report(JSON.stringify(answers), correct);
@@ -726,7 +773,9 @@ const LessonQuestionScreen: React.FC<{
     </div>
     <h1 id={`player-question-${step.id}`}>{step.prompt}</h1>
     {step.kind === 'highlight' && sourceLines.length > 0 && <div className="lesson-highlight-exercise">{sourceLines.map((line: any, index: number) => <p className="lesson-highlight-phrase" key={index}>{line.speaker && <strong>{line.speaker}</strong>}<RichText text={line.text} revealHighlights={completed} /></p>)}</div>}
-    {step.kind === 'complete_table'
+    {step.kind === 'mots_trous' && step.data?.mots_trous
+      ? <LessonMotsTrousAnswer key={step.id} definition={step.data.mots_trous} onResult={handleMotsTrous} disabled={completed} verifySignal={verifySignal} hideCheck />
+      : step.kind === 'complete_table'
       ? <DiscoveryTableExercise key={step.id} data={step.data} disabled={completed} verifySignal={verifySignal} hideCheck onResult={handleTable} />
       : step.kind === 'free_text'
         ? <FreeTextAnswer key={step.id} onSubmit={handleFreeText} disabled={completed} verifySignal={verifySignal} hideCheck />
