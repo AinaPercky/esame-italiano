@@ -266,6 +266,7 @@ const FillBlanksAnswer: React.FC<{
   const validate = () => onResult(answers, isLessonFillBlanksCorrect(data, answers));
   useEffect(() => { if (verifySignal > 0) validate(); }, [verifySignal]);
   return <div className="lesson-fill-blanks">
+    {data?.group_label && <p className="lesson-fill-blanks-group">{data.group_label}</p>}
     {items.map((item: any, index: number) => {
       const key = String(item.id ?? index);
       return <label className="lesson-fill-blank-row" key={key}>
