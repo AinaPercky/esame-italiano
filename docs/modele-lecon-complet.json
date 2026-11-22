@@ -47,17 +47,12 @@
       "build_formula": "Question de compréhension de formule au format choix: fournir data.options[] ou formula_block/formula_index et correct_answer. Pour faire reconstruire une suite d’éléments, utiliser reorder.",
       "group": "Catégorisation convertie en choix: fournir data.options[] avec une option correcte; aucune interaction de glisser-déposer.",
       "reorder": "Réponse ordonnée par glisser-déposer: data.items[] (chaînes ou objets avec id/text/value) contient les éléments; data.correct_order[] définit l’ordre attendu (valeurs, identifiants ou indices de tableau zéro-based). La saisie fonctionne à la souris, au tactile et au clavier. Le type order est aussi accepté.",
-      "order": "Alias de reorder: fournir data.items[] et data.correct_order[]; les éléments doivent être réorganisés par glisser-déposer."
+      "order": "Alias de reorder: fournir data.items[] et data.correct_order[]; les éléments doivent être réorganisés par glisser-déposer.",
+      "mots_trous": "Utilise data.mots_trous avec titre?, consigne?, banque[] et phrases[]. Chaque phrase contient id, debut, fin et mot (réponse attendue). Le composant natif gère le glisser-déposer, le tactile, la correction et la progression."
     },
     "references": "Pour relier une étape à un bloc, utiliser son id source dans data.source ou data.formula_block. Les identifiants alias sont remplacés par des UUID lors de la sauvegarde et les références sont remappées.",
     "correctAnswers": "Pour choose, guess_meaning, compare, build_formula et group, marquer la bonne option avec correct=true et les distracteurs avec correct=false. Pour free_text, préciser correct_answer ou accepted_answers[] pour comparer les phrases complètes. Pour reorder, préciser correct_order[].",
-    "publishing": "Garder status=draft pendant l’édition et la vérification; publier depuis l’administration une fois la leçon validée.",
-    "discovery_kinds": [
-      "mots_trous"
-    ],
-    "discovery_step_kinds": {
-      "mots_trous": "Utilise data.mots_trous avec banque[] et phrases[]. Chaque phrase contient id, debut, fin et mot (réponse attendue). Le composant natif gère le glisser-déposer, le tactile, la correction et la progression."
-    }
+    "publishing": "Garder status=draft pendant l’édition et la vérification; publier depuis l’administration une fois la leçon validée."
   },
   "slug": "modele-lecon-complet-a-personnaliser",
   "type": "grammaire",
