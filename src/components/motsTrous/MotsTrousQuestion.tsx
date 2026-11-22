@@ -14,6 +14,7 @@ import {
 
 type Props = {
   definition: MotsTrousDefinition;
+  mode?: 'lesson' | 'exercise' | 'quiz' | 'exam' | 'editor';
   answer: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -41,9 +42,14 @@ export const MotsTrousQuestion: React.FC<Props> = ({
   onChange,
   disabled = false,
   showCorrection = false,
-  answerKey
+  answerKey,
+  mode = 'lesson'
 }) => {
   const phrases = definition.phrases || [];
+  const isExamMode = mode === 'exam';
+  const bankInstruction = isExamMode
+    ? 'Sélectionnez un mot, puis son emplacement. Vous pouvez modifier vos réponses avant de remettre la copie.'
+    : 'Touchez un mot, puis le trou correspondant. Le glisser-déposer fonctionne aussi.';
   const banque = definition.banque || [];
   const answers = useMemo(() => parseMotsTrousAnswers(answer, phrases), [answer, phrases]);
   const remaining = useMemo(() => banqueRestanteMots(banque, answers), [banque, answers]);
@@ -280,9 +286,9 @@ export const MotsTrousQuestion: React.FC<Props> = ({
   const progressPct = phrases.length > 0 ? Math.round((completedCount / phrases.length) * 100) : 0;
 
   return (
-    <section className="w-full min-w-0 space-y-4 text-[#072a3f]" lang="it">
+    <section className="w-full min-w-0 space-y-3 text-[#072a3f]" lang="it" data-mots-trous-mode={mode}>
       {(definition.titre || definition.consigne) && (
-        <div className="rounded-2xl border border-[#d8e6ee] bg-[#edf5fa] px-4 py-3">
+        <div className="rounded-xl border border-[#d8e6ee] bg-[#f3f8fb] px-3.5 py-3">
           {definition.titre && <h3 className="text-base font-extrabold text-[#072a3f]">{definition.titre}</h3>}
           {definition.consigne && (
             <p className="mt-1 text-sm leading-relaxed text-[#46657a]">{definition.consigne}</p>
@@ -332,19 +338,19 @@ export const MotsTrousQuestion: React.FC<Props> = ({
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[#0b3c5d]">
+                <p className="text-xs font-bold text-[#0b3c5d]">
                   Banque de mots
                 </p>
                 <p className="mt-0.5 text-xs text-[#46657a]">
-                  Glissez-déposez chaque mot dans le trou de la phrase correspondante (ou touchez un mot puis un trou).
+                  {bankInstruction}
                 </p>
               </div>
-              {!disabled && hasAnyPlaced && (
+              {!disabled && hasAnyPlaced && !isExamMode && (
                 <button
                   type="button"
                   onClick={handleResetAll}
                   title="Replacer tous les mots dans la banque"
-                  className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-xl border border-[#cfe1ec] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#0b3c5d] transition hover:bg-[#edf5fa]"
+                  className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-[#cfe1ec] bg-white px-3 py-2 text-xs font-semibold text-[#0b3c5d] transition hover:bg-[#edf5fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] focus-visible:ring-offset-2"
                 >
                   <RotateCcw size={13} />
                   Réinitialiser
@@ -401,17 +407,16 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                           ? 'cursor-pointer border-[#0b3c5d] bg-[#072a3f] text-white ring-2 ring-[#0b3c5d]/25'
                           : isBeingDragged
                           ? 'cursor-grabbing border-[#0b3c5d] bg-[#edf5fa] opacity-50'
-                          : 'cursor-grab border-[#cfe1ec] bg-white text-[#072a3f] hover:border-[#0b3c5d] hover:bg-[#edf5fa]'
+                          : 'cursor-pointer border-[#cfe1ec] bg-white text-[#072a3f] hover:border-[#0b3c5d] hover:bg-[#edf5fa]'
                       }`}
                     >
-                      {!disabled && <GripVertical size={14} className="shrink-0 opacity-45" aria-hidden="true" />}
                       <span>{word}</span>
                     </button>
                   );
                 })
               ) : (
-                <p className="py-1.5 text-sm font-semibold text-[#145c3d]">
-                  ✓ Tous les mots de la banque ont été utilisés
+                <p className="py-1.5 text-sm font-medium text-[#46657a]">
+                  Tous les mots sont placés. Vous pouvez encore les déplacer.
                 </p>
               )}
             </div>
@@ -423,7 +428,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                   {completedCount} / {phrases.length}
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[#ddeaf2]">
+              <div role="progressbar" aria-label="Phrases complétées" aria-valuemin={0} aria-valuemax={phrases.length} aria-valuenow={completedCount} className="h-1.5 overflow-hidden rounded-full bg-[#ddeaf2]">
                 <div
                   className="h-full rounded-full bg-[#2fa36b] transition-all duration-200"
                   style={{ width: `${progressPct}%` }}
@@ -431,7 +436,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
               </div>
               {banque.length > phrases.length && (
                 <p className="text-[11px] font-medium text-[#607f93]">
-                  Attention : {banque.length - phrases.length} mot(s) intrus dans la banque.
+                  {banque.length - phrases.length} mot(s) supplémentaire(s) dans la banque.
                 </p>
               )}
             </div>
@@ -452,7 +457,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                 touchDrag.hoverTarget.phraseId === id);
 
             let cardClasses =
-              'rounded-2xl border bg-white p-4 shadow-[0_4px_14px_rgba(7,42,63,0.04)] transition';
+              'rounded-xl border bg-white px-3.5 py-3 transition-colors';
             if (showCorrection && phraseScore) {
               cardClasses += phraseScore.correct
                 ? ' border-[#2fa36b] bg-[#eef9f3]/35'
@@ -499,24 +504,22 @@ export const MotsTrousQuestion: React.FC<Props> = ({
               >
                 <div className="flex items-start gap-2.5">
                   <span
-                    className="mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#edf5fa] text-xs font-extrabold text-[#0b3c5d]"
+                    className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#edf5fa] text-xs font-bold text-[#0b3c5d]"
                     aria-hidden="true"
                   >
                     {index + 1}
                   </span>
 
-                  <div className="min-w-0 flex-1 text-base leading-[2.3] text-[#072a3f] sm:text-[17px]">
+                  <div className="min-w-0 flex-1 break-words text-base leading-[2.1] text-[#072a3f] sm:text-[17px]">
                     {phrase.debut && <span>{phrase.debut}</span>}
 
                     {chosen ? (
                       <span className="mx-1 inline-flex items-center align-middle">
-                        <span
+                        <div className="mx-1 inline-flex max-w-full items-center gap-1 align-middle">
+                        <button
+                          type="button"
                           draggable={!disabled}
-                          tabIndex={disabled ? -1 : 0}
-                          role="button"
-                          aria-label={`Phrase ${index + 1}, mot placé : ${chosen}${
-                            disabled ? '' : '. Cliquez ou glissez pour déplacer, ou retirez avec Supprimer.'
-                          }`}
+                          aria-label={`Phrase ${index + 1}, mot placé : ${chosen}. Activer pour sélectionner ce mot.`}
                           onDragStart={e => {
                             if (disabled) return;
                             const payload: DragPayload = { source: 'phrase', phraseId: id, word: chosen };
@@ -532,17 +535,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                           }}
                           onTouchStart={e => startTouchDrag(e, { source: 'phrase', phraseId: id, word: chosen })}
                           onClick={() => handleGapClick(id)}
-                          onKeyDown={e => {
-                            if (disabled) return;
-                            if (e.key === 'Backspace' || e.key === 'Delete') {
-                              e.preventDefault();
-                              handleRemoveFromPhrase(id);
-                            } else if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleGapClick(id);
-                            }
-                          }}
-                          className={`inline-flex min-h-[44px] touch-manipulation select-none items-center gap-1.5 rounded-xl border px-3 py-1 text-sm font-extrabold transition ${
+                          className={`inline-flex min-h-[44px] max-w-full touch-manipulation select-none items-center gap-1.5 rounded-lg border px-3 py-1 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d] focus-visible:ring-offset-2 ${
                             showCorrection && phraseScore
                               ? phraseScore.correct
                                 ? 'border-[#2fa36b] bg-[#eef9f3] text-[#145c3d]'
@@ -550,29 +543,23 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                               : isTargeted
                               ? 'border-[#2fa36b] bg-[#eef9f3] text-[#072a3f] ring-2 ring-[#2fa36b]/25'
                               : disabled
-                              ? 'border-[#cfe1ec] bg-[#f5f9fc] text-[#072a3f]'
-                              : 'cursor-grab border-[#0b3c5d] bg-[#edf5fa] text-[#072a3f] hover:bg-[#dfeef8]'
+                              ? 'border-[#cfe1ec] bg-[#f3f8fb] text-[#072a3f]'
+                              : 'cursor-pointer border-[#0b3c5d] bg-[#edf5fa] text-[#072a3f] hover:bg-[#dfeef8]'
                           }`}
                         >
-                          {!disabled && (
-                            <GripVertical size={13} className="shrink-0 opacity-50" aria-hidden="true" />
-                          )}
-                          <span>{chosen}</span>
-                          {!disabled && (
-                            <button
-                              type="button"
-                              aria-label={`Retirer le mot ${chosen} de la phrase ${index + 1}`}
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleRemoveFromPhrase(id);
-                              }}
-                              className="ml-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#46657a] transition hover:bg-white/90 hover:text-rose-700"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </span>
-                      </span>
+                          <span className="break-words">{chosen}</span>
+                        </button>
+                        {!disabled && (
+                          <button
+                            type="button"
+                            aria-label={`Retirer le mot ${chosen} de la phrase ${index + 1}`}
+                            onClick={() => handleRemoveFromPhrase(id)}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#607f93] transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0b3c5d]"
+                          >
+                            <X size={14} aria-hidden="true" />
+                          </button>
+                        )}
+                        </div>
                     ) : (
                       <button
                         type="button"
@@ -599,7 +586,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
                           ? `Placer « ${selectedWord} »`
                           : isTargeted
                           ? 'Choisissez un mot…'
-                          : 'Trou à compléter'}
+                          : 'Choisir un mot'}
                       </button>
                     )}
 
@@ -635,7 +622,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
           })}
 
           {showCorrection && score && (
-            <div className="rounded-2xl border border-[#d8e6ee] bg-[#edf5fa] p-4 text-center">
+            <div className="rounded-xl border border-[#d8e6ee] bg-[#f3f8fb] p-3.5 text-center">
               <p aria-live="polite" className="text-2xl font-black tabular-nums text-[#072a3f]">
                 {score.score} / {score.maxScore}
               </p>
@@ -655,7 +642,7 @@ export const MotsTrousQuestion: React.FC<Props> = ({
       {touchDrag?.active && (
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-[#0b3c5d] bg-[#072a3f] px-3.5 py-2 text-sm font-extrabold text-white shadow-xl"
+          className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[#0b3c5d] bg-[#072a3f] px-3 py-2 text-sm font-bold text-white shadow-lg"
           style={{ left: touchDrag.clientX, top: touchDrag.clientY }}
         >
           {touchDrag.payload.word}
