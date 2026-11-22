@@ -208,7 +208,7 @@ export const MotsTrousEditor: React.FC<Props> = ({ definition, answerKey, onChan
 
       <div className="rounded-xl border border-dashed border-[#b8cce2] bg-white p-3">
         <p className="mb-2 text-xs font-bold text-slate-600">Aperçu élève</p>
-        <MotsTrousQuestion definition={definition} answer="" onChange={() => undefined} disabled />
+        <MotsTrousQuestion definition={definition} answer="" onChange={() => undefined} disabled mode="editor" />
       </div>
     </div>
   );

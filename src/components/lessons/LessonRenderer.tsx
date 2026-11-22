@@ -317,6 +317,7 @@ const LessonMotsTrousAnswer: React.FC<LessonMotsTrousAnswerProps> = ({
         answer={answer}
         onChange={setAnswer}
         disabled={disabled}
+        mode="lesson"
       />
       {!hideCheck && (
         <button type="button" className="lesson-discovery-check" disabled={disabled} onClick={validate}>

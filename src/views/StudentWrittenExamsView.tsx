@@ -522,6 +522,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
                 definition={qData.mots_trous}
                 answer={typeof answers[q.id] === 'string' ? answers[q.id] : JSON.stringify(answers[q.id] || {})}
                 onChange={value => updateAnswer(q.id, value)}
+                mode="exam"
               />
             )}
           </div>

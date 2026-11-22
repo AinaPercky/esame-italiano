@@ -192,6 +192,7 @@ const ActiveQuizQuestion = React.memo<ActiveQuizQuestionProps>(({
           answer={answer}
           onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
           showCorrection={false}
+          mode="quiz"
         />
       )}
 
