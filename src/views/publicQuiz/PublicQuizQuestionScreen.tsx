@@ -237,6 +237,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           disabled={isValidated}
           showCorrection={isValidated && showCorrection}
           answerKey={question.mots_trous.phrases as MotsTrousAnswerKeyPhrase[]}
+          mode="quiz"
         />
       ) : (
         <QuizClozeInput
