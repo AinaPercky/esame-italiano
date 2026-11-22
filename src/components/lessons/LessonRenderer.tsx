@@ -266,7 +266,7 @@ const QuizDropdown: React.FC<{ choices: LessonQuizChoice[]; onSubmit: (choice: L
               return (
                 <label key={choice.id} htmlFor={inputId} className={`lesson-quiz-radio-option ${checked ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''}`}>
                   <input id={inputId} type="radio" name={radioGroupId} value={choice.id} checked={checked} onChange={() => setSelectedId(choice.id)} disabled={disabled} className="lesson-quiz-radio-input" />
-                                    <span className="lesson-quiz-radio-label">{choice.label}</span>
+                  <span className="lesson-quiz-radio-label">{choice.label}</span>
                 </label>
               );
             })}
