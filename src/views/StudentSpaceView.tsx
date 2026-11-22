@@ -51,6 +51,11 @@ import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds,
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
 import { calculateQuestionPointsEarned } from '../utils/quizAnswerMatcher';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
+import {
+  formatCorrectMotsTrousForDisplay,
+  formatMotsTrousAnswerForDisplay,
+  parseMotsTrousAnswers
+} from '../utils/motsTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
 import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION_SECONDS } from '../utils/quizPresence';
@@ -58,6 +63,7 @@ import { canStudentStartQuiz, isRetryAuthorizedParticipant } from '../utils/quiz
 import { QuizReorderList } from '../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
+import { MotsTrousQuestion } from '../components/motsTrous/MotsTrousQuestion';
 import {
   AssessmentCorrectionModal,
   AssessmentQcmOptions,
@@ -176,6 +182,15 @@ const ActiveQuizQuestion = React.memo<ActiveQuizQuestionProps>(({
           answer={answer}
           onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
           onEnterPress={onEnterPress}
+          showCorrection={false}
+        />
+      )}
+
+      {question.type === 'mots_trous' && question.mots_trous && (
+        <MotsTrousQuestion
+          definition={question.mots_trous}
+          answer={answer}
+          onChange={(newAnswer) => onAnswerChange(question.id, newAnswer)}
           showCorrection={false}
         />
       )}
@@ -897,6 +912,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (!currentQ) return;
     const studentAns = updatedAnswers[currentQ.id] || '';
 
+    const formattedStudentAnswer =
+      currentQ.type === 'mots_trous'
+        ? formatMotsTrousAnswerForDisplay(currentQ.mots_trous, studentAns)
+        : studentAns;
+
     if (isPracticeMode) {
       const local = calculateQuestionPointsEarned(currentQ, studentAns);
       if (local.isFullyCorrect) {
@@ -907,8 +927,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
         questionText: currentQ.question,
-        studentAnswer: studentAns,
-        correctAnswer: '',
+        studentAnswer: formattedStudentAnswer,
+        correctAnswer:
+          currentQ.type === 'mots_trous'
+            ? formatCorrectMotsTrousForDisplay(currentQ.mots_trous)
+            : '',
         countdown: CORRECTION_DISPLAY_SECONDS,
         pendingNextAnswers: updatedAnswers,
         isTimeout,
@@ -931,7 +954,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
         questionText: currentQ.question,
-        studentAnswer: studentAns,
+        studentAnswer: formattedStudentAnswer,
         correctAnswer: feedback.expected || '',
         explanation: feedback.explanation,
         countdown: CORRECTION_DISPLAY_SECONDS,
@@ -969,6 +992,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     if (currentQ?.type === 'verbes_trous' && currentQ.verbes_trous) {
       const response = parseVerbesTrousAnswers(quizAnswersRef.current[currentQ.id] || '');
       const missing = currentQ.verbes_trous.phrases.filter((phrase) => !response[String(phrase.id)]?.verbe_choisi).length;
+      if (missing > 0) {
+        setIncompletePhraseConfirmation(missing);
+        return;
+      }
+    }
+    if (currentQ?.type === 'mots_trous' && currentQ.mots_trous) {
+      const response = parseMotsTrousAnswers(quizAnswersRef.current[currentQ.id] || '', currentQ.mots_trous.phrases);
+      const missing = currentQ.mots_trous.phrases.filter((phrase) => !response[String(phrase.id)]).length;
       if (missing > 0) {
         setIncompletePhraseConfirmation(missing);
         return;
@@ -1493,13 +1524,13 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                 <div className="min-w-0 space-y-1.5">
                   <LearningCardHeader
                     kicker="Entraînement · Essais illimités"
-                    status={<StatusBadge tone="info" icon={<Clock className="h-3 w-3" />}>5 questions · ~2 min 15</StatusBadge>}
+                    status={<StatusBadge tone="info" icon={<Clock className="h-3 w-3" />}>6 questions · ~2 min 45</StatusBadge>}
                   />
                   <h2 className="font-display text-base font-extrabold text-[#072a3f] sm:text-lg">
                     Découvrir comment passer un quiz
                   </h2>
                   <p className="max-w-3xl text-xs leading-relaxed text-[#46657a] sm:text-[13px]">
-                    Testez les QCM, la réponse écrite, les phrases à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Le résultat reste local et n’affecte pas vos notes.
+                    Testez les QCM, la réponse écrite, les mots à trous avec banque (glisser-déposer), les verbes à trous et la remise en ordre avec la même interface, les chronomètres, les bips et le contrôle anti-triche. Le résultat reste local et n’affecte pas vos notes.
                   </p>
                 </div>
                 <button
@@ -1750,14 +1781,14 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                       <span>
                         {isPracticeMode
                           ? 'Terminer le tutoriel'
-                          : currentQ?.type === 'verbes_trous'
+                          : currentQ?.type === 'verbes_trous' || currentQ?.type === 'mots_trous'
                             ? 'Corriger et terminer'
                             : 'Valider et terminer le quiz'}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span>{currentQ?.type === 'verbes_trous' ? 'Corriger et continuer' : 'Valider et continuer'}</span>
+                      <span>{currentQ?.type === 'verbes_trous' || currentQ?.type === 'mots_trous' ? 'Corriger et continuer' : 'Valider et continuer'}</span>
                       <ChevronRight className="h-4 w-4" />
                     </>
                   )}

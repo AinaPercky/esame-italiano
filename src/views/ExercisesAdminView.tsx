@@ -40,6 +40,10 @@ import {
 } from '../services/exerciseService';
 import { StudentAvatar } from '../components/StudentAvatar';
 import {
+  formatCorrectMotsTrousForDisplay,
+  formatMotsTrousAnswerForDisplay
+} from '../utils/motsTrous';
+import {
   ExerciseQuizConverterPanel,
   type ConverterDirection
 } from '../components/ExerciseQuizConverterPanel';
@@ -2312,12 +2316,22 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                       item => item.id === detail.question_id
                     );
                     const expected =
-                      question?.answers?.join(' / ') ||
-                      question?.correct_answer ||
-                      question?.verbes_trous?.phrases
-                        ?.map(phrase => phrase.reponses?.join(' / '))
-                        .join(' · ') ||
-                      'Correction non disponible';
+                      question?.type === 'mots_trous'
+                        ? formatCorrectMotsTrousForDisplay(question.mots_trous)
+                        : question?.answers?.join(' / ') ||
+                          question?.correct_answer ||
+                          question?.verbes_trous?.phrases
+                            ?.map(phrase => phrase.reponses?.join(' / '))
+                            .join(' · ') ||
+                          'Correction non disponible';
+                    const formattedStudentAnswer =
+                      detail.answer == null
+                        ? 'Aucune réponse'
+                        : question?.type === 'mots_trous'
+                          ? formatMotsTrousAnswerForDisplay(question.mots_trous, detail.answer)
+                          : typeof detail.answer === 'string'
+                            ? detail.answer
+                            : JSON.stringify(detail.answer);
 
                     return (
                       <article
@@ -2342,11 +2356,7 @@ export const ExercisesAdminView: React.FC<Props> = ({ classes }) => {
                               Réponse de l’élève
                             </p>
                             <p className="mt-1 break-words text-sm font-medium text-[#072a3f]">
-                              {detail.answer == null
-                                ? 'Aucune réponse'
-                                : typeof detail.answer === 'string'
-                                ? detail.answer
-                                : JSON.stringify(detail.answer)}
+                              {formattedStudentAnswer}
                             </p>
                           </div>
                           <div className="rounded-xl bg-[#eef9f3] p-3">

@@ -4,6 +4,7 @@ import {
   formatCorrectTextAnswerForDisplay
 } from './quizAnswerMatcher';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from './quizReorder';
+import { formatCorrectMotsTrousForDisplay, formatMotsTrousAnswerForDisplay } from './motsTrous';
 
 export interface QuizQuestionResponseAnalysis {
   submission: QuizSubmission;
@@ -63,15 +64,19 @@ export function analyzeSubmissionQuestion(
     ? feedback.expected
     : question.type === 'reorder'
       ? formatCorrectReorderAnswer(question)
-      : question.type === 'text'
-        ? formatCorrectTextAnswerForDisplay(question)
-        : question.correct_answer || '';
+      : question.type === 'mots_trous' && question.mots_trous
+        ? formatCorrectMotsTrousForDisplay(question.mots_trous)
+        : question.type === 'text'
+          ? formatCorrectTextAnswerForDisplay(question)
+          : question.correct_answer || '';
   const answer = typeof feedback.studentAnswer === 'string' && feedback.studentAnswer
     ? feedback.studentAnswer
     : rawAnswer
       ? question.type === 'reorder'
         ? formatReorderAnswer(question, rawAnswer)
-        : rawAnswer
+        : question.type === 'mots_trous' && question.mots_trous
+          ? formatMotsTrousAnswerForDisplay(question.mots_trous, rawAnswer)
+          : rawAnswer
       : 'Aucune réponse saisie';
 
   const savedPoints = Number(feedback.points);

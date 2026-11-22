@@ -21,7 +21,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       question: 'Le matin, quelle formule italienne convient pour dire « Bonjour » ?',
       options: ['Buongiorno', 'Buonanotte', 'Arrivederci', 'Per favore'],
       correct_answer: 'Buongiorno',
-      points: 4,
+      points: 3,
       time_limit_seconds: 15,
       explanation: 'Buongiorno s’utilise pour saluer le matin et pendant la journée.'
     },
@@ -31,7 +31,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       question: 'Choisissez la phrase correcte avec le verbe essere (« être »).',
       options: ['Io sono studente.', 'Io sei studente.', 'Io è studente.', 'Io siamo studente.'],
       correct_answer: 'Io sono studente.',
-      points: 4,
+      points: 3,
       time_limit_seconds: 15,
       explanation: 'À la première personne du singulier, essere se conjugue sono : io sono.'
     },
@@ -40,7 +40,7 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
       type: 'text',
       question: 'Saisissez en italien : « Merci beaucoup ».',
       correct_answer: 'Grazie mille / Molte grazie',
-      points: 4,
+      points: 3,
       time_limit_seconds: 25,
       explanation: '« Grazie mille » et « Molte grazie » sont deux façons courantes de remercier.'
     },
@@ -55,9 +55,28 @@ export function createTutorialQuiz(classId = '', className = 'Entraînement'): Q
         { id: reorderIds[3], text: 'mercato.' }
       ],
       correct_answer: JSON.stringify(reorderIds),
-      points: 4,
+      points: 3,
       time_limit_seconds: 35,
       explanation: 'La phrase complète est « Domani vado al mercato. »'
+    },
+    {
+      id: 'tutorial-mots-trous',
+      type: 'mots_trous',
+      question: 'Mots à trous avec banque — Al bar',
+      points: 4,
+      time_limit_seconds: 35,
+      mots_trous: {
+        titre: 'Mots à trous avec banque — Al bar',
+        consigne: 'Glissez-déposez chaque mot de la banque dans le trou de la phrase qui lui correspond.',
+        points_par_phrase: 2,
+        banque: ['caffè', 'cornetto', 'tè'],
+        phrases: [
+          { id: 1, debut: 'La mattina bevo un ', fin: ' caldo.', mot: 'caffè' },
+          { id: 2, debut: 'Mangio un ', fin: ' alla crema.', mot: 'cornetto' }
+        ]
+      },
+      correct_answer: '',
+      explanation: 'Mots attendus : caffè (« un café chaud ») et cornetto (« un croissant à la crème »). Le mot « tè » est un piège.'
     },
     {
       id: 'tutorial-verbes-trous',

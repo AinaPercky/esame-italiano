@@ -6,6 +6,7 @@ import { applyWrittenExamOrder, WrittenAttempt, getTimedQuestionIndex, getTimedQ
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
+import { MotsTrousQuestion } from '../components/motsTrous/MotsTrousQuestion';
 import { WrittenExamStudentCopy } from '../components/WrittenExamStudentCopy';
 import {
   isTimerBeepEnabled,
@@ -29,6 +30,7 @@ import {
 } from '../components/LearningCard';
 import type { QuizQuestion } from '../types';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
+import { parseMotsTrousAnswers } from '../utils/motsTrous';
 import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
 
 type ExamCard = { id: string; title: string; description: string; level: string; target_language: string; instruction_language: string; duration_minutes: number; raw_max: number; display_scale: number | null; status: string; opens_at?: string; closes_at?: string; class_eligible?: boolean; attempt_status?: string; attempts_used: number; max_attempts: number; results_published: boolean; show_score_after_publish: boolean; show_corrections_after_publish: boolean; integrity_settings: any; navigation_mode: 'free' | 'sequential'; sections: any[]; raw_score?: number | null; normalized_score?: number | null; attempt_raw_max?: number | null; attempt_display_scale?: number | null; };
@@ -289,10 +291,17 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
   const requestFinish = () => {
     const missing = flat.reduce((total, item) => {
       const q = item.question;
-      if (q.type !== 'verbes_trous') return total;
-      const phrases = q.public_data?.verbes_trous?.phrases || [];
-      const response = parseVerbesTrousAnswers(answersRef.current[q.id]);
-      return total + phrases.filter((phrase: any) => !response[String(phrase.id)]?.verbe_choisi).length;
+      if (q.type === 'verbes_trous') {
+        const phrases = q.public_data?.verbes_trous?.phrases || [];
+        const response = parseVerbesTrousAnswers(answersRef.current[q.id]);
+        return total + phrases.filter((phrase: any) => !response[String(phrase.id)]?.verbe_choisi).length;
+      }
+      if (q.type === 'mots_trous') {
+        const phrases = q.public_data?.mots_trous?.phrases || [];
+        const response = parseMotsTrousAnswers(answersRef.current[q.id], phrases);
+        return total + phrases.filter((phrase: any) => !response[String(phrase.id)]).length;
+      }
+      return total;
     }, 0);
     if (missing > 0) setIncompleteConfirmation(missing);
     else void finish();
@@ -504,6 +513,13 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
             {q.type === 'verbes_trous' && qData.verbes_trous && (
               <VerbesTrousQuestion
                 definition={qData.verbes_trous}
+                answer={typeof answers[q.id] === 'string' ? answers[q.id] : JSON.stringify(answers[q.id] || {})}
+                onChange={value => updateAnswer(q.id, value)}
+              />
+            )}
+            {q.type === 'mots_trous' && qData.mots_trous && (
+              <MotsTrousQuestion
+                definition={qData.mots_trous}
                 answer={typeof answers[q.id] === 'string' ? answers[q.id] : JSON.stringify(answers[q.id] || {})}
                 onChange={value => updateAnswer(q.id, value)}
               />

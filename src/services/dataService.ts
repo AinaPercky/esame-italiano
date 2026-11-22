@@ -20,6 +20,7 @@ import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizRe
 import { isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay, calculateQuestionPointsEarned, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
+import { formatCorrectMotsTrousForDisplay, formatMotsTrousAnswerForDisplay } from '../utils/motsTrous';
 import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
 import { normalizeOralExamDurationSeconds } from '../utils/oralExamTiming';
 import { isCountedQuizSubmission, markBestQuizAttempt } from '../utils/quizBestAttempt';
@@ -1206,6 +1207,44 @@ export const dataService = {
         };
         if (!state.quizzes) state.quizzes = [];
         state.quizzes.push(q);
+      } else if (id === 'quiz_mots_trous_demo' || id.includes('mots_trous')) {
+        q = {
+          id: 'quiz_mots_trous_demo',
+          title: 'Démo – Mots à trous avec banque',
+          description: 'Glisser-déposer de mots depuis une banque',
+          category: 'Vocabulaire',
+          class_id: state.classes?.[0]?.id || 'class-1',
+          class_ids: [state.classes?.[0]?.id || 'class-1'],
+          class_name: state.classes?.[0]?.name || 'Club-Espresso',
+          created_at: new Date().toISOString(),
+          duration_minutes: 5,
+          status: 'launched',
+          launched_at: new Date().toISOString(),
+          questions: [
+            {
+              id: 'mt-demo-1',
+              type: 'mots_trous',
+              question: 'Démo – Mots à trous avec banque',
+              points: 3,
+              time_limit_seconds: 32,
+              mots_trous: {
+                titre: 'Al bar in Italia',
+                consigne: 'Glissez-déposez chaque mot dans le trou de la phrase qui lui correspond.',
+                points_par_phrase: 1,
+                banque: ['caffè', 'cornetto', 'succo', 'tè'],
+                phrases: [
+                  { id: 1, debut: 'La mattina bevo un ', fin: ' caldo.', mot: 'caffè' },
+                  { id: 2, debut: 'Mangio un ', fin: ' alla crema.', mot: 'cornetto' },
+                  { id: 3, debut: 'Preferisco un ', fin: " d'arancia.", mot: 'succo' }
+                ]
+              },
+              correct_answer: ''
+            }
+          ],
+          total_points: 3
+        };
+        if (!state.quizzes) state.quizzes = [];
+        state.quizzes.push(q);
       } else {
         return null;
       }
@@ -1576,6 +1615,8 @@ export const dataService = {
           ? formatCorrectTextAnswerForDisplay(q)
           : q.type === 'verbes_trous' && q.verbes_trous
           ? q.verbes_trous.phrases.map((phrase) => (phrase.verbe || '') + ' → ' + (phrase.reponses || []).join(' / ')).join(' · ')
+          : q.type === 'mots_trous' && q.mots_trous
+          ? formatCorrectMotsTrousForDisplay(q.mots_trous)
           : (q.correct_answer || ''),
         studentAnswer: q.type === 'reorder'
           ? formatReorderAnswer(q, studentAns)
@@ -1583,6 +1624,8 @@ export const dataService = {
           ? formatTextAnswerForDisplay(q, studentAns)
           : q.type === 'verbes_trous' && q.verbes_trous
           ? q.verbes_trous.phrases.map((phrase) => { const response = parseVerbesTrousAnswers(studentAns)[String(phrase.id)]; return (response?.verbe_choisi || '—') + ' → ' + (response?.texte_saisi || '—'); }).join(' · ')
+          : q.type === 'mots_trous' && q.mots_trous
+          ? formatMotsTrousAnswerForDisplay(q.mots_trous, studentAns)
           : studentAns
       };
     });

@@ -99,6 +99,7 @@ function getQuestionTypeLabel(type: string): string {
   if (type === 'text') return 'Texte / Trous';
   if (type === 'reorder') return 'Remise en ordre';
   if (type === 'verbes_trous') return 'Banque de verbes';
+  if (type === 'mots_trous') return 'Mots à trous avec banque';
   return type;
 }
 

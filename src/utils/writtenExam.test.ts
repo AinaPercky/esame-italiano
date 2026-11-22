@@ -115,6 +115,7 @@ test('quiz-imported questions preserve their individual time limit and use a saf
  assert.equal(getWrittenQuestionTimeLimit({type:'qcm'}),17);
  assert.equal(getWrittenQuestionTimeLimit({type:'text'}),32);
  assert.equal(getWrittenQuestionTimeLimit({type:'verbes_trous'}),32);
+ assert.equal(getWrittenQuestionTimeLimit({type:'mots_trous'}),32);
  assert.equal(getWrittenQuestionTimeLimit({type:'text',time_limit_seconds:0}),32);
 });
 test('per-question clock resumes at the correct randomized question from the server start time',()=>{
@@ -130,10 +131,51 @@ test('per-question clock resumes at the correct randomized question from the ser
 test('new manually created questions receive quiz-compatible defaults and invalid timer values are rejected',()=>{
  assert.equal(createQuestion('qcm').time_limit_seconds,17);
  assert.equal(createQuestion('text').time_limit_seconds,32);
+ assert.equal(createQuestion('mots_trous').time_limit_seconds,32);
  const section=createSection('Timed');
  section.questions=[{id:'bad-time',type:'text',prompt:'Ciao?',points:1,time_limit_seconds:3601,answer_key:{acceptedAnswers:['ciao']}}];
  const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
  assert.ok(errors.some(error=>error.includes('temps doit être compris entre 1 et 3600')));
+});
+
+test('mots_trous question validates bank, unique words, and matching points_par_phrase',()=>{
+ const baseQuestion=createQuestion('mots_trous');
+ const validQuestion={
+  ...baseQuestion,
+  points:2,
+  mots_trous:{
+   titre:'Al bar',
+   consigne:'Glissez chaque mot dans la phrase.',
+   points_par_phrase:1,
+   banque:['caffè','cornetto','tè'],
+   phrases:[
+    {id:1,debut:'Bevo un ',fin:' caldo.'},
+    {id:2,debut:'Mangio un ',fin:' dolce.'}
+   ]
+  },
+  answer_key:{
+   phrases:[
+    {id:1,debut:'Bevo un ',fin:' caldo.',mot:'caffè'},
+    {id:2,debut:'Mangio un ',fin:' dolce.',mot:'cornetto'}
+   ]
+  }
+ };
+ const section=createSection('Vocabulaire');
+ section.questions=[validQuestion];
+ assert.deepEqual(validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]}),[]);
+
+ const broken={
+  ...validQuestion,
+  points:5,
+  mots_trous:{
+   ...validQuestion.mots_trous,
+   banque:['caffè']
+  }
+ };
+ section.questions=[broken];
+ const errors=validateWrittenExam({...A1_TEMPLATE,class_ids:['class-1'],sections:[section]});
+ assert.ok(errors.some(e=>e.includes('banque de mots')));
+ assert.ok(errors.some(e=>e.includes('barème')));
 });
 test('iOS and other mobile visibility changes never disqualify a written exam',()=>{
  assert.equal(shouldDisqualifyWrittenExamVisibilityChange(true),false);

@@ -169,6 +169,17 @@ export function downloadQuizWorkbookPdf(quiz: Quiz): void {
         writeParagraph(`${phraseIndex + 1}. ${phrase.debut || ''} ____________________ ${phrase.fin || ''}`, 9.5, 6);
       });
       y += 4;
+    } else if (question.type === 'mots_trous' && question.mots_trous) {
+      const exercise = question.mots_trous;
+      if (exercise.consigne) writeParagraph(exercise.consigne, 9, 4.5);
+      if (exercise.banque?.length) {
+        writeParagraph(`Banque de mots : ${shuffle(exercise.banque).join(' • ')}`, 9, 5);
+        y += 2;
+      }
+      (exercise.phrases || []).forEach((phrase, phraseIndex) => {
+        writeParagraph(`${phraseIndex + 1}. ${phrase.debut || ''} ____________________ ${phrase.fin || ''}`, 9.5, 6);
+      });
+      y += 4;
     } else {
       const blankCount = question.answers?.length
         || (question.correct_answer?.includes('|') ? question.correct_answer.split('|').length : 1);

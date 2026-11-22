@@ -192,6 +192,7 @@ DECLARE
   v_clean JSONB;
   v_type TEXT;
   v_vt JSONB;
+  v_mt JSONB;
   v_phrases JSONB;
   v_items JSONB;
   v_blank_count INTEGER;
@@ -227,6 +228,21 @@ BEGIN
         v_vt := jsonb_set(v_vt, '{phrases}', v_phrases, true);
       END IF;
       v_clean := jsonb_set(v_clean, '{verbes_trous}', v_vt, true);
+    ELSIF v_type = 'mots_trous' AND jsonb_typeof(v_q -> 'mots_trous') = 'object' THEN
+      v_mt := (v_q -> 'mots_trous');
+      IF jsonb_typeof(v_mt -> 'phrases') = 'array' THEN
+        SELECT coalesce(jsonb_agg(
+          jsonb_build_object(
+            'id', p.value -> 'id',
+            'debut', coalesce(p.value ->> 'debut', ''),
+            'fin', coalesce(p.value ->> 'fin', '')
+          )
+        ), '[]'::jsonb)
+        INTO v_phrases
+        FROM jsonb_array_elements(v_mt -> 'phrases') WITH ORDINALITY AS p(value, ord);
+        v_mt := jsonb_set(v_mt, '{phrases}', v_phrases, true);
+      END IF;
+      v_clean := jsonb_set(v_clean, '{mots_trous}', v_mt, true);
     END IF;
 
     v_result := v_result || jsonb_build_array(v_clean);
@@ -390,6 +406,78 @@ BEGIN
       v_vt_student_parts := array_append(
         v_vt_student_parts,
         coalesce(nullif(btrim(v_chosen_verb), ''), '—') || ' → ' || coalesce(nullif(btrim(v_typed_text), ''), '—')
+      );
+    END LOOP;
+
+    v_correct := (v_max > 0 AND v_points = v_max);
+    v_expected_display := array_to_string(v_vt_expected_parts, ' · ');
+    v_student_display := array_to_string(v_vt_student_parts, ' · ');
+
+  ELSIF v_type = 'mots_trous' AND jsonb_typeof(p_question -> 'mots_trous') = 'object' THEN
+    v_vt := p_question -> 'mots_trous';
+    v_phrases := coalesce(v_vt -> 'phrases', '[]'::jsonb);
+    v_ppp := greatest(1, coalesce((v_vt ->> 'points_par_phrase')::numeric, (p_question ->> 'points_par_phrase')::numeric, 1));
+    v_max := greatest(0, jsonb_array_length(v_phrases) * v_ppp);
+
+    BEGIN
+      IF v_ans <> '' THEN
+        v_ans_obj := v_ans::jsonb;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_ans_obj := '{}'::jsonb;
+    END;
+    IF jsonb_typeof(v_ans_obj) <> 'object' THEN
+      v_ans_obj := '{}'::jsonb;
+    END IF;
+
+    FOR v_idx IN 0 .. greatest(-1, jsonb_array_length(v_phrases) - 1) LOOP
+      v_phrase := v_phrases -> v_idx;
+      v_exp_verb := btrim(coalesce(v_phrase ->> 'mot', ''));
+      v_exp_verb_norm := public.quiz_norm_answer(v_exp_verb);
+
+      IF (v_ans_obj ? 'choices') AND jsonb_typeof(v_ans_obj -> 'choices') = 'object' THEN
+        IF jsonb_typeof(v_ans_obj -> 'choices' -> (v_phrase ->> 'id')) = 'object' THEN
+          v_chosen_verb := coalesce(v_ans_obj -> 'choices' -> (v_phrase ->> 'id') ->> 'mot_choisi', v_ans_obj -> 'choices' -> (v_phrase ->> 'id') ->> 'mot', '');
+        ELSIF jsonb_typeof(v_ans_obj -> 'choices' -> (v_idx::text)) = 'object' THEN
+          v_chosen_verb := coalesce(v_ans_obj -> 'choices' -> (v_idx::text) ->> 'mot_choisi', v_ans_obj -> 'choices' -> (v_idx::text) ->> 'mot', '');
+        ELSE
+          v_chosen_verb := coalesce(v_ans_obj -> 'choices' ->> (v_phrase ->> 'id'), v_ans_obj -> 'choices' ->> (v_idx::text), '');
+        END IF;
+      ELSE
+        IF jsonb_typeof(v_ans_obj -> (v_phrase ->> 'id')) = 'object' THEN
+          v_chosen_verb := coalesce(v_ans_obj -> (v_phrase ->> 'id') ->> 'mot_choisi', v_ans_obj -> (v_phrase ->> 'id') ->> 'mot', v_ans_obj -> (v_phrase ->> 'id') ->> 'word', '');
+        ELSE
+          v_chosen_verb := coalesce(v_ans_obj ->> (v_phrase ->> 'id'), '');
+        END IF;
+      END IF;
+
+      v_chosen_norm := public.quiz_norm_answer(v_chosen_verb);
+      v_p_total := 0;
+
+      IF v_chosen_norm <> ''
+         AND NOT (v_chosen_norm = ANY(v_used_verbs))
+         AND (
+           jsonb_typeof(v_vt -> 'banque') <> 'array'
+           OR jsonb_array_length(v_vt -> 'banque') = 0
+           OR EXISTS (
+             SELECT 1 FROM jsonb_array_elements_text(v_vt -> 'banque') AS b
+             WHERE public.quiz_norm_answer(b) = v_chosen_norm
+           )
+         ) THEN
+        v_used_verbs := array_append(v_used_verbs, v_chosen_norm);
+        IF v_exp_verb_norm <> '' AND v_chosen_norm = v_exp_verb_norm THEN
+          v_p_total := v_ppp;
+        END IF;
+      END IF;
+
+      v_points := v_points + v_p_total;
+      v_vt_expected_parts := array_append(
+        v_vt_expected_parts,
+        (v_idx + 1) || '. ' || coalesce(nullif(btrim(v_exp_verb), ''), '—')
+      );
+      v_vt_student_parts := array_append(
+        v_vt_student_parts,
+        (v_idx + 1) || '. ' || coalesce(nullif(btrim(v_chosen_verb), ''), '—')
       );
     END LOOP;
 

@@ -77,3 +77,34 @@ Les nouvelles tentatives utilisent désormais le parcours groupé :
 - Les tentatives créées avant cette migration conservent les anciennes RPC de reprise et de correction afin de ne pas interrompre les sessions déjà en cours.
 
 Les RPC groupées sont réservées au rôle `authenticated`. La migration doit être appliquée avant de publier la nouvelle version du frontend.
+
+## Type « Mots à trous avec banque » (`mots_trous`)
+
+Le module Exercices prend également en charge le type `mots_trous` (glisser-déposer d’une banque de mots vers le trou de chaque phrase, avec pièges possibles).
+
+~~~json
+{
+  "id": "q_mots_1",
+  "type": "mots_trous",
+  "question": "Completa le frasi con le parole della banca",
+  "points": 3,
+  "time_limit_seconds": 32,
+  "mots_trous": {
+    "titre": "Al bar in Italia",
+    "consigne": "Glisse chaque mot dans le trou de la phrase correspondante.",
+    "points_par_phrase": 1,
+    "banque": ["caffè", "cornetto", "succo", "acqua"],
+    "phrases": [
+      { "id": 1, "debut": "La mattina bevo un ", "fin": " caldo.", "mot": "caffè" },
+      { "id": 2, "debut": "Mangio un ", "fin": " alla crema.", "mot": "cornetto" },
+      { "id": 3, "debut": "Vorrei un ", "fin": " d'arancia.", "mot": "succo" }
+    ]
+  },
+  "explanation": "Vocabulaire courant du petit-déjeuner italien."
+}
+~~~
+
+- `points` doit correspondre à `phrases.length × points_par_phrase` (`points_par_phrase` vaut `1` par défaut).
+- `banque` contient au moins autant de mots que de phrases, sans doublon ; chaque `mot` attendu est unique et appartient à `banque`.
+- Côté élève, `exercise_sanitize_question_for_batch` et `exercise_question_for_student` suppriment le champ `mot` de chaque phrase avant envoi. La correction et le score sont calculés côté PostgreSQL par `exercise_grade_question` (voir `docs/mots-trous.md`).
+

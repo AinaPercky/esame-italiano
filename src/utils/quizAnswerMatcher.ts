@@ -1,6 +1,7 @@
 import { QuizQuestion } from '../types';
 import { isReorderAnswerCorrect } from './quizReorder';
 import { noterQuiz, type VerbesTrousAnswerKeyPhrase } from './verbesTrous';
+import { noterMotsTrous, type MotsTrousAnswerKeyPhrase } from './motsTrous';
 
 /**
  * Normalise une chaîne pour la comparaison de réponse :
@@ -198,6 +199,19 @@ export function calculateQuestionPointsEarned(question: QuizQuestion, studentAns
     const result = noterQuiz(question.verbes_trous, sAns, phrases);
     const fullyCorrect = result.score === result.maxScore;
     return { awardedPoints: result.score, maxPoints: result.maxScore, isFullyCorrect: fullyCorrect, partialCorrectCount: result.phrases.filter((phrase) => phrase.correct).length, totalBlanks: result.phrases.length };
+  }
+
+  if (question.type === 'mots_trous' && question.mots_trous) {
+    const phrases = question.mots_trous.phrases.filter((phrase) => Boolean(phrase.mot)) as MotsTrousAnswerKeyPhrase[];
+    const result = noterMotsTrous(question.mots_trous, sAns, phrases);
+    const fullyCorrect = result.maxScore > 0 && result.score === result.maxScore;
+    return {
+      awardedPoints: result.score,
+      maxPoints: result.maxScore,
+      isFullyCorrect: fullyCorrect,
+      partialCorrectCount: result.phrases.filter((phrase) => phrase.correct).length,
+      totalBlanks: result.phrases.length
+    };
   }
 
   // Type texte : trou unique ou trous multiples

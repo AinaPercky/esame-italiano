@@ -32,6 +32,8 @@ export function getQuestionTypeLabel(type: string): string {
       return 'Ordre des éléments';
     case 'verbes_trous':
       return 'Banque de verbes et conjugaison';
+    case 'mots_trous':
+      return 'Mots à trous avec banque';
     case 'text':
     default:
       return 'Réponse à compléter';
@@ -46,6 +48,8 @@ export function getQuestionInstruction(type: string): string {
       return 'Glissez-déposez ou déplacez les cartes pour les placer dans le bon ordre.';
     case 'verbes_trous':
       return 'Choisissez un verbe dans la banque pour chaque phrase, puis conjuguez-le.';
+    case 'mots_trous':
+      return 'Glissez-déposez chaque mot de la banque dans le trou de la phrase correspondante.';
     case 'text':
     default:
       return 'Complétez directement les champs vides ci-dessous.';

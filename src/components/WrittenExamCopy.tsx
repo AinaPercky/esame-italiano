@@ -2,6 +2,7 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {getDefaultWrittenQuestionTimeLimit} from '../utils/writtenExam';
+import {formatCorrectMotsTrousForDisplay, formatMotsTrousAnswerForDisplay, noterMotsTrous, type MotsTrousAnswerKeyPhrase} from '../utils/motsTrous';
 
 type Props={attempt:any;version:any;manualScores:Record<string,number>;onManualScore:(id:string,value:number)=>void};
 
@@ -32,6 +33,9 @@ const correctText=(q:any)=>{
  if(q.question_type==='verbes_trous'){
   return (key.phrases||[]).map((p:any,i:number)=>'Phrase '+(i+1)+' : '+p.verbe+' ('+(p.reponses||[]).join(' / ')+')').join(' · ');
  }
+ if(q.question_type==='mots_trous'){
+  return formatCorrectMotsTrousForDisplay(pub.mots_trous,key.phrases);
+ }
  return '—';
 };
 const studentText=(q:any,value:any)=>{
@@ -44,6 +48,9 @@ const studentText=(q:any,value:any)=>{
  if(q.question_type==='verbes_trous'){
   const parsed=parseObject(value);const phrases=pub.verbes_trous?.phrases||[];
   return phrases.map((p:any,i:number)=>{const a=parsed[String(p.id)]||{};return (i+1)+'. Verbe choisi : '+(a.verbe_choisi||'—')+' · Conjugaison : '+(a.texte_saisi||'—');}).join('\n')||'Aucune réponse';
+ }
+ if(q.question_type==='mots_trous'){
+  return formatMotsTrousAnswerForDisplay(pub.mots_trous,value);
  }
  const parsed=parseArray(value);
  return parsed.map((x:any)=>String(x??'')).join(' | ')||'Aucune réponse';
@@ -68,6 +75,11 @@ const autoScore=(q:any,value:any)=>{
   const actual=parseObject(value);const phrases=key.phrases||[];const bank=(pub.verbes_trous?.banque||[]).map((x:any)=>normalize(x));const used=new Set<string>();let score=0;
   phrases.forEach((phrase:any)=>{const answer=actual[String(phrase.id)]||{};const chosen=normalize(answer.verbe_choisi);const expected=normalize(phrase.verbe);const unique=!!chosen&&!used.has(chosen)&&bank.includes(chosen);if(unique){used.add(chosen);if(chosen===expected)score+=1;if((phrase.reponses||[]).some((x:any)=>normalize(x)===normalize(answer.texte_saisi)))score+=2;}});
   return Math.min(points,score);
+ }
+ if(q.question_type==='mots_trous'){
+  const def=pub.mots_trous||{banque:[],phrases:[]};
+  const scored=noterMotsTrous(def,value,(key.phrases||[]) as MotsTrousAnswerKeyPhrase[]);
+  return Math.min(points,scored.score);
  }
  return 0;
 };
@@ -107,8 +119,9 @@ export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onMa
      const answer=answerOf(attempt,q);const score=autoScore(q,answer);const manual=Number(manualScores[q.id]??attempt.manual_scores?.[q.id]??score??0);const hasManualOverride=manualScores[q.id]!==undefined||attempt.manual_scores?.[q.id]!==undefined;const reviewable=true;const awarded=hasManualOverride?manual:score;
      const publicData=publicOf(q);
      return <article key={q.id} className="space-y-3 p-3 sm:p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question {qi+1} · {q.question_type==='qcm'?'QCM':q.question_type==='text'?'Réponse texte':q.question_type==='reorder'?'Réordonnement':'Verbes à trous'} · {publicData.time_limit_seconds||getDefaultWrittenQuestionTimeLimit({type:q.question_type})} s</p><p className="mt-1 text-sm font-semibold text-[#072a3f]">{q.prompt}</p></div><span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold">{q.points} pt{Number(q.points)===1?'':'s'}</span></div>
+      <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Question {qi+1} · {q.question_type==='qcm'?'QCM':q.question_type==='text'?'Réponse texte':q.question_type==='reorder'?'Réordonnement':q.question_type==='mots_trous'?'Mots à trous avec banque':'Verbes à trous'} · {publicData.time_limit_seconds||getDefaultWrittenQuestionTimeLimit({type:q.question_type})} s</p><p className="mt-1 text-sm font-semibold text-[#072a3f]">{q.prompt}</p></div><span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold">{q.points} pt{Number(q.points)===1?'':'s'}</span></div>
       {publicData.verbes_trous?.titre&&<p className="text-xs text-slate-500">{publicData.verbes_trous.titre}</p>}
+      {publicData.mots_trous?.titre&&<p className="text-xs text-slate-500">{publicData.mots_trous.titre}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
        <div className={'rounded-lg border p-3 '+(q.manual_review?'border-amber-200 bg-amber-50':Number(score)===Number(q.points)?'border-emerald-200 bg-emerald-50':'border-rose-200 bg-rose-50')}><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Réponse de l’élève</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{studentText(q,answer)}</p></div>
        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3"><p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Réponse correcte / attendue</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{correctText(q)}</p></div>

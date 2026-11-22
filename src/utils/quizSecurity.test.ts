@@ -107,13 +107,42 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       process.cwd(),
       'supabase/migrations/20261120000000_quiz_server_side_grading_security.sql'
     );
+    const motsTrousMigrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261124000000_mots_trous_support.sql'
+    );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
-    // Le script de bootstrap masque aussi les nouveaux mappings de diagnostic.
-    // La migration historique reste immuable ; la migration additive reprend ce correctif.
-    const bootstrapWithoutDiagnosticMapping = QUIZ_SECURITY_MIGRATION_SQL
+    const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
+
+    // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
+    // doivent correspondre exactement à la migration additive 20261124000000.
+    const extractFn = (source: string, fnName: string) => {
+      const start = source.indexOf(`CREATE OR REPLACE FUNCTION public.${fnName}(`);
+      assert.notEqual(start, -1, `Fonction ${fnName} introuvable.`);
+      const end = source.indexOf('$$;', start);
+      assert.notEqual(end, -1, `Fin de fonction ${fnName} introuvable.`);
+      return source.slice(start, end + 3).trim();
+    };
+
+    for (const fnName of ['quiz_sanitize_questions', 'quiz_grade_question']) {
+      assert.equal(
+        extractFn(QUIZ_SECURITY_MIGRATION_SQL, fnName),
+        extractFn(motsTrousSql, fnName),
+        `${fnName} doit rester synchronisée avec 20261124000000_mots_trous_support.sql`
+      );
+    }
+
+    // Tout le reste du script de bootstrap reste synchronisé avec la migration historique immuable.
+    const replaceFn = (source: string, fnName: string, replacement: string) =>
+      source.replace(extractFn(source, fnName), () => replacement);
+
+    let normalizedBootstrap = QUIZ_SECURITY_MIGRATION_SQL
       .replace(" - 'error_category_map'", '')
       .trim();
-    assert.equal(sqlFromFile, bootstrapWithoutDiagnosticMapping);
+    for (const fnName of ['quiz_sanitize_questions', 'quiz_grade_question']) {
+      normalizedBootstrap = replaceFn(normalizedBootstrap, fnName, extractFn(sqlFromFile, fnName));
+    }
+    assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
   it('ne contourne jamais la RLS sur quizzes pour les sessions non-professeur', () => {

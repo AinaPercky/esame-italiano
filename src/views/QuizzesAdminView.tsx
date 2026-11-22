@@ -48,6 +48,8 @@ import { createQuizReorderItem } from '../utils/quizReorder';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 import { VerbesTrousEditor } from '../components/verbesTrous/VerbesTrousEditor';
+import { MotsTrousEditor } from '../components/motsTrous/MotsTrousEditor';
+import { validateMotsTrousDefinition } from '../utils/motsTrous';
 import { downloadQuizWorkbookPdf } from '../utils/quizWorkbookPdf';
 import {
   LearningCard,
@@ -211,11 +213,16 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       level: quizLevel || null,
       duration_minutes: quizDuration || 10,
       questions: questions.map((q) => {
+        const motsPointsPerPhrase = Math.max(1, Math.round(Number(q.mots_trous?.points_par_phrase) || 1));
         const item: any = {
           type: q.type,
           question: q.question,
-          points: q.type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
-          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' || q.type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+          points: q.type === 'verbes_trous'
+            ? (Number(q.verbes_trous?.phrases?.length || 0) * 3)
+            : q.type === 'mots_trous'
+              ? (Number(q.mots_trous?.phrases?.length || 0) * motsPointsPerPhrase)
+              : Number(q.points) || 1,
+          time_limit_seconds: q.time_limit_seconds || (q.type === 'text' || q.type === 'verbes_trous' || q.type === 'mots_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
         };
         if (q.type === 'qcm') {
           item.options = q.options || ['', '', '', ''];
@@ -225,6 +232,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           item.correct_answer = q.correct_answer || '';
         } else if (q.type === 'verbes_trous') {
           item.verbes_trous = q.verbes_trous || {};
+        } else if (q.type === 'mots_trous') {
+          item.mots_trous = q.mots_trous || {};
         } else {
           item.correct_answer = q.correct_answer || '';
           if (Array.isArray(q.answers) && q.answers.length > 0) {
@@ -269,7 +278,15 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   };
 
   const normalizeImportedQuestion = (q: any, i: number): QuizQuestion => {
-    const type: QuizQuestion['type'] = q.type === 'text' ? 'text' : q.type === 'reorder' ? 'reorder' : q.type === 'verbes_trous' ? 'verbes_trous' : 'qcm';
+    const type: QuizQuestion['type'] = q.type === 'text'
+      ? 'text'
+      : q.type === 'reorder'
+        ? 'reorder'
+        : q.type === 'verbes_trous'
+          ? 'verbes_trous'
+          : q.type === 'mots_trous'
+            ? 'mots_trous'
+            : 'qcm';
     const sourceItems = type === 'reorder'
       ? (Array.isArray(q.items) ? q.items : String(q.correct_answer || '').split(/\s*(?:→|->|⟶)\s*/).filter(Boolean))
       : [];
@@ -280,6 +297,34 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       }
       return createQuizReorderItem(String(item ?? ''));
     });
+
+    const rawMotsTrous = type === 'mots_trous'
+      ? (q.mots_trous || (Array.isArray(q.banque) || Array.isArray(q.phrases)
+        ? {
+            titre: q.titre,
+            consigne: q.consigne,
+            points_par_phrase: q.points_par_phrase,
+            banque: Array.isArray(q.banque) ? q.banque : [],
+            phrases: Array.isArray(q.phrases) ? q.phrases : []
+          }
+        : undefined))
+      : undefined;
+    const normalizedMotsTrous = rawMotsTrous
+      ? {
+          titre: rawMotsTrous.titre,
+          consigne: rawMotsTrous.consigne,
+          points_par_phrase: Math.max(1, Math.round(Number(rawMotsTrous.points_par_phrase) || 1)),
+          banque: Array.isArray(rawMotsTrous.banque) ? rawMotsTrous.banque.map((w: unknown) => String(w).trim()).filter(Boolean) : [],
+          phrases: Array.isArray(rawMotsTrous.phrases)
+            ? rawMotsTrous.phrases.map((phrase: any, phraseIdx: number) => ({
+                id: phrase?.id ?? phraseIdx + 1,
+                debut: String(phrase?.debut ?? ''),
+                fin: String(phrase?.fin ?? ''),
+                mot: String(phrase?.mot ?? '').trim()
+              }))
+            : []
+        }
+      : undefined;
 
     let textAnswers: string[] | undefined = undefined;
     let correctAnswer = q.correct_answer || '';
@@ -306,9 +351,14 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
       items: type === 'reorder' ? items : undefined,
       verbes_trous: type === 'verbes_trous' ? q.verbes_trous : undefined,
+      mots_trous: normalizedMotsTrous,
       answers: type === 'text' && textAnswers && textAnswers.length > 1 ? textAnswers : undefined,
       correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
-      points: type === 'verbes_trous' ? (Number(q.verbes_trous?.phrases?.length || 0) * 3) : Number(q.points) || 1,
+      points: type === 'verbes_trous'
+        ? (Number(q.verbes_trous?.phrases?.length || 0) * 3)
+        : type === 'mots_trous'
+          ? (Number(normalizedMotsTrous?.phrases?.length || 0) * (normalizedMotsTrous?.points_par_phrase || 1))
+          : Number(q.points) || 1,
       explanation: q.explanation || '',
       competency: typeof q.competency === 'string' ? q.competency : undefined,
       skill_code: typeof q.skill_code === 'string' ? q.skill_code : undefined,
@@ -316,7 +366,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       error_category_map: q.error_category_map && typeof q.error_category_map === 'object' && !Array.isArray(q.error_category_map)
         ? Object.fromEntries(Object.entries(q.error_category_map).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
         : undefined,
-      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
+      time_limit_seconds: Number(q.time_limit_seconds) || (type === 'text' || type === 'verbes_trous' || type === 'mots_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS)
     };
   };
 
@@ -554,7 +604,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     setIsEditorOpen(true);
   };
 
-  const handleAddQuestion = (type: 'qcm' | 'text' | 'reorder' | 'verbes_trous') => {
+  const handleAddQuestion = (type: 'qcm' | 'text' | 'reorder' | 'verbes_trous' | 'mots_trous') => {
     const newQ: QuizQuestion = {
       id: `q_${Date.now()}_${questions.length + 1}`,
       type,
@@ -562,10 +612,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       options: type === 'qcm' ? ['', '', '', ''] : undefined,
       items: type === 'reorder' ? Array.from({ length: 5 }, () => createQuizReorderItem()) : undefined,
       verbes_trous: type === 'verbes_trous' ? { titre: 'Esercizio 6 – Verbi riflessivi e presente indicativo', consigne: 'Choisissez le verbe qui convient, puis conjuguez-le au présent.', points_par_phrase: 3, banque: [], phrases: [] } : undefined,
+      mots_trous: type === 'mots_trous' ? { titre: 'Mots à trous avec banque', consigne: 'Glissez-déposez chaque mot dans le trou de la phrase qui lui correspond.', points_par_phrase: 1, banque: [], phrases: [] } : undefined,
       correct_answer: '',
-      points: type === 'verbes_trous' ? 0 : 5,
+      points: type === 'verbes_trous' || type === 'mots_trous' ? 0 : 5,
       explanation: '',
-      time_limit_seconds: type === 'text' || type === 'verbes_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS
+      time_limit_seconds: type === 'text' || type === 'verbes_trous' || type === 'mots_trous' ? DEFAULT_TEXT_TIME_SECONDS : DEFAULT_QCM_TIME_SECONDS
     };
     setQuestions([...questions, newQ]);
   };
@@ -627,6 +678,14 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           return;
         }
         q.points = phrases.length * 3;
+      } else if (q.type === 'mots_trous') {
+        const motsErrors = validateMotsTrousDefinition(q.mots_trous);
+        if (motsErrors.length > 0) {
+          setFormError(`Question #${i + 1} (Mots à trous avec banque) : ${motsErrors[0]}`);
+          return;
+        }
+        const ppp = Math.max(1, Math.round(Number(q.mots_trous?.points_par_phrase) || 1));
+        q.points = (q.mots_trous?.phrases?.length || 0) * ppp;
       } else if (q.type === 'reorder') {
         const items = q.items || [];
         if (items.length < 2 || items.some((item) => !item.text.trim())) {
@@ -2097,6 +2156,13 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     >
                       + Verbes à trous avec banque
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('mots_trous')}
+                      className="px-3 py-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      + Mots à trous avec banque
+                    </button>
                   </div>
                 </div>
 
@@ -2108,7 +2174,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                           {idx + 1}
                         </span>
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : q.type === 'text' ? 'Réponse Saisie (Texte)' : q.type === 'verbes_trous' ? 'Verbes à trous avec banque' : 'Réarranger les éléments'}
+                          {q.type === 'qcm' ? 'QCM (Choix Multiple)' : q.type === 'text' ? 'Réponse Saisie (Texte)' : q.type === 'verbes_trous' ? 'Verbes à trous avec banque' : q.type === 'mots_trous' ? 'Mots à trous avec banque' : 'Réarranger les éléments'}
                         </span>
                       </div>
 
@@ -2422,6 +2488,30 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                       />
                     )}
 
+                    {q.type === 'mots_trous' && (
+                      <MotsTrousEditor
+                        definition={{ ...(q.mots_trous || { titre: '', consigne: '', points_par_phrase: 1, banque: [], phrases: [] }), phrases: (q.mots_trous?.phrases || []).map((phrase) => ({ id: phrase.id, debut: phrase.debut, fin: phrase.fin })) }}
+                        answerKey={(q.mots_trous?.phrases || []).map((phrase) => ({ ...phrase, mot: phrase.mot || '' }))}
+                        onChange={(definition, keys) => {
+                          const ppp = Math.max(1, Math.round(Number(definition.points_par_phrase) || 1));
+                          const updated = [...questions];
+                          updated[idx] = {
+                            ...updated[idx],
+                            mots_trous: {
+                              ...definition,
+                              points_par_phrase: ppp,
+                              phrases: definition.phrases.map((phrase, phraseIndex) => ({
+                                ...phrase,
+                                mot: keys[phraseIndex]?.mot || ''
+                              }))
+                            },
+                            points: definition.phrases.length * ppp
+                          };
+                          setQuestions(updated);
+                        }}
+                      />
+                    )}
+
                     {/* Explanation */}
                     <div>
                       <input
@@ -2531,7 +2621,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Le modèle intègre les quatre types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>), <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code> et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">verbes_trous</code> (banque de verbes, un verbe par phrase et conjugaison). Les commentaires de documentation sont acceptés.
+                  Le modèle intègre les types <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">qcm</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">text</code> (mono-trou avec variantes par <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">/</code> et multi-trous via <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">answers</code> ou <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">|</code>), <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">reorder</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">verbes_trous</code> (banque de verbes, un verbe par phrase et conjugaison) et <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">mots_trous</code> (banque de mots par glisser-déposer dans chaque phrase). Les commentaires de documentation sont acceptés.
                 </p>
                 <pre className="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-48 select-all">
 {quizImportTemplate}

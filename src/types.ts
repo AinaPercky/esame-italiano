@@ -162,9 +162,16 @@ export interface VerbesTrousPhrase {
   reponses?: string[];
 }
 
+export interface MotsTrousPhrase {
+  id: string | number;
+  debut: string;
+  fin: string;
+  mot?: string;
+}
+
 export interface QuizQuestion {
   id: string;
-  type: 'qcm' | 'text' | 'reorder' | 'verbes_trous'; // QCM, réponse saisie, remise en ordre ou banque de verbes
+  type: 'qcm' | 'text' | 'reorder' | 'verbes_trous' | 'mots_trous'; // QCM, réponse saisie, remise en ordre, banque de verbes ou mots à trous avec banque
   question: string;
   options?: string[]; // Pour QCM (ex: 4 options)
   items?: QuizReorderItem[]; // Éléments d'un exercice de remise en ordre, rangés par le professeur dans l'ordre correct
@@ -187,6 +194,7 @@ export interface QuizQuestion {
   points_par_phrase?: number;
   phrases?: VerbesTrousPhrase[];
   verbes_trous?: { titre?: string; consigne?: string; points_par_phrase?: number; banque: string[]; phrases: VerbesTrousPhrase[] };
+  mots_trous?: { titre?: string; consigne?: string; points_par_phrase?: number; banque: string[]; phrases: MotsTrousPhrase[] };
 }
 
 export interface QuizReorderItem {
@@ -415,6 +423,7 @@ export interface ExerciseAttemptReviewQuestion {
   options?: string[];
   items?: QuizReorderItem[];
   verbes_trous?: QuizQuestion['verbes_trous'];
+  mots_trous?: QuizQuestion['mots_trous'];
 }
 
 export interface ExerciseAttemptReview {

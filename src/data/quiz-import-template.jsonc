@@ -48,6 +48,35 @@
 //   }
 //   - Le nombre de points de la question doit être égal à 3 × le nombre de phrases.
 //
+// - mots_trous : question « Mots à trous avec banque » (glisser-déposer).
+//   - question : consigne ou titre affiché pour la question.
+//   - points : égal à (nombre de phrases) × mots_trous.points_par_phrase (1 pt par phrase par défaut).
+//   - time_limit_seconds : facultatif (32 s par défaut si absent).
+//   - mots_trous.titre et mots_trous.consigne : titre et consigne de la question.
+//   - mots_trous.points_par_phrase : entier >= 1 (1 par défaut).
+//   - mots_trous.banque : liste de mots sans doublon (au moins autant de mots que de phrases ; pièges autorisés).
+//   - mots_trous.phrases : tableau des phrases à trou ; chaque élément contient id, debut, fin et mot (mot manquant attendu, présent une seule fois dans banque).
+//   - L’élève choisit par glisser-déposer (ou toucher / clavier) quel mot de la banque complète le trou de chaque phrase.
+//   - Chaque mot de la banque ne peut être utilisé qu’une seule fois ; comparaison insensible à la casse, aux espaces superflus et aux apostrophes typographiques (les accents restent significatifs).
+//   Exemple de question :
+//   {
+//     "type": "mots_trous",
+//     "question": "Complète les phrases avec les mots de la banque.",
+//     "points": 3,
+//     "time_limit_seconds": 32,
+//     "mots_trous": {
+//       "titre": "Al bar in Italia",
+//       "consigne": "Glisse chaque mot dans le trou de la phrase qui correspond.",
+//       "points_par_phrase": 1,
+//       "banque": ["caffè", "cornetto", "succo", "tè", "acqua"],
+//       "phrases": [
+//         { "id": 1, "debut": "La mattina bevo un ", "fin": " caldo.", "mot": "caffè" },
+//         { "id": 2, "debut": "Mangio un ", "fin": " alla crema.", "mot": "cornetto" },
+//         { "id": 3, "debut": "Preferisco un ", "fin": " d'arancia.", "mot": "succo" }
+//       ]
+//     }
+//   }
+//
 // time_limit_seconds est facultatif : valeur par défaut 17 s pour qcm/reorder, 32 s pour text.
 // points détermine le barème; explanation (facultative) est montrée dans la correction.
 // Les commentaires sont ignorés par l’importateur et ne modifient pas les données du quiz.

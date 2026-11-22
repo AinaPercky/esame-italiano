@@ -6,6 +6,11 @@ import { exerciseService } from '../services/exerciseService';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../components/QuizClozeInput';
 import { QuizReorderList } from '../components/QuizReorderList';
 import { VerbesTrousQuestion } from '../components/verbesTrous/VerbesTrousQuestion';
+import { MotsTrousQuestion } from '../components/motsTrous/MotsTrousQuestion';
+import {
+  formatCorrectMotsTrousForDisplay,
+  formatMotsTrousAnswerForDisplay
+} from '../utils/motsTrous';
 import { CORRECTION_DISPLAY_SECONDS } from '../utils/quizTiming';
 import {
   isTimerBeepEnabled,
@@ -39,6 +44,14 @@ const hasSubmittedAnswer = (value: unknown): boolean => {
 };
 
 const formatExerciseExpected = (question: ExerciseAttemptReview['questions'][number]): string => {
+  if (question.type === 'mots_trous') {
+    if (Array.isArray(question.expected)) {
+      return correctionText(question.expected);
+    }
+    if (question.mots_trous) {
+      return formatCorrectMotsTrousForDisplay(question.mots_trous);
+    }
+  }
   if (question.type === 'reorder' && question.items?.length) {
     try {
       const raw = typeof question.expected === 'string' ? question.expected : JSON.stringify(question.expected);
@@ -59,6 +72,7 @@ const correctionText = (value: unknown): string => {
   if (Array.isArray(value)) return value.map((item, index) => {
     if (typeof item === 'string') return item;
     if (item && Array.isArray((item as any).reponses)) return 'Phrase ' + (index + 1) + ' : ' + (item as any).reponses.join(' / ');
+    if (item && typeof (item as any).mot === 'string') return (index + 1) + '. ' + (item as any).mot;
     return JSON.stringify(item);
   }).join(' · ');
   return JSON.stringify(value);
@@ -238,7 +252,8 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                 explanation: graded.explanation,
                 options: item.question.options,
                 items: item.question.items,
-                verbes_trous: item.question.verbes_trous
+                verbes_trous: item.question.verbes_trous,
+                mots_trous: item.question.mots_trous
               };
             })
           };
@@ -412,7 +427,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                 points: graded.max_points, answer: batchAnswers[questionId] ?? null,
                 correct: graded.correct, points_awarded: graded.points, max_points: graded.max_points,
                 timed_out: graded.timed_out, expected: graded.expected, explanation: graded.explanation,
-                options: item.question.options, items: item.question.items, verbes_trous: item.question.verbes_trous
+                options: item.question.options, items: item.question.items, verbes_trous: item.question.verbes_trous, mots_trous: item.question.mots_trous
               };
             })
           };
@@ -499,8 +514,17 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         <VerbesTrousQuestion
           definition={question.verbes_trous as any}
           answer={answer}
-          onChange={setAnswer}
+          onChange={updateAnswer}
           onEnterPress={() => void submit()}
+        />
+      );
+    }
+    if (question.type === 'mots_trous' && question.mots_trous) {
+      return (
+        <MotsTrousQuestion
+          definition={question.mots_trous as any}
+          answer={answer}
+          onChange={updateAnswer}
         />
       );
     }
@@ -561,7 +585,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
               <span>
                 {batchMode
                   ? isLastQuestion ? 'Remettre l’exercice' : 'Enregistrer et continuer'
-                  : q.type === 'verbes_trous'
+                  : q.type === 'verbes_trous' || q.type === 'mots_trous'
                     ? isLastQuestion ? 'Corriger et terminer' : 'Corriger et continuer'
                     : isLastQuestion ? 'Valider et terminer' : 'Valider la réponse'}
               </span>
@@ -585,7 +609,11 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
             isTimeout={Boolean(correction?.timed_out)}
             questionNumber={active.question_number}
             questionText={q.question}
-            studentAnswer={correctionText((correction?.student_answer ?? answer) || '')}
+            studentAnswer={
+              q.type === 'mots_trous'
+                ? formatMotsTrousAnswerForDisplay(q.mots_trous, correction?.student_answer ?? answer)
+                : correctionText((correction?.student_answer ?? answer) || '')
+            }
             expectedAnswer={correctionText(correction?.expected)}
             explanation={correction?.explanation ? correctionText(correction.explanation) : undefined}
             points={correction?.points ?? 0}
@@ -866,7 +894,13 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                 <div className="space-y-2 p-3.5 sm:p-4">
                   <div className={'rounded-xl border p-3 ' + (question.correct && !unanswered ? 'border-[#bfe3ce] bg-[#eef9f3]' : 'border-rose-200 bg-rose-50')}>
                     <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Votre réponse</p>
-                    <p className={'break-words text-sm font-semibold ' + (question.correct && !unanswered ? 'text-[#145c3d]' : 'text-rose-800')}>{unanswered ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu') : correctionText(question.answer)}</p>
+                    <p className={'break-words text-sm font-semibold ' + (question.correct && !unanswered ? 'text-[#145c3d]' : 'text-rose-800')}>
+                      {unanswered
+                        ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu')
+                        : question.type === 'mots_trous'
+                          ? formatMotsTrousAnswerForDisplay(question.mots_trous, question.answer)
+                          : correctionText(question.answer)}
+                    </p>
                   </div>
                   {(!question.correct || unanswered) && <>
                     <div className="rounded-xl border border-[#bfe3ce] bg-[#eef9f3] p-3"><p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[#145c3d]">Réponse attendue</p><p className="break-words text-sm font-bold text-[#145c3d]">{formatExerciseExpected(question)}</p></div>

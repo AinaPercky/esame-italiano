@@ -1,6 +1,12 @@
 import { Quiz, QuizQuestion } from '../../types';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../../utils/quizReorder';
 import { noterQuiz, parseVerbesTrousAnswers, type VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
+import {
+  formatCorrectMotsTrousForDisplay,
+  formatMotsTrousAnswerForDisplay,
+  noterMotsTrous,
+  type MotsTrousAnswerKeyPhrase
+} from '../../utils/motsTrous';
 import { isTextAnswerCorrect, isQuestionAnswerCorrect, formatTextAnswerForDisplay, formatCorrectTextAnswerForDisplay } from '../../utils/quizAnswerMatcher';
 
 export { isTextAnswerCorrect, isQuestionAnswerCorrect };
@@ -45,6 +51,20 @@ export function evaluateQuizAnswers(
           const value = parsed[String(phrase.id)];
           return (value?.verbe_choisi || '—') + ' → ' + (value?.texte_saisi || '—');
         }).join(' · ')
+      };
+      return;
+    }
+
+    if (question.type === 'mots_trous' && question.mots_trous) {
+      const definition = question.mots_trous;
+      const keys = definition.phrases.filter((phrase) => phrase.mot) as MotsTrousAnswerKeyPhrase[];
+      const scored = noterMotsTrous(definition, studentAnswer, keys);
+      rawScore += scored.score;
+      feedback[question.id] = {
+        correct: scored.score === scored.maxScore && scored.maxScore > 0,
+        points: scored.score,
+        expected: formatCorrectMotsTrousForDisplay(definition, keys),
+        studentAnswer: formatMotsTrousAnswerForDisplay(definition, studentAnswer, keys)
       };
       return;
     }

@@ -7,6 +7,8 @@ import { QuizReorderList } from '../../components/QuizReorderList';
 import { QuizClozeInput, parseQuestionClozePrompt } from '../../components/QuizClozeInput';
 import { VerbesTrousQuestion } from '../../components/verbesTrous/VerbesTrousQuestion';
 import { parseVerbesTrousAnswers, type VerbesTrousAnswerKeyPhrase } from '../../utils/verbesTrous';
+import { MotsTrousQuestion } from '../../components/motsTrous/MotsTrousQuestion';
+import { parseMotsTrousAnswers, type MotsTrousAnswerKeyPhrase } from '../../utils/motsTrous';
 import {
   AssessmentCorrectionModal,
   AssessmentQcmOptions,
@@ -65,6 +67,8 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
 
   const missingVerbPhrases = question.type === 'verbes_trous' && question.verbes_trous
     ? question.verbes_trous.phrases.filter((phrase) => !parseVerbesTrousAnswers(answer)[String(phrase.id)]?.verbe_choisi).length
+    : question.type === 'mots_trous' && question.mots_trous
+    ? question.mots_trous.phrases.filter((phrase) => !parseMotsTrousAnswers(answer, question.mots_trous?.phrases)[String(phrase.id)]).length
     : 0;
 
   const requestValidation = () => {
@@ -78,7 +82,7 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
   const totalSecondsRemaining = Math.max(0, Math.ceil(totalTimeLeftMs / 1000));
 
   const primaryLabel = !isValidated
-    ? question.type === 'verbes_trous' ? 'Corriger' : 'Valider'
+    ? question.type === 'verbes_trous' || question.type === 'mots_trous' ? 'Corriger' : 'Valider'
     : isLastQuestion
       ? 'Terminer le quiz'
       : 'Question suivante';
@@ -224,6 +228,15 @@ export const PublicQuizQuestionScreen: React.FC<PublicQuizQuestionScreenProps> =
           disabled={isValidated}
           showCorrection={isValidated && showCorrection}
           answerKey={question.verbes_trous.phrases as VerbesTrousAnswerKeyPhrase[]}
+        />
+      ) : question.type === 'mots_trous' && question.mots_trous ? (
+        <MotsTrousQuestion
+          definition={question.mots_trous}
+          answer={answer}
+          onChange={onAnswerChange}
+          disabled={isValidated}
+          showCorrection={isValidated && showCorrection}
+          answerKey={question.mots_trous.phrases as MotsTrousAnswerKeyPhrase[]}
         />
       ) : (
         <QuizClozeInput

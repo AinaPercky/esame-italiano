@@ -12,6 +12,7 @@ import type {
   StudentExerciseItem
 } from '../types';
 import { getQuestionTimeSeconds } from '../utils/quizTiming';
+import { validateMotsTrousDefinition } from '../utils/motsTrous';
 
 const SCHEMA = 'perckylingua.exercise';
 const SCHEMA_VERSION = 1;
@@ -36,8 +37,50 @@ function normalizeQuestions(questions: QuizQuestion[], requireTimers = true): Qu
     if (requireTimers && (!Number.isInteger(seconds) || seconds <= 0)) {
       throw new Error('La question ' + (index + 1) + ' doit avoir un temps imparti strictement positif.');
     }
-    if (!['qcm', 'text', 'reorder', 'verbes_trous'].includes(question.type)) {
+    if (!['qcm', 'text', 'reorder', 'verbes_trous', 'mots_trous'].includes(question.type)) {
       throw new Error('Le type de question de la question ' + (index + 1) + ' n’est pas compatible.');
+    }
+    if (question.type === 'mots_trous') {
+      const rawAny = question as any;
+      const source: {
+        titre?: string;
+        consigne?: string;
+        points_par_phrase?: number;
+        banque: string[];
+        phrases: Array<{ id?: string | number; debut?: string; fin?: string; mot?: string }>;
+      } | undefined = question.mots_trous || (Array.isArray(rawAny.banque) || Array.isArray(rawAny.phrases)
+        ? {
+            titre: rawAny.titre,
+            consigne: rawAny.consigne,
+            points_par_phrase: rawAny.points_par_phrase,
+            banque: Array.isArray(rawAny.banque) ? rawAny.banque.map((w: unknown) => String(w)) : [],
+            phrases: Array.isArray(rawAny.phrases) ? rawAny.phrases : []
+          }
+        : undefined);
+      const errors = validateMotsTrousDefinition(source as any);
+      if (errors.length > 0) {
+        throw new Error('Question ' + (index + 1) + ' (Mots à trous avec banque) : ' + errors[0]);
+      }
+      const pointsPerPhrase = Math.max(1, Math.round(Number(source!.points_par_phrase) || 1));
+      const normalizedPhrases = source!.phrases.map((phrase: { id?: string | number; debut?: string; fin?: string; mot?: string }, phraseIdx: number) => ({
+        id: phrase.id ?? phraseIdx + 1,
+        debut: String(phrase.debut ?? ''),
+        fin: String(phrase.fin ?? ''),
+        mot: String(phrase.mot ?? '').trim()
+      }));
+      return {
+        ...question,
+        id,
+        points: Number(question.points) > 0 ? Number(question.points) : normalizedPhrases.length * pointsPerPhrase,
+        mots_trous: {
+          titre: source!.titre,
+          consigne: source!.consigne,
+          points_par_phrase: pointsPerPhrase,
+          banque: source!.banque.map((word: unknown) => String(word).trim()).filter(Boolean),
+          phrases: normalizedPhrases
+        },
+        time_limit_seconds: seconds
+      };
     }
     return { ...question, id, time_limit_seconds: seconds };
   });

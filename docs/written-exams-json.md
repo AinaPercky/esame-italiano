@@ -463,3 +463,58 @@ La remise à zéro est séparée de la modification du sujet. Pour actualiser un
 ### Erreur `save_written_exam_question_time_limits` / `PGRST202`
 
 Cette erreur indique que PostgREST ne trouve pas le RPC dans le schéma Supabase courant. Appliquez toutes les migrations en attente, notamment `supabase/migrations/20261110000000_written_exam_question_timers.sql`. Si la migration est déjà présente mais que le cache est obsolète, exécutez `NOTIFY pgrst, 'reload schema';` dans le SQL Editor. La sauvegarde du sujet peut déjà avoir créé un brouillon avant cette erreur, mais ses durées individuelles n’ont pas été écrites; après réparation du schéma, rouvrez et réenregistrez ce même sujet.
+
+## 12. Question « Mots à trous avec banque » — `mots_trous`
+
+Ce type de question peut être utilisé dans `sections[].questions[]`. Il présente une banque de mots : l’élève place par **glisser-déposer** (ou par sélection tactile / clavier) le mot de la banque qui complète le trou de chaque phrase. La banque contient au moins autant de mots que de phrases ; les mots supplémentaires servent de pièges.
+
+### Structure JSON
+
+Dans un examen composite, les données affichées à l’élève (`mots_trous`) et le corrigé (`answer_key.phrases`) sont séparés et reliés par le même identifiant `id`.
+
+```json
+{
+  "id": "mots_01",
+  "type": "mots_trous",
+  "prompt": "Al bar – completa le frasi con la parola giusta",
+  "points": 3,
+  "time_limit_seconds": 32,
+  "mots_trous": {
+    "titre": "Al bar in Italia",
+    "consigne": "Glisse chaque mot dans le trou de la phrase correspondante.",
+    "points_par_phrase": 1,
+    "banque": ["caffè", "cornetto", "succo", "acqua"],
+    "phrases": [
+      { "id": 1, "debut": "La mattina bevo un ", "fin": " caldo." },
+      { "id": 2, "debut": "Mangio un ", "fin": " alla crema." },
+      { "id": 3, "debut": "Vorrei un ", "fin": " d'arancia." }
+    ]
+  },
+  "answer_key": {
+    "phrases": [
+      { "id": 1, "mot": "caffè" },
+      { "id": 2, "mot": "cornetto" },
+      { "id": 3, "mot": "succo" }
+    ]
+  }
+}
+```
+
+### Règles et validation
+
+- `mots_trous.titre` et `mots_trous.consigne` sont des chaînes de caractères facultatives.
+- `points_par_phrase` est un entier supérieur ou égal à **1** (`1` par défaut). Le champ global `points` doit être égal à `phrases.length × points_par_phrase`.
+- `banque` est une liste de mots non vides, sans doublon.
+- `phrases` contient au moins une phrase et `banque` contient au moins autant de mots que de phrases.
+- Chaque phrase possède un `id` unique, un `debut` et une `fin`.
+- Chaque identifiant de phrase possède une entrée correspondante dans `answer_key.phrases` avec un `mot` attendu unique et présent dans `banque`.
+- `manual_review` doit être `false` (correction automatique).
+- `time_limit_seconds` vaut **32 secondes** par défaut si le champ est omis.
+- Les réponses sont normalisées sans tenir compte de la casse, des espaces superflus ni des variantes d’apostrophes ; les accents restent significatifs.
+
+### Barème
+
+Chaque phrase juste rapporte `points_par_phrase` point(s) (1 point par défaut). Une phrase vide ou contenant un mot déjà utilisé ailleurs dans la même question rapporte 0. Les mots pièges inutilisés ne rapportent aucun point.
+
+Pour le format complet (Quiz, Exercices et Examens écrits), consultez [le guide Mots à trous avec banque](mots-trous.md).
+
