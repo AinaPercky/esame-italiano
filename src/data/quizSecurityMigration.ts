@@ -72,7 +72,7 @@ DECLARE
   v_expected_nopunct TEXT;
   v_alt TEXT;
   v_alt_count INTEGER := 0;
-  v_alternative_pattern CONSTANT TEXT := '(?i)\\s*[/;|]\\s*|\\s+(ou|oppure|o)\\s+';
+  v_alternative_pattern CONSTANT TEXT := '(?i)\s*[/;|]\s*|\s+(ou|oppure|o)\s+';
 BEGIN
   IF v_student = '' OR v_expected = '' THEN RETURN FALSE; END IF;
   IF v_student = v_expected THEN RETURN TRUE; END IF;
