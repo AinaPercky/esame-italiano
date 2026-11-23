@@ -2,6 +2,7 @@ import { QuizQuestion } from '../types';
 import { isReorderAnswerCorrect } from './quizReorder';
 import { noterQuiz, type VerbesTrousAnswerKeyPhrase } from './verbesTrous';
 import { noterMotsTrous, type MotsTrousAnswerKeyPhrase } from './motsTrous';
+import { areEquivalentItalianNumbers } from './italianNumberWords';
 
 /**
  * Normalise une chaîne pour la comparaison de réponse :
@@ -66,13 +67,20 @@ export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: strin
     return true;
   }
 
+  // 3. Équivalence exacte entre chiffres et nombres cardinaux italiens (0 à 999).
+  if (areEquivalentItalianNumbers(normStudentNoEndPunct, normExpectedNoEndPunct)) {
+    return true;
+  }
+
   // 3. Prise en charge des alternatives déclarées par le professeur (ex: "io cuocio / cuocio")
   const alternatives = expectedAnswer
     .split(/\s*[\/;|]\s*|\s+(?:ou|oppure|o)\s+/i)
     .map(alt => normalizeAnswerText(alt, true))
     .filter(Boolean);
 
-  if (alternatives.length > 1 && alternatives.includes(normStudentNoEndPunct)) {
+  if (alternatives.length > 1 && alternatives.some(alt =>
+    alt === normStudentNoEndPunct || areEquivalentItalianNumbers(normStudentNoEndPunct, alt)
+  )) {
     return true;
   }
 

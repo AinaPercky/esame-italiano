@@ -34,6 +34,42 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.equal(isTextAnswerCorrect('24', 'ventitré / 23'), false);
   });
 
+  it('accepte les chiffres et les nombres cardinaux italiens équivalents', () => {
+    const pairs = [
+      ['92', 'novantadue'],
+      ['novantadue', '92'],
+      ['92', 'novantadue euro'],
+      ['92 euro', 'novantadue'],
+      ['108', 'centotto'],
+      ['180', 'centottanta'],
+      ['223', 'duecentoventitré'],
+      ['999', 'novecentonovantanove']
+    ];
+    for (const [student, expected] of pairs) {
+      assert.equal(isTextAnswerCorrect(student, expected), true, `${student} should match ${expected}`);
+    }
+    assert.equal(isTextAnswerCorrect('93', 'novantadue'), false);
+    assert.equal(isTextAnswerCorrect('92', 'novantatré'), false);
+    assert.equal(isTextAnswerCorrect('novantadue', '93'), false);
+
+    const question: any = {
+      id: 'number-92',
+      type: 'text',
+      question: 'Scrivi in cifre: novantadue',
+      points: 2,
+      correct_answer: 'novantadue'
+    };
+    const result = calculateQuestionPointsEarned(question, '92');
+    assert.equal(result.isFullyCorrect, true);
+    assert.equal(result.awardedPoints, 2);
+  });
+
+  it('accepte les nombres en chiffres dans les variantes déclarées', () => {
+    assert.equal(isTextAnswerCorrect('92', 'novantadue / novantadue euro'), true);
+    assert.equal(isTextAnswerCorrect('92 euro', 'novantadue / 93'), true);
+    assert.equal(isTextAnswerCorrect('93', 'novantadue / novantadue euro'), false);
+  });
+
   it('accepte les alternatives séparées par slash, ou, o et oppure', () => {
     for (const expected of [
       'ventiquattro / ventiquattro euro',
