@@ -16,6 +16,9 @@ import {
   HelpCircle,
   Save,
   ShieldCheck,
+  ShieldAlert,
+  CameraOff,
+  AppWindow,
   LogOut,
   UserCheck,
   KeyRound
@@ -41,6 +44,8 @@ import { QUIZ_ATTEMPT_SUBMISSION_MIGRATION_SQL } from '../data/quizAttemptSubmis
 import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration';
 import { QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL } from '../data/quizRetryConfirmationMigration';
 import { QUIZ_SECURITY_MIGRATION_SQL } from '../data/quizSecurityMigration';
+import { ANTI_CHEAT_SETTINGS_MIGRATION_SQL } from '../data/antiCheatSettingsMigration';
+import type { AntiCheatSettings } from '../utils/antiCheatSettings';
 
 interface SettingsViewProps {
   onResetData: () => void;
@@ -61,6 +66,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedRetryConfirmationMigration, setCopiedRetryConfirmationMigration] = useState(false);
   const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
   const [copiedQuizSecurityMigration, setCopiedQuizSecurityMigration] = useState(false);
+  const [copiedAntiCheatMigration, setCopiedAntiCheatMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -71,6 +77,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [showSqlGuide, setShowSqlGuide] = useState(false);
+  const [antiCheatSettings, setAntiCheatSettings] = useState<AntiCheatSettings>(() => dataService.getAntiCheatSettings());
+  const [antiCheatDraft, setAntiCheatDraft] = useState<AntiCheatSettings>(() => dataService.getAntiCheatSettings());
+  const [isSavingAntiCheat, setIsSavingAntiCheat] = useState(false);
+  const [antiCheatSaveMessage, setAntiCheatSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [antiCheatMigrationWarning, setAntiCheatMigrationWarning] = useState<string | null>(() => dataService.getAntiCheatMigrationWarning());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -89,6 +100,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
   const [passwordErrorMessage, setPasswordErrorMessage] = useState<string | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  useEffect(() => {
+    const syncFromStore = () => {
+      const stored = dataService.getAntiCheatSettings();
+      setAntiCheatSettings(stored);
+      setAntiCheatMigrationWarning(dataService.getAntiCheatMigrationWarning());
+    };
+    const unsubscribe = dataService.subscribe(syncFromStore);
+    if (supabaseService.isConfigured()) {
+      void dataService.refreshAntiCheatSettings().then((fresh) => {
+        setAntiCheatSettings(fresh);
+        setAntiCheatDraft(fresh);
+        setAntiCheatMigrationWarning(dataService.getAntiCheatMigrationWarning());
+      });
+    }
+    return unsubscribe;
+  }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,6 +237,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration sécurité quiz:', e);
       setActionMessage({ type: 'error', text: 'Impossible de copier la migration Sécurité & correction serveur des quiz.' });
+    }
+  };
+
+  const handleCopyAntiCheatMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(ANTI_CHEAT_SETTINGS_MIGRATION_SQL);
+      setCopiedAntiCheatMigration(true);
+      setTimeout(() => setCopiedAntiCheatMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration anti-triche:', e);
+      setAntiCheatSaveMessage({ type: 'error', text: 'Impossible de copier la migration Paramètres Anti-Triche.' });
+    }
+  };
+
+  const handleSaveAntiCheatSettings = async () => {
+    setAntiCheatSaveMessage(null);
+    setIsSavingAntiCheat(true);
+    try {
+      const saved = await dataService.updateAntiCheatSettings({
+        screenshotProtectionEnabled: antiCheatDraft.screenshotProtectionEnabled,
+        tabSwitchProtectionEnabled: antiCheatDraft.tabSwitchProtectionEnabled
+      });
+      setAntiCheatSettings(saved);
+      setAntiCheatDraft(saved);
+      setAntiCheatMigrationWarning(dataService.getAntiCheatMigrationWarning());
+      setAntiCheatSaveMessage({
+        type: 'success',
+        text: 'Paramètres anti-triche enregistrés en base de données.'
+      });
+      setTimeout(() => setAntiCheatSaveMessage(null), 3500);
+    } catch (error) {
+      setAntiCheatMigrationWarning(dataService.getAntiCheatMigrationWarning());
+      setAntiCheatSaveMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Impossible d’enregistrer les paramètres anti-triche.'
+      });
+    } finally {
+      setIsSavingAntiCheat(false);
     }
   };
 
@@ -452,6 +518,189 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
         </div>
       </div>
 
+      {/* Carte Sécurité & Anti-triche des évaluations */}
+      {(() => {
+        const isAntiCheatDirty =
+          antiCheatDraft.screenshotProtectionEnabled !== antiCheatSettings.screenshotProtectionEnabled ||
+          antiCheatDraft.tabSwitchProtectionEnabled !== antiCheatSettings.tabSwitchProtectionEnabled;
+
+        return (
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-5 h-5 text-slate-800" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
+                      Sécurité & Anti-triche des évaluations
+                    </h3>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono tracking-wider ${
+                        isAntiCheatDirty
+                          ? 'bg-amber-100 text-amber-900'
+                          : 'bg-emerald-100 text-emerald-900'
+                      }`}
+                    >
+                      {isAntiCheatDirty ? 'Modifications non enregistrées' : 'Synchronisé en base'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Activez ou désactivez globalement les protections anti-triche appliquées pendant les quiz officiels et examens écrits.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {antiCheatMigrationWarning && (
+              <div role="alert" className="p-3.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2 text-xs">
+                  <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <span>{antiCheatMigrationWarning}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyAntiCheatMigration}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 min-h-[38px]"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copiedAntiCheatMigration ? '✓ Migration copiée !' : 'Copier migration Anti-Triche'}</span>
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Toggle 1 : Capture d'écran */}
+              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <CameraOff className="w-4 h-4 text-slate-800 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-900">
+                      Protection contre la capture d’écran
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Détecte les raccourcis de capture/impression et bloque le clic droit, la copie et l’impression pendant les épreuves officielles.
+                    </p>
+                    <span
+                      className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                        antiCheatDraft.screenshotProtectionEnabled
+                          ? 'bg-emerald-100 text-emerald-900'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {antiCheatDraft.screenshotProtectionEnabled ? 'Activée' : 'Désactivée'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={antiCheatDraft.screenshotProtectionEnabled}
+                  aria-label="Activer ou désactiver la protection contre la capture d'écran"
+                  onClick={() =>
+                    setAntiCheatDraft(prev => ({
+                      ...prev,
+                      screenshotProtectionEnabled: !prev.screenshotProtectionEnabled
+                    }))
+                  }
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                    antiCheatDraft.screenshotProtectionEnabled ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      antiCheatDraft.screenshotProtectionEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Toggle 2 : Changement d'onglet */}
+              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <AppWindow className="w-4 h-4 text-slate-800 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-900">
+                      Détection du changement d’onglet
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Surveille la sortie d’onglet ou de fenêtre pendant les évaluations et déclenche l’action anti-triche prévue (quiz et examens écrits).
+                    </p>
+                    <span
+                      className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                        antiCheatDraft.tabSwitchProtectionEnabled
+                          ? 'bg-emerald-100 text-emerald-900'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {antiCheatDraft.tabSwitchProtectionEnabled ? 'Activée' : 'Désactivée'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={antiCheatDraft.tabSwitchProtectionEnabled}
+                  aria-label="Activer ou désactiver la détection du changement d'onglet"
+                  onClick={() =>
+                    setAntiCheatDraft(prev => ({
+                      ...prev,
+                      tabSwitchProtectionEnabled: !prev.tabSwitchProtectionEnabled
+                    }))
+                  }
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                    antiCheatDraft.tabSwitchProtectionEnabled ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      antiCheatDraft.tabSwitchProtectionEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-[11px] text-slate-500">
+                Ces réglages s’appliquent automatiquement aux sessions élèves dès leur enregistrement en base de données.
+                {antiCheatSettings.updatedAt
+                  ? ` Dernière mise à jour : ${new Date(antiCheatSettings.updatedAt).toLocaleString('fr-FR')}.`
+                  : ''}
+              </p>
+              <button
+                type="button"
+                disabled={isSavingAntiCheat || !isConfigured}
+                onClick={handleSaveAntiCheatSettings}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-900 rounded-lg shadow-xs transition-colors min-h-[40px] shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingAntiCheat ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>{isSavingAntiCheat ? 'Enregistrement...' : 'Enregistrer les paramètres anti-triche'}</span>
+              </button>
+            </div>
+
+            {antiCheatSaveMessage && (
+              <div
+                role={antiCheatSaveMessage.type === 'error' ? 'alert' : 'status'}
+                className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${
+                  antiCheatSaveMessage.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}
+              >
+                {antiCheatSaveMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{antiCheatSaveMessage.text}</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Bannière de statut de la base de données */}
       <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
         isConfigured && testResult?.success
@@ -637,6 +886,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyAntiCheatMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-amber-800 hover:bg-amber-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedAntiCheatMigration ? '✓ Migration Anti-Triche copiée !' : 'Copier migration Paramètres Anti-Triche (sans effacer les données)'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -679,6 +936,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-cyan-800">
               Si Supabase signale que <code>get_public_quiz_catalog</code> ou <code>get_student_quiz_catalog</code> est absent du cache de schéma, exécutez « Sécurité &amp; correction serveur des quiz » dans Supabase &gt; SQL Editor : cette migration additive installe les catalogues sécurisés, la correction côté serveur et recharge le cache PostgREST sans supprimer de données.
+            </span>
+            <span className="text-[11px] text-amber-900">
+              La migration « Paramètres Anti-Triche » est additive et sans risque : elle crée la table <code>app_settings</code> et la fonction <code>save_anti_cheat_settings</code> pour activer ou désactiver la capture d’écran et le changement d’onglet depuis les paramètres professeur.
             </span>
           </div>
         </div>

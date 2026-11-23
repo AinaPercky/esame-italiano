@@ -15,6 +15,12 @@ import {
   QuizRetryGrant,
   normalizeQuizCategory
 } from '../types';
+import {
+  AntiCheatSettings,
+  DEFAULT_ANTI_CHEAT_SETTINGS,
+  normalizeAntiCheatSettings,
+  ANTI_CHEAT_SETTINGS_MIGRATION_WARNING
+} from '../utils/antiCheatSettings';
 
 export function cleanSupabaseUrl(url: string): string {
   if (!url) return '';
@@ -87,12 +93,30 @@ export function isSupabaseMissingRpcError(
   return message.toLowerCase().includes(rpcName.toLowerCase());
 }
 
+export function isSupabaseMissingTableError(
+  error: { code?: string; message?: string } | null | undefined,
+  tableName?: string
+): boolean {
+  if (!error) return false;
+  const code = (error.code || '').toUpperCase();
+  const message = error.message || '';
+  const isMissing =
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    /could not find the table|relation .* does not exist/i.test(message);
+  if (!isMissing) return false;
+  if (!tableName) return true;
+  return message.toLowerCase().includes(tableName.toLowerCase());
+}
+
 class SupabaseService {
   private client: SupabaseClient | null = null;
   private currentConfig: SupabaseConfig = this.loadConfig();
   private quizWriteQueues = new Map<string, Promise<void>>();
   private lastImportedAuthKey: string | null = null;
   private quizSecurityWarning: string | null = null;
+  private antiCheatSettings: AntiCheatSettings = { ...DEFAULT_ANTI_CHEAT_SETTINGS };
+  private antiCheatMigrationWarning: string | null = null;
 
   public getLastImportedAuthKey(): string | null {
     return this.lastImportedAuthKey;
@@ -100,6 +124,102 @@ class SupabaseService {
 
   public getQuizSecurityWarning(): string | null {
     return this.quizSecurityWarning;
+  }
+
+  public getAntiCheatSettings(): AntiCheatSettings {
+    return { ...this.antiCheatSettings };
+  }
+
+  public getAntiCheatMigrationWarning(): string | null {
+    return this.antiCheatMigrationWarning;
+  }
+
+  public async fetchAntiCheatSettings(): Promise<AntiCheatSettings> {
+    const client = this.getClient();
+    if (!client) return { ...this.antiCheatSettings };
+
+    try {
+      const { data, error } = await client
+        .from('app_settings')
+        .select('id,anti_cheat_screenshot_enabled,anti_cheat_tab_switch_enabled,updated_at')
+        .eq('id', 'global')
+        .maybeSingle();
+
+      if (error) {
+        if (isSupabaseMissingTableError(error, 'app_settings')) {
+          this.antiCheatMigrationWarning = ANTI_CHEAT_SETTINGS_MIGRATION_WARNING;
+          return { ...this.antiCheatSettings };
+        }
+        console.warn('[Supabase] Chargement des paramètres anti-triche ignoré :', error.message);
+        return { ...this.antiCheatSettings };
+      }
+
+      this.antiCheatMigrationWarning = null;
+      this.antiCheatSettings = data
+        ? normalizeAntiCheatSettings(data)
+        : { ...DEFAULT_ANTI_CHEAT_SETTINGS };
+      return { ...this.antiCheatSettings };
+    } catch (error) {
+      console.warn('[Supabase] Chargement des paramètres anti-triche indisponible :', error);
+      return { ...this.antiCheatSettings };
+    }
+  }
+
+  public async saveAntiCheatSettings(
+    settings: Pick<AntiCheatSettings, 'screenshotProtectionEnabled' | 'tabSwitchProtectionEnabled'>
+  ): Promise<AntiCheatSettings> {
+    const client = this.getClient();
+    if (!client) {
+      throw new Error('Supabase n’est pas configuré.');
+    }
+
+    const screenshotEnabled = Boolean(settings.screenshotProtectionEnabled);
+    const tabSwitchEnabled = Boolean(settings.tabSwitchProtectionEnabled);
+
+    const { data: rpcData, error: rpcError } = await client.rpc('save_anti_cheat_settings', {
+      p_screenshot_enabled: screenshotEnabled,
+      p_tab_switch_enabled: tabSwitchEnabled
+    });
+
+    if (!rpcError) {
+      this.antiCheatMigrationWarning = null;
+      this.antiCheatSettings = normalizeAntiCheatSettings(rpcData ?? {
+        anti_cheat_screenshot_enabled: screenshotEnabled,
+        anti_cheat_tab_switch_enabled: tabSwitchEnabled,
+        updated_at: new Date().toISOString()
+      });
+      return { ...this.antiCheatSettings };
+    }
+
+    if (!isSupabaseMissingRpcError(rpcError, 'save_anti_cheat_settings')) {
+      throw new Error(rpcError.message || 'Impossible d’enregistrer les paramètres anti-triche.');
+    }
+
+    const { data: tableData, error: tableError } = await client
+      .from('app_settings')
+      .upsert(
+        {
+          id: 'global',
+          anti_cheat_screenshot_enabled: screenshotEnabled,
+          anti_cheat_tab_switch_enabled: tabSwitchEnabled,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'id' }
+      )
+      .select('id,anti_cheat_screenshot_enabled,anti_cheat_tab_switch_enabled,updated_at')
+      .single();
+
+    if (tableError) {
+      if (isSupabaseMissingTableError(tableError, 'app_settings')) {
+        this.antiCheatMigrationWarning = ANTI_CHEAT_SETTINGS_MIGRATION_WARNING;
+        throw new Error('La table Supabase « app_settings » est absente. Copiez et exécutez la migration Anti-Triche dans le guide Supabase ci-dessous.');
+      }
+      throw new Error(tableError.message || 'Impossible d’enregistrer les paramètres anti-triche.');
+    }
+
+    this.antiCheatMigrationWarning = ANTI_CHEAT_SETTINGS_MIGRATION_WARNING;
+    this.antiCheatSettings = normalizeAntiCheatSettings(tableData);
+    return { ...this.antiCheatSettings };
   }
 
   public loadConfig(): SupabaseConfig {
@@ -1721,6 +1841,7 @@ class SupabaseService {
       passOrder: PassOrderItem[];
       quizzes: Quiz[];
       quizSubmissions: QuizSubmission[];
+      antiCheatSettings?: AntiCheatSettings;
     };
   }> {
     const client = this.getClient();
@@ -1733,6 +1854,7 @@ class SupabaseService {
 
     try {
       this.quizSecurityWarning = null;
+      this.antiCheatMigrationWarning = null;
       const { data: authData } = await client.auth.getUser();
       this.lastImportedAuthKey = authData.user?.id || 'anon';
       const isAuthenticated = Boolean(authData.user);
@@ -1797,6 +1919,11 @@ class SupabaseService {
       const enrollmentsRequest = isTeacher
         ? client.from('class_enrollments').select('student_id,class_id,status')
         : Promise.resolve({ data: [], error: null });
+      const appSettingsRequest = client
+        .from('app_settings')
+        .select('id,anti_cheat_screenshot_enabled,anti_cheat_tab_switch_enabled,updated_at')
+        .eq('id', 'global')
+        .maybeSingle();
       const [
         { data: classesData, error: errC },
         { data: studentsData, error: errS },
@@ -1810,7 +1937,8 @@ class SupabaseService {
         { data: quizSubmissionsData, error: errQS },
         { data: classLeaderboardData, error: errClassLeaderboard },
         { data: enrollmentsData, error: errEnrollments },
-        { data: classRosterData, error: errClassRoster }
+        { data: classRosterData, error: errClassRoster },
+        { data: appSettingsData, error: errAppSettings }
       ] = await Promise.all([
         classesRequest,
         studentsRequest,
@@ -1824,7 +1952,8 @@ class SupabaseService {
         quizSubmissionsRequest,
         classLeaderboardRequest,
         enrollmentsRequest,
-        classRosterRequest
+        classRosterRequest,
+        appSettingsRequest
       ]);
 
       if (errC) throw new Error(`Classes: ${errC.message}`);
@@ -2061,6 +2190,20 @@ class SupabaseService {
         is_counted: s.is_counted !== false
       }));
 
+      if (errAppSettings) {
+        if (isSupabaseMissingTableError(errAppSettings, 'app_settings')) {
+          this.antiCheatMigrationWarning = ANTI_CHEAT_SETTINGS_MIGRATION_WARNING;
+        } else {
+          console.warn('[Supabase] Chargement des paramètres anti-triche ignoré :', errAppSettings.message);
+        }
+        this.antiCheatSettings = { ...DEFAULT_ANTI_CHEAT_SETTINGS };
+      } else {
+        this.antiCheatMigrationWarning = null;
+        this.antiCheatSettings = appSettingsData
+          ? normalizeAntiCheatSettings(appSettingsData)
+          : { ...DEFAULT_ANTI_CHEAT_SETTINGS };
+      }
+
       return {
         success: true,
         message: `Import Supabase réussi : ${classes.length} classes, ${students.length} profils visibles, ${exams.length} examens, ${quizzes.length} quiz et ${quizSubmissions.length} résultats récupérés.${isTeacher ? '' : isAuthenticated ? ' Les données élèves sont limitées au profil et aux classes autorisées.' : ' Aucune donnée scolaire privée n’a été chargée.'}`,
@@ -2071,7 +2214,8 @@ class SupabaseService {
           evaluations,
           passOrder,
           quizzes,
-          quizSubmissions
+          quizSubmissions,
+          antiCheatSettings: { ...this.antiCheatSettings }
         }
       };
     } catch (e: any) {

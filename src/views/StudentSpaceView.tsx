@@ -58,6 +58,12 @@ import {
 } from '../utils/motsTrous';
 import { createTutorialQuiz, scoreTutorialQuiz } from '../utils/tutorialQuiz';
 import type { TutorialQuizScore } from '../utils/tutorialQuiz';
+import {
+  type AntiCheatSettings,
+  getAssessmentIntegrityBanner,
+  shouldMonitorScreenshot,
+  shouldMonitorTabSwitch
+} from '../utils/antiCheatSettings';
 import { getPresenceInitializationRemainingSeconds, QUIZ_PRESENCE_INITIALIZATION_SECONDS } from '../utils/quizPresence';
 import { canStudentStartQuiz, isRetryAuthorizedParticipant } from '../utils/quizRetryAvailability';
 import { QuizReorderList } from '../components/QuizReorderList';
@@ -225,6 +231,8 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
   const [classEnrollmentsLoaded, setClassEnrollmentsLoaded] = useState(false);
   const [timeoutNotice, setTimeoutNotice] = useState<boolean>(false);
   const [antiCheatNotice, setAntiCheatNotice] = useState<boolean>(false);
+  const [antiCheatReason, setAntiCheatReason] = useState<'tab_switch' | 'screenshot' | null>(null);
+  const [antiCheatSettings, setAntiCheatSettings] = useState<AntiCheatSettings>(() => dataService.getAntiCheatSettings());
   
   // In-app Confirm Dialog
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -428,6 +436,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const rawQList = dataService.getQuizzes(quizClassIds);
     const qList = rawQList.filter(q => q.status === 'launched' || subs.some(s => s.quiz_id === q.id));
     setQuizzes(qList);
+    setAntiCheatSettings(dataService.getAntiCheatSettings());
   };
 
   useEffect(() => {
@@ -547,10 +556,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     };
   }, [currentUser.student_id, onLogout, studentRecord?.id]);
 
-  // Anti-triche : les événements blur sont particulièrement imprécis sur iOS,
-  // notamment lors de l'ouverture du clavier; ils ne sont donc jamais utilisés sur mobile.
+  // Anti-triche : changement d'onglet / perte de focus (contrôlé par les paramètres professeur en base).
+  // Les événements blur sont particulièrement imprécis sur iOS, notamment lors de l'ouverture du clavier;
+  // ils ne sont donc jamais utilisés sur mobile.
   useEffect(() => {
-    if (!activeQuiz) return;
+    if (!activeQuiz || isPracticeMode || !shouldMonitorTabSwitch(antiCheatSettings)) return;
 
     const gracePeriodMs = 2000;
     const debounceMs = 1500;
@@ -573,6 +583,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         violationTimer = null;
         const actuallyAway = document.hidden || (!isMobileDevice && !document.hasFocus());
         if (actuallyAway) {
+          setAntiCheatReason('tab_switch');
           setAntiCheatNotice(true);
           void handleSubmitQuiz(true);
         }
@@ -601,7 +612,7 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
       window.removeEventListener('focus', handleFocus);
       clearViolationTimer();
     };
-  }, [activeQuiz, isPracticeMode]);
+  }, [activeQuiz, isPracticeMode, antiCheatSettings.tabSwitchProtectionEnabled]);
 
   // 1. Chronomètre du temps total du Quiz (en pause pendant l'affichage de l'explication)
   useEffect(() => {
@@ -689,6 +700,10 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     setTutorialResult(null);
     setTimeoutNotice(false);
     setAntiCheatNotice(false);
+    setAntiCheatReason(null);
+    if (!practiceMode && supabaseService.isConfigured()) {
+      void dataService.refreshAntiCheatSettings().then(setAntiCheatSettings);
+    }
     let restoredAnswers: Record<string, string> = {};
     quizDraftQueueRef.current = Promise.resolve();
     if (!practiceMode) {
@@ -1456,18 +1471,27 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
                   <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-bold text-amber-950 text-sm">
-                      {tutorialResult ? '🛡️ Entraînement interrompu • Fenêtre quittée' : '🛡️ Alerte Anti-Triche • Fenêtre quittée'}
+                      {tutorialResult
+                        ? '🛡️ Entraînement interrompu • Fenêtre quittée'
+                        : antiCheatReason === 'screenshot'
+                          ? '🛡️ Alerte Anti-Triche • Capture d’écran détectée'
+                          : '🛡️ Alerte Anti-Triche • Fenêtre quittée'}
                     </h3>
                     <p className="text-xs text-amber-900">
                       {tutorialResult
                         ? 'Vous avez quitté la fenêtre ou l’onglet pendant le tutoriel. L’entraînement a été arrêté avec un résultat local; aucune note officielle n’a été enregistrée.'
-                        : 'Vous avez quitté la fenêtre ou l’onglet d’évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.'}
+                        : antiCheatReason === 'screenshot'
+                          ? 'Une tentative de capture d’écran ou d’impression a été détectée pendant le quiz. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.'
+                          : 'Vous avez quitté la fenêtre ou l’onglet d’évaluation en cours. Conformément au règlement anti-triche, votre quiz a été automatiquement soumis et verrouillé.'}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setAntiCheatNotice(false)}
+                  onClick={() => {
+                    setAntiCheatNotice(false);
+                    setAntiCheatReason(null);
+                  }}
                   className="text-amber-500 hover:text-amber-700 p-1"
                 >
                   ✕
@@ -1721,21 +1745,29 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
           const maxQSecs = currentQ ? getQuestionTimeSeconds(currentQ) : 1;
           const clozeInfo = currentQ?.type === 'text' ? parseQuestionClozePrompt(currentQ.question) : null;
           const isLastQuestion = safeIndex + 1 === totalQuestions;
+          const screenshotProtectionActive = !isPracticeMode && shouldMonitorScreenshot(antiCheatSettings);
+          const integrityBanner = getAssessmentIntegrityBanner({
+            mode: isPracticeMode ? 'practice_quiz' : 'official_quiz',
+            settings: antiCheatSettings
+          });
 
           return (
             <AssessmentShell
               modeTone={isPracticeMode ? 'training' : 'official'}
-              bannerLabel={
-                isPracticeMode
-                  ? 'MODE ENTRAÎNEMENT • Résultat non enregistré'
-                  : 'MODE SÉCURISÉ ANTI-TRICHE • Capture d’écran strictement interdite'
-              }
-              bannerMobileLabel={isPracticeMode ? 'MODE ENTRAÎNEMENT' : 'MODE SÉCURISÉ ANTI-TRICHE'}
+              bannerLabel={integrityBanner.bannerLabel}
+              bannerMobileLabel={integrityBanner.bannerMobileLabel}
               bannerRight={
                 !isPracticeMode
                   ? `${currentUser.name} • ${currentUser.student_number || 'N°1'} • Session officielle`
                   : undefined
               }
+              screenshotProtectionEnabled={screenshotProtectionActive}
+              onScreenshotAttempt={() => {
+                if (isPracticeMode || !screenshotProtectionActive) return;
+                setAntiCheatReason('screenshot');
+                setAntiCheatNotice(true);
+                void handleSubmitQuiz(true);
+              }}
               onExit={isPracticeMode ? handleExitTutorial : undefined}
               exitLabel="Quitter"
               kicker={isPracticeMode ? 'Tutoriel interactif' : `Quiz · ${activeQuiz.class_name || 'Classe'}`}

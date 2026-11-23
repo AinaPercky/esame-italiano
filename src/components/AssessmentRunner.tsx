@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
   ChevronRight,
   Clock,
   LogOut,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Volume2,
@@ -11,6 +12,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { CORRECTION_DISPLAY_SECONDS } from '../utils/quizTiming';
+import { detectScreenshotShortcut } from '../utils/antiCheatSettings';
 
 export function formatAssessmentTime(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '—';
@@ -77,6 +79,8 @@ export interface AssessmentShellProps {
   footerLeft?: React.ReactNode;
   footerAction: React.ReactNode;
   watermarkText?: string;
+  screenshotProtectionEnabled?: boolean;
+  onScreenshotAttempt?: (shortcut: string) => void;
   zIndexClass?: string;
   modals?: React.ReactNode;
   children: React.ReactNode;
@@ -103,10 +107,54 @@ export const AssessmentShell: React.FC<AssessmentShellProps> = ({
   footerLeft,
   footerAction,
   watermarkText,
+  screenshotProtectionEnabled = false,
+  onScreenshotAttempt,
   zIndexClass = 'z-[110]',
   modals,
   children
 }) => {
+  const [captureBlocked, setCaptureBlocked] = useState(false);
+  const lastCaptureTriggerRef = useRef<number>(0);
+  const onScreenshotAttemptRef = useRef(onScreenshotAttempt);
+  onScreenshotAttemptRef.current = onScreenshotAttempt;
+
+  useEffect(() => {
+    if (!screenshotProtectionEnabled) {
+      setCaptureBlocked(false);
+      return;
+    }
+
+    let curtainTimer: number | null = null;
+    const triggerCaptureDeterrence = (shortcut: string, event: KeyboardEvent) => {
+      try {
+        event.preventDefault();
+        event.stopPropagation();
+      } catch {
+        // Certains événements système OS ne peuvent pas être annulés
+      }
+      const now = Date.now();
+      if (now - lastCaptureTriggerRef.current < 500) return;
+      lastCaptureTriggerRef.current = now;
+      setCaptureBlocked(true);
+      if (curtainTimer !== null) window.clearTimeout(curtainTimer);
+      curtainTimer = window.setTimeout(() => setCaptureBlocked(false), 1800);
+      onScreenshotAttemptRef.current?.(shortcut);
+    };
+
+    const handleKeyEvent = (event: KeyboardEvent) => {
+      const shortcut = detectScreenshotShortcut(event);
+      if (!shortcut) return;
+      triggerCaptureDeterrence(shortcut, event);
+    };
+
+    window.addEventListener('keydown', handleKeyEvent, true);
+    window.addEventListener('keyup', handleKeyEvent, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyEvent, true);
+      window.removeEventListener('keyup', handleKeyEvent, true);
+      if (curtainTimer !== null) window.clearTimeout(curtainTimer);
+    };
+  }, [screenshotProtectionEnabled]);
   const safeTotalQ = Math.max(1, totalQuestions);
   const safeIndex = Math.min(Math.max(0, questionIndex), safeTotalQ - 1);
   const safeQSecs = Math.max(0, questionSecondsRemaining ?? 0);
@@ -137,16 +185,61 @@ export const AssessmentShell: React.FC<AssessmentShellProps> = ({
       ? 'text-[#7be0ad]'
       : 'text-[#89c9f0]';
 
+  const handleClipboardBlock = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!screenshotProtectionEnabled) return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+    e.preventDefault();
+  };
+
   return (
-    <div className={`fixed inset-0 ${zIndexClass} flex min-h-0 flex-col overflow-hidden bg-[#f3f8fb] text-[#072a3f] animate-fade-in`}>
-      {watermarkText && (
-        <div
-          className="pointer-events-none fixed bottom-16 right-3 z-20 rounded-lg border border-[#d8e6ee] bg-white/80 px-2.5 py-1 text-[10px] font-semibold text-[#46657a] backdrop-blur-xs"
-          aria-hidden="true"
-        >
-          {watermarkText}
+    <>
+      {screenshotProtectionEnabled && (
+        <div className="hidden print:flex fixed inset-0 z-[200] items-center justify-center bg-white p-8 text-center text-[#072a3f]">
+          <div className="max-w-md space-y-2 rounded-2xl border border-[#d8e6ee] p-6">
+            <p className="text-base font-extrabold">Impression et capture désactivées</p>
+            <p className="text-xs text-[#46657a]">
+              Cette évaluation est protégée par le règlement anti-triche configuré par l’enseignant.
+            </p>
+          </div>
         </div>
       )}
+
+      <div
+        onContextMenu={(e) => {
+          if (screenshotProtectionEnabled) e.preventDefault();
+        }}
+        onCopy={handleClipboardBlock}
+        onCut={handleClipboardBlock}
+        className={`fixed inset-0 ${zIndexClass} flex min-h-0 flex-col overflow-hidden bg-[#f3f8fb] text-[#072a3f] animate-fade-in ${
+          screenshotProtectionEnabled ? 'select-none [&_input]:select-text [&_textarea]:select-text print:hidden' : ''
+        }`}
+      >
+        {captureBlocked && (
+          <div
+            role="alert"
+            className="fixed inset-0 z-[190] flex items-center justify-center bg-[#051e2e]/95 p-6 text-center text-white backdrop-blur-md"
+          >
+            <div className="max-w-md space-y-2 rounded-2xl border border-rose-300/40 bg-[#0b3c5d] p-6 shadow-2xl">
+              <ShieldAlert className="mx-auto h-10 w-10 text-rose-300" aria-hidden="true" />
+              <p className="font-display text-lg font-extrabold">Capture d’écran ou impression bloquée</p>
+              <p className="text-xs leading-relaxed text-white/85">
+                La protection anti-triche est activée pour cette évaluation officielle.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {watermarkText && (
+          <div
+            className="pointer-events-none fixed bottom-16 right-3 z-20 rounded-lg border border-[#d8e6ee] bg-white/80 px-2.5 py-1 text-[10px] font-semibold text-[#46657a] backdrop-blur-xs"
+            aria-hidden="true"
+          >
+            {watermarkText}
+          </div>
+        )}
 
       {/* Bandeau contexte / sécurité compact */}
       <div className={`flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1 text-[10px] sm:px-5 sm:py-1 sm:text-[11px] ${bannerClass}`}>
@@ -332,6 +425,7 @@ export const AssessmentShell: React.FC<AssessmentShellProps> = ({
 
       {modals}
     </div>
+    </>
   );
 };
 

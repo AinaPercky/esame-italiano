@@ -32,6 +32,13 @@ import type { QuizQuestion } from '../types';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import { parseMotsTrousAnswers } from '../utils/motsTrous';
 import { deleteWrittenExamDraft, loadWrittenExamDraft, saveWrittenExamDraft } from '../utils/writtenExamLocalAnswers';
+import { dataService } from '../services/dataService';
+import {
+  type AntiCheatSettings,
+  getAssessmentIntegrityBanner,
+  shouldMonitorScreenshot,
+  shouldMonitorTabSwitch
+} from '../utils/antiCheatSettings';
 
 type ExamCard = { id: string; title: string; description: string; level: string; target_language: string; instruction_language: string; duration_minutes: number; raw_max: number; display_scale: number | null; status: string; opens_at?: string; closes_at?: string; class_eligible?: boolean; attempt_status?: string; attempts_used: number; max_attempts: number; results_published: boolean; show_score_after_publish: boolean; show_corrections_after_publish: boolean; integrity_settings: any; navigation_mode: 'free' | 'sequential'; sections: any[]; raw_score?: number | null; normalized_score?: number | null; attempt_raw_max?: number | null; attempt_display_scale?: number | null; };
 
@@ -61,6 +68,14 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
   const [corrections, setCorrections] = useState<Record<string, any[]>>({});
   const [correctionOpen, setCorrectionOpen] = useState<string | null>(null);
   const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
+  const [antiCheatSettings, setAntiCheatSettings] = useState<AntiCheatSettings>(() => dataService.getAntiCheatSettings());
+
+  useEffect(() => {
+    const syncAntiCheat = () => setAntiCheatSettings(dataService.getAntiCheatSettings());
+    const unsub = dataService.subscribe(syncAntiCheat);
+    void dataService.refreshAntiCheatSettings().then(setAntiCheatSettings);
+    return unsub;
+  }, []);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -199,6 +214,10 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
     const debounceMs = 1500;
     const startedAt = Date.now();
     const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const tabSwitchMonitoringEnabled = shouldMonitorTabSwitch(
+      antiCheatSettings,
+      attempt.exam.integrity_settings?.warn_on_tab_switch !== false
+    );
     let violationTimer: number | null = null;
     const clearViolationTimer = () => { if (violationTimer !== null) { window.clearTimeout(violationTimer); violationTimer = null; } };
     const scheduleViolationCheck = (reason: 'visibility_hidden' | 'window_blur') => {
@@ -215,44 +234,53 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
       }, graceRemainingMs + debounceMs);
     };
     const hidden = () => {
-      if (document.hidden && attempt.exam.integrity_settings?.warn_on_tab_switch !== false) {
+      if (!tabSwitchMonitoringEnabled) return;
+      if (document.hidden) {
         if (!shouldDisqualifyWrittenExamVisibilityChange(isMobileDevice)) {
           void writtenExamService.logIntegrity(attempt.attempt_id, 'visibility_hidden', { page: 'written-exam', platform: 'mobile', policy: 'non_disqualifying' }).catch(() => {});
         } else { scheduleViolationCheck('visibility_hidden'); }
       } else if (!document.hidden) clearViolationTimer();
     };
-    const blur = () => { if (!isMobileDevice && attempt.exam.integrity_settings?.warn_on_tab_switch !== false) scheduleViolationCheck('window_blur'); };
+    const blur = () => { if (!isMobileDevice && tabSwitchMonitoringEnabled) scheduleViolationCheck('window_blur'); };
     const focus = () => clearViolationTimer();
     const log = (type: string) => { void writtenExamService.logIntegrity(attempt.attempt_id, type, { page: 'written-exam' }).catch(() => {}); };
     const copy = () => log('copy_attempt');
     const paste = () => log('paste_attempt');
     const offline = () => log('connection_lost');
     const online = () => { log('connection_restored'); if (submitPendingRef.current) void finish(); };
-    document.addEventListener('visibilitychange', hidden);
-    window.addEventListener('blur', blur);
-    window.addEventListener('focus', focus);
+    if (tabSwitchMonitoringEnabled) {
+      document.addEventListener('visibilitychange', hidden);
+      window.addEventListener('blur', blur);
+      window.addEventListener('focus', focus);
+    }
     document.addEventListener('copy', copy);
     document.addEventListener('paste', paste);
     window.addEventListener('offline', offline);
     window.addEventListener('online', online);
     return () => {
-      document.removeEventListener('visibilitychange', hidden);
-      window.removeEventListener('blur', blur);
-      window.removeEventListener('focus', focus);
+      if (tabSwitchMonitoringEnabled) {
+        document.removeEventListener('visibilitychange', hidden);
+        window.removeEventListener('blur', blur);
+        window.removeEventListener('focus', focus);
+      }
       document.removeEventListener('copy', copy);
       document.removeEventListener('paste', paste);
       window.removeEventListener('offline', offline);
       window.removeEventListener('online', online);
       clearViolationTimer();
     };
-  }, [attempt, finish, submitted]);
+  }, [attempt, finish, submitted, antiCheatSettings.tabSwitchProtectionEnabled]);
 
   const start = async (id: string) => {
     primeTimerAudio();
     try {
       setError('');
       onFullscreenChange?.(true);
-      const result = await writtenExamService.start(id);
+      const [result, latestSettings] = await Promise.all([
+        writtenExamService.start(id),
+        dataService.refreshAntiCheatSettings()
+      ]);
+      setAntiCheatSettings(latestSettings);
       const localDraft = await loadWrittenExamDraft(result.attempt_id);
       submitLock.current = false;
       violationPendingRef.current = false;
@@ -347,18 +375,31 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
     const clozeInfo = q.type === 'text' ? parseQuestionClozePrompt(q.prompt) : null;
     const maxQuestionSecs = getWrittenQuestionTimeLimit(q);
     const isLastQuestion = index >= flat.length - 1;
+    const screenshotProtectionActive = shouldMonitorScreenshot(antiCheatSettings);
+    const integrityBanner = getAssessmentIntegrityBanner({
+      mode: 'written_exam',
+      settings: antiCheatSettings,
+      perExamTabSwitchEnabled: attempt.exam.integrity_settings?.warn_on_tab_switch !== false
+    });
 
     return (
       <AssessmentShell
         modeTone="exam"
-        bannerLabel={
-          attempt.exam.integrity_settings?.warn_on_tab_switch !== false
-            ? 'EXAMEN OFFICIEL • Surveillance active — Ne quittez pas cette fenêtre'
-            : 'EXAMEN OFFICIEL • Session écrite contrôlée'
-        }
-        bannerMobileLabel="EXAMEN OFFICIEL"
+        bannerLabel={integrityBanner.bannerLabel}
+        bannerMobileLabel={integrityBanner.bannerMobileLabel}
         bannerRight={`${currentUser.name} · Copie surveillée`}
         watermarkText={attempt.exam.integrity_settings?.watermark ? `${currentUser.name} · PerckyLingua` : undefined}
+        screenshotProtectionEnabled={screenshotProtectionActive}
+        onScreenshotAttempt={(shortcut) => {
+          if (!screenshotProtectionActive) return;
+          setIntegrityWarning('Tentative de capture d’écran ou d’impression bloquée et consignée dans le journal de l’examen.');
+          void writtenExamService
+            .flagIntegrityViolation(attempt.attempt_id, 'screenshot_attempt', {
+              page: 'written-exam',
+              shortcut
+            })
+            .catch(() => {});
+        }}
         kicker={current.section.title || 'Examen écrit'}
         title={attempt.exam.title}
         questionIndex={index}
@@ -613,7 +654,15 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
        {section.support_url&&<a className="mt-1 inline-block font-semibold text-[#0b3c5d] underline" href={section.support_url} target="_blank" rel="noreferrer">Document support</a>}
       </div>)}
       <p className="border-t border-[#e5eff5] pt-2 text-[11px] text-[#607f93]">Période : {exam.opens_at?new Date(exam.opens_at).toLocaleString():'dès publication'} – {exam.closes_at?new Date(exam.closes_at).toLocaleString():'sans date de fermeture'}</p>
-      <p className="border-t border-[#e5eff5] pt-2 text-[11px] leading-relaxed text-[#607f93]">Règles : ordre aléatoire propre à chaque élève, temps global et compte à rebours individuel par question, passage automatique sans retour en arrière. Les corrigés restent masqués. Un changement d’onglet ou une perte de fenêtre persistante peut entraîner la remise automatique et une note nulle. Sur iPhone, les événements blur sont ignorés pour éviter les faux positifs; les captures d’écran natives ne sont pas détectables de manière fiable.</p>
+      <p className="border-t border-[#e5eff5] pt-2 text-[11px] leading-relaxed text-[#607f93]">
+        Règles : ordre aléatoire propre à chaque élève, temps global et compte à rebours individuel par question, passage automatique sans retour en arrière. Les corrigés restent masqués.
+        {shouldMonitorTabSwitch(antiCheatSettings, exam.integrity_settings?.warn_on_tab_switch !== false)
+          ? ' Un changement d’onglet ou une perte de fenêtre persistante peut entraîner la remise automatique et une note nulle. Sur iPhone, les événements blur sont ignorés pour éviter les faux positifs.'
+          : ' La détection de changement d’onglet est actuellement désactivée.'}
+        {shouldMonitorScreenshot(antiCheatSettings)
+          ? ' Les captures clavier et l’impression sont bloquées et consignées dans le journal de l’examen.'
+          : ' La protection contre la capture d’écran est actuellement désactivée.'}
+      </p>
      </div>}
     </div>
 

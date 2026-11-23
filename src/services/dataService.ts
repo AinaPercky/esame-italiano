@@ -24,6 +24,11 @@ import { formatCorrectMotsTrousForDisplay, formatMotsTrousAnswerForDisplay } fro
 import { canSubmitQuizAttempt } from '../utils/quizRetryAvailability';
 import { normalizeOralExamDurationSeconds } from '../utils/oralExamTiming';
 import { isCountedQuizSubmission, markBestQuizAttempt } from '../utils/quizBestAttempt';
+import {
+  AntiCheatSettings,
+  DEFAULT_ANTI_CHEAT_SETTINGS,
+  normalizeAntiCheatSettings
+} from '../utils/antiCheatSettings';
 
 interface AppState {
   classes: ClassRoom[];
@@ -34,6 +39,7 @@ interface AppState {
   passOrder: PassOrderItem[];
   quizzes: Quiz[];
   quizSubmissions: QuizSubmission[];
+  antiCheatSettings: AntiCheatSettings;
 }
 
 type Subscriber = () => void;
@@ -104,7 +110,8 @@ function sanitizeState(appState: AppState): AppState {
     evaluations: validEvaluations,
     passOrder: validPassOrder,
     quizzes: validQuizzes,
-    quizSubmissions: validSubmissions
+    quizSubmissions: validSubmissions,
+    antiCheatSettings: normalizeAntiCheatSettings(appState.antiCheatSettings)
   };
 }
 
@@ -119,7 +126,8 @@ function loadInitialState(): AppState {
     evaluations: [],
     passOrder: [],
     quizzes: [],
-    quizSubmissions: []
+    quizSubmissions: [],
+    antiCheatSettings: { ...DEFAULT_ANTI_CHEAT_SETTINGS }
   };
 }
 
@@ -149,6 +157,7 @@ export const dataService = {
     passOrder: PassOrderItem[];
     quizzes?: Quiz[];
     quizSubmissions?: QuizSubmission[];
+    antiCheatSettings?: AntiCheatSettings;
   }) {
     const rubrics: ExamRubric[] = [];
     newState.exams.forEach(e => {
@@ -165,7 +174,8 @@ export const dataService = {
       evaluations: newState.evaluations,
       passOrder: newState.passOrder,
       quizzes: newState.quizzes ?? state.quizzes ?? [],
-      quizSubmissions: newState.quizSubmissions ?? state.quizSubmissions ?? []
+      quizSubmissions: newState.quizSubmissions ?? state.quizSubmissions ?? [],
+      antiCheatSettings: normalizeAntiCheatSettings(newState.antiCheatSettings ?? state.antiCheatSettings)
     });
 
     persistState();
@@ -191,6 +201,38 @@ export const dataService = {
 
   getQuizSecurityWarning(): string | null {
     return supabaseService.getQuizSecurityWarning();
+  },
+
+  getAntiCheatSettings(): AntiCheatSettings {
+    return normalizeAntiCheatSettings(state.antiCheatSettings);
+  },
+
+  getAntiCheatMigrationWarning(): string | null {
+    return supabaseService.getAntiCheatMigrationWarning();
+  },
+
+  async refreshAntiCheatSettings(): Promise<AntiCheatSettings> {
+    const fresh = await supabaseService.fetchAntiCheatSettings();
+    state = {
+      ...state,
+      antiCheatSettings: normalizeAntiCheatSettings(fresh)
+    };
+    persistState();
+    notifySubscribers();
+    return state.antiCheatSettings;
+  },
+
+  async updateAntiCheatSettings(
+    settings: Pick<AntiCheatSettings, 'screenshotProtectionEnabled' | 'tabSwitchProtectionEnabled'>
+  ): Promise<AntiCheatSettings> {
+    const saved = await supabaseService.saveAntiCheatSettings(settings);
+    state = {
+      ...state,
+      antiCheatSettings: normalizeAntiCheatSettings(saved)
+    };
+    persistState();
+    notifySubscribers();
+    return state.antiCheatSettings;
   },
 
   // Recharger les données cloud; aucune réinitialisation locale de démonstration.
