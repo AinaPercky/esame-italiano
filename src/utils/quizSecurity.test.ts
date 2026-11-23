@@ -173,7 +173,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'quiz_text_matches',
       extractFn(sqlFromFile, 'quiz_text_matches')
     );
-    normalizedBootstrap = normalizedBootstrap.replace(/\\n{3,}/g, '\\n\\n');
+    normalizedBootstrap = normalizedBootstrap.replace(/\n{3,}/g, '\n\n');
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
