@@ -87,7 +87,7 @@ end;
      or (v_result ->> 'points')::numeric <> 2 then
     raise exception 'Explicit legacy multi-blank grading lost its partial-score behavior.';
   end if;
-end
+end;
 $grade$;
 
 -- End-to-end database contract for the exercises module.
