@@ -163,6 +163,11 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       extractFn(alternativeSql, 'quiz_text_matches'),
       'Le correcteur SQL de bootstrap doit rester synchronisé avec la migration des alternatives.'
     );
+    normalizedBootstrap = replaceFn(
+      normalizedBootstrap,
+      'quiz_text_matches',
+      extractFn(alternativeSql, 'quiz_text_matches')
+    );
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
