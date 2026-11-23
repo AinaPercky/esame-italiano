@@ -124,12 +124,12 @@ export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
 
   // The pipe delimiter remains the legacy explicit notation for multiple blanks.
   if (raw.includes('|')) {
-    const parts = raw.split(/\\s*\\|\\s*/).filter(Boolean);
+    const parts = raw.split(/\s*\|\s*/).filter(Boolean);
     if (parts.length > 1) return parts;
   }
 
   if (raw.includes(' // ')) {
-    const parts = raw.split(/\\s*\\/\\/\\s*/).filter(Boolean);
+    const parts = raw.split(/\s*\/\/\s*/).filter(Boolean);
     if (parts.length > 1) return parts;
   }
 
