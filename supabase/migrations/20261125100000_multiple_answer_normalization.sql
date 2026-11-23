@@ -137,7 +137,7 @@ begin
         IF v_chosen_verb <> '' AND v_typed_text <> '' AND EXISTS (
           SELECT 1
           FROM jsonb_array_elements_text(v_responses) r(value)
-          WHERE lower(regexp_replace(trim(r.value), '[[:space:]]+', ' ', 'g')) = v_typed_text
+          WHERE public.quiz_norm_answer(r.value) = v_typed_text
         ) THEN
           v_awarded := v_awarded + (v_phrase_points * 2 / 3);
         END IF;
