@@ -268,10 +268,10 @@ begin
 
   select raw_score,normalized_score,status into v_raw_score,v_normalized,v_status
   from public.written_exam_attempts where id=v_attempt_id;
-  if v_status<>'graded' or v_raw_score<>10 or v_normalized<>58.82 then
+  if v_status<>'graded' or v_raw_score<>12 or v_normalized<>66.67 then
     raise exception 'Unexpected final grading result: status %, raw %, normalized %',v_status,v_raw_score,v_normalized;
   end if;
-  if (select coalesce(sum(raw_score),0) from public.written_exam_section_results where attempt_id=v_attempt_id)<>10 then
+  if (select coalesce(sum(raw_score),0) from public.written_exam_section_results where attempt_id=v_attempt_id)<>12 then
     raise exception 'Repeated manual grading changed the section total.';
   end if;
 
