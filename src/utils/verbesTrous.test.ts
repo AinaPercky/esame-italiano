@@ -17,6 +17,7 @@ const definition = {
 test('normalise la casse et les espaces sans supprimer les accents', () => {
   assert.equal(normalizeVerbesTrousAnswer('  MI   ADDORMENTO  '), 'mi addormento');
   assert.notEqual(normalizeVerbesTrousAnswer('a'), normalizeVerbesTrousAnswer('à'));
+  assert.equal(normalizeVerbesTrousAnswer('ventitre\\u0301'), normalizeVerbesTrousAnswer('ventitré'));
 });
 test('place un verbe une seule fois et calcule la banque restante', () => {
   const one = placerVerbe({}, 1, 'addormentarsi');
@@ -32,6 +33,17 @@ test('accepte plusieurs conjugaisons possibles', () => {
   const score = noterQuiz(definition, { '1': { verbe_choisi: 'addormentarsi', texte_saisi: 'MI ADDORMENTO' } });
   assert.equal(score.score, 3);
 });
+test('accepte toutes les conjugaisons alternatives, y compris en Unicode NFD', () => {
+  const answer = { '1': { verbe_choisi: 'addormentarsi', texte_saisi: 'mi addormento subito' } };
+  assert.equal(noterQuiz(definition, answer).score, 3);
+  const accentDefinition = {
+    points_par_phrase: 3,
+    banque: ['avere'],
+    phrases: [{ id: 1, debut: 'Io ', fin: '.', verbe: 'avere', reponses: ['ho', 'h\\u006f'] }]
+  };
+  assert.equal(noterQuiz(accentDefinition, { '1': { verbe_choisi: 'avere', texte_saisi: 'ho' } }).score, 3);
+});
+
 test('note séparément le verbe et la conjugaison, même si la phrase est incomplète', () => {
   const score = noterQuiz(definition, {
     '1': { verbe_choisi: 'dire', texte_saisi: 'mi addormento' },
