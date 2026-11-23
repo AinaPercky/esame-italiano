@@ -12,7 +12,9 @@ import { noterMotsTrous, type MotsTrousAnswerKeyPhrase } from './motsTrous';
  * - Optionnellement : normalisation de la ponctuation terminale de phrase (. ? ! ; :)
  */
 export function normalizeAnswerText(value: string, stripTerminalPunctuation = false): string {
+  // NFC unifie les caractères accentués précomposés et décomposés (ex. é).
   let text = (value || '')
+    .normalize('NFC')
     .trim()
     .toLowerCase()
     .replace(/[’‘`]/g, "'")
