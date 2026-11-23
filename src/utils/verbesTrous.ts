@@ -35,7 +35,7 @@ export type VerbesTrousScore = {
 };
 
 export function normalizeVerbesTrousAnswer(value: unknown): string {
-  return String(value ?? '').trim().toLocaleLowerCase('it-IT').replace(/\s+/g, ' ');
+  return String(value ?? '').normalize('NFC').trim().toLocaleLowerCase('it-IT').replace(/\s+/g, ' ');
 }
 
 export function parseVerbesTrousAnswers(value: unknown): VerbesTrousAnswers {
