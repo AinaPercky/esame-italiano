@@ -55,5 +55,25 @@ BEGIN
   IF public.quiz_text_matches('caffe', 'caffè') THEN
     RAISE EXCEPTION 'Quiz matcher incorrectly removed a meaningful accent.';
   END IF;
+
+  IF jsonb_array_length(public.quiz_expected_answers_list(
+    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb
+  )) <> 1 THEN
+    RAISE EXCEPTION 'A flat accepted-answer list must represent one answer, not multiple blanks.';
+  END IF;
+  IF NOT public.quiz_text_matches('trentatré', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the first accepted variant.';
+  END IF;
+  IF NOT public.quiz_text_matches('trentatré euro', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the second accepted variant.';
+  END IF;
+  IF public.quiz_text_matches('trentatr', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher accepted an incomplete single answer.';
+  END IF;
+  IF jsonb_array_length(public.quiz_expected_answers_list(
+    '{"type":"text","blank_count":2,"answers":["parlo","scrivi"]}'::jsonb
+  )) <> 2 THEN
+    RAISE EXCEPTION 'Explicit legacy blank_count must preserve multiple blanks.';
+  END IF;
 END
 $test$;

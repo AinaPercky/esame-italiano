@@ -120,10 +120,15 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       process.cwd(),
       'supabase/migrations/20261127100000_italian_number_digit_equivalence.sql'
     );
+    const unifiedAnswersMigrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261128120000_unified_answer_variants_grading.sql'
+    );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
     const unicodeSql = fs.readFileSync(unicodeMigrationPath, 'utf8');
     const italianNumbersSql = fs.readFileSync(italianNumbersMigrationPath, 'utf8');
+    const unifiedAnswersSql = fs.readFileSync(unifiedAnswersMigrationPath, 'utf8');
 
     // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
     // doivent correspondre exactement à la migration additive 20261124000000.
@@ -134,6 +139,12 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       assert.notEqual(end, -1, `Fin de fonction ${fnName} introuvable.`);
       return source.slice(start, end + 3).trim();
     };
+
+    assert.equal(
+      extractFn(QUIZ_SECURITY_MIGRATION_SQL, 'quiz_expected_answers_list'),
+      extractFn(unifiedAnswersSql, 'quiz_expected_answers_list'),
+      'quiz_expected_answers_list doit rester synchronisée avec la migration unifiée.'
+    );
 
     for (const fnName of ['quiz_sanitize_questions', 'quiz_grade_question']) {
       assert.equal(
@@ -159,6 +170,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'Le helpers TypeScript et SQL doivent utiliser la même normalisation NFC.'
     );
     normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(sqlFromFile, 'quiz_norm_answer'));
+    normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_expected_answers_list', extractFn(sqlFromFile, 'quiz_expected_answers_list'));
     for (const fnName of ['quiz_italian_under_100', 'quiz_italian_number_words', 'quiz_italian_number_value', 'quiz_text_matches']) {
       assert.equal(
         extractFn(QUIZ_SECURITY_MIGRATION_SQL, fnName),

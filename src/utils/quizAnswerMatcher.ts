@@ -93,13 +93,23 @@ export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: strin
  * - S'il y a plusieurs trous (ex: 2, 3, 4 verbes) : renvoie le tableau des réponses pour chaque trou.
  */
 export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
+  const explicitBlankCount = Math.max(0, Number((question as any).blank_count) || 0);
+  const normalizeEntries = (entries: unknown[]): string[] => {
+    const values = entries.map((entry) => Array.isArray(entry)
+      ? entry.map(String).map(value => value.trim()).filter(Boolean).join(' / ')
+      : String(entry ?? '').trim()).filter(Boolean);
+
+    // A flat list is a list of accepted variants for ONE answer.
+    // Multiple blanks must be represented by nested arrays, or explicitly by blank_count.
+    const hasNestedBlanks = entries.some(Array.isArray);
+    if (!hasNestedBlanks && explicitBlankCount <= 1 && values.length > 1) {
+      return [values.join(' / ')];
+    }
+    return values;
+  };
+
   if (Array.isArray(question.answers) && question.answers.length > 0) {
-    return question.answers.map(a => {
-      if (Array.isArray(a)) {
-        return a.map(String).join(' / ');
-      }
-      return String(a || '').trim();
-    });
+    return normalizeEntries(question.answers);
   }
 
   const raw = (question.correct_answer || '').trim();
@@ -107,15 +117,12 @@ export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item: any) => {
-          if (Array.isArray(item)) return item.map(String).join(' / ');
-          return String(item || '').trim();
-        });
+        return normalizeEntries(parsed);
       }
     } catch {}
   }
 
-  // Délimiteur pipe pour les réponses multi-trous (ex: "parlo | scrivi | legge | dormiamo" ou "parlo|scrivi|legge|dormiamo")
+  // The pipe delimiter remains the legacy explicit notation for multiple blanks.
   if (raw.includes('|')) {
     const parts = raw.split(/\s*\|\s*/).filter(Boolean);
     if (parts.length > 1) return parts;

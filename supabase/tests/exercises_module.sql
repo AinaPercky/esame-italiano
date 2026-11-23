@@ -58,6 +58,34 @@ begin
   if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 2 then
     raise exception 'Verbes à trous grading failed';
   end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
+    '"trentatré"'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true
+     or (v_result ->> 'points')::numeric <> 2
+     or (v_result ->> 'max_points')::numeric <> 2 then
+    raise exception 'Exercise grading treated accepted variants as separate required blanks.';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
+    '"trentatré euro"'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true
+     or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Exercise grading rejected the second accepted variant.';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"text","points":4,"blank_count":2,"answers":["parlo","scrivi"]}'::jsonb,
+    '["parlo","wrong"]'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,true) is not false
+     or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Explicit legacy multi-blank grading lost its partial-score behavior.';
+  end if;
 end;
 $grade$;
 

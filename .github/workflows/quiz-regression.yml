@@ -71,14 +71,6 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: perckylingua_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261127100000_italian_number_digit_equivalence.sql
-      - name: Test quiz alternatives and Unicode normalization
-        env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: perckylingua_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/quiz_answer_grading.sql
       - name: Test quiz snapshot migration in isolated PostgreSQL
         env:
           PGHOST: localhost
@@ -87,6 +79,22 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: perckylingua_test
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/quiz_submission_questions_snapshot_migration.sql
+      - name: Apply unified accepted-answer variants grading
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261128120000_unified_answer_variants_grading.sql
+      - name: Test quiz alternatives and Unicode normalization
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/quiz_answer_grading.sql
       - name: Bootstrap minimal schema for public quiz batch grading
         env:
           PGHOST: localhost

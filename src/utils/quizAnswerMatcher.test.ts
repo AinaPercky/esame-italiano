@@ -148,3 +148,52 @@ describe('notation des questions verbes_trous', () => {
     assert.equal(result.isFullyCorrect, false);
   });
 });
+
+
+describe('distinction entre variantes acceptées et cases multiples', () => {
+  it('traite une liste plate de réponses comme des variantes d’une seule réponse', () => {
+    const question: any = {
+      id: 'single-answer-variants', type: 'text', question: 'Scrivi il risultato in lettere',
+      points: 2, answers: ['trentatré', 'trentatré euro']
+    };
+    for (const answer of ['trentatré', 'trentatré euro']) {
+      const result = calculateQuestionPointsEarned(question, answer);
+      assert.equal(result.isFullyCorrect, true, answer);
+      assert.equal(result.awardedPoints, 2, answer);
+      assert.equal(result.totalBlanks, 1, answer);
+    }
+  });
+
+  it('conserve les vrais trous multiples représentés par des tableaux imbriqués', () => {
+    const question: any = {
+      id: 'two-blanks-variants', type: 'text', question: 'Completa le due forme',
+      points: 4, answers: [['parlo', 'io parlo'], ['scrivi', 'tu scrivi']]
+    };
+    const full = calculateQuestionPointsEarned(question, JSON.stringify(['io parlo', 'scrivi']));
+    const partial = calculateQuestionPointsEarned(question, JSON.stringify(['parlo', 'wrong']));
+    assert.equal(full.awardedPoints, 4);
+    assert.equal(full.totalBlanks, 2);
+    assert.equal(partial.awardedPoints, 2);
+    assert.equal(partial.isFullyCorrect, false);
+  });
+
+  it('préserve les anciens exercices à plusieurs cases déclarées explicitement', () => {
+    const question: any = {
+      id: 'legacy-explicit-blanks', type: 'text', question: 'Completa',
+      points: 4, blank_count: 2, answers: ['parlo', 'scrivi']
+    };
+    const result = calculateQuestionPointsEarned(question, JSON.stringify(['parlo', 'scrivi']));
+    assert.equal(result.isFullyCorrect, true);
+    assert.equal(result.totalBlanks, 2);
+  });
+
+  it('ne confond pas les variantes avec une réponse partielle', () => {
+    const question: any = {
+      id: 'wrong-variant', type: 'text', question: 'Scrivi il risultato',
+      points: 2, answers: ['trentatré', 'trentatré euro']
+    };
+    const result = calculateQuestionPointsEarned(question, 'trentatr');
+    assert.equal(result.awardedPoints, 0);
+    assert.equal(result.isFullyCorrect, false);
+  });
+});
