@@ -28,6 +28,30 @@ BEGIN
   IF public.quiz_text_matches('venti', 'ventitré / 23') THEN
     RAISE EXCEPTION 'Quiz matcher accepted an incomplete answer.';
   END IF;
+  IF NOT public.quiz_text_matches('92', 'novantadue') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected numeric digits for the Italian number novantadue.';
+  END IF;
+  IF NOT public.quiz_text_matches('novantadue', '92') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected Italian number words for numeric expected answer 92.';
+  END IF;
+  IF NOT public.quiz_text_matches('92', 'novantadue euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected numeric digits for a number followed by euro.';
+  END IF;
+  IF NOT public.quiz_text_matches('92 euro', 'novantadue') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the optional euro suffix.';
+  END IF;
+  IF NOT public.quiz_text_matches('108', 'centotto') OR
+     NOT public.quiz_text_matches('180', 'centottanta') OR
+     NOT public.quiz_text_matches('223', 'duecentoventitré') THEN
+    RAISE EXCEPTION 'Quiz matcher failed Italian compound-number conversion.';
+  END IF;
+  IF public.quiz_text_matches('93', 'novantadue') OR
+     public.quiz_text_matches('92', 'novantatré') THEN
+    RAISE EXCEPTION 'Quiz matcher accepted a different numeric value.';
+  END IF;
+  IF public.quiz_text_matches('1000', 'novantadue') THEN
+    RAISE EXCEPTION 'Quiz matcher accepted a value outside the supported number range.';
+  END IF;
   IF public.quiz_text_matches('caffe', 'caffè') THEN
     RAISE EXCEPTION 'Quiz matcher incorrectly removed a meaningful accent.';
   END IF;
