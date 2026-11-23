@@ -13,6 +13,18 @@ BEGIN
   IF NOT public.quiz_text_matches('ventitre' || U&'\0301', 'ventitré') THEN
     RAISE EXCEPTION 'Quiz matcher rejected canonically equivalent NFC/NFD accents.';
   END IF;
+  IF NOT public.quiz_text_matches('ventiquattro', 'ventiquattro ou ventiquattro euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the French "ou" alternative connector.';
+  END IF;
+  IF NOT public.quiz_text_matches('ventiquattro euro', 'ventiquattro oppure ventiquattro euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the Italian "oppure" alternative connector.';
+  END IF;
+  IF NOT public.quiz_text_matches('ventiquattro', 'ventiquattro o ventiquattro euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the Italian "o" alternative connector.';
+  END IF;
+  IF public.quiz_text_matches('venticinque', 'ventiquattro ou ventiquattro euro') THEN
+    RAISE EXCEPTION 'Quiz matcher accepted an undeclared alternative.';
+  END IF;
   IF public.quiz_text_matches('venti', 'ventitré / 23') THEN
     RAISE EXCEPTION 'Quiz matcher accepted an incomplete answer.';
   END IF;

@@ -68,7 +68,7 @@ export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: strin
 
   // 3. Prise en charge des alternatives déclarées par le professeur (ex: "io cuocio / cuocio")
   const alternatives = expectedAnswer
-    .split(/\s*[\/;|]\s*/)
+    .split(/\s*[\/;|]\s*|\s+(?:ou|oppure|o)\s+/i)
     .map(alt => normalizeAnswerText(alt, true))
     .filter(Boolean);
 

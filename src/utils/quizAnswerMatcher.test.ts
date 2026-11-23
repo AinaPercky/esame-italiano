@@ -34,6 +34,20 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.equal(isTextAnswerCorrect('24', 'ventitré / 23'), false);
   });
 
+  it('accepte les alternatives séparées par slash, ou, o et oppure', () => {
+    for (const expected of [
+      'ventiquattro / ventiquattro euro',
+      'ventiquattro ou ventiquattro euro',
+      'ventiquattro o ventiquattro euro',
+      'ventiquattro oppure ventiquattro euro'
+    ]) {
+      assert.equal(isTextAnswerCorrect('ventiquattro', expected), true, expected);
+      assert.equal(isTextAnswerCorrect('ventiquattro euro', expected), true, expected);
+    }
+    assert.equal(isTextAnswerCorrect('venti', 'ventiquattro ou ventiquattro euro'), false);
+    assert.equal(isTextAnswerCorrect('venticinque', 'ventiquattro oppure ventiquattro euro'), false);
+  });
+
   it('note les trous multiples lorsque chaque trou possède plusieurs variantes acceptées', () => {
     const question: any = {
       id: 'multi-answers',
