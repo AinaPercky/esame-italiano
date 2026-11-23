@@ -26,6 +26,30 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.equal(score.awardedPoints, 2);
   });
 
+  it('accepte plusieurs variantes complètes pour une même question et refuse les autres', () => {
+    for (const accepted of ['ventitré', '23', 'ventitre\\u0301']) {
+      assert.equal(isTextAnswerCorrect(accepted, 'ventitré / 23'), true);
+    }
+    assert.equal(isTextAnswerCorrect('venti', 'ventitré / 23'), false);
+    assert.equal(isTextAnswerCorrect('24', 'ventitré / 23'), false);
+  });
+
+  it('note les trous multiples lorsque chaque trou possède plusieurs variantes acceptées', () => {
+    const question: any = {
+      id: 'multi-answers',
+      type: 'text',
+      question: 'Completa le due risposte',
+      points: 4,
+      answers: [['sono', 'io sono'], ['ho', 'possiedo']]
+    };
+    const allAlternatives = calculateQuestionPointsEarned(question, JSON.stringify(['IO SONO', 'possiedo']));
+    assert.equal(allAlternatives.isFullyCorrect, true);
+    assert.equal(allAlternatives.awardedPoints, 4);
+    const oneAlternative = calculateQuestionPointsEarned(question, JSON.stringify(['sono', 'wrong']));
+    assert.equal(oneAlternative.isFullyCorrect, false);
+    assert.equal(oneAlternative.awardedPoints, 2);
+  });
+
   it('accepte une ponctuation finale omise ou ajoutée', () => {
     assert.equal(isTextAnswerCorrect('io vado a scuola', 'Io vado a scuola.'), true);
     assert.equal(isTextAnswerCorrect('Io vado a scuola!', 'io vado a scuola'), true);
