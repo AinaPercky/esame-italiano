@@ -113,7 +113,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     );
     const unicodeMigrationPath = path.resolve(
       process.cwd(),
-      'supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql'
+      'supabase/migrations/20261126100000_quiz_text_alternative_connectors.sql'
     );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
