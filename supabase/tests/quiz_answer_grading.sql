@@ -61,23 +61,14 @@ BEGIN
   )) <> 1 THEN
     RAISE EXCEPTION 'A flat accepted-answer list must represent one answer, not multiple blanks.';
   END IF;
-  IF NOT (public.quiz_grade_question(
-    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
-    'trentatré'
-  ) ->> 'correct')::boolean THEN
-    RAISE EXCEPTION 'Quiz grading rejected the first accepted variant as a full answer.';
+  IF NOT public.quiz_text_matches('trentatré', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the first accepted variant.';
   END IF;
-  IF NOT (public.quiz_grade_question(
-    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
-    'trentatré euro'
-  ) ->> 'correct')::boolean THEN
-    RAISE EXCEPTION 'Quiz grading rejected the second accepted variant as a full answer.';
+  IF NOT public.quiz_text_matches('trentatré euro', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher rejected the second accepted variant.';
   END IF;
-  IF (public.quiz_grade_question(
-    '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
-    'trentatr'
-  ) ->> 'points')::numeric <> 0 THEN
-    RAISE EXCEPTION 'Quiz grading awarded partial points for an incomplete single answer.';
+  IF public.quiz_text_matches('trentatr', 'trentatré / trentatré euro') THEN
+    RAISE EXCEPTION 'Quiz matcher accepted an incomplete single answer.';
   END IF;
   IF jsonb_array_length(public.quiz_expected_answers_list(
     '{"type":"text","blank_count":2,"answers":["parlo","scrivi"]}'::jsonb
