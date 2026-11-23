@@ -527,16 +527,16 @@ DO $migration$
 DECLARE d text; u text;
 BEGIN
  d:=pg_get_functiondef('public.exercise_grade_question(jsonb,jsonb)'::regprocedure);
- u:=replace(d,$old$WHERE public.quiz_norm_answer(a.value) = v_student_text$old$,$new$WHERE public.quiz_text_matches(v_student_text,a.value)$new$);
+ u:=replace(d,$old$where public.quiz_norm_answer(a.value) = v_student_text$old$,$new$WHERE public.quiz_text_matches(v_student_text,a.value)$new$);
  IF u=d THEN RAISE EXCEPTION 'Exercise nested variant matcher anchor missing'; END IF;
  d:=u;
  u:=replace(d,$old$if v_student_text = v_expected_text or exists ($old$,$new$if public.quiz_text_matches(v_student_text,v_expected_text) or exists ($new$);
  IF u=d THEN RAISE EXCEPTION 'Exercise direct text matcher anchor missing'; END IF;
  d:=u;
- u:=replace(d,$old$WHERE public.quiz_norm_answer(a) = v_student_text$old$,$new$WHERE public.quiz_text_matches(v_student_text,a)$new$);
+ u:=replace(d,$old$where public.quiz_norm_answer(a) = v_student_text$old$,$new$WHERE public.quiz_text_matches(v_student_text,a)$new$);
  IF u=d THEN RAISE EXCEPTION 'Exercise alternatives matcher anchor missing'; END IF;
  d:=u;
- u:=replace(d,$old$WHERE public.quiz_norm_answer(r.value) = v_typed_text$old$,$new$WHERE public.quiz_text_matches(v_typed_text,r.value)$new$);
+ u:=replace(d,$old$where public.quiz_norm_answer(r.value) = v_typed_text$old$,$new$WHERE public.quiz_text_matches(v_typed_text,r.value)$new$);
  IF u=d THEN RAISE EXCEPTION 'Exercise verb form matcher anchor missing'; END IF;
  EXECUTE u;
 END;
