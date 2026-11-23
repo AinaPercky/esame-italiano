@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'supabase/migrations/**'
       - 'tests/sql/**'
+      - 'supabase/tests/**'
       - 'package.json'
       - '.github/workflows/quiz-regression.yml'
   pull_request:
@@ -95,6 +96,22 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: perckylingua_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/quiz_answer_grading.sql
+      - name: Apply quiz grading and QCM regression fix
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261129100000_fix_quiz_qcm_grading_regression.sql
+      - name: Test quiz grading and QCM regression cases
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/quiz_grading_regression_cases.sql
       - name: Bootstrap minimal schema for public quiz batch grading
         env:
           PGHOST: localhost

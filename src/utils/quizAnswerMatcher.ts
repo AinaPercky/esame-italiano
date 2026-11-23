@@ -102,6 +102,11 @@ export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
     // A flat list is a list of accepted variants for ONE answer.
     // Multiple blanks must be represented by nested arrays, or explicitly by blank_count.
     const hasNestedBlanks = entries.some(Array.isArray);
+    // Legacy sanitizer could persist duplicate variants as blank_count=2.
+    // Identical flat answers cannot represent two distinct expected slots.
+    const allFlatEntriesIdentical = !hasNestedBlanks && values.length > 1
+      && values.every(value => normalizeAnswerText(value) === normalizeAnswerText(values[0]));
+    if (allFlatEntriesIdentical) return [values[0]];
     if (!hasNestedBlanks && explicitBlankCount <= 1 && values.length > 1) {
       return [values.join(' / ')];
     }
@@ -206,8 +211,22 @@ export function calculateQuestionPointsEarned(question: QuizQuestion, studentAns
   }
 
   if (question.type === 'qcm') {
-    const expected = (question.correct_answer || '').trim();
-    const isCorrect = normalizeAnswerText(sAns) === normalizeAnswerText(expected);
+    const expected = normalizeAnswerText(question.correct_answer || '');
+    const options = (question.options || []) as unknown as Array<string | { id?: string; label?: string }>;
+    const keyedOption = options.find(option => {
+      if (typeof option === 'string') return normalizeAnswerText(option) === expected;
+      return normalizeAnswerText(option.id || '') === expected
+        || normalizeAnswerText(option.label || '') === expected;
+    });
+    const acceptedValues = new Set<string>([expected]);
+    if (keyedOption) {
+      if (typeof keyedOption === 'string') acceptedValues.add(normalizeAnswerText(keyedOption));
+      else {
+        if (keyedOption.id) acceptedValues.add(normalizeAnswerText(keyedOption.id));
+        if (keyedOption.label) acceptedValues.add(normalizeAnswerText(keyedOption.label));
+      }
+    }
+    const isCorrect = acceptedValues.has(normalizeAnswerText(sAns));
     return { awardedPoints: isCorrect ? maxPoints : 0, maxPoints, isFullyCorrect: isCorrect, partialCorrectCount: isCorrect ? 1 : 0, totalBlanks: 1 };
   }
 
