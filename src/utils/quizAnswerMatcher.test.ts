@@ -197,3 +197,31 @@ describe('distinction entre variantes acceptées et cases multiples', () => {
     assert.equal(result.isFullyCorrect, false);
   });
 });
+
+
+describe('régression QCM et anciennes réponses dupliquées', () => {
+  it('traite deux réponses identiques enregistrées comme une seule réponse attendue', () => {
+    const question: any = {
+      id: 'duplicate-single-answer', type: 'text', question: 'Calcola 9 × 5',
+      points: 2, blank_count: 2, answers: ['quarantacinque', 'quarantacinque']
+    };
+    const result = calculateQuestionPointsEarned(question, 'quarantacinque');
+    assert.equal(result.isFullyCorrect, true);
+    assert.equal(result.awardedPoints, 2);
+    assert.equal(result.totalBlanks, 1);
+  });
+
+  it('accepte le libellé ou l’identifiant de la bonne option QCM', () => {
+    const byId: any = {
+      id: 'qcm-id', type: 'qcm', question: 'QCM', points: 2,
+      correct_answer: 'opt-a',
+      options: [{ id: 'opt-a', label: 'Quarantacinque' }, { id: 'opt-b', label: 'Cinquantacinque' }]
+    };
+    assert.equal(calculateQuestionPointsEarned(byId, 'opt-a').awardedPoints, 2);
+    assert.equal(calculateQuestionPointsEarned(byId, 'Quarantacinque').awardedPoints, 2);
+    const byLabel: any = { ...byId, correct_answer: 'Quarantacinque' };
+    assert.equal(calculateQuestionPointsEarned(byLabel, 'opt-a').awardedPoints, 2);
+    assert.equal(calculateQuestionPointsEarned(byLabel, 'Quarantacinque').awardedPoints, 2);
+    assert.equal(calculateQuestionPointsEarned(byLabel, 'Cinquantacinque').awardedPoints, 0);
+  });
+});
