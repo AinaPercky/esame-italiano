@@ -33,7 +33,7 @@ function italianNumberUnder1000(value: number): string {
 }
 
 const ITALIAN_NUMBER_VALUES = new Map<string, number>(
-  Array.from({ length: 1000 }, (_, value) => [italianNumberUnder1000(value), value])
+  Array.from({ length: 1000 }, (_, value) => [italianNumberUnder1000(value), value] as const)
 );
 
 /**
