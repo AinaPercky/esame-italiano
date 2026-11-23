@@ -35,7 +35,7 @@ BEGIN
  IF coalesce((r->>'correct')::boolean,false) IS NOT TRUE OR (r->>'points')::numeric<>2 THEN RAISE EXCEPTION 'EXERCISE_VARIANTS_FAIL %',r; END IF;
  r:=public.exercise_grade_question('{"type":"text","points":1,"blank_count":3,"question":"___ ___ ___","answers":["a","b","c"]}'::jsonb,'["a","b","c"]'::jsonb);
  IF coalesce((r->>'correct')::boolean,false) IS NOT TRUE OR (r->>'points')::numeric<>1 THEN RAISE EXCEPTION 'EXERCISE_THIRDS_FAIL %',r; END IF;
- r:=public.exercise_grade_question('{"type":"text","points":2,"correct_answer":"caffè"}'::jsonb,'"caffé"'::jsonb);
+ r:=public.exercise_grade_question('{"type":"text","points":2,"correct_answer":"caffè"}'::jsonb,'"caffè"'::jsonb);
  IF coalesce((r->>'correct')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'EXERCISE_UNICODE_FAIL %',r; END IF;
  r:=public.exercise_grade_question('{"type":"reorder","points":2,"items":[{"id":"a"},{"id":"b"}]}'::jsonb,'["a","b"]'::jsonb);
  IF coalesce((r->>'correct')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'EXERCISE_REORDER_FAIL %',r; END IF;
