@@ -113,11 +113,16 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     );
     const unicodeMigrationPath = path.resolve(
       process.cwd(),
+      'supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql'
+    );
+    const alternativeMigrationPath = path.resolve(
+      process.cwd(),
       'supabase/migrations/20261126100000_quiz_text_alternative_connectors.sql'
     );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
     const unicodeSql = fs.readFileSync(unicodeMigrationPath, 'utf8');
+    const alternativeSql = fs.readFileSync(alternativeMigrationPath, 'utf8');
 
     // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
     // doivent correspondre exactement à la migration additive 20261124000000.
@@ -153,6 +158,11 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'Le helpers TypeScript et SQL doivent utiliser la même normalisation NFC.'
     );
     normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(sqlFromFile, 'quiz_norm_answer'));
+    assert.equal(
+      extractFn(QUIZ_SECURITY_MIGRATION_SQL, 'quiz_text_matches'),
+      extractFn(alternativeSql, 'quiz_text_matches'),
+      'Le correcteur SQL de bootstrap doit rester synchronisé avec la migration des alternatives.'
+    );
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
