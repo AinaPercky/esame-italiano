@@ -11,6 +11,14 @@ import {
   formatCorrectMotsTrousForDisplay,
   formatMotsTrousAnswerForDisplay
 } from '../utils/motsTrous';
+import {
+  formatCorrectTextAnswerForDisplay,
+  formatTextAnswerForDisplay
+} from '../utils/quizAnswerMatcher';
+import {
+  formatCorrectReorderAnswer,
+  formatReorderAnswer
+} from '../utils/quizReorder';
 import { CORRECTION_DISPLAY_SECONDS } from '../utils/quizTiming';
 import {
   isTimerBeepEnabled,
@@ -51,6 +59,16 @@ const formatExerciseExpected = (question: ExerciseAttemptReview['questions'][num
     if (question.mots_trous) {
       return formatCorrectMotsTrousForDisplay(question.mots_trous);
     }
+  }
+  if (question.type === 'text') {
+    const rawExpected = question.expected;
+    return formatCorrectTextAnswerForDisplay({
+      question: question.question,
+      blank_count: question.blank_count,
+      ...(Array.isArray(rawExpected)
+        ? { answers: rawExpected as string[] }
+        : { correct_answer: typeof rawExpected === 'string' ? rawExpected : correctionText(rawExpected) })
+    });
   }
   if (question.type === 'reorder' && question.items?.length) {
     try {
@@ -610,12 +628,38 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
             isTimeout={Boolean(correction?.timed_out)}
             questionNumber={active.question_number}
             questionText={q.question}
-            studentAnswer={
-              q.type === 'mots_trous'
-                ? formatMotsTrousAnswerForDisplay(q.mots_trous, correction?.student_answer ?? answer)
-                : correctionText((correction?.student_answer ?? answer) || '')
-            }
-            expectedAnswer={correctionText(correction?.expected)}
+            studentAnswer={(() => {
+              const rawStudent = correction?.student_answer ?? answer;
+              if (q.type === 'mots_trous') {
+                return formatMotsTrousAnswerForDisplay(q.mots_trous, rawStudent);
+              }
+              if (q.type === 'text') {
+                const rawStr = typeof rawStudent === 'string' ? rawStudent : JSON.stringify(rawStudent ?? '');
+                return formatTextAnswerForDisplay(q, rawStr);
+              }
+              if (q.type === 'reorder') {
+                const rawStr = typeof rawStudent === 'string' ? rawStudent : JSON.stringify(rawStudent ?? '');
+                return formatReorderAnswer(q, rawStr);
+              }
+              return correctionText(rawStudent || '');
+            })()}
+            expectedAnswer={(() => {
+              const rawExpected = correction?.expected;
+              if (q.type === 'text') {
+                return formatCorrectTextAnswerForDisplay({
+                  question: q.question,
+                  blank_count: q.blank_count,
+                  ...(Array.isArray(rawExpected)
+                    ? { answers: rawExpected as string[] }
+                    : { correct_answer: typeof rawExpected === 'string' ? rawExpected : correctionText(rawExpected) })
+                });
+              }
+              if (q.type === 'reorder' && q.items?.length) {
+                const rawStr = typeof rawExpected === 'string' ? rawExpected : JSON.stringify(rawExpected ?? '');
+                return formatCorrectReorderAnswer({ ...q, correct_answer: rawStr });
+              }
+              return correctionText(rawExpected);
+            })()}
             explanation={correction?.explanation ? correctionText(correction.explanation) : undefined}
             points={correction?.points ?? 0}
             maxPoints={correction?.max_points ?? q.points}
@@ -900,7 +944,23 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
                         ? (question.timed_out ? 'Temps écoulé · aucune réponse' : 'Non répondu')
                         : question.type === 'mots_trous'
                           ? formatMotsTrousAnswerForDisplay(question.mots_trous, question.answer)
-                          : correctionText(question.answer)}
+                          : question.type === 'text'
+                            ? formatTextAnswerForDisplay(
+                                {
+                                  question: question.question,
+                                  blank_count: question.blank_count,
+                                  ...(Array.isArray(question.expected)
+                                    ? { answers: question.expected as string[] }
+                                    : { correct_answer: typeof question.expected === 'string' ? question.expected : '' })
+                                },
+                                typeof question.answer === 'string' ? question.answer : JSON.stringify(question.answer ?? '')
+                              )
+                            : question.type === 'reorder' && question.items?.length
+                              ? formatReorderAnswer(
+                                  { id: question.question_id, type: 'reorder', question: question.question, correct_answer: '', points: question.points, items: question.items },
+                                  typeof question.answer === 'string' ? question.answer : JSON.stringify(question.answer ?? '')
+                                )
+                              : correctionText(question.answer)}
                     </p>
                   </div>
                   {(!question.correct || unanswered) && <>

@@ -3,10 +3,12 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {getDefaultWrittenQuestionTimeLimit} from '../utils/writtenExam';
 import {formatCorrectMotsTrousForDisplay, formatMotsTrousAnswerForDisplay, noterMotsTrous, type MotsTrousAnswerKeyPhrase} from '../utils/motsTrous';
+import {formatWrittenExamTextExpected, gradeWrittenExamTextQuestion, normalizeAnswerText} from '../utils/quizAnswerMatcher';
+import {normalizeVerbesTrousAnswer} from '../utils/verbesTrous';
 
 type Props={attempt:any;version:any;manualScores:Record<string,number>;onManualScore:(id:string,value:number)=>void};
 
-const normalize=(value:any)=>String(value??'').normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('it-IT');
+const normalize=(value:any)=>normalizeAnswerText(String(value??''));
 const parseArray=(value:any):any[]=>{
  if(Array.isArray(value))return value;
  if(typeof value==='string'){try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch{return value? [value]:[];}}
@@ -24,8 +26,7 @@ const correctText=(q:any)=>{
  const key=keyOf(q);const pub=publicOf(q);
  if(q.question_type==='qcm')return (pub.options||[]).find((o:any)=>o.id===key.correctOptionId)?.label||'Corrigé indisponible';
  if(q.question_type==='text'){
-  if(Array.isArray(key.answers))return key.answers.map((variants:any,i:number)=>'Trou '+(i+1)+' : '+(Array.isArray(variants)?variants.join(' / '):String(variants))).join(' · ');
-  return (key.acceptedAnswers||[]).join(' / ')||'Correction manuelle';
+  return formatWrittenExamTextExpected(q.prompt||'',key,pub.blank_count);
  }
  if(q.question_type==='reorder'){
   const items=pub.items||[];return (key.correctOrder||[]).map((id:string)=>items.find((x:any)=>x.id===id)?.text||id).join(' → ');
@@ -57,14 +58,14 @@ const studentText=(q:any,value:any)=>{
 };
 const autoScore=(q:any,value:any)=>{
  const points=Number(q.points)||0;const key=keyOf(q);const pub=publicOf(q);
- if(q.question_type==='qcm')return String(value??'')===String(key.correctOptionId??'')?points:0;
+ if(q.question_type==='qcm'){
+  const correctId=String(key.correctOptionId??'');
+  if(String(value??'')===correctId)return points;
+  const expectedLabel=(pub.options||[]).find((o:any)=>String(o.id)===correctId)?.label;
+  return expectedLabel&&normalize(expectedLabel)===normalize(value)?points:0;
+ }
  if(q.question_type==='text'){
-  if(Array.isArray(key.answers)){
-   const actual=parseArray(value);const expected=key.answers;let hits=0;
-   expected.forEach((variants:any,i:number)=>{const accepted=Array.isArray(variants)?variants:[variants];if(accepted.some((x:any)=>normalize(x)===normalize(actual[i])))hits++;});
-   return expected.length?Math.round(points*hits/expected.length*100)/100:0;
-  }
-  const accepted=key.acceptedAnswers||[];return accepted.some((x:any)=>normalize(x)===normalize(value))?points:0;
+  return gradeWrittenExamTextQuestion(q.prompt||'',key,pub.blank_count,value,points);
  }
  if(q.question_type==='reorder'){
   const expected=key.correctOrder||[];const actual=parseArray(value);let hits=0;
@@ -72,8 +73,20 @@ const autoScore=(q:any,value:any)=>{
   return expected.length?Math.round(points*hits/expected.length*100)/100:0;
  }
  if(q.question_type==='verbes_trous'){
-  const actual=parseObject(value);const phrases=key.phrases||[];const bank=(pub.verbes_trous?.banque||[]).map((x:any)=>normalize(x));const used=new Set<string>();let score=0;
-  phrases.forEach((phrase:any)=>{const answer=actual[String(phrase.id)]||{};const chosen=normalize(answer.verbe_choisi);const expected=normalize(phrase.verbe);const unique=!!chosen&&!used.has(chosen)&&bank.includes(chosen);if(unique){used.add(chosen);if(chosen===expected)score+=1;if((phrase.reponses||[]).some((x:any)=>normalize(x)===normalize(answer.texte_saisi)))score+=2;}});
+  const actual=parseObject(value);const phrases=key.phrases||[];const bank=(pub.verbes_trous?.banque||[]).map((x:any)=>normalizeVerbesTrousAnswer(String(x)));const used=new Set<string>();let score=0;
+  phrases.forEach((phrase:any)=>{
+   const answer=actual[String(phrase.id)]||{};
+   const chosen=normalizeVerbesTrousAnswer(String(answer.verbe_choisi||''));
+   const expected=normalizeVerbesTrousAnswer(String(phrase.verbe||''));
+   const unique=!!chosen&&!used.has(chosen)&&(bank.length===0||bank.includes(chosen));
+   if(unique){
+    used.add(chosen);
+    if(chosen===expected)score+=1;
+    const typedNorm=normalizeVerbesTrousAnswer(String(answer.texte_saisi||''),true);
+    const expanded=(phrase.reponses||[]).flatMap((r:any)=>String(r??'').split(/\s*[\/;|]\s*/).map((s:string)=>s.trim()).filter(Boolean));
+    if(typedNorm&&expanded.some((x:string)=>normalizeVerbesTrousAnswer(x,true)===typedNorm))score+=2;
+   }
+  });
   return Math.min(points,score);
  }
  if(q.question_type==='mots_trous'){

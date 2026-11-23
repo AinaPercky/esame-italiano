@@ -4,7 +4,7 @@ import {dataService} from '../services/dataService';
 import {CEFR_LEVELS} from '../types';
 import {writtenExamService} from '../services/writtenExamService';
 import {A1_TEMPLATE,L135_TEMPLATE,WrittenExam,WrittenQuestion,WrittenSection,createQuestion,createSection,createWrittenExamFromTemplate,getWrittenExamTotals,getDefaultWrittenQuestionTimeLimit,makeId,validateWrittenExam,hasPendingExpressionWritingScore,getWrittenAttemptCorrectionStatus,groupWrittenExamIntegrityEvents} from '../utils/writtenExam';
-import {getQuestionExpectedAnswers} from '../utils/quizAnswerMatcher';
+import {getQuestionExpectedAnswers, normalizeAnswerText} from '../utils/quizAnswerMatcher';
 import {getCorrectReorderIds} from '../utils/quizReorder';
 import {VerbesTrousEditor} from '../components/verbesTrous/VerbesTrousEditor';
 import {MotsTrousEditor} from '../components/motsTrous/MotsTrousEditor';
@@ -26,7 +26,7 @@ const toIso=(v:string)=>v?new Date(v).toISOString():null;
 const stripJsonComments=(v:string)=>v.replace(/\/\*[\s\S]*?\*\//g,'').split('\n').map(line=>line.replace(/(^|\s)\/\/.*$/,'')).join('\n').replace(/,\s*([}\]])/g,'$1');
 const fromQuiz=(quiz:Quiz,q:QuizQuestion):WrittenQuestion=>{
  const base:any={id:makeId(),type:q.type,prompt:q.question,points:Number(q.points)||1,source_quiz_id:quiz.id,source_question_id:q.id,explanation:q.explanation,time_limit_seconds:Number(q.time_limit_seconds)||getDefaultWrittenQuestionTimeLimit(q)};
- if(q.type==='qcm'){const options=(q.options||[]).map(label=>({id:makeId(),label}));const raw=String(q.correct_answer||'').trim();const letterIndex=/^[A-Z]$/i.test(raw)?raw.toUpperCase().charCodeAt(0)-65:-1;const numericIndex=/^\d+$/.test(raw)?Number(raw):-1;const index=options.findIndex(o=>o.label===raw);const correctIndex=index>=0?index:letterIndex>=0&&letterIndex<options.length?letterIndex:numericIndex>=0&&numericIndex<options.length?numericIndex:-1;return {...base,options,answer_key:{correctOptionId:correctIndex>=0?options[correctIndex].id:''}};}
+ if(q.type==='qcm'){const options=(q.options||[]).map(label=>({id:makeId(),label:String(label??'')}));const raw=q.correct_answer!=null?String(q.correct_answer).trim():'';const letterIndex=/^[A-Z]$/i.test(raw)?raw.toUpperCase().charCodeAt(0)-65:-1;const numericIndex=/^\d+$/.test(raw)?Number(raw):-1;const index=options.findIndex(o=>normalizeAnswerText(o.label)===normalizeAnswerText(raw));const correctIndex=index>=0?index:letterIndex>=0&&letterIndex<options.length?letterIndex:numericIndex>=0&&numericIndex<options.length?numericIndex:-1;return {...base,options,answer_key:{correctOptionId:correctIndex>=0?options[correctIndex].id:''}};}
  if(q.type==='reorder')return {...base,items:(q.items||[]).map(x=>({...x})),answer_key:{correctOrder:getCorrectReorderIds(q)}};
  if(q.type==='verbes_trous')return {...base,points:(q.verbes_trous?.phrases?.length||0)*3,verbes_trous:q.verbes_trous,answer_key:{phrases:(q.verbes_trous?.phrases||[]).map(p=>({...p,verbe:p.verbe||'',reponses:p.reponses||[]})) as any}};
  if(q.type==='mots_trous'){const ppp=Math.max(1,Math.round(Number(q.mots_trous?.points_par_phrase)||1));return {...base,points:(q.mots_trous?.phrases?.length||0)*ppp,mots_trous:q.mots_trous?{...q.mots_trous,points_par_phrase:ppp,phrases:(q.mots_trous.phrases||[]).map(p=>({id:p.id,debut:p.debut,fin:p.fin}))}:undefined,answer_key:{phrases:(q.mots_trous?.phrases||[]).map(p=>({id:p.id,debut:p.debut,fin:p.fin,mot:p.mot||''}))}};}

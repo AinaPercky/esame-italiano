@@ -34,8 +34,21 @@ export type VerbesTrousScore = {
   phrases: VerbesTrousPhraseScore[];
 };
 
-export function normalizeVerbesTrousAnswer(value: unknown): string {
-  return String(value ?? '').normalize('NFC').trim().toLocaleLowerCase('it-IT').replace(/\s+/g, ' ');
+export function normalizeVerbesTrousAnswer(value: unknown, stripTerminalPunctuation = false): string {
+  let text = String(value ?? '')
+    .normalize('NFC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .trim()
+    .toLocaleLowerCase('it-IT')
+    .replace(/[’‘`]/g, "'")
+    .replace(/'\s+/g, "'")
+    .replace(/[«»“”]/g, '"')
+    .replace(/\s+/g, ' ');
+  if (stripTerminalPunctuation) {
+    text = text.replace(/[.?!;:]+$/, '').trim();
+  }
+  return text;
 }
 
 export function parseVerbesTrousAnswers(value: unknown): VerbesTrousAnswers {
@@ -78,9 +91,12 @@ export function noterPhrase(
 ): VerbesTrousPhraseScore {
   const chosen = normalizeVerbesTrousAnswer(answer?.verbe_choisi);
   const expectedVerb = normalizeVerbesTrousAnswer(phrase.verbe);
-  const typed = normalizeVerbesTrousAnswer(answer?.texte_saisi);
+  const typed = normalizeVerbesTrousAnswer(answer?.texte_saisi, true);
   const points_verbe = chosen && chosen === expectedVerb ? 1 : 0;
-  const accepted = (phrase.reponses || []).map(normalizeVerbesTrousAnswer).filter(Boolean);
+  const accepted = (phrase.reponses || [])
+    .flatMap(r => String(r || '').split(/\s*[\/;|]\s*/))
+    .map(r => normalizeVerbesTrousAnswer(r, true))
+    .filter(Boolean);
   const points_conjugaison = chosen && typed && accepted.includes(typed) ? 2 : 0;
   const total = points_verbe + points_conjugaison;
   return {

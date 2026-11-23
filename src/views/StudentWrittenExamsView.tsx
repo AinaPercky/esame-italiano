@@ -343,6 +343,7 @@ export const StudentWrittenExamsView: React.FC<{ currentUser: AuthUser; onFullsc
     correct_answer: '',
     options: (q.options || []).map((o: any) => o.label),
     items: q.items || [],
+    blank_count: Number(q.public_data?.blank_count) > 0 ? Number(q.public_data.blank_count) : undefined,
     answers: q.type === 'text' && Number(q.public_data?.blank_count) > 1 ? Array(Number(q.public_data.blank_count)).fill('') : undefined
   });
 

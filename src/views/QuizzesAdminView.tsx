@@ -45,6 +45,7 @@ import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
 import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { createQuizReorderItem } from '../utils/quizReorder';
+import { CLOZE_BLANK_REGEX, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
 import quizImportTemplate from '../data/quiz-import-template.jsonc?raw';
 import { parseJsonWithComments } from '../utils/parseJsonWithComments';
 import { VerbesTrousEditor } from '../components/verbesTrous/VerbesTrousEditor';
@@ -133,15 +134,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
   // Helpers pour les questions de type text (mono-trou ou multi-trous ex: 4 verbes)
   const getQuestionBlankAnswers = (q: QuizQuestion): string[] => {
-    if (Array.isArray(q.answers) && q.answers.length > 0) {
-      return q.answers;
-    }
-    const raw = (q.correct_answer || '').trim();
-    if (raw.includes('|')) {
-      const parts = raw.split(/\s*\|\s*/).filter(Boolean);
-      if (parts.length > 1) return parts;
-    }
-    return [raw];
+    return getQuestionExpectedAnswers(q);
   };
 
   const handleUpdateBlankAnswer = (qIdx: number, blankIdx: number, val: string) => {
@@ -152,6 +145,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     updated[qIdx] = {
       ...updated[qIdx],
       answers: blanks.length > 1 ? blanks : undefined,
+      blank_count: blanks.length > 1 ? blanks.length : 1,
       correct_answer: blanks.join(' | ')
     };
     setQuestions(updated);
@@ -164,6 +158,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     updated[qIdx] = {
       ...updated[qIdx],
       answers: blanks,
+      blank_count: blanks.length,
       correct_answer: blanks.join(' | ')
     };
     setQuestions(updated);
@@ -176,12 +171,14 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       updated[qIdx] = {
         ...updated[qIdx],
         answers: undefined,
+        blank_count: 1,
         correct_answer: blanks[0] || ''
       };
     } else {
       updated[qIdx] = {
         ...updated[qIdx],
         answers: blanks,
+        blank_count: blanks.length,
         correct_answer: blanks.join(' | ')
       };
     }
@@ -190,15 +187,16 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
 
   const handleAutoDetectBlanks = (qIdx: number) => {
     const q = questions[qIdx];
-    const matches = Array.from((q.question || '').matchAll(/(_{2,}|\[_+\]|\[\s*\]|\[\d+\]|\.{3,}|\((?:_{2,}|\.{2,}|\s*)\)|\[(?:\.{2,}|\s*)\])/g));
+    const matches = Array.from((q.question || '').matchAll(new RegExp(CLOZE_BLANK_REGEX.source, 'g')));
     if (matches.length > 0) {
       const currentBlanks = getQuestionBlankAnswers(q);
       const newBlanks = Array.from({ length: matches.length }, (_, i) => currentBlanks[i] || '');
       const updated = [...questions];
       updated[qIdx] = {
         ...updated[qIdx],
-        answers: newBlanks,
-        correct_answer: newBlanks.join(' | ')
+        answers: newBlanks.length > 1 ? newBlanks : undefined,
+        blank_count: newBlanks.length > 1 ? newBlanks.length : 1,
+        correct_answer: newBlanks.length > 1 ? newBlanks.join(' | ') : (newBlanks[0] || '')
       };
       setQuestions(updated);
     }
@@ -236,8 +234,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           item.mots_trous = q.mots_trous || {};
         } else {
           item.correct_answer = q.correct_answer || '';
-          if (Array.isArray(q.answers) && q.answers.length > 0) {
+          if (Array.isArray(q.answers) && q.answers.length > 1) {
             item.answers = q.answers;
+            item.blank_count = q.answers.length;
+          } else if (typeof q.blank_count === 'number' && q.blank_count > 1) {
+            item.blank_count = q.blank_count;
           }
         }
         if (q.explanation) {
@@ -327,20 +328,30 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       : undefined;
 
     let textAnswers: string[] | undefined = undefined;
-    let correctAnswer = q.correct_answer || '';
+    let textBlankCount: number | undefined = undefined;
+    let correctAnswer = q.correct_answer != null ? String(q.correct_answer) : '';
 
     if (type === 'text') {
-      if (Array.isArray(q.answers) && q.answers.length > 0) {
-        const mapped = q.answers.map((a: any) => Array.isArray(a) ? a.map(String).join(' / ') : String(a || '').trim());
-        textAnswers = mapped;
-        correctAnswer = mapped.join(' | ');
-      } else if (Array.isArray(q.correct_answer) && q.correct_answer.length > 0) {
-        const arr = q.correct_answer as any[];
-        const mapped = arr.map((a: any) => Array.isArray(a) ? a.map(String).join(' / ') : String(a || '').trim());
-        textAnswers = mapped;
-        correctAnswer = mapped.join(' | ');
-      } else if (typeof q.correct_answer === 'string' && q.correct_answer.includes('|')) {
-        textAnswers = q.correct_answer.split(/\s*\|\s*/).filter(Boolean);
+      const resolvedExpected = getQuestionExpectedAnswers({
+        question: q.question || '',
+        correct_answer: Array.isArray(q.correct_answer) ? '' : (q.correct_answer != null ? String(q.correct_answer) : ''),
+        answers: Array.isArray(q.answers)
+          ? q.answers
+          : Array.isArray(q.correct_answer)
+            ? q.correct_answer
+            : undefined,
+        acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : undefined,
+        accepted_answers: Array.isArray(q.accepted_answers) ? q.accepted_answers : undefined,
+        blank_count: q.blank_count
+      });
+      if (resolvedExpected.length > 1) {
+        textAnswers = resolvedExpected;
+        textBlankCount = resolvedExpected.length;
+        correctAnswer = resolvedExpected.join(' | ');
+      } else {
+        textAnswers = undefined;
+        textBlankCount = 1;
+        correctAnswer = resolvedExpected[0] || '';
       }
     }
 
@@ -348,11 +359,12 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       id: `q_imported_${Date.now()}_${i}`,
       type,
       question: q.question || '',
-      options: type === 'qcm' ? (q.options || ['', '', '', '']) : undefined,
+      options: type === 'qcm' ? (Array.isArray(q.options) ? q.options.map((opt: unknown) => String(opt ?? '')) : ['', '', '', '']) : undefined,
       items: type === 'reorder' ? items : undefined,
       verbes_trous: type === 'verbes_trous' ? q.verbes_trous : undefined,
       mots_trous: normalizedMotsTrous,
-      answers: type === 'text' && textAnswers && textAnswers.length > 1 ? textAnswers : undefined,
+      answers: type === 'text' ? textAnswers : undefined,
+      blank_count: type === 'text' ? textBlankCount : undefined,
       correct_answer: type === 'reorder' ? JSON.stringify(items.map((item: { id: string }) => item.id)) : correctAnswer,
       points: type === 'verbes_trous'
         ? (Number(q.verbes_trous?.phrases?.length || 0) * 3)
@@ -698,11 +710,11 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
           return;
         }
       } else if (q.type === 'text' && Array.isArray(q.answers) && q.answers.length > 0) {
-        if (q.answers.some(a => !a.trim())) {
+        if (q.answers.some(a => String(a ?? '').trim() === '')) {
           setFormError(`Veuillez renseigner toutes les cases vides de la question #${i + 1}.`);
           return;
         }
-      } else if (!q.correct_answer.trim()) {
+      } else if (String(q.correct_answer ?? '').trim() === '') {
         setFormError(`Veuillez renseigner la bonne réponse pour la question #${i + 1}.`);
         return;
       }
@@ -711,17 +723,27 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
     const primaryClassId = selectedQuizClassIds[0] || selectedClassId || classes[0]?.id || '';
     const normalizedQuestions = questions.map((question) => {
       let finalCorrectAnswer = question.correct_answer;
+      let finalAnswers = question.answers;
+      let finalBlankCount = question.blank_count;
       if (question.type === 'reorder') {
         finalCorrectAnswer = JSON.stringify((question.items || []).map((item) => item.id));
       } else if (question.type === 'text') {
-        if (Array.isArray(question.answers) && question.answers.length > 0) {
-          finalCorrectAnswer = question.answers.join(' | ');
+        const expected = getQuestionExpectedAnswers(question);
+        if (expected.length > 1) {
+          finalAnswers = expected;
+          finalBlankCount = expected.length;
+          finalCorrectAnswer = expected.join(' | ');
+        } else {
+          finalAnswers = undefined;
+          finalBlankCount = 1;
+          finalCorrectAnswer = expected[0] || finalCorrectAnswer;
         }
       }
       return {
         ...question,
         correct_answer: finalCorrectAnswer,
-        answers: question.type === 'text' && Array.isArray(question.answers) && question.answers.length > 1 ? question.answers : undefined,
+        answers: question.type === 'text' ? finalAnswers : undefined,
+        blank_count: question.type === 'text' ? finalBlankCount : question.blank_count,
         time_limit_seconds: getQuestionTimeSeconds(question)
       };
     });
@@ -2268,10 +2290,10 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                               <input
                                 type="radio"
                                 name={`correct_${q.id}`}
-                                checked={q.correct_answer === opt && opt !== ''}
+                                checked={String(q.correct_answer ?? '') === String(opt ?? '') && String(opt ?? '') !== ''}
                                 onChange={() => {
                                   const updated = [...questions];
-                                  updated[idx].correct_answer = opt;
+                                  updated[idx].correct_answer = String(opt ?? '');
                                   setQuestions(updated);
                                 }}
                                 className="text-amber-800 focus:ring-amber-500"
@@ -2302,7 +2324,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     {q.type === 'text' && (() => {
                       const blankAnswers = getQuestionBlankAnswers(q);
                       const isMultiBlank = blankAnswers.length > 1;
-                      const matches = Array.from((q.question || '').matchAll(/(_{2,}|\[_+\]|\[\s*\]|\[\d+\]|\.{3,}|\((?:_{2,}|\.{2,}|\s*)\)|\[(?:\.{2,}|\s*)\])/g));
+                      const matches = Array.from((q.question || '').matchAll(new RegExp(CLOZE_BLANK_REGEX.source, 'g')));
                       const detectedCount = matches.length;
 
                       return (

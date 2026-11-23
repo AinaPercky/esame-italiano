@@ -40,9 +40,15 @@ const ITALIAN_NUMBER_VALUES = new Map<string, number>(
  * Renvoie la valeur d'un nombre saisi en chiffres ou en lettres italiennes.
  * Les nombres composés de phrases ou les valeurs hors de 0..999 ne sont pas interprétés.
  */
-export function parseItalianNumber(value: string): number | null {
-  let normalized = (value || '').normalize('NFC').trim().toLowerCase();
-  normalized = normalized.replace(/\s+euro$/, '').trim();
+export function parseItalianNumber(value: unknown): number | null {
+  const rawStr = value == null ? '' : String(value);
+  let normalized = rawStr
+    .normalize('NFC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u00A0\u202F]/g, ' ')
+    .trim()
+    .toLowerCase();
+  normalized = normalized.replace(/(?:\s+(?:euro|euros)|\s*€)$/i, '').trim();
   if (!normalized) return null;
 
   if (/^\d{1,3}$/.test(normalized)) {
@@ -50,11 +56,16 @@ export function parseItalianNumber(value: string): number | null {
     return numericValue >= 0 && numericValue <= 999 ? numericValue : null;
   }
 
+  // Tolère l'accent grave usuel sur les nombres composés se terminant par -tré (ex: trentatrè -> trentatré)
+  if (normalized.length > 3 && normalized.endsWith('trè')) {
+    normalized = normalized.slice(0, -1) + 'é';
+  }
+
   return ITALIAN_NUMBER_VALUES.get(normalized) ?? null;
 }
 
 /** Compare deux écritures exactes d'un même nombre italien. */
-export function areEquivalentItalianNumbers(left: string, right: string): boolean {
+export function areEquivalentItalianNumbers(left: unknown, right: unknown): boolean {
   const leftValue = parseItalianNumber(left);
   const rightValue = parseItalianNumber(right);
   return leftValue !== null && rightValue !== null && leftValue === rightValue;

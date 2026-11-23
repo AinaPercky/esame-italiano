@@ -49,7 +49,11 @@ import {
 import { shuffleArray, shuffleQuizQuestions } from '../utils/quizQuestionOrder';
 import { CORRECTION_DISPLAY_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { formatCorrectReorderAnswer, formatReorderAnswer } from '../utils/quizReorder';
-import { calculateQuestionPointsEarned } from '../utils/quizAnswerMatcher';
+import {
+  calculateQuestionPointsEarned,
+  formatCorrectTextAnswerForDisplay,
+  formatTextAnswerForDisplay
+} from '../utils/quizAnswerMatcher';
 import { parseVerbesTrousAnswers } from '../utils/verbesTrous';
 import {
   formatCorrectMotsTrousForDisplay,
@@ -931,7 +935,11 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
     const formattedStudentAnswer =
       currentQ.type === 'mots_trous'
         ? formatMotsTrousAnswerForDisplay(currentQ.mots_trous, studentAns)
-        : studentAns;
+        : currentQ.type === 'text'
+          ? formatTextAnswerForDisplay(currentQ, studentAns)
+          : currentQ.type === 'reorder'
+            ? formatReorderAnswer(currentQ, studentAns)
+            : studentAns;
 
     if (isPracticeMode) {
       const local = calculateQuestionPointsEarned(currentQ, studentAns);
@@ -939,15 +947,20 @@ export const StudentSpaceView: React.FC<StudentSpaceViewProps> = ({
         advanceToNextQuestion(updatedAnswers);
         return;
       }
+      const practiceCorrectAnswer =
+        currentQ.type === 'mots_trous'
+          ? formatCorrectMotsTrousForDisplay(currentQ.mots_trous)
+          : currentQ.type === 'text'
+            ? formatCorrectTextAnswerForDisplay(currentQ)
+            : currentQ.type === 'reorder'
+              ? formatCorrectReorderAnswer(currentQ)
+              : currentQ.correct_answer || '';
       setIncorrectFeedback({
         isOpen: true,
         questionNumber: currentQuestionIndex + 1,
         questionText: currentQ.question,
         studentAnswer: formattedStudentAnswer,
-        correctAnswer:
-          currentQ.type === 'mots_trous'
-            ? formatCorrectMotsTrousForDisplay(currentQ.mots_trous)
-            : '',
+        correctAnswer: practiceCorrectAnswer,
         countdown: CORRECTION_DISPLAY_SECONDS,
         pendingNextAnswers: updatedAnswers,
         isTimeout,

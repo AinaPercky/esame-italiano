@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { QuizQuestion } from '../types';
-import { getQuestionExpectedAnswers, parseStudentAnswers } from '../utils/quizAnswerMatcher';
+import { CLOZE_BLANK_REGEX, getQuestionExpectedAnswers, parseStudentAnswers } from '../utils/quizAnswerMatcher';
 
 export interface QuizClozeInputProps {
   question: QuizQuestion;
@@ -16,11 +16,7 @@ export interface QuizClozeInputProps {
 const ITALIAN_ACCENTS = ['à', 'á', 'è', 'é', 'ì', 'í', 'ò', 'ó', 'ù', 'ú'];
 
 // Détection de tous les formats de cases vides / trous courants :
-// - Underscores : ___, ____, ________
-// - Points : ..., .....
-// - Crochets : [___], [ ], [1], [....]
-// - Parenthèses : (___), (....), ( )
-export const BLANK_REGEX = /(_{2,}|\[_+\]|\[\s*\]|\[\d+\]|\.{3,}|\((?:_{2,}|\.{2,}|\s*)\)|\[(?:\.{2,}|\s*)\])/g;
+export const BLANK_REGEX = CLOZE_BLANK_REGEX;
 
 /**
  * Découpe un énoncé pour séparer une consigne éventuelle (avant ':') de la phrase à compléter

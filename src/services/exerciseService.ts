@@ -82,6 +82,23 @@ function normalizeQuestions(questions: QuizQuestion[], requireTimers = true): Qu
         time_limit_seconds: seconds
       };
     }
+    if (question.type === 'qcm') {
+      return {
+        ...question,
+        id,
+        options: Array.isArray(question.options) ? question.options.map(opt => String(opt ?? '')) : question.options,
+        correct_answer: question.correct_answer != null ? String(question.correct_answer) : '',
+        time_limit_seconds: seconds
+      };
+    }
+    if (question.type === 'text') {
+      return {
+        ...question,
+        id,
+        correct_answer: question.correct_answer != null ? String(question.correct_answer) : '',
+        time_limit_seconds: seconds
+      };
+    }
     return { ...question, id, time_limit_seconds: seconds };
   });
 }

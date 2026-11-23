@@ -36,6 +36,8 @@ export type MotsTrousScore = {
 export function normalizeMotsTrousAnswer(value: unknown): string {
   return String(value ?? '')
     .normalize('NFC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u00A0\u202F]/g, ' ')
     .trim()
     .toLocaleLowerCase('it-IT')
     .replace(/[’‘`]/g, "'")

@@ -422,6 +422,7 @@ export interface ExerciseAttemptReviewQuestion {
   explanation?: string | null;
   options?: string[];
   items?: QuizReorderItem[];
+  blank_count?: number;
   verbes_trous?: QuizQuestion['verbes_trous'];
   mots_trous?: QuizQuestion['mots_trous'];
 }

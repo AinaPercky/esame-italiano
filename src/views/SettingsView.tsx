@@ -45,6 +45,7 @@ import { QUIZ_INDIVIDUAL_RETRY_MIGRATION_SQL } from '../data/quizRetryMigration'
 import { QUIZ_RETRY_CONFIRMATION_MIGRATION_SQL } from '../data/quizRetryConfirmationMigration';
 import { QUIZ_SECURITY_MIGRATION_SQL } from '../data/quizSecurityMigration';
 import { ANTI_CHEAT_SETTINGS_MIGRATION_SQL } from '../data/antiCheatSettingsMigration';
+import { ANSWER_MATCHING_UNIFICATION_MIGRATION_SQL } from '../data/answerMatchingMigration';
 import type { AntiCheatSettings } from '../utils/antiCheatSettings';
 
 interface SettingsViewProps {
@@ -67,6 +68,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
   const [copiedQuizAttemptSubmissionMigration, setCopiedQuizAttemptSubmissionMigration] = useState(false);
   const [copiedQuizSecurityMigration, setCopiedQuizSecurityMigration] = useState(false);
   const [copiedAntiCheatMigration, setCopiedAntiCheatMigration] = useState(false);
+  const [copiedAnswerMatchingMigration, setCopiedAnswerMatchingMigration] = useState(false);
   const [copiedAvatarMigration, setCopiedAvatarMigration] = useState(false);
   const [copiedStudentEmailMigration, setCopiedStudentEmailMigration] = useState(false);
   const [copiedValidationMigration, setCopiedValidationMigration] = useState(false);
@@ -248,6 +250,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
     } catch (e) {
       console.error('Erreur copie migration anti-triche:', e);
       setAntiCheatSaveMessage({ type: 'error', text: 'Impossible de copier la migration Paramètres Anti-Triche.' });
+    }
+  };
+
+  const handleCopyAnswerMatchingMigration = async () => {
+    try {
+      await navigator.clipboard.writeText(ANSWER_MATCHING_UNIFICATION_MIGRATION_SQL);
+      setCopiedAnswerMatchingMigration(true);
+      setTimeout(() => setCopiedAnswerMatchingMigration(false), 2500);
+    } catch (e) {
+      console.error('Erreur copie migration unification correction:', e);
+      setActionMessage({ type: 'error', text: 'Impossible de copier la migration d’unification de correction.' });
     }
   };
 
@@ -894,6 +907,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </button>
             <button
               type="button"
+              onClick={handleCopyAnswerMatchingMigration}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>{copiedAnswerMatchingMigration ? '✓ Correctif correction copié !' : 'Unifier la correction Quiz / Exercices / Examens (SQL)'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyValidationMigration}
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 active:bg-slate-950 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[38px]"
             >
@@ -939,6 +960,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onResetData, current
             </span>
             <span className="text-[11px] text-amber-900">
               La migration « Paramètres Anti-Triche » est additive et sans risque : elle crée la table <code>app_settings</code> et la fonction <code>save_anti_cheat_settings</code> pour activer ou désactiver la capture d’écran et le changement d’onglet depuis les paramètres professeur.
+            </span>
+            <span className="text-[11px] text-emerald-900">
+              La migration « Unifier la correction Quiz / Exercices / Examens » corrige côté Supabase la reconnaissance des réponses exactes (variantes multiples d’un même champ vs. multi-cases, caractères invisibles, variantes <code>-trè</code>/<code>-tré</code>, <code>€</code>/<code>euros</code> et arrondis multi-trous) sans modifier aucune donnée existante.
             </span>
           </div>
         </div>
