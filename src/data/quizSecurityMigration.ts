@@ -48,7 +48,7 @@ AS $$
     regexp_replace(
       replace(
         translate(
-          lower(btrim(coalesce(p_val, ''))),
+          lower(normalize(btrim(coalesce(p_val, '')), NFC)),
           chr(8217) || chr(8216) || chr(96) || chr(171) || chr(187) || chr(8220) || chr(8221),
           repeat(chr(39), 3) || repeat(chr(34), 4)
         ),
