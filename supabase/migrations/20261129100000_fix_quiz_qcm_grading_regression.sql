@@ -79,14 +79,20 @@ BEGIN
    ok := public.quiz_norm_answer(raw)=public.quiz_norm_answer(expected)
      OR EXISTS (
        SELECT 1 FROM jsonb_array_elements(coalesce(q->'options','[]'::jsonb)) WITH ORDINALITY opt(value,ord)
-       WHERE public.quiz_norm_answer(raw)=public.quiz_norm_answer(
-         CASE WHEN jsonb_typeof(opt.value)='object'
-           THEN coalesce(opt.value->>'id',opt.value->>'label','')
-           ELSE opt.value #>> '{}' END)
-       AND public.quiz_norm_answer(expected)=public.quiz_norm_answer(
-         CASE WHEN jsonb_typeof(opt.value)='object'
-           THEN coalesce(opt.value->>'id',opt.value->>'label','')
-           ELSE opt.value #>> '{}' END)
+       WHERE
+         (
+           public.quiz_norm_answer(expected)=public.quiz_norm_answer(
+             CASE WHEN jsonb_typeof(opt.value)='object' THEN coalesce(opt.value->>'id','') ELSE opt.value #>> '{}' END)
+           OR public.quiz_norm_answer(expected)=public.quiz_norm_answer(
+             CASE WHEN jsonb_typeof(opt.value)='object' THEN coalesce(opt.value->>'label','') ELSE opt.value #>> '{}' END)
+         )
+         AND
+         (
+           public.quiz_norm_answer(raw)=public.quiz_norm_answer(
+             CASE WHEN jsonb_typeof(opt.value)='object' THEN coalesce(opt.value->>'id','') ELSE opt.value #>> '{}' END)
+           OR public.quiz_norm_answer(raw)=public.quiz_norm_answer(
+             CASE WHEN jsonb_typeof(opt.value)='object' THEN coalesce(opt.value->>'label','') ELSE opt.value #>> '{}' END)
+         )
      );
    earned := CASE WHEN ok THEN pts ELSE 0 END;
  ELSIF t='reorder' THEN
