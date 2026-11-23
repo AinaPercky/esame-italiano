@@ -49,7 +49,7 @@ BEGIN
  SELECT pg_get_functiondef('public.save_written_exam_definition(uuid,jsonb)'::regprocedure) INTO v_save;
  IF position('mots_trous' IN v_save)=0 THEN RAISE EXCEPTION 'EXAM_SAVE_MOTS_PAYLOAD_MISSING'; END IF;
 
- SELECT id INTO v_section FROM public.written_exam_sections ORDER BY position LIMIT 1;
+ SELECT s.id INTO v_section FROM public.written_exam_sections s WHERE NOT EXISTS (SELECT 1 FROM public.written_exam_attempts a WHERE a.version_id=s.version_id) ORDER BY s.position LIMIT 1;
  IF v_section IS NOT NULL THEN
    SELECT coalesce(max(position),0)+1 INTO v_position FROM public.written_exam_questions WHERE section_id=v_section;
    v_question_id:=gen_random_uuid();
