@@ -147,7 +147,12 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     for (const fnName of ['quiz_sanitize_questions', 'quiz_grade_question']) {
       normalizedBootstrap = replaceFn(normalizedBootstrap, fnName, extractFn(sqlFromFile, fnName));
     }
-    normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(unicodeSql, 'quiz_norm_answer'));
+    assert.equal(
+      extractFn(QUIZ_SECURITY_MIGRATION_SQL, 'quiz_norm_answer'),
+      extractFn(unicodeSql, 'quiz_norm_answer'),
+      'Le helpers TypeScript et SQL doivent utiliser la même normalisation NFC.'
+    );
+    normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(sqlFromFile, 'quiz_norm_answer'));
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
