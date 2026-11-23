@@ -58,7 +58,6 @@ begin
   if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 2 then
     raise exception 'Verbes à trous grading failed';
   end if;
-end;
 
   v_result := public.exercise_grade_question(
     '{"type":"text","points":2,"answers":["trentatré","trentatré euro"]}'::jsonb,
