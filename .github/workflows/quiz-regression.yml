@@ -47,6 +47,22 @@ jobs:
         run: npm test
       - name: TypeScript validation
         run: npm run lint
+      - name: Apply Unicode answer normalization and text matcher
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql
+      - name: Test quiz alternatives and Unicode normalization
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/quiz_answer_grading.sql
       - name: Test quiz snapshot migration in isolated PostgreSQL
         env:
           PGHOST: localhost
