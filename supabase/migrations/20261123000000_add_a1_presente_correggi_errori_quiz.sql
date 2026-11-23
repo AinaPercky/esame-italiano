@@ -47,10 +47,10 @@ VALUES (
     "type": "qcm",
     "question": "Qual è la forma corretta? «Tu ___ il conto al ristorante» (pagare).",
     "options": [
-      "pagi",
       "paghi",
-      "pagi",
-      "paga"
+      "pago",
+      "paga",
+      "pagate"
     ],
     "correct_answer": "paghi",
     "points": 1,
@@ -130,14 +130,14 @@ VALUES (
   {
     "id": "correggi-q07",
     "type": "qcm",
-    "question": "Qual è la frase corretta?",
+    "question": "Qual è la forma corretta di preferire con «noi»?",
     "options": [
-      "Noi preferisc(i)amo il tè.",
-      "Noi preferiamo il tè.",
-      "Noi preferiscono il tè.",
-      "Noi preferite il tè."
+      "preferiamo",
+      "preferiscono",
+      "preferite",
+      "preferisce"
     ],
-    "correct_answer": "Noi preferiamo il tè.",
+    "correct_answer": "preferiamo",
     "points": 1,
     "time_limit_seconds": 25,
     "competency": "Distinguer les personnes avec les verbes en -ISC-",
@@ -168,8 +168,8 @@ VALUES (
     "options": [
       "leggono",
       "leggete",
-      "leggete",
-      "leggi"
+      "legge",
+      "leggiamo"
     ],
     "correct_answer": "leggete",
     "points": 1,
