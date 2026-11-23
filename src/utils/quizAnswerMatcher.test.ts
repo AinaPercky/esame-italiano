@@ -20,6 +20,10 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.equal(normalizeAnswerText(studentAnswer), expected);
     assert.equal(isTextAnswerCorrect(studentAnswer, expected), true);
     assert.equal(isTextAnswerCorrect('VENTITRE\u0301', expected), true);
+    const question: any = { id: 'unicode-23', type: 'text', question: 'Scrivi 23 in lettere', points: 2, correct_answer: expected };
+    const score = calculateQuestionPointsEarned(question, studentAnswer);
+    assert.equal(score.isFullyCorrect, true);
+    assert.equal(score.awardedPoints, 2);
   });
 
   it('accepte une ponctuation finale omise ou ajoutée', () => {
