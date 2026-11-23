@@ -166,7 +166,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     normalizedBootstrap = replaceFn(
       normalizedBootstrap,
       'quiz_text_matches',
-      extractFn(alternativeSql, 'quiz_text_matches')
+      extractFn(sqlFromFile, 'quiz_text_matches')
     );
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
