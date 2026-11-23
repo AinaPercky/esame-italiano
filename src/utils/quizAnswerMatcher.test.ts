@@ -27,7 +27,7 @@ describe('normalisation des réponses textuelles de quiz', () => {
   });
 
   it('accepte plusieurs variantes complètes pour une même question et refuse les autres', () => {
-    for (const accepted of ['ventitré', '23', 'ventitre\\u0301']) {
+    for (const accepted of ['ventitré', '23', 'ventitre\u0301']) {
       assert.equal(isTextAnswerCorrect(accepted, 'ventitré / 23'), true);
     }
     assert.equal(isTextAnswerCorrect('venti', 'ventitré / 23'), false);
