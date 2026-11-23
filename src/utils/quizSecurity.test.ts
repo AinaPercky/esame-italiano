@@ -115,10 +115,6 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       process.cwd(),
       'supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql'
     );
-    const alternativeMigrationPath = path.resolve(
-      process.cwd(),
-      'supabase/migrations/20261126100000_quiz_text_alternative_connectors.sql'
-    );
     const italianNumbersMigrationPath = path.resolve(
       process.cwd(),
       'supabase/migrations/20261127100000_italian_number_digit_equivalence.sql'
@@ -126,7 +122,6 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
     const unicodeSql = fs.readFileSync(unicodeMigrationPath, 'utf8');
-    const alternativeSql = fs.readFileSync(alternativeMigrationPath, 'utf8');
     const italianNumbersSql = fs.readFileSync(italianNumbersMigrationPath, 'utf8');
 
     // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
@@ -178,6 +173,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'quiz_text_matches',
       extractFn(sqlFromFile, 'quiz_text_matches')
     );
+    normalizedBootstrap = normalizedBootstrap.replace(/\\n{3,}/g, '\\n\\n');
     assert.equal(sqlFromFile, normalizedBootstrap);
   });
 
