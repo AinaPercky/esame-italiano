@@ -111,8 +111,13 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       process.cwd(),
       'supabase/migrations/20261124000000_mots_trous_support.sql'
     );
+    const unicodeMigrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql'
+    );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
+    const unicodeSql = fs.readFileSync(unicodeMigrationPath, 'utf8');
 
     // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
     // doivent correspondre exactement à la migration additive 20261124000000.
@@ -142,7 +147,18 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
     for (const fnName of ['quiz_sanitize_questions', 'quiz_grade_question']) {
       normalizedBootstrap = replaceFn(normalizedBootstrap, fnName, extractFn(sqlFromFile, fnName));
     }
+    normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(unicodeSql, 'quiz_norm_answer'));
     assert.equal(sqlFromFile, normalizedBootstrap);
+  });
+
+  it('normalise les caractères Unicode canoniquement équivalents côté PostgreSQL', () => {
+    const migrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql'
+    );
+    const migration = fs.readFileSync(migrationPath, 'utf8');
+    assert.ok(migration.includes('normalize(btrim(coalesce(p_val, \'\')), NFC)'));
+    assert.ok(migration.includes('CREATE OR REPLACE FUNCTION public.quiz_norm_answer(p_val TEXT)'));
   });
 
   it('ne contourne jamais la RLS sur quizzes pour les sessions non-professeur', () => {
