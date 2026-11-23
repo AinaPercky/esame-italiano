@@ -16,6 +16,15 @@ DECLARE
   v_option_value text;
 BEGIN
   IF v_value = '' THEN RETURN NULL; END IF;
+  -- quiz_grade_question may already have expanded a numeric correct_answer into a JSON option object.
+  IF left(v_value, 1) = '{' THEN
+    BEGIN
+      v_option := v_value::jsonb;
+      v_value := public.quiz_norm_answer(coalesce(v_option ->> 'id', v_option ->> 'value', v_option ->> 'label', v_option ->> 'text', v_value));
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+  END IF;
   IF jsonb_typeof(p_options) <> 'array' THEN RETURN 'raw:' || v_value; END IF;
 
   FOR v_option IN SELECT value FROM jsonb_array_elements(p_options)
