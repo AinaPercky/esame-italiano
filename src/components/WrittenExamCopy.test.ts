@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWrittenExamCopyPdf } from './WrittenExamCopy';
+import { createWrittenExamCopyPdf, getWrittenQuestionAutoScore } from './WrittenExamCopy';
 
 test('written exam PDF is generated with the original student answer and teacher-awarded score',()=>{
  const attempt={
@@ -25,4 +25,23 @@ test('written exam PDF is generated with the original student answer and teacher
  const bytes=pdf.output('arraybuffer');
  assert.ok(bytes.byteLength>1000,'the generated PDF should contain a real document');
  assert.equal(JSON.stringify(attempt.answers),originalAnswer,'PDF generation must not mutate student answers');
+});
+
+test('written exam accepts every declared text alternative and preserves partial multi-blank scoring', () => {
+ const single = {
+  question_type: 'text',
+  points: 2,
+  written_exam_answer_keys: [{ answer_key: { acceptedAnswers: ['ventitré', '23'] } }]
+ };
+ assert.equal(getWrittenQuestionAutoScore(single, '23'), 2);
+ assert.equal(getWrittenQuestionAutoScore(single, 'ventitre\\u0301'), 2);
+ assert.equal(getWrittenQuestionAutoScore(single, 'venti'), 0);
+
+ const multi = {
+  question_type: 'text',
+  points: 4,
+  written_exam_answer_keys: [{ answer_key: { answers: [['sono', 'io sono'], ['ho', 'possiedo']] } }]
+ };
+ assert.equal(getWrittenQuestionAutoScore(multi, ['IO SONO', 'possiedo']), 4);
+ assert.equal(getWrittenQuestionAutoScore(multi, ['sono', 'wrong']), 2);
 });
