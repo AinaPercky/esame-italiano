@@ -76,6 +76,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'CREATE OR REPLACE FUNCTION public.quiz_current_student_id()',
       'CREATE OR REPLACE FUNCTION public.quiz_norm_answer(',
       'CREATE OR REPLACE FUNCTION public.quiz_text_matches(',
+      'CREATE OR REPLACE FUNCTION public.quiz_italian_number_value(',
       'CREATE OR REPLACE FUNCTION public.quiz_sanitize_questions(',
       "'blank_count'",
       "- 'error_category_map'",
