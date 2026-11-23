@@ -197,66 +197,60 @@ IMMUTABLE
 AS $$
 DECLARE
   v_raw TEXT := btrim(coalesce(p_question ->> 'correct_answer', ''));
-  v_parsed JSONB;
   v_parts JSONB;
+  v_has_nested BOOLEAN := false;
 BEGIN
   IF jsonb_typeof(p_question -> 'answers') = 'array' AND jsonb_array_length(p_question -> 'answers') > 0 THEN
-    SELECT coalesce(jsonb_agg(
-      CASE
-        WHEN jsonb_typeof(elem) = 'array' THEN (
-          SELECT string_agg(val, ' / ')
-          FROM jsonb_array_elements_text(elem) AS val
-        )
-        ELSE btrim(elem #>> '{}')
-      END
-    ), '[]'::jsonb)
-    INTO v_parts
-    FROM jsonb_array_elements(p_question -> 'answers') AS elem;
-    RETURN v_parts;
+    SELECT coalesce(bool_or(jsonb_typeof(elem) = 'array'), false)
+      INTO v_has_nested
+      FROM jsonb_array_elements(p_question -> 'answers') elem;
+    IF v_has_nested OR coalesce((p_question ->> 'blank_count')::integer, 1) > 1 THEN
+      SELECT coalesce(jsonb_agg(
+        CASE WHEN jsonb_typeof(elem) = 'array'
+          THEN to_jsonb((SELECT string_agg(value, ' / ') FROM jsonb_array_elements_text(elem) AS a(value)))
+          ELSE to_jsonb(btrim(elem #>> '{}'))
+        END
+      ), '[]'::jsonb)
+      INTO v_parts
+      FROM jsonb_array_elements(p_question -> 'answers') elem;
+      RETURN v_parts;
+    END IF;
+    SELECT jsonb_build_array(to_jsonb(string_agg(btrim(elem #>> '{}'), ' / ' ORDER BY ord)))
+      INTO v_parts
+      FROM jsonb_array_elements(p_question -> 'answers') WITH ORDINALITY AS a(elem, ord);
+    RETURN coalesce(v_parts, '[]'::jsonb);
   END IF;
-
   IF left(v_raw, 1) = '[' AND right(v_raw, 1) = ']' THEN
     BEGIN
-      v_parsed := v_raw::jsonb;
-      IF jsonb_typeof(v_parsed) = 'array' AND jsonb_array_length(v_parsed) > 0 THEN
-        SELECT coalesce(jsonb_agg(
-          CASE
-            WHEN jsonb_typeof(elem) = 'array' THEN (
-              SELECT string_agg(val, ' / ')
-              FROM jsonb_array_elements_text(elem) AS val
-            )
-            ELSE btrim(elem #>> '{}')
-          END
-        ), '[]'::jsonb)
-        INTO v_parts
-        FROM jsonb_array_elements(v_parsed) AS elem;
-        RETURN v_parts;
+      v_parts := v_raw::jsonb;
+      IF jsonb_typeof(v_parts) = 'array' AND jsonb_array_length(v_parts) > 0 THEN
+        IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_parts) e WHERE jsonb_typeof(e) = 'array') THEN
+          RETURN (SELECT coalesce(jsonb_agg(
+            CASE WHEN jsonb_typeof(elem) = 'array'
+              THEN to_jsonb((SELECT string_agg(value, ' / ') FROM jsonb_array_elements_text(elem) AS a(value)))
+              ELSE to_jsonb(btrim(elem #>> '{}'))
+            END
+          ), '[]'::jsonb) FROM jsonb_array_elements(v_parts) elem);
+        END IF;
+        RETURN jsonb_build_array(to_jsonb((SELECT string_agg(btrim(elem #>> '{}'), ' / ') FROM jsonb_array_elements(v_parts) elem)));
       END IF;
-    EXCEPTION WHEN OTHERS THEN
-      NULL;
+    EXCEPTION WHEN OTHERS THEN NULL;
     END;
   END IF;
-
   IF position('|' IN v_raw) > 0 THEN
     SELECT coalesce(jsonb_agg(to_jsonb(btrim(part))), '[]'::jsonb)
-    INTO v_parts
-    FROM regexp_split_to_table(v_raw, '\s*\|\s*') AS part
-    WHERE btrim(part) <> '';
-    IF jsonb_array_length(v_parts) > 1 THEN
-      RETURN v_parts;
-    END IF;
+      INTO v_parts
+      FROM regexp_split_to_table(v_raw, '\\s*\\|\\s*') part
+      WHERE btrim(part) <> '';
+    IF jsonb_array_length(v_parts) > 1 THEN RETURN v_parts; END IF;
   END IF;
-
   IF position(' // ' IN v_raw) > 0 THEN
     SELECT coalesce(jsonb_agg(to_jsonb(btrim(part))), '[]'::jsonb)
-    INTO v_parts
-    FROM regexp_split_to_table(v_raw, '\s*//\s*') AS part
-    WHERE btrim(part) <> '';
-    IF jsonb_array_length(v_parts) > 1 THEN
-      RETURN v_parts;
-    END IF;
+      INTO v_parts
+      FROM regexp_split_to_table(v_raw, '\\s*//\\s*') part
+      WHERE btrim(part) <> '';
+    IF jsonb_array_length(v_parts) > 1 THEN RETURN v_parts; END IF;
   END IF;
-
   RETURN jsonb_build_array(v_raw);
 END;
 $$;
