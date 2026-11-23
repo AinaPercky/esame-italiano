@@ -10,7 +10,7 @@ BEGIN
   IF NOT public.quiz_text_matches('23', 'ventitré | 23') THEN
     RAISE EXCEPTION 'Quiz matcher rejected a pipe-separated alternative.';
   END IF;
-  IF NOT public.quiz_text_matches('ventitre' || U&'\\0301', 'ventitré') THEN
+  IF NOT public.quiz_text_matches('ventitre' || U&'\0301', 'ventitré') THEN
     RAISE EXCEPTION 'Quiz matcher rejected canonically equivalent NFC/NFD accents.';
   END IF;
   IF public.quiz_text_matches('venti', 'ventitré / 23') THEN
