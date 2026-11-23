@@ -111,8 +111,12 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261119100000_local_written_exam_answers.sql
       - name: Normalize canonically equivalent Unicode answers
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261123090000_unicode_quiz_answer_normalization.sql
+      - name: Apply mots-trous and exercise grading support
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261124000000_mots_trous_support.sql
       - name: Apply Unicode-aware written-exam grading
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261125090000_unicode_written_exam_answer_normalization.sql
+      - name: Apply multiple-answer exercise grading
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261125100000_multiple_answer_normalization.sql
       - name: Verify schema and RLS
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/written_exam_schema_smoke.sql
       - name: Test complete exam lifecycle and student isolation
