@@ -170,7 +170,7 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'supabase/migrations/20261125090000_unicode_written_exam_answer_normalization.sql'
     );
     const writtenExamMigration = fs.readFileSync(writtenExamMigrationPath, 'utf8');
-    assert.ok(writtenExamMigration.includes('public.written_exam_auto_question_score(uuid,jsonb)'));
+    assert.ok(writtenExamMigration.includes('create or replace function public.written_exam_auto_question_score('));
     assert.ok(writtenExamMigration.includes('public.quiz_norm_answer(coalesce(v_actual->>v_idx,\'\'))'));
     assert.ok(writtenExamMigration.includes('public.quiz_norm_answer(coalesce(v_phrase_answer->>\'texte_saisi\',\'\'))'));
   });
