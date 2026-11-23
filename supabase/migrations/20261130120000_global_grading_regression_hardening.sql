@@ -632,4 +632,16 @@ $function$$new$);
 END;
 $migration$;
 
+
+-- Avoid floating/numeric division drift when awarding fractional points (e.g. 1/3 + 1/3 + 1/3).
+DO $migration$
+DECLARE d text; u text;
+BEGIN
+ d:=pg_get_functiondef('public.exercise_grade_question(jsonb,jsonb)'::regprocedure);
+ u:=replace(d,'v_awarded >= v_points','round(v_awarded,2) >= round(v_points,2)');
+ IF u=d THEN RAISE EXCEPTION 'Exercise rounded correctness threshold not patched'; END IF;
+ EXECUTE u;
+END;
+$migration$;
+
 NOTIFY pgrst,'reload schema';
