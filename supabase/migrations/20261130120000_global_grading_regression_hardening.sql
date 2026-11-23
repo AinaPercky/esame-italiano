@@ -644,4 +644,19 @@ BEGIN
 END;
 $migration$;
 
+
+-- Canonical Unicode normalization prevents NFC/NFD accent mismatches (e.g. caffè).
+CREATE OR REPLACE FUNCTION public.quiz_norm_answer(v text, strip_end boolean DEFAULT false)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+AS $function$
+ SELECT CASE WHEN strip_end
+   THEN regexp_replace(regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '[’‘]', '''', 'g'), '[.?!;:]+
+, '')
+   ELSE regexp_replace(regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '[’‘]', '''', 'g'), '\s+', ' ', 'g')
+ END
+$function$;
+
 NOTIFY pgrst,'reload schema';
