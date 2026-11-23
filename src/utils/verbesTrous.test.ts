@@ -38,10 +38,10 @@ test('accepte toutes les conjugaisons alternatives, y compris en Unicode NFD', (
   assert.equal(noterQuiz(definition, answer).score, 3);
   const accentDefinition = {
     points_par_phrase: 3,
-    banque: ['avere'],
-    phrases: [{ id: 1, debut: 'Io ', fin: '.', verbe: 'avere', reponses: ['ho', 'h\\u006f'] }]
+    banque: ['essere'],
+    phrases: [{ id: 1, debut: 'Lui ', fin: '.', verbe: 'essere', reponses: ['è', 'e\\u0300'] }]
   };
-  assert.equal(noterQuiz(accentDefinition, { '1': { verbe_choisi: 'avere', texte_saisi: 'ho' } }).score, 3);
+  assert.equal(noterQuiz(accentDefinition, { '1': { verbe_choisi: 'essere', texte_saisi: 'e\\u0300' } }).score, 3);
 });
 
 test('note séparément le verbe et la conjugaison, même si la phrase est incomplète', () => {
