@@ -653,9 +653,8 @@ IMMUTABLE
 PARALLEL SAFE
 AS $function$
  SELECT CASE WHEN strip_end
-   THEN regexp_replace(regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '[’‘]', '''', 'g'), '[.?!;:]+
-, '')
-   ELSE regexp_replace(regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '[’‘]', '''', 'g'), '\s+', ' ', 'g')
+   THEN regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '[.?!;:]+$', '')
+   ELSE regexp_replace(lower(btrim(normalize(coalesce(v,''), NFC))), '\s+', ' ', 'g')
  END
 $function$;
 
