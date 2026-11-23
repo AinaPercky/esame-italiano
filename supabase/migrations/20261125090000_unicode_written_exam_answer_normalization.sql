@@ -76,7 +76,7 @@ begin
     if exists(
       select 1 from jsonb_array_elements_text(coalesce(v_key->'acceptedAnswers','[]'::jsonb)) e
       where public.quiz_norm_answer(e)=
-        lower(regexp_replace(btrim(v_answer_text),'\s+',' ','g'))
+        public.quiz_norm_answer(v_answer_text)
     ) then return v_q.points; end if;
     return 0;
   elsif v_q.question_type='reorder' then
