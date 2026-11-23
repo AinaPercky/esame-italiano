@@ -12,6 +12,38 @@ begin
   end if;
 
   v_result := public.exercise_grade_question(
+    '{"type":"text","points":4,"answers":[["parlo","io parlo"],["scrivi","tu scrivi"]]}'::jsonb,
+    '["IO PARLO","tu scrivi"]'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 4 then
+    raise exception 'Exercise text alternatives per blank were not accepted';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"text","points":4,"answers":[["parlo","io parlo"],["scrivi","tu scrivi"]]}'::jsonb,
+    '["parlo","wrong"]'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,true) is not false or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Exercise multi-blank partial score with alternatives was incorrect';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"text","points":2,"correct_answer":"ventitré / 23"}'::jsonb,
+    to_jsonb(convert_from(decode('76656e7469747265cc81','hex'),'UTF8'))
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 2 then
+    raise exception 'Exercise Unicode NFD alternative answer was not accepted';
+  end if;
+
+  v_result := public.exercise_grade_question(
+    '{"type":"verbes_trous","points":3,"verbes_trous":{"phrases":[{"id":"1","verbe":"essere","reponses":["è","è"]}]}}'::jsonb,
+    '{"1":{"verbe_choisi":"essere","texte_saisi":"è"}}'::jsonb
+  );
+  if coalesce((v_result ->> 'correct')::boolean,false) is not true or (v_result ->> 'points')::numeric <> 3 then
+    raise exception 'Exercise verb conjugation alternative in Unicode NFD was not accepted';
+  end if;
+
+  v_result := public.exercise_grade_question(
     '{"type":"reorder","points":1,"items":[{"id":"a"},{"id":"b"}]}'::jsonb,
     '["a","b"]'::jsonb
   );
