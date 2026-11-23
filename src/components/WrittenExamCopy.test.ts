@@ -34,7 +34,7 @@ test('written exam accepts every declared text alternative and preserves partial
   written_exam_answer_keys: [{ answer_key: { acceptedAnswers: ['ventitré', '23'] } }]
  };
  assert.equal(getWrittenQuestionAutoScore(single, '23'), 2);
- assert.equal(getWrittenQuestionAutoScore(single, 'ventitre\\u0301'), 2);
+ assert.equal(getWrittenQuestionAutoScore(single, 'ventitre\u0301'), 2);
  assert.equal(getWrittenQuestionAutoScore(single, 'venti'), 0);
 
  const multi = {
