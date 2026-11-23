@@ -35,6 +35,7 @@ export type MotsTrousScore = {
 
 export function normalizeMotsTrousAnswer(value: unknown): string {
   return String(value ?? '')
+    .normalize('NFC')
     .trim()
     .toLocaleLowerCase('it-IT')
     .replace(/[’‘`]/g, "'")
