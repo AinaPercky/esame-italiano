@@ -13,6 +13,15 @@ describe('normalisation des réponses textuelles de quiz', () => {
     assert.equal(isTextAnswerCorrect('IO   VADO A SCUOLA', 'io vado a scuola'), true);
   });
 
+  it('accepte les accents Unicode précomposés et décomposés visuellement identiques', () => {
+    const expected = 'ventitré';
+    const studentAnswer = 'ventitre\u0301';
+    assert.notEqual(studentAnswer, expected);
+    assert.equal(normalizeAnswerText(studentAnswer), expected);
+    assert.equal(isTextAnswerCorrect(studentAnswer, expected), true);
+    assert.equal(isTextAnswerCorrect('VENTITRE\u0301', expected), true);
+  });
+
   it('accepte une ponctuation finale omise ou ajoutée', () => {
     assert.equal(isTextAnswerCorrect('io vado a scuola', 'Io vado a scuola.'), true);
     assert.equal(isTextAnswerCorrect('Io vado a scuola!', 'io vado a scuola'), true);
