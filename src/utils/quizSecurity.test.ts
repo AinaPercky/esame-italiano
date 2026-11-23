@@ -119,10 +119,15 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       process.cwd(),
       'supabase/migrations/20261126100000_quiz_text_alternative_connectors.sql'
     );
+    const italianNumbersMigrationPath = path.resolve(
+      process.cwd(),
+      'supabase/migrations/20261127100000_italian_number_digit_equivalence.sql'
+    );
     const sqlFromFile = fs.readFileSync(sqlPath, 'utf8').trim();
     const motsTrousSql = fs.readFileSync(motsTrousMigrationPath, 'utf8');
     const unicodeSql = fs.readFileSync(unicodeMigrationPath, 'utf8');
     const alternativeSql = fs.readFileSync(alternativeMigrationPath, 'utf8');
+    const italianNumbersSql = fs.readFileSync(italianNumbersMigrationPath, 'utf8');
 
     // Les fonctions quiz_sanitize_questions et quiz_grade_question du bootstrap TS
     // doivent correspondre exactement à la migration additive 20261124000000.
@@ -158,11 +163,16 @@ describe('migration SQL de sécurité et correction serveur des quiz', () => {
       'Le helpers TypeScript et SQL doivent utiliser la même normalisation NFC.'
     );
     normalizedBootstrap = replaceFn(normalizedBootstrap, 'quiz_norm_answer', extractFn(sqlFromFile, 'quiz_norm_answer'));
-    assert.equal(
-      extractFn(QUIZ_SECURITY_MIGRATION_SQL, 'quiz_text_matches'),
-      extractFn(alternativeSql, 'quiz_text_matches'),
-      'Le correcteur SQL de bootstrap doit rester synchronisé avec la migration des alternatives.'
-    );
+    for (const fnName of ['quiz_italian_under_100', 'quiz_italian_number_words', 'quiz_italian_number_value', 'quiz_text_matches']) {
+      assert.equal(
+        extractFn(QUIZ_SECURITY_MIGRATION_SQL, fnName),
+        extractFn(italianNumbersSql, fnName),
+        `${fnName} doit rester synchronisée avec la migration des nombres italiens.`
+      );
+    }
+    for (const fnName of ['quiz_italian_under_100', 'quiz_italian_number_words', 'quiz_italian_number_value']) {
+      normalizedBootstrap = replaceFn(normalizedBootstrap, fnName, '');
+    }
     normalizedBootstrap = replaceFn(
       normalizedBootstrap,
       'quiz_text_matches',
