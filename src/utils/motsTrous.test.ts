@@ -33,6 +33,14 @@ test('normalise la casse, les espaces et les apostrophes sans effacer les accent
   assert.equal(normalizeMotsTrousAnswer("  UN’  ARANCIATA "), "un'aranciata");
   assert.equal(normalizeMotsTrousAnswer('  Caffè   Caldo '), 'caffè caldo');
   assert.notEqual(normalizeMotsTrousAnswer('caffe'), normalizeMotsTrousAnswer('caffè'));
+  assert.equal(normalizeMotsTrousAnswer('caffe\\u0300'), normalizeMotsTrousAnswer('caffè'));
+});
+
+test('note correctement une réponse Unicode visuellement identique en NFC et NFD', () => {
+  const decomposed = 'caffe\\u0300';
+  const score = noterMotsTrous(definition, { '1': decomposed });
+  assert.equal(score.phrases[0].correct, true);
+  assert.equal(score.score, 2);
 });
 
 test('place un mot, évite les doublons et calcule la banque restante avec pièges', () => {
