@@ -257,6 +257,10 @@ export interface QuizManualReview {
   general_comment: string;
   reviewed_at: string;
   reviewed_by?: string | null;
+  /** Valeurs automatiques conservées lors de la première vérification. */
+  automatic_score?: number;
+  automatic_score_20?: number;
+  automatic_feedback?: Record<string, { correct: boolean; points: number; maxPoints?: number; expected: string; studentAnswer: string; explanation?: string }>;
 }
 
 export interface QuizSubmission {
