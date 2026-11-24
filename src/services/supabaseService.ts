@@ -2225,6 +2225,7 @@ class SupabaseService {
         submitted_at: s.submitted_at || undefined,
         answers: s.answers || {},
         questions_snapshot: Array.isArray(s.questions_snapshot) ? s.questions_snapshot : null,
+        manual_review: s.manual_review || null,
         score: Number(s.score) || 0,
         max_score: Number(s.max_score) || 20,
         score_20: Number(s.score_20) || 0,
