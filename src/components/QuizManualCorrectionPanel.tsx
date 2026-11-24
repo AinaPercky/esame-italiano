@@ -136,6 +136,10 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     const value = raw === undefined ? Number(selectedSubmission?.manual_review?.question_scores?.[question.id] ?? selectedSubmission?.feedback?.[question.id]?.points ?? 0) : Number(raw);
     return sum + (Number.isFinite(value) ? Math.min(Number(question.points) || 0, Math.max(0, value)) : 0);
   }, 0);
+  // Tant qu'aucune vérification n'est enregistrée, la note automatique reste la note officielle du quiz.
+  const retainedScore20 = selectedSubmission?.manual_review
+    ? (maxTotal > 0 ? Number((manualTotal / maxTotal * 20).toFixed(1)) : 0)
+    : Number(selectedSubmission?.score_20 ?? 0);
   const pendingCount = quizSubmissions.filter(item => !item.manual_review && item.status !== 'missed' && item.questions_snapshot?.length).length;
   const reviewedCount = quizSubmissions.filter(item => Boolean(item.manual_review)).length;
 
@@ -229,7 +233,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-bold text-[#072a3f]">{submission.student_name || 'Élève sans nom'}</span>
                       <span className="mt-0.5 block truncate text-[11px] text-slate-500">{submission.class_name || 'Classe'} · {submission.student_number || 'Sans matricule'} · Tentative {submission.attempt_number || 1}</span>
-                      <span className="mt-1 block text-[10px] font-semibold text-slate-500">{submissionStatus(submission)} · {Number(submission.score_20 || 0).toFixed(1)}/20</span>
+                      <span className="mt-1 block text-[10px] font-semibold text-slate-500">{submissionStatus(submission)} · {Number(submission.score_20 || 0).toFixed(1)}/20 · {submission.manual_review ? 'Vérifiée' : 'Note automatique retenue'}</span>
                     </span>
                     <span className="shrink-0 text-right">
                       {reviewed ? <CheckCircle2 className="ml-auto h-4 w-4 text-[#2fa36b]" aria-label="Copie vérifiée" /> : unavailable ? <AlertCircle className="ml-auto h-4 w-4 text-slate-400" aria-label="Copie non corrigeable" /> : <span className="block h-2.5 w-2.5 rounded-full bg-amber-500" aria-label="À vérifier" />}
@@ -255,7 +259,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Note automatique</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#072a3f]">{Number(selectedSubmission.manual_review?.automatic_score_20 ?? selectedSubmission.score_20 ?? 0).toFixed(1)}<span className="text-xs text-slate-400">/20</span></div></div>
-                      <div className="rounded-xl border border-[#b9d8c9] bg-[#f6fbf8] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-[#176b45]">Note vérifiée</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#176b45]">{maxTotal > 0 ? (manualTotal / maxTotal * 20).toFixed(1) : '0.0'}<span className="text-xs text-[#5c8b72]">/20</span></div></div>
+                      <div className="rounded-xl border border-[#b9d8c9] bg-[#f6fbf8] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-[#176b45]">{selectedSubmission.manual_review ? 'Note après vérification' : 'Note retenue (automatique)'}</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#176b45]">{retainedScore20.toFixed(1)}<span className="text-xs text-[#5c8b72]">/20</span></div></div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-slate-500"><span>Barème : {maxTotal || selectedSubmission.max_score} points · Automatique : {automaticTotal.toFixed(2)} points</span><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-[#2fa36b]" /> Les réponses originales sont conservées</span></div>
