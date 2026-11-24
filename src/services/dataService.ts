@@ -1756,6 +1756,37 @@ export const dataService = {
     return submission;
   },
 
+  async reviewQuizSubmission(
+    submissionId: string,
+    questionScores: Record<string, number>,
+    questionComments: Record<string, string>,
+    generalComment: string
+  ): Promise<QuizSubmission> {
+    const existing = (state.quizSubmissions || []).find(item => item.id === submissionId);
+    if (!existing) throw new Error('Copie introuvable dans les résultats chargés.');
+    // La base valide le rôle professeur, les identifiants de questions et les plafonds.
+    const reviewed = await supabaseService.reviewQuizSubmission(
+      submissionId,
+      questionScores,
+      questionComments,
+      generalComment
+    );
+    const sameStudentAttempts = (state.quizSubmissions || []).filter(item =>
+      item.quiz_id === reviewed.quiz_id && item.student_id === reviewed.student_id
+    );
+    const updatedAttempts = sameStudentAttempts.map(item => item.id === reviewed.id ? reviewed : item);
+    markBestQuizAttempt(updatedAttempts).forEach(attempt => {
+      const stored = state.quizSubmissions.find(item => item.id === attempt.id);
+      if (stored) stored.is_counted = attempt.is_counted;
+      if (attempt.id === reviewed.id) reviewed.is_counted = attempt.is_counted;
+    });
+    const index = state.quizSubmissions.findIndex(item => item.id === reviewed.id);
+    if (index >= 0) state.quizSubmissions[index] = reviewed;
+    persistState();
+    notifySubscribers();
+    return reviewed;
+  },
+
   getQuizSubmissions(quizId?: string): QuizSubmission[] {
     this.checkAndApplyExpiredQuizzes();
     let list = state.quizSubmissions || [];
