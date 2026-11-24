@@ -111,6 +111,11 @@ BEGIN
   IF reviewed.manual_review ->> 'general_comment' IS DISTINCT FROM 'Relecture professorale après vérification du corrigé.' THEN
     RAISE EXCEPTION 'Le commentaire général n''a pas été conservé.';
   END IF;
+  IF reviewed.manual_review ->> 'automatic_score' IS DISTINCT FROM '4'
+     OR reviewed.manual_review ->> 'automatic_score_20' IS DISTINCT FROM '8'
+     OR reviewed.manual_review #>> '{automatic_feedback,q1,points}' IS DISTINCT FROM '2' THEN
+    RAISE EXCEPTION 'La note automatique originale doit rester disponible après correction.';
+  END IF;
   IF reviewed.feedback #>> '{q1,points}' IS DISTINCT FROM '5'
      OR reviewed.feedback #>> '{q1,correct}' IS DISTINCT FROM 'true' THEN
     RAISE EXCEPTION 'Le feedback de la question doit refléter les points vérifiés : %', reviewed.feedback;
