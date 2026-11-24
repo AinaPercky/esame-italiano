@@ -136,3 +136,13 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: perckylingua_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public_quiz_batch_grading.sql
+      - name: Test secure teacher manual quiz correction in isolated PostgreSQL
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: perckylingua_test
+        run: |
+          createdb -U postgres quiz_manual_correction_test
+          PGDATABASE=quiz_manual_correction_test psql -v ON_ERROR_STOP=1 -f tests/sql/quiz_manual_correction_migration.sql

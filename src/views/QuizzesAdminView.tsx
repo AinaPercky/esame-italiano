@@ -35,7 +35,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Search,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ClipboardCheck
 } from 'lucide-react';
 import { Quiz, QuizQuestion, ClassRoom, Student, QuizSubmission, DailyGrade, QuizParticipant, QUIZ_CATEGORIES, QuizCategory, normalizeQuizCategory, CEFR_LEVELS, CEFRLevel } from '../types';
 import { dataService } from '../services/dataService';
@@ -43,6 +44,7 @@ import { supabaseService } from '../services/supabaseService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ClassLeaderboard } from '../components/ClassLeaderboard';
 import { QuizAnalyticsDashboard } from '../components/QuizAnalyticsDashboard';
+import { QuizManualCorrectionPanel } from '../components/QuizManualCorrectionPanel';
 import { DEFAULT_QCM_TIME_SECONDS, DEFAULT_TEXT_TIME_SECONDS, formatQuizDuration, getQuestionTimeSeconds, getQuizTotalTimeSeconds } from '../utils/quizTiming';
 import { createQuizReorderItem } from '../utils/quizReorder';
 import { CLOZE_BLANK_REGEX, getQuestionExpectedAnswers } from '../utils/quizAnswerMatcher';
@@ -439,6 +441,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
   const [retryBusy, setRetryBusy] = useState(false);
   const [retryClassId, setRetryClassId] = useState('');
   const [activeAnalyticsQuizId, setActiveAnalyticsQuizId] = useState<string | null>(null);
+  const [activeCorrectionQuizId, setActiveCorrectionQuizId] = useState<string | null>(null);
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('');
 
   // Génération automatique du QR code lorsque sharingQuiz est ouvert
@@ -1315,6 +1318,8 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                 const isClosed = quiz.status === 'closed';
                 // Une seule note par élève : la meilleure tentative marquée par le serveur.
                 const quizSubs = submissions.filter(s => s.quiz_id === quiz.id && s.is_counted !== false);
+                const allQuizSubmissions = submissions.filter(s => s.quiz_id === quiz.id);
+                const pendingManualReviews = allQuizSubmissions.filter(s => !s.manual_review && s.status !== 'missed' && s.questions_snapshot?.length).length;
                 const classNamesText = quiz.class_ids && quiz.class_ids.length > 1
                   ? quiz.class_ids.map(cid => classes.find(item => item.id === cid)?.name || 'Classe').join(', ')
                   : (quiz.class_name || 'Classe');
@@ -1389,6 +1394,18 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                     <LearningCardFooter>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setActiveCorrectionQuizId(quiz.id)}
+                            disabled={allQuizSubmissions.length === 0}
+                            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-[#b9d8c9] bg-[#f6fbf8] px-3 py-1.5 text-xs font-bold text-[#176b45] transition-colors hover:bg-[#eaf5ef] disabled:cursor-not-allowed disabled:opacity-45"
+                            title="Vérifier les réponses et ajuster manuellement les points attribués"
+                          >
+                            <ClipboardCheck className="w-3.5 h-3.5" />
+                            <span>Corriger</span>
+                            {pendingManualReviews > 0 && <span className="rounded-full bg-[#2fa36b] px-1.5 py-0.5 text-[10px] font-extrabold text-white">{pendingManualReviews}</span>}
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => {
@@ -2697,6 +2714,20 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
       )}
 
       {/* Modal Partage & QR Code du Quiz Public */}
+      {activeCorrectionQuizId && quizzes.find(item => item.id === activeCorrectionQuizId) && (
+        <QuizManualCorrectionPanel
+          quiz={quizzes.find(item => item.id === activeCorrectionQuizId)!}
+          submissions={submissions}
+          onClose={() => setActiveCorrectionQuizId(null)}
+          onSave={async (submissionId, questionScores, questionComments, generalComment) => {
+            const updated = await dataService.reviewQuizSubmission(submissionId, questionScores, questionComments, generalComment);
+            loadData();
+            if (onRefresh) onRefresh();
+            return updated;
+          }}
+        />
+      )}
+
       {sharingQuiz && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">

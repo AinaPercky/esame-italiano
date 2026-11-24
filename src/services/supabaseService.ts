@@ -10,6 +10,7 @@ import {
   PassOrderItem,
   Quiz,
   QuizSubmission,
+  QuizManualReview,
   QuizLaunch,
   QuizParticipant,
   QuizRetryGrant,
@@ -1344,6 +1345,55 @@ class SupabaseService {
     if (error) throw new Error(`Résultat du quiz « ${submission.quiz_title} » : ${error.message}`);
   }
 
+  public async reviewQuizSubmission(
+    submissionId: string,
+    questionScores: Record<string, number>,
+    questionComments: Record<string, string>,
+    generalComment: string
+  ): Promise<QuizSubmission> {
+    const client = this.getClient();
+    if (!client) throw new Error('La connexion Supabase est indisponible.');
+    const { data, error } = await client.rpc('review_quiz_submission', {
+      p_submission_id: submissionId,
+      p_question_scores: questionScores,
+      p_question_comments: questionComments,
+      p_general_comment: generalComment
+    });
+    if (error) {
+      if (isSupabaseMissingRpcError(error, 'review_quiz_submission')) {
+        throw new Error('La migration « Correction manuelle des quiz » doit être appliquée dans Supabase avant de corriger une copie.');
+      }
+      throw new Error(`Enregistrement de la correction manuelle impossible : ${error.message}`);
+    }
+    if (!data || typeof data !== 'object') throw new Error('Le serveur n’a retourné aucune copie corrigée.');
+    return {
+      id: data.id,
+      quiz_id: data.quiz_id,
+      quiz_title: data.quiz_title,
+      student_id: data.student_id,
+      student_name: data.student_name,
+      student_number: data.student_number,
+      class_id: data.class_id,
+      class_name: data.class_name,
+      started_at: data.started_at,
+      submitted_at: data.submitted_at,
+      answers: data.answers || {},
+      questions_snapshot: Array.isArray(data.questions_snapshot) ? data.questions_snapshot : null,
+      score: Number(data.score) || 0,
+      max_score: Number(data.max_score) || 20,
+      score_20: Number(data.score_20) || 0,
+      status: data.status,
+      feedback: data.feedback || {},
+      date: data.date,
+      attempt_number: Number(data.attempt_number) || 1,
+      launch_id: data.launch_id || undefined,
+      attendance_status: data.attendance_status || 'unknown',
+      retry_grant_id: data.retry_grant_id || undefined,
+      is_counted: data.is_counted !== false,
+      manual_review: (data.manual_review || null) as QuizManualReview | null
+    };
+  }
+
   public async launchQuizAtomically(quizId: string): Promise<boolean> {
     const client = this.getClient();
     if (!client) {
@@ -2175,6 +2225,7 @@ class SupabaseService {
         submitted_at: s.submitted_at || undefined,
         answers: s.answers || {},
         questions_snapshot: Array.isArray(s.questions_snapshot) ? s.questions_snapshot : null,
+        manual_review: s.manual_review || null,
         score: Number(s.score) || 0,
         max_score: Number(s.max_score) || 20,
         score_20: Number(s.score_20) || 0,

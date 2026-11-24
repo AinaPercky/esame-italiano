@@ -251,6 +251,18 @@ export interface Quiz {
   total_points: number; // Total des points des questions
 }
 
+export interface QuizManualReview {
+  question_scores: Record<string, number>;
+  question_comments: Record<string, string>;
+  general_comment: string;
+  reviewed_at: string;
+  reviewed_by?: string | null;
+  /** Valeurs automatiques conservées lors de la première vérification. */
+  automatic_score?: number;
+  automatic_score_20?: number;
+  automatic_feedback?: Record<string, { correct: boolean; points: number; maxPoints?: number; expected: string; studentAnswer: string; explanation?: string }>;
+}
+
 export interface QuizSubmission {
   id: string;
   quiz_id: string;
@@ -276,6 +288,8 @@ export interface QuizSubmission {
   attendance_status?: 'unknown' | 'present' | 'absent';
   retry_grant_id?: string;
   is_counted?: boolean;
+  /** Correction manuelle du professeur, exposée uniquement via la RPC enseignant. */
+  manual_review?: QuizManualReview | null;
 }
 
 export type QuizPresenceStatus = 'pending' | 'present' | 'absent' | 'completed' | 'timeout' | 'retry_authorized';
