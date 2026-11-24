@@ -2,7 +2,7 @@
  * Diagnostic temporaire du moteur de correction.
  * Supprimer ce fichier et ses appels après analyse des journaux navigateur.
  * Ne journalise que les corrections contenant au moins une réponse incorrecte/partielle.
- * Les corrigés et clés de réponse ne sont jamais affichés.
+ * Affiche volontairement les réponses attendues et clés présentes dans le résultat de correction.
  */
 type DiagnosticModule = 'quiz' | 'exercise' | 'written_exam';
 
@@ -30,19 +30,9 @@ function findIncorrect(value: unknown, path = '$', found: Array<{ path: string; 
   }
 
   for (const [key, child] of Object.entries(record)) {
-    if (!['expected', 'correct_answer', 'answer_key', 'answer_keys', 'solution', 'explanation'].includes(key)) {
-      findIncorrect(child, `${path}.${key}`, found);
-    }
+    findIncorrect(child, `${path}.${key}`, found);
   }
   return found;
-}
-
-function redact(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redact);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-    .filter(([key]) => !['expected', 'correct_answer', 'answer_key', 'answer_keys', 'solution', 'explanation'].includes(key))
-    .map(([key, child]) => [key, redact(child)]));
 }
 
 export function logGradingDiagnostic(input: {
@@ -65,6 +55,6 @@ export function logGradingDiagnostic(input: {
     studentId: input.studentId,
     submittedAnswers: input.submittedAnswers,
     incorrectQuestions,
-    gradingResult: redact(input.gradingResult)
+    gradingResult: input.gradingResult
   });
 }
