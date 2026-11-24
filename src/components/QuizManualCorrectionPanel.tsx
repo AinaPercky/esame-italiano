@@ -96,7 +96,8 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     const value = raw === undefined ? Number(selectedSubmission?.manual_review?.question_scores?.[question.id] ?? selectedSubmission?.feedback?.[question.id]?.points ?? 0) : Number(raw);
     return sum + (Number.isFinite(value) ? Math.min(Number(question.points) || 0, Math.max(0, value)) : 0);
   }, 0);
-  const pendingCount = quizSubmissions.filter(item => !item.manual_review && item.status !== 'missed').length;
+  const pendingCount = quizSubmissions.filter(item => !item.manual_review && item.status !== 'missed' && item.questions_snapshot?.length).length;
+  const reviewedCount = quizSubmissions.filter(item => Boolean(item.manual_review)).length;
 
   useEffect(() => {
     if (!selectedSubmission) return;
@@ -171,7 +172,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-[#f3f8fb] p-2"><div className="text-lg font-extrabold tabular-nums text-[#072a3f]">{quizSubmissions.length}</div><div className="text-[10px] text-slate-500">Copies</div></div>
                 <div className="rounded-lg bg-[#f3f8fb] p-2"><div className="text-lg font-extrabold tabular-nums text-[#a15c08]">{pendingCount}</div><div className="text-[10px] text-slate-500">À vérifier</div></div>
-                <div className="rounded-lg bg-[#f3f8fb] p-2"><div className="text-lg font-extrabold tabular-nums text-[#176b45]">{quizSubmissions.length - pendingCount}</div><div className="text-[10px] text-slate-500">Vérifiées</div></div>
+                <div className="rounded-lg bg-[#f3f8fb] p-2"><div className="text-lg font-extrabold tabular-nums text-[#176b45]">{reviewedCount}</div><div className="text-[10px] text-slate-500">Vérifiées</div></div>
               </div>
               <label className="mt-3 block">
                 <span className="mb-1 block text-xs font-semibold text-[#46657a]">Rechercher un élève</span>
