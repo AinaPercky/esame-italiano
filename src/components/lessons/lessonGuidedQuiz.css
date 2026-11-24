@@ -293,7 +293,7 @@
 
 .lesson-quiz-radio-option {
   display: grid !important;
-  grid-template-columns: 22px minmax(0, 1fr) !important;
+  grid-template-columns: 22px 28px minmax(0, 1fr) !important;
   align-items: center;
   justify-items: stretch;
   gap: 12px !important;
@@ -335,6 +335,23 @@
   justify-self: center;
   accent-color: #2fa36b;
   cursor: inherit;
+}
+
+.lesson-quiz-radio-marker {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e6f0f7;
+  color: #315267;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.lesson-quiz-radio-option.is-selected .lesson-quiz-radio-marker {
+  background: #d7f0e2;
+  color: #145c3d;
 }
 
 .lesson-quiz-radio-label {
