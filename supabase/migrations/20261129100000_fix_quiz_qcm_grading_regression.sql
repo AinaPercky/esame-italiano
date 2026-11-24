@@ -57,15 +57,15 @@ BEGIN
   RETURN jsonb_build_array(v_raw);
 END $function$;
 
-CREATE OR REPLACE FUNCTION public.quiz_grade_question(q jsonb, answer text)
+CREATE OR REPLACE FUNCTION public.quiz_grade_question(p_question jsonb, p_answer text)
  RETURNS jsonb
  LANGUAGE plpgsql
  IMMUTABLE
 AS $function$
 DECLARE
- t TEXT := coalesce(q->>'type','text'); raw TEXT := btrim(coalesce(answer,''));
- expected TEXT := btrim(coalesce(q->>'correct_answer',''));
- pts NUMERIC := coalesce(nullif((q->>'points')::numeric,0),1);
+ t TEXT := coalesce(p_question->>'type','text'); raw TEXT := btrim(coalesce(p_answer,''));
+ expected TEXT := btrim(coalesce(p_question->>'correct_answer',''));
+ pts NUMERIC := coalesce(nullif((p_question->>'points')::numeric,0),1);
  maxpts NUMERIC := pts; earned NUMERIC := 0; ok BOOLEAN := FALSE;
  exp_display TEXT := expected; student_display TEXT := raw;
  exp_parts JSONB := '[]'; stu_parts JSONB := '[]'; item JSONB; phrase JSONB; ans JSONB;
@@ -78,7 +78,7 @@ BEGIN
  IF t='qcm' THEN
    ok := public.quiz_norm_answer(raw)=public.quiz_norm_answer(expected)
      OR EXISTS (
-       SELECT 1 FROM jsonb_array_elements(coalesce(q->'options','[]'::jsonb)) WITH ORDINALITY opt(value,ord)
+       SELECT 1 FROM jsonb_array_elements(coalesce(p_question->'options','[]'::jsonb)) WITH ORDINALITY opt(value,ord)
        WHERE
          (
            public.quiz_norm_answer(expected)=public.quiz_norm_answer(
@@ -97,8 +97,8 @@ BEGIN
    earned := CASE WHEN ok THEN pts ELSE 0 END;
  ELSIF t='reorder' THEN
    SELECT coalesce(jsonb_agg(value->>'id' ORDER BY ord),'[]') INTO item_ids
-   FROM jsonb_array_elements(coalesce(q->'items','[]')) WITH ORDINALITY x(value,ord);
-   BEGIN correct_order := (q->>'correct_answer')::jsonb; EXCEPTION WHEN OTHERS THEN correct_order := item_ids; END;
+   FROM jsonb_array_elements(coalesce(p_question->'items','[]')) WITH ORDINALITY x(value,ord);
+   BEGIN correct_order := (p_question->>'correct_answer')::jsonb; EXCEPTION WHEN OTHERS THEN correct_order := item_ids; END;
    IF jsonb_typeof(correct_order)<>'array' OR jsonb_array_length(correct_order)<>jsonb_array_length(item_ids) THEN correct_order:=item_ids; END IF;
    BEGIN student_order := raw::jsonb; EXCEPTION WHEN OTHERS THEN student_order:='[]'; END;
    IF jsonb_typeof(student_order)<>'array' THEN student_order:='[]'; END IF;
@@ -106,16 +106,16 @@ BEGIN
    earned := CASE WHEN ok THEN pts ELSE 0 END;
    SELECT coalesce(string_agg(i.value->>'text',' → ' ORDER BY x.ord),'') INTO exp_display
    FROM jsonb_array_elements_text(correct_order) WITH ORDINALITY x(id,ord)
-   JOIN jsonb_array_elements(coalesce(q->'items','[]')) i(value) ON i.value->>'id'=x.id;
+   JOIN jsonb_array_elements(coalesce(p_question->'items','[]')) i(value) ON i.value->>'id'=x.id;
    SELECT coalesce(string_agg(i.value->>'text',' → ' ORDER BY x.ord),'') INTO student_display
    FROM jsonb_array_elements_text(student_order) WITH ORDINALITY x(id,ord)
-   JOIN jsonb_array_elements(coalesce(q->'items','[]')) i(value) ON i.value->>'id'=x.id;
- ELSIF t='verbes_trous' AND q ? 'verbes_trous' THEN
+   JOIN jsonb_array_elements(coalesce(p_question->'items','[]')) i(value) ON i.value->>'id'=x.id;
+ ELSIF t='verbes_trous' AND p_question ? 'verbes_trous' THEN
    exp_display := '';
-   per_phrase := coalesce(nullif((q#>>'{verbes_trous,points_par_phrase}')::numeric,0),3);
+   per_phrase := coalesce(nullif((p_question#>>'{verbes_trous,points_par_phrase}')::numeric,0),3);
    BEGIN ans:=raw::jsonb; EXCEPTION WHEN OTHERS THEN ans:='{}'; END;
    choices:=coalesce(ans->'choices','{}'); saisies:=coalesce(ans->'saisies','{}');
-   FOR phrase,idx IN SELECT value,ord::integer FROM jsonb_array_elements(coalesce(q#>'{verbes_trous,phrases}','[]')) WITH ORDINALITY AS x(value,ord) LOOP
+   FOR phrase,idx IN SELECT value,ord::integer FROM jsonb_array_elements(coalesce(p_question#>'{verbes_trous,phrases}','[]')) WITH ORDINALITY AS x(value,ord) LOOP
      IF coalesce(phrase->>'verbe','')='' OR jsonb_typeof(phrase->'reponses')<>'array' THEN CONTINUE; END IF;
      n:=n+1;
      IF ans ? 'choices' OR ans ? 'saisies' THEN
@@ -138,7 +138,7 @@ BEGIN
    maxpts:=n*per_phrase; ok:=n>0 AND earned=maxpts;
  ELSE
    exp_display := '';
-   exp_parts := public.quiz_expected_answers_list(q);
+   exp_parts := public.quiz_expected_answers_list(p_question);
    IF jsonb_array_length(exp_parts)=0 THEN exp_parts:=jsonb_build_array(expected); END IF;
    BEGIN stu_parts:=raw::jsonb; IF jsonb_typeof(stu_parts)<>'array' THEN stu_parts:='[]'; END IF;
    EXCEPTION WHEN OTHERS THEN
@@ -165,7 +165,7 @@ BEGIN
    ELSE earned:=CASE WHEN correct_n=1 THEN pts ELSE 0 END; END IF;
    ok:=correct_n=n;
  END IF;
- RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display,'explanation',q->'explanation');
-END $function$
+ RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display,'explanation',p_question->'explanation');
+END; $function$;
 
 NOTIFY pgrst,'reload schema';

@@ -92,7 +92,11 @@ export function isTextAnswerCorrect(studentAnswer: string, expectedAnswer: strin
  * - S'il y a 1 seul trou : renvoie [reponse]
  * - S'il y a plusieurs trous (ex: 2, 3, 4 verbes) : renvoie le tableau des réponses pour chaque trou.
  */
-export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
+export const CLOZE_BLANK_REGEX = /(?:_{2,}|…{2,}|\.{3,}|\[\s*\]|\(\s*\)|\{\{\s*\}\})/g;
+
+export type QuizExpectedAnswerSource = Pick<QuizQuestion, 'question'> & Partial<Pick<QuizQuestion, 'correct_answer' | 'answers' | 'blank_count'>> & { acceptedAnswers?: string[]; accepted_answers?: string[] };
+
+export function getQuestionExpectedAnswers(question: QuizExpectedAnswerSource): string[] {
   const explicitBlankCount = Math.max(0, Number((question as any).blank_count) || 0);
   const normalizeEntries = (entries: unknown[]): string[] => {
     const values = entries.map((entry) => Array.isArray(entry)
@@ -116,6 +120,9 @@ export function getQuestionExpectedAnswers(question: QuizQuestion): string[] {
   if (Array.isArray(question.answers) && question.answers.length > 0) {
     return normalizeEntries(question.answers);
   }
+
+  const declaredAlternatives = question.acceptedAnswers || question.accepted_answers;
+  if (Array.isArray(declaredAlternatives) && declaredAlternatives.length > 0) return normalizeEntries(declaredAlternatives);
 
   const raw = (question.correct_answer || '').trim();
   if (raw.startsWith('[') && raw.endsWith(']')) {
@@ -166,7 +173,7 @@ export function parseStudentAnswers(answerStr: string, expectedCount: number): s
 /**
  * Formate la réponse saisie par l'élève pour un affichage lisible dans la modale de correction.
  */
-export function formatTextAnswerForDisplay(question: QuizQuestion, answerStr: string): string {
+export function formatTextAnswerForDisplay(question: QuizExpectedAnswerSource, answerStr: string): string {
   const expectedAnswers = getQuestionExpectedAnswers(question);
   if (expectedAnswers.length <= 1) {
     const parts = parseStudentAnswers(answerStr, 1);
@@ -180,7 +187,7 @@ export function formatTextAnswerForDisplay(question: QuizQuestion, answerStr: st
 /**
  * Formate la réponse attendue pour un affichage lisible dans la modale de correction.
  */
-export function formatCorrectTextAnswerForDisplay(question: QuizQuestion): string {
+export function formatCorrectTextAnswerForDisplay(question: QuizExpectedAnswerSource): string {
   const expectedAnswers = getQuestionExpectedAnswers(question);
   if (expectedAnswers.length <= 1) {
     return expectedAnswers[0] || question.correct_answer || '';
@@ -290,4 +297,60 @@ export function calculateQuestionPointsEarned(question: QuizQuestion, studentAns
  */
 export function isQuestionAnswerCorrect(question: QuizQuestion, studentAnswer: string): boolean {
   return calculateQuestionPointsEarned(question, studentAnswer).isFullyCorrect;
+}
+
+
+function getWrittenExamExpectedSlots(answerKey: any, blankCount?: number): string[] {
+  const source = Array.isArray(answerKey?.answers) && answerKey.answers.length
+    ? answerKey.answers
+    : Array.isArray(answerKey?.acceptedAnswers) && answerKey.acceptedAnswers.length
+      ? answerKey.acceptedAnswers
+      : Array.isArray(answerKey?.accepted_answers) && answerKey.accepted_answers.length
+        ? answerKey.accepted_answers
+        : answerKey?.correct_answer != null ? [answerKey.correct_answer] : [];
+  if (!source.length) return [];
+  if (source.some(Array.isArray)) {
+    return source.map((entry: unknown) => Array.isArray(entry)
+      ? entry.map(String).map(value => value.trim()).filter(Boolean).join(' / ')
+      : String(entry ?? '').trim()).filter(Boolean);
+  }
+  const values = source.map(String).map((value: string) => value.trim()).filter(Boolean);
+  if (Number(blankCount) > 1 && values.length > 1) return values;
+  return values.length ? [values.join(' / ')] : [];
+}
+
+export function formatWrittenExamTextExpected(prompt: string, answerKey: any, blankCount?: number): string {
+  const slots = getWrittenExamExpectedSlots(answerKey, blankCount);
+  if (!slots.length) return 'Corrigé indisponible';
+  if (slots.length === 1) return slots[0];
+  return slots.map((value, index) => 'Case ' + (index + 1) + ': ' + value).join(' · ');
+}
+
+export function gradeWrittenExamTextQuestion(
+  prompt: string,
+  answerKey: any,
+  blankCount: number | undefined,
+  studentAnswer: unknown,
+  maxPoints: number
+): number {
+  const expected = getWrittenExamExpectedSlots(answerKey, blankCount);
+  const max = Number(maxPoints);
+  if (!expected.length || !Number.isFinite(max) || max <= 0) return 0;
+  let submitted: string[] = [];
+  if (Array.isArray(studentAnswer)) {
+    submitted = studentAnswer.map(value => String(value ?? ''));
+  } else if (typeof studentAnswer === 'string') {
+    try {
+      const parsed = JSON.parse(studentAnswer);
+      submitted = Array.isArray(parsed) ? parsed.map(value => String(value ?? '')) : [studentAnswer];
+    } catch {
+      submitted = [studentAnswer];
+    }
+  } else if (studentAnswer != null) {
+    submitted = [String(studentAnswer)];
+  }
+  if (expected.length === 1) return isTextAnswerCorrect(submitted[0] || '', expected[0]) ? max : 0;
+  const correctCount = expected.reduce((count, value, index) =>
+    count + (isTextAnswerCorrect(submitted[index] || '', value) ? 1 : 0), 0);
+  return Number(((correctCount / expected.length) * max).toFixed(2));
 }
