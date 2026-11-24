@@ -1,3 +1,4 @@
+import { logGradingDiagnostic } from '../utils/gradingDiagnostics';
 import { 
   ClassRoom, 
   Student, 
@@ -1714,6 +1715,14 @@ export const dataService = {
     const serverSubmission = ((quiz.attendance_mode === 'strict_presence' && !quiz.is_public) || allowAuthorizedRetry)
       ? await supabaseService.submitQuizPresenceSubmission(submission)
       : await supabaseService.submitQuizSubmissionAtomically(submission);
+    logGradingDiagnostic({
+      module: 'quiz',
+      quizId,
+      studentId,
+      submittedAnswers: answers,
+      gradingResult: serverSubmission || submission
+    });
+
     if (serverSubmission) {
       // L'état local reflète la note et le statut de meilleure tentative calculés par PostgreSQL.
       Object.assign(submission, serverSubmission);
