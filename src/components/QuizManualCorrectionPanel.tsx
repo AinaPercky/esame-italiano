@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, CheckCircle2, ClipboardCheck, FileText, Save, Search, ShieldCheck, X } from 'lucide-react';
 import { Quiz, QuizQuestion, QuizSubmission } from '../types';
 
@@ -74,6 +74,46 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
   const [savedSubmission, setSavedSubmission] = useState<QuizSubmission | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const savingRef = useRef(saving);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => { savingRef.current = saving; }, [saving]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const getFocusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    ) || []).filter(element => element.offsetParent !== null);
+    getFocusable()[0]?.focus();
+
+    const handleDialogKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (!savingRef.current) onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleDialogKeys);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeys);
+      previousFocus?.focus();
+    };
+  }, []);
 
   const quizSubmissions = useMemo(() => submissions.filter(item => item.quiz_id === quiz.id).sort((a, b) =>
     new Date(b.submitted_at || b.started_at).getTime() - new Date(a.submitted_at || a.started_at).getTime()
@@ -154,7 +194,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
 
   return (
     <div className="fixed inset-0 z-[90] flex items-stretch justify-center bg-[#072a3f]/55 p-0 sm:p-3 lg:p-5" role="dialog" aria-modal="true" aria-labelledby="quiz-manual-correction-title">
-      <section className="flex h-full w-full max-w-[1440px] flex-col overflow-hidden bg-[#f5f8fa] shadow-2xl sm:rounded-2xl">
+      <section ref={dialogRef} className="flex h-full w-full max-w-[1440px] flex-col overflow-hidden bg-[#f5f8fa] shadow-2xl sm:rounded-2xl">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#d8e6ee] bg-white px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e6f0f7] text-[#0b3c5d]"><ClipboardCheck className="h-5 w-5" /></div>
