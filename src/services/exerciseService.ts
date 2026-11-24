@@ -1,3 +1,4 @@
+import { logGradingDiagnostic } from '../utils/gradingDiagnostics';
 import { supabaseService } from './supabaseService';
 import type {
   ExerciseAttemptQuestion,
@@ -252,6 +253,12 @@ export const exerciseService = {
     });
     if (error) throwIfError(error, 'Remise groupée de l’exercice impossible');
     if (!data?.completed) throw new Error('Le serveur n’a pas confirmé la remise de l’exercice.');
+    logGradingDiagnostic({
+      module: 'exercise',
+      attemptId,
+      submittedAnswers: answers,
+      gradingResult: data
+    });
     return data as ExerciseBatchSubmissionResult;
   },
 
