@@ -570,7 +570,9 @@ const DiscoveryBlock: React.FC<{ content: any; discovery: DiscoveryState; onDisc
     {step.kind === 'mots_trous' && step.data?.mots_trous && <LessonMotsTrousAnswer key={step.id} definition={step.data.mots_trous} onResult={answerMotsTrous} disabled={done} />}
     {step.kind === 'fill_blanks' && <FillBlanksAnswer key={step.id} data={step.data} onResult={answerFillBlanks} disabled={done} />}
     {(step.kind === 'reorder' || step.kind === 'order') && <ReorderAnswer key={step.id} data={step.data} onSubmit={answerOrder} disabled={done} />}
-    {['choose', 'guess_meaning', 'compare', 'highlight', 'build_formula', 'group'].includes(step.kind) && <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />}
+    {['choose', 'guess_meaning', 'compare', 'highlight', 'build_formula', 'group'].includes(step.kind) && (quizChoices.length > 0
+      ? <QuizDropdown key={step.id} choices={quizChoices} onSubmit={answerOption} disabled={done} />
+      : <FreeTextAnswer key={step.id} onSubmit={answerFreeText} disabled={done} />)}
     {feedback && <Feedback good={feedback.good}>
       {feedback.text}
     </Feedback>}
