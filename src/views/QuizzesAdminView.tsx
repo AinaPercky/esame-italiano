@@ -1319,7 +1319,7 @@ export const QuizzesAdminView: React.FC<QuizzesAdminViewProps> = ({
                 // Une seule note par élève : la meilleure tentative marquée par le serveur.
                 const quizSubs = submissions.filter(s => s.quiz_id === quiz.id && s.is_counted !== false);
                 const allQuizSubmissions = submissions.filter(s => s.quiz_id === quiz.id);
-                const pendingManualReviews = allQuizSubmissions.filter(s => !s.manual_review && s.status !== 'missed').length;
+                const pendingManualReviews = allQuizSubmissions.filter(s => !s.manual_review && s.status !== 'missed' && s.questions_snapshot?.length).length;
                 const classNamesText = quiz.class_ids && quiz.class_ids.length > 1
                   ? quiz.class_ids.map(cid => classes.find(item => item.id === cid)?.name || 'Classe').join(', ')
                   : (quiz.class_name || 'Classe');
