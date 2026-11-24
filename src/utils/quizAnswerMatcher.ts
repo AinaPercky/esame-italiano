@@ -173,7 +173,7 @@ export function parseStudentAnswers(answerStr: string, expectedCount: number): s
 /**
  * Formate la réponse saisie par l'élève pour un affichage lisible dans la modale de correction.
  */
-export function formatTextAnswerForDisplay(question: QuizQuestion, answerStr: string): string {
+export function formatTextAnswerForDisplay(question: QuizExpectedAnswerSource, answerStr: string): string {
   const expectedAnswers = getQuestionExpectedAnswers(question);
   if (expectedAnswers.length <= 1) {
     const parts = parseStudentAnswers(answerStr, 1);
