@@ -89,7 +89,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
   const questions = selectedSubmission?.questions_snapshot || [];
   const isSnapshotMissing = !selectedSubmission?.questions_snapshot?.length;
   const canReview = Boolean(selectedSubmission && selectedSubmission.status !== 'missed' && !isSnapshotMissing);
-  const automaticTotal = questions.reduce((sum, question) => sum + (Number(selectedSubmission?.feedback?.[question.id]?.points) || 0), 0);
+  const automaticTotal = questions.reduce((sum, question) => sum + (Number(selectedSubmission?.manual_review?.automatic_feedback?.[question.id]?.points ?? selectedSubmission?.feedback?.[question.id]?.points) || 0), 0);
   const maxTotal = questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0);
   const manualTotal = questions.reduce((sum, question) => {
     const raw = points[question.id];
@@ -105,7 +105,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     const initialComments: Record<string, string> = {};
     (selectedSubmission.questions_snapshot || []).forEach(question => {
       const savedPoints = selectedSubmission.manual_review?.question_scores?.[question.id];
-      initialPoints[question.id] = String(savedPoints ?? selectedSubmission.feedback?.[question.id]?.points ?? 0);
+      initialPoints[question.id] = String(savedPoints ?? selectedSubmission.manual_review?.automatic_feedback?.[question.id]?.points ?? selectedSubmission.feedback?.[question.id]?.points ?? 0);
       initialComments[question.id] = selectedSubmission.manual_review?.question_comments?.[question.id] || '';
     });
     setPoints(initialPoints);
@@ -147,7 +147,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
 
   const resetToAutomatic = () => {
     if (!selectedSubmission) return;
-    setPoints(Object.fromEntries(questions.map(question => [question.id, String(selectedSubmission.feedback?.[question.id]?.points ?? 0)])));
+    setPoints(Object.fromEntries(questions.map(question => [question.id, String(selectedSubmission.manual_review?.automatic_feedback?.[question.id]?.points ?? selectedSubmission.feedback?.[question.id]?.points ?? 0)])));
     setQuestionComments({});
     setGeneralComment('');
   };
@@ -214,7 +214,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                       <p className="text-xs text-slate-500">{selectedSubmission.class_name || 'Classe'} · {selectedSubmission.student_number || 'Sans matricule'} · Tentative {selectedSubmission.attempt_number || 1} · Remise {selectedSubmission.submitted_at ? new Date(selectedSubmission.submitted_at).toLocaleString() : '—'}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Note automatique</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#072a3f]">{Number(selectedSubmission.score_20 || 0).toFixed(1)}<span className="text-xs text-slate-400">/20</span></div></div>
+                      <div className="rounded-xl border border-[#d8e6ee] bg-[#f7fafc] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Note automatique</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#072a3f]">{Number(selectedSubmission.manual_review?.automatic_score_20 ?? selectedSubmission.score_20 ?? 0).toFixed(1)}<span className="text-xs text-slate-400">/20</span></div></div>
                       <div className="rounded-xl border border-[#b9d8c9] bg-[#f6fbf8] px-3 py-2 text-right"><div className="text-[10px] font-semibold uppercase tracking-wide text-[#176b45]">Note vérifiée</div><div className="font-mono text-lg font-extrabold tabular-nums text-[#176b45]">{maxTotal > 0 ? (manualTotal / maxTotal * 20).toFixed(1) : '0.0'}<span className="text-xs text-[#5c8b72]">/20</span></div></div>
                     </div>
                   </div>
@@ -230,14 +230,15 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                     <div className="space-y-3">
                       {questions.map((question, index) => {
                         const feedback = selectedSubmission.feedback?.[question.id];
+                        const automaticFeedback = selectedSubmission.manual_review?.automatic_feedback?.[question.id] || feedback;
                         const maximum = Number(question.points) || 0;
                         const value = points[question.id] ?? String(selectedSubmission.manual_review?.question_scores?.[question.id] ?? feedback?.points ?? 0);
-                        const isChanged = Number(value) !== Number(feedback?.points ?? 0);
+                        const isChanged = Number(value) !== Number(automaticFeedback?.points ?? 0);
                         return (
                           <article key={question.id} className="overflow-hidden rounded-xl border border-[#d8e6ee] bg-white">
                             <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#edf1f4] bg-[#fbfcfd] px-4 py-3">
                               <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-[#58768a]">Question {index + 1} · {questionTypeLabel[question.type]}</p><h4 className="mt-1 whitespace-pre-wrap text-sm font-bold leading-relaxed text-[#072a3f]">{question.question}</h4></div>
-                              <div className="flex shrink-0 items-center gap-1.5"><span className={'rounded-md px-2 py-1 text-[10px] font-bold ' + (feedback?.correct ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>{feedback?.correct ? 'Automatique : juste' : 'À vérifier'}</span>{isChanged && <span className="rounded-md bg-[#e6f0f7] px-2 py-1 text-[10px] font-bold text-[#0b3c5d]">Modifiée</span>}</div>
+                              <div className="flex shrink-0 items-center gap-1.5"><span className={'rounded-md px-2 py-1 text-[10px] font-bold ' + (automaticFeedback?.correct ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>{automaticFeedback?.correct ? 'Automatique : juste' : 'À vérifier'}</span>{isChanged && <span className="rounded-md bg-[#e6f0f7] px-2 py-1 text-[10px] font-bold text-[#0b3c5d]">Modifiée</span>}</div>
                             </div>
                             <div className="grid gap-3 p-4 md:grid-cols-2">
                               <div className="min-w-0 rounded-lg border border-[#d8e6ee] bg-[#f7fafc] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Réponse de l’élève</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#072a3f]">{displayValue(selectedSubmission.answers?.[question.id])}</p></div>
@@ -245,7 +246,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                             </div>
                             <div className="grid gap-3 border-t border-[#edf1f4] bg-white px-4 py-3 sm:grid-cols-[minmax(0,1fr)_180px]">
                               <label className="block min-w-0 text-xs font-semibold text-[#46657a]">Commentaire sur cette question<input value={questionComments[question.id] || ''} onChange={event => setQuestionComments(previous => ({ ...previous, [question.id]: event.target.value }))} placeholder="Facultatif : expliquer la décision…" className="mt-1 min-h-10 w-full rounded-lg border border-[#cbd9e2] px-3 text-sm font-normal text-[#072a3f] outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/15" /></label>
-                              <label className="block text-xs font-semibold text-[#46657a]">Points attribués<span className="mt-1 flex items-center gap-2"><input type="number" inputMode="decimal" min="0" max={maximum} step="0.25" value={value} onChange={event => setPoints(previous => ({ ...previous, [question.id]: event.target.value }))} disabled={!canReview || saving} className="min-h-11 w-full rounded-lg border border-[#cbd9e2] px-3 text-base font-bold tabular-nums text-[#072a3f] outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/15 disabled:bg-slate-100" /><span className="shrink-0 font-mono text-sm text-slate-500">/ {maximum}</span></span><span className="mt-1 block text-[10px] font-normal text-slate-500">Automatique : {Number(feedback?.points || 0).toFixed(2)} pts</span></label>
+                              <label className="block text-xs font-semibold text-[#46657a]">Points attribués<span className="mt-1 flex items-center gap-2"><input type="number" inputMode="decimal" min="0" max={maximum} step="0.25" value={value} onChange={event => setPoints(previous => ({ ...previous, [question.id]: event.target.value }))} disabled={!canReview || saving} className="min-h-11 w-full rounded-lg border border-[#cbd9e2] px-3 text-base font-bold tabular-nums text-[#072a3f] outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/15 disabled:bg-slate-100" /><span className="shrink-0 font-mono text-sm text-slate-500">/ {maximum}</span></span><span className="mt-1 block text-[10px] font-normal text-slate-500">Automatique : {Number(automaticFeedback?.points || 0).toFixed(2)} pts</span></label>
                             </div>
                           </article>
                         );
