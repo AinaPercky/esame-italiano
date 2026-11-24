@@ -135,6 +135,9 @@ BEGIN
     'question_scores', coalesce(p_question_scores, '{}'::jsonb),
     'question_comments', coalesce(p_question_comments, '{}'::jsonb),
     'general_comment', coalesce(p_general_comment, ''),
+    'automatic_score', coalesce(nullif(v_submission.manual_review ->> 'automatic_score', '')::numeric, v_submission.score),
+    'automatic_score_20', coalesce(nullif(v_submission.manual_review ->> 'automatic_score_20', '')::numeric, v_submission.score_20),
+    'automatic_feedback', coalesce(v_submission.manual_review -> 'automatic_feedback', v_submission.feedback),
     'reviewed_at', clock_timestamp(),
     'reviewed_by', auth.uid()
   );
