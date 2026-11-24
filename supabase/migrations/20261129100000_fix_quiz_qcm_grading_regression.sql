@@ -166,6 +166,6 @@ BEGIN
    ok:=correct_n=n;
  END IF;
  RETURN jsonb_build_object('correct',ok,'points',round(earned,2),'maxPoints',round(maxpts,2),'expected',coalesce(exp_display,expected),'studentAnswer',student_display,'explanation',q->'explanation');
-END $function$
+END; $function$;
 
 NOTIFY pgrst,'reload schema';
