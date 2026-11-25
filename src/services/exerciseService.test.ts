@@ -100,3 +100,26 @@ test('exercise batch migration keeps answer keys server-side and exposes only au
   assert.ok(view.includes('deleteWrittenExamDraft(active.attempt_id)'));
   assert.ok(!view.includes('exercise_batch_draft_'));
 });
+
+test('batch exercise timer starts a fresh server deadline for each question', () => {
+  const migrationPath = path.resolve(process.cwd(), 'supabase/migrations/20261125110000_independent_exercise_question_timers.sql');
+  const migration = fs.readFileSync(migrationPath, 'utf8');
+  for (const snippet of [
+    'CREATE OR REPLACE FUNCTION public.advance_exercise_attempt_batch(',
+    'current_question_started_at = v_next_started_at',
+    'current_question_deadline_at = v_next_deadline',
+    'clock_timestamp() >= v_attempt.current_question_deadline_at',
+    'v_attempt.current_question_index <> jsonb_array_length(v_attempt.question_order) - 1',
+    'GRANT EXECUTE ON FUNCTION public.advance_exercise_attempt_batch(UUID, TEXT, JSONB) TO authenticated;'
+  ]) {
+    assert.ok(migration.includes(snippet), 'Chronomètre indépendant incomplet : ' + snippet);
+  }
+
+  const service = fs.readFileSync(path.resolve(process.cwd(), 'src/services/exerciseService.ts'), 'utf8');
+  assert.ok(service.includes("client.rpc('advance_exercise_attempt_batch'"));
+
+  const view = fs.readFileSync(path.resolve(process.cwd(), 'src/views/ExercisesStudentView.tsx'), 'utf8');
+  assert.ok(view.includes('exerciseService.advanceAttemptBatch('));
+  assert.ok(view.includes('resumedBatch.current_question_index'));
+  assert.ok(view.includes('withBatchQuestionTiming(batchBundle, nextIndex, transition)'));
+});

@@ -84,6 +84,19 @@ const formatExerciseExpected = (question: ExerciseAttemptReview['questions'][num
   return correctionText(question.expected);
 };
 
+const withBatchQuestionTiming = (
+  bundle: ExerciseAttemptBundle,
+  index: number,
+  timing: { deadline_at: string; seconds_remaining: number; server_now: string; current_question_index: number }
+): ExerciseAttemptBundle => ({
+  ...bundle,
+  current_question_index: timing.current_question_index,
+  server_now: timing.server_now,
+  questions: bundle.questions.map((item, itemIndex) => itemIndex === index
+    ? { ...item, deadline_at: timing.deadline_at, seconds_remaining: timing.seconds_remaining }
+    : item)
+});
+
 const correctionText = (value: unknown): string => {
   if (value == null) return '—';
   if (typeof value === 'string') return value;
@@ -177,25 +190,37 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     setRemaining(nextQuestion.seconds_remaining);
   }, [onFullscreenChange, refresh]);
 
-  const activateBatchQuestion = useCallback((bundle: ExerciseAttemptBundle, index: number, answers: Record<string, unknown>) => {
+  const activateBatchQuestion = useCallback((
+    bundle: ExerciseAttemptBundle,
+    index: number,
+    answers: Record<string, unknown>,
+    timing?: { deadline_at: string; seconds_remaining: number; server_now: string }
+  ) => {
     const item = bundle.questions[index];
     if (!item) return;
-    serverClockOffset.current = Date.now() - new Date(bundle.server_now).getTime();
+    const deadlineAt = timing?.deadline_at || item.deadline_at;
+    if (!deadlineAt) {
+      setError('Le serveur n’a pas fourni l’échéance de la question active.');
+      return;
+    }
+    const serverNow = timing?.server_now || bundle.server_now;
+    const secondsRemaining = timing?.seconds_remaining ?? item.seconds_remaining;
+    serverClockOffset.current = Date.now() - new Date(serverNow).getTime();
     const nextQuestion: ExerciseAttemptQuestion = {
       attempt_id: bundle.attempt_id,
       question: item.question,
       question_number: item.question_number,
       question_count: item.question_count,
-      deadline_at: item.deadline_at,
-      seconds_remaining: item.seconds_remaining,
-      server_now: bundle.server_now
+      deadline_at: deadlineAt,
+      seconds_remaining: secondsRemaining,
+      server_now: serverNow
     };
     setActive(nextQuestion);
     setCorrection(null);
     const savedAnswer = answers[item.question.id];
     setAnswer(typeof savedAnswer === 'string' ? savedAnswer : savedAnswer == null ? '' : JSON.stringify(savedAnswer));
     timeoutLock.current = false;
-    setRemaining(item.seconds_remaining);
+    setRemaining(secondsRemaining);
   }, []);
 
   const updateAnswer = useCallback((value: string) => {
@@ -287,14 +312,21 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
           onFullscreenChange(false);
           await refresh();
         } else {
-          const nextIndex = batchIndex + 1;
+          const transition = await exerciseService.advanceAttemptBatch(
+            active.attempt_id,
+            active.question.id,
+            currentAnswer
+          );
+          const nextIndex = transition.current_question_index;
+          const nextBundle = withBatchQuestionTiming(batchBundle, nextIndex, transition);
+          setBatchBundle(nextBundle);
           setBatchIndex(nextIndex);
           const nextWrite = localSaveQueueRef.current.catch(() => undefined).then(() =>
             saveWrittenExamDraft(active.attempt_id, nextAnswers, nextIndex)
           );
           localSaveQueueRef.current = nextWrite;
           await nextWrite;
-          activateBatchQuestion(batchBundle, nextIndex, nextAnswers);
+          activateBatchQuestion(nextBundle, nextIndex, nextAnswers, transition);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Remise groupée impossible. Réessayez.');
@@ -360,14 +392,12 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
         if (resumedBatch) {
           const draft = await loadWrittenExamDraft(attemptId);
           const restoredAnswers = draft?.answers && typeof draft.answers === 'object' ? draft.answers as Record<string, unknown> : {};
-          serverClockOffset.current = Date.now() - new Date(resumedBatch.server_now).getTime();
-          const estimatedServerNow = Date.now() - serverClockOffset.current;
-          const inferredIndex = resumedBatch.questions.findIndex(item => new Date(item.deadline_at).getTime() > estimatedServerNow);
-          const fallbackIndex = inferredIndex < 0 ? resumedBatch.questions.length - 1 : inferredIndex;
-          const draftIndex = draft?.currentIndex;
-          const restoredIndex = Number.isInteger(draftIndex)
-            ? Math.min(resumedBatch.questions.length - 1, Math.max(fallbackIndex, Math.max(0, draftIndex as number)))
-            : fallbackIndex;
+          // L'index actif vient du serveur : le brouillon local ne peut pas
+          // choisir une question ni modifier son échéance.
+          const restoredIndex = Math.min(
+            resumedBatch.questions.length - 1,
+            Math.max(0, resumedBatch.current_question_index)
+          );
           setBatchMode(true);
           setBatchBundle(resumedBatch);
           setBatchAnswers(restoredAnswers);
@@ -414,14 +444,25 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
     try {
       if (batchMode && batchBundle) {
         if (batchIndex < batchBundle.questions.length - 1) {
-          const nextIndex = batchIndex + 1;
+          const currentAnswer = batchAnswers[active.question.id] ?? answer;
+          const nextAnswers = { ...batchAnswers, [active.question.id]: currentAnswer };
+          setBatchAnswers(nextAnswers);
+          await localSaveQueueRef.current.catch(() => undefined);
+          const transition = await exerciseService.advanceAttemptBatch(
+            active.attempt_id,
+            active.question.id,
+            currentAnswer
+          );
+          const nextIndex = transition.current_question_index;
+          const nextBundle = withBatchQuestionTiming(batchBundle, nextIndex, transition);
+          setBatchBundle(nextBundle);
           setBatchIndex(nextIndex);
           const write = localSaveQueueRef.current.catch(() => undefined).then(() =>
-            saveWrittenExamDraft(active.attempt_id, batchAnswers, nextIndex)
+            saveWrittenExamDraft(active.attempt_id, nextAnswers, nextIndex)
           );
           localSaveQueueRef.current = write;
           await write;
-          activateBatchQuestion(batchBundle, nextIndex, batchAnswers);
+          activateBatchQuestion(nextBundle, nextIndex, nextAnswers, transition);
         } else {
           await localSaveQueueRef.current;
           const submitted = await exerciseService.submitAttemptBatch(active.attempt_id, batchAnswers);
@@ -462,7 +503,7 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Passage à la question suivante impossible.'); }
     finally { advanceLock.current = false; setSubmitting(false); }
-  }, [active, applyAttemptState, batchMode, batchBundle, batchIndex, batchAnswers, activateBatchQuestion, onFullscreenChange, refresh]);
+  }, [active, answer, applyAttemptState, batchMode, batchBundle, batchIndex, batchAnswers, activateBatchQuestion, onFullscreenChange, refresh]);
 
   useEffect(() => {
     if (!active || !correction || correction.correct) return;

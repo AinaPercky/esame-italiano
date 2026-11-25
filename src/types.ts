@@ -391,7 +391,7 @@ export interface ExerciseAttemptBundleQuestion {
   question: QuizQuestion;
   question_number: number;
   question_count: number;
-  deadline_at: string;
+  deadline_at: string | null;
   seconds_remaining: number;
 }
 
@@ -400,7 +400,17 @@ export interface ExerciseAttemptBundle {
   exercise_id: string;
   started_at: string;
   server_now: string;
+  current_question_index: number;
   questions: ExerciseAttemptBundleQuestion[];
+}
+
+export interface ExerciseBatchAdvanceResult {
+  advanced: boolean;
+  idempotent?: boolean;
+  current_question_index: number;
+  deadline_at: string;
+  seconds_remaining: number;
+  server_now: string;
 }
 
 export interface ExerciseBatchSubmissionResult {

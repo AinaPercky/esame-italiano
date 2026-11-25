@@ -4,6 +4,7 @@ import type {
   ExerciseAttemptQuestion,
   ExerciseAttemptBundle,
   ExerciseBatchSubmissionResult,
+  ExerciseBatchAdvanceResult,
   ExerciseCorrection,
   ExerciseDefinition,
   ExerciseAttemptResult,
@@ -243,6 +244,18 @@ export const exerciseService = {
     });
     if (error) throwIfError(error, 'Correction de la question impossible');
     return data as ExerciseCorrection;
+  },
+
+  async advanceAttemptBatch(attemptId: string, questionId: string, answer: unknown): Promise<ExerciseBatchAdvanceResult> {
+    const client = requireClient();
+    const { data, error } = await client.rpc('advance_exercise_attempt_batch', {
+      p_attempt_id: attemptId,
+      p_question_id: questionId,
+      p_answer: answer === undefined ? null : answer
+    });
+    if (error) throwIfError(error, 'Passage à la question suivante impossible');
+    if (!data?.advanced || !data.deadline_at) throw new Error('Le serveur n’a pas confirmé le démarrage du chronomètre suivant.');
+    return data as ExerciseBatchAdvanceResult;
   },
 
   async submitAttemptBatch(attemptId: string, answers: Record<string, unknown>): Promise<ExerciseBatchSubmissionResult> {
