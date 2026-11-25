@@ -66,6 +66,7 @@ function submissionStatus(submission: QuizSubmission): string {
 
 export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps> = ({ quiz, submissions, onClose, onSave }) => {
   const [search, setSearch] = useState('');
+  const [questionFilter, setQuestionFilter] = useState<'all' | 'review' | 'correct'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(submissions.find(item => item.quiz_id === quiz.id)?.id || null);
   const [points, setPoints] = useState<Record<string, string>>({});
   const [questionComments, setQuestionComments] = useState<Record<string, string>>({});
@@ -142,6 +143,15 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     : Number(selectedSubmission?.score_20 ?? 0);
   const pendingCount = quizSubmissions.filter(item => !item.manual_review && item.status !== 'missed' && item.questions_snapshot?.length).length;
   const reviewedCount = quizSubmissions.filter(item => Boolean(item.manual_review)).length;
+  const questionStatus = (question: QuizQuestion) => {
+    const automatic = selectedSubmission?.manual_review?.automatic_feedback?.[question.id] || selectedSubmission?.feedback?.[question.id];
+    const raw = points[question.id];
+    const awarded = raw === undefined ? Number(selectedSubmission?.manual_review?.question_scores?.[question.id] ?? automatic?.points ?? 0) : Number(raw);
+    return awarded >= Number(question.points || 0) && Number(question.points || 0) > 0 ? 'correct' : 'review';
+  };
+  const visibleQuestions = questions.filter(question => questionFilter === 'all' || questionStatus(question) === questionFilter);
+  const correctQuestionCount = questions.filter(question => questionStatus(question) === 'correct').length;
+  const reviewQuestionCount = questions.length - correctQuestionCount;
 
   useEffect(() => {
     if (!selectedSubmission) return;
@@ -178,6 +188,9 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
       }
       scores[question.id] = value;
     }
+    const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
+    const maximumTotal = questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0);
+    if (!window.confirm('Confirmer l’enregistrement de la correction ?\\n\\nPoints attribués : ' + total.toFixed(2) + ' / ' + maximumTotal.toFixed(2) + '.\\nChaque note respecte le barème de sa question.')) return;
     try {
       setSaving(true);
       const updated = await onSave(selectedSubmission.id, scores, questionComments, generalComment);
@@ -271,8 +284,15 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                   ) : selectedSubmission.status === 'missed' ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">Cette tentative est enregistrée comme absence et ne contient aucune réponse à corriger.</div>
                   ) : (
-                    <div className="space-y-3">
-                      {questions.map((question, index) => {
+                    <div className="space-y-4">
+                      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d8e6ee] bg-white/95 p-3 shadow-sm backdrop-blur-sm">
+                        <div><p className="text-sm font-bold text-[#072a3f]">Réponses de cette copie</p><p className="text-xs text-slate-500">{questions.length} questions · {correctQuestionCount} justes · {reviewQuestionCount} à vérifier</p></div>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les questions">
+                          {([{id:'all',label:'Tous',count:questions.length},{id:'review',label:'À vérifier',count:reviewQuestionCount},{id:'correct',label:'Réponse juste',count:correctQuestionCount}] as const).map(filter => <button key={filter.id} type="button" aria-pressed={questionFilter === filter.id} onClick={() => setQuestionFilter(filter.id)} className={'min-h-10 rounded-lg border px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b3c5d] ' + (questionFilter === filter.id ? filter.id === 'review' ? 'border-rose-700 bg-rose-700 text-white' : filter.id === 'correct' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-[#0b3c5d] bg-[#0b3c5d] text-white' : 'border-[#cbd9e2] bg-white text-[#46657a] hover:bg-[#f3f8fb]')}>{filter.label} ({filter.count})</button>)}
+                        </div>
+                      </div>
+                      {visibleQuestions.length === 0 ? <div className="rounded-xl border border-[#d8e6ee] bg-white p-8 text-center text-sm text-slate-500">Aucune question dans cette catégorie.</div> : visibleQuestions.map(question => {
+                        const index = questions.findIndex(item => item.id === question.id);
                         const feedback = selectedSubmission.feedback?.[question.id];
                         const automaticFeedback = selectedSubmission.manual_review?.automatic_feedback?.[question.id] || feedback;
                         const maximum = Number(question.points) || 0;
@@ -282,15 +302,15 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
                           <article key={question.id} className="overflow-hidden rounded-xl border border-[#d8e6ee] bg-white">
                             <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[#edf1f4] bg-[#fbfcfd] px-4 py-3">
                               <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-[#58768a]">Question {index + 1} · {questionTypeLabel[question.type]}</p><h4 className="mt-1 whitespace-pre-wrap text-sm font-bold leading-relaxed text-[#072a3f]">{question.question}</h4></div>
-                              <div className="flex shrink-0 items-center gap-1.5"><span className={'rounded-md px-2 py-1 text-[10px] font-bold ' + (automaticFeedback?.correct ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>{automaticFeedback?.correct ? 'Automatique : juste' : 'À vérifier'}</span>{isChanged && <span className="rounded-md bg-[#e6f0f7] px-2 py-1 text-[10px] font-bold text-[#0b3c5d]">Modifiée</span>}</div>
+                              <div className="flex shrink-0 items-center gap-1.5"><span className={'rounded-md border px-2.5 py-1.5 text-[11px] font-extrabold ' + (questionStatus(question) === 'correct' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800')}>{questionStatus(question) === 'correct' ? 'Réponse juste' : 'À vérifier'}</span>{isChanged && <span className="rounded-md bg-[#e6f0f7] px-2 py-1 text-[10px] font-bold text-[#0b3c5d]">Modifiée</span>}</div>
                             </div>
-                            <div className="grid gap-3 p-4 md:grid-cols-2">
-                              <div className="min-w-0 rounded-lg border border-[#d8e6ee] bg-[#f7fafc] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Réponse de l’élève</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#072a3f]">{displayValue(selectedSubmission.answers?.[question.id])}</p></div>
-                              <div className="min-w-0 rounded-lg border border-[#b9d8c9] bg-[#f6fbf8] p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[#176b45]">Réponse attendue</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[#174d35]">{expectedAnswer(question)}</p>{question.explanation && <p className="mt-2 border-t border-[#dcebe2] pt-2 text-xs leading-relaxed text-[#46657a]">{question.explanation}</p>}</div>
+                            <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2 md:gap-5">
+                              <div className="min-h-[180px] min-w-0 rounded-xl border border-[#cbd9e2] bg-[#f4f8fb] p-5 sm:p-6"><p className="text-xs font-extrabold uppercase tracking-wide text-[#46657a]">Réponse de l’élève</p><p className="mt-3 whitespace-pre-wrap break-words text-base leading-7 text-[#072a3f]">{displayValue(selectedSubmission.answers?.[question.id])}</p></div>
+                              <div className="min-h-[180px] min-w-0 rounded-xl border border-[#b9d8c9] bg-[#f3faf6] p-5 sm:p-6"><p className="text-xs font-extrabold uppercase tracking-wide text-[#176b45]">Réponse attendue</p><p className="mt-3 whitespace-pre-wrap break-words text-base leading-7 text-[#174d35]">{expectedAnswer(question)}</p>{question.explanation && <p className="mt-4 border-t border-[#dcebe2] pt-3 text-sm leading-6 text-[#46657a]">{question.explanation}</p>}</div>
                             </div>
                             <div className="grid gap-3 border-t border-[#edf1f4] bg-white px-4 py-3 sm:grid-cols-[minmax(0,1fr)_180px]">
                               <label className="block min-w-0 text-xs font-semibold text-[#46657a]">Commentaire sur cette question<input value={questionComments[question.id] || ''} onChange={event => setQuestionComments(previous => ({ ...previous, [question.id]: event.target.value }))} placeholder="Facultatif : expliquer la décision…" className="mt-1 min-h-10 w-full rounded-lg border border-[#cbd9e2] px-3 text-sm font-normal text-[#072a3f] outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/15" /></label>
-                              <label className="block text-xs font-semibold text-[#46657a]">Points attribués<span className="mt-1 flex items-center gap-2"><input type="number" inputMode="decimal" min="0" max={maximum} step="0.25" value={value} onChange={event => setPoints(previous => ({ ...previous, [question.id]: event.target.value }))} disabled={!canReview || saving} className="min-h-11 w-full rounded-lg border border-[#cbd9e2] px-3 text-base font-bold tabular-nums text-[#072a3f] outline-none focus:border-[#0b3c5d] focus:ring-2 focus:ring-[#0b3c5d]/15 disabled:bg-slate-100" /><span className="shrink-0 font-mono text-sm text-slate-500">/ {maximum}</span></span><span className="mt-1 block text-[10px] font-normal text-slate-500">Automatique : {Number(automaticFeedback?.points || 0).toFixed(2)} pts</span></label>
+                              <label className="block text-xs font-semibold text-[#46657a]">Points attribués<span className="mt-1 flex items-center gap-2"><input type="number" inputMode="decimal" min="0" max={maximum} step="0.25" value={value} aria-invalid={value.trim() === '' || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > maximum} onChange={event => setPoints(previous => ({ ...previous, [question.id]: event.target.value }))} disabled={!canReview || saving} className={'min-h-11 w-full rounded-lg border px-3 text-base font-bold tabular-nums text-[#072a3f] outline-none focus:ring-2 disabled:bg-slate-100 ' + (value.trim() === '' || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > maximum ? 'border-rose-500 focus:border-rose-600 focus:ring-rose-200' : 'border-[#cbd9e2] focus:border-[#0b3c5d] focus:ring-[#0b3c5d]/15')} /><span className="shrink-0 font-mono text-sm text-slate-500">/ {maximum}</span></span><span className="mt-1 block text-[10px] font-normal text-slate-500">Automatique : {Number(automaticFeedback?.points || 0).toFixed(2)} pts</span></label>
                             </div>
                           </article>
                         );
