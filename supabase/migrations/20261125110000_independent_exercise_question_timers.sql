@@ -106,6 +106,7 @@ DECLARE
   v_question JSONB;
   v_grade JSONB;
   v_timed_out BOOLEAN;
+  v_existing public.exercise_answers%ROWTYPE;
 BEGIN
   SELECT * INTO v_attempt
   FROM public.exercise_attempts
@@ -131,6 +132,28 @@ BEGIN
 
   IF v_question IS NULL THEN
     RAISE EXCEPTION 'Question introuvable dans la version de l’exercice.';
+  END IF;
+
+  SELECT * INTO v_existing
+  FROM public.exercise_answers
+  WHERE attempt_id = v_attempt.id AND question_id = p_question_id;
+
+  IF FOUND THEN
+    IF coalesce(v_existing.timed_out, FALSE) THEN
+      v_grade := jsonb_build_object(
+        'correct', FALSE, 'points', 0,
+        'max_points', coalesce((v_question ->> 'points')::numeric, 0),
+        'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+        'explanation', v_question -> 'explanation'
+      );
+    ELSE
+      v_grade := public.exercise_grade_question(v_question, coalesce(v_existing.answer, 'null'::jsonb));
+    END IF;
+    RETURN v_grade || jsonb_build_object(
+      'timed_out', coalesce(v_existing.timed_out, FALSE),
+      'question_id', p_question_id,
+      'student_answer', v_existing.answer
+    );
   END IF;
 
   v_timed_out := v_attempt.current_question_deadline_at IS NULL
