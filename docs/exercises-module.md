@@ -72,9 +72,12 @@ Les nouvelles tentatives utilisent désormais le parcours groupé :
 
 - `start_exercise_attempt_batch` crée la tentative et retourne en une seule réponse toutes les questions nettoyées, dans l’ordre aléatoire figé côté serveur ; les clés de réponse et explications restent dans la version privée.
 - Les réponses et l’index courant sont conservés dans IndexedDB pendant le parcours. Le navigateur n’appelle plus PostgreSQL à chaque validation ou changement de question.
-- `submit_exercise_attempt_batch` reçoit l’ensemble des réponses, recalcule chaque note avec `exercise_grade_question`, écrit les lignes de détail et clôt la tentative dans une transaction.
-- Les échéances sont calculées depuis `started_at` et la durée cumulée des questions, comme pour les examens écrits. Une réponse à une question qui n’a pas encore commencé est rejetée ; une réponse déjà saisie reste évaluée à la remise finale.
-- Les tentatives créées avant cette migration conservent les anciennes RPC de reprise et de correction afin de ne pas interrompre les sessions déjà en cours.
+- `submit_exercise_attempt_batch` reçoit les réponses de la tentative, recalcule les notes avec `exercise_grade_question`, écrit les lignes de détail et clôt la tentative dans une transaction.
+- Chaque question possède son propre chronomètre indépendant. Le serveur démarre son échéance au moment où la question est activée ; le temps inutilisé est perdu et n'est jamais transféré à la question suivante.
+- `advance_exercise_attempt_batch` enregistre la réponse validée puis démarre le chronomètre complet de la question suivante côté PostgreSQL. L'index actif et l'échéance ne sont jamais déterminés par le brouillon du navigateur.
+- `evaluate_exercise_attempt_question` n'accepte que la question actuellement ouverte. La réponse et son état (dans le délai / expirée) sont figés lors de la validation ; l'écran de correction reste sans limite de temps.
+- La remise finale n'accepte que la dernière question active. Les réponses aux questions précédentes sont reprises depuis les enregistrements serveur, et une réponse tardive ne peut pas être notée comme correcte.
+- Les tentatives historiques non groupées continuent d'utiliser les RPC individuelles. Les tentatives groupées déjà en cours au moment du déploiement doivent être terminées ou contrôlées avant l'application de cette migration.
 
 Les RPC groupées sont réservées au rôle `authenticated`. La migration doit être appliquée avant de publier la nouvelle version du frontend.
 
