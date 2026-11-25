@@ -148,6 +148,30 @@ BEGIN
     v_grade := public.exercise_grade_question(v_question, coalesce(p_answer, 'null'::jsonb));
   END IF;
 
+  -- Figer la validation au moment où elle est reçue : l'écran de correction
+  -- est sans limite de temps et ne doit pas faire expirer rétroactivement la réponse.
+  INSERT INTO public.exercise_answers(
+    attempt_id, question_id, answer, is_correct, points_awarded, max_points, timed_out
+  ) VALUES (
+    v_attempt.id, p_question_id, p_answer,
+    coalesce((v_grade ->> 'correct')::boolean, FALSE),
+    coalesce((v_grade ->> 'points')::numeric, 0),
+    coalesce((v_grade ->> 'max_points')::numeric, 0),
+    v_timed_out
+  )
+  ON CONFLICT (attempt_id, question_id) DO UPDATE SET
+    answer = EXCLUDED.answer,
+    is_correct = EXCLUDED.is_correct,
+    points_awarded = EXCLUDED.points_awarded,
+    max_points = EXCLUDED.max_points,
+    timed_out = EXCLUDED.timed_out,
+    answered_at = clock_timestamp();
+
+  UPDATE public.exercise_attempts
+  SET answers = coalesce(answers, '{}'::jsonb) || jsonb_build_object(p_question_id, p_answer),
+      updated_at = clock_timestamp()
+  WHERE id = v_attempt.id;
+
   RETURN v_grade || jsonb_build_object(
     'timed_out', v_timed_out,
     'question_id', p_question_id,
@@ -226,39 +250,35 @@ BEGIN
     RAISE EXCEPTION 'Question introuvable dans la version de l’exercice.';
   END IF;
 
-  v_timed_out := v_attempt.current_question_deadline_at IS NULL
-    OR clock_timestamp() >= v_attempt.current_question_deadline_at;
+  -- La réponse a été figée par evaluate_exercise_attempt_question.
+  -- En cas d'appel direct, enregistrer une validation serveur à l'instant présent.
+  SELECT answer, timed_out INTO v_answer, v_timed_out
+  FROM public.exercise_answers
+  WHERE attempt_id = v_attempt.id AND question_id = p_question_id;
 
-  IF v_timed_out THEN
-    v_grade := jsonb_build_object(
-      'correct', FALSE,
-      'points', 0,
-      'max_points', coalesce((v_question ->> 'points')::numeric, 0),
-      'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
-      'explanation', v_question -> 'explanation'
+  IF NOT FOUND THEN
+    v_timed_out := v_attempt.current_question_deadline_at IS NULL
+      OR clock_timestamp() >= v_attempt.current_question_deadline_at;
+    IF v_timed_out THEN
+      v_grade := jsonb_build_object(
+        'correct', FALSE, 'points', 0,
+        'max_points', coalesce((v_question ->> 'points')::numeric, 0),
+        'expected', coalesce(v_question -> 'answers', v_question -> 'correct_answer', v_question #> '{verbes_trous,phrases}'),
+        'explanation', v_question -> 'explanation'
+      );
+    ELSE
+      v_grade := public.exercise_grade_question(v_question, v_answer);
+    END IF;
+    INSERT INTO public.exercise_answers(
+      attempt_id, question_id, answer, is_correct, points_awarded, max_points, timed_out
+    ) VALUES (
+      v_attempt.id, p_question_id, v_answer,
+      coalesce((v_grade ->> 'correct')::boolean, FALSE),
+      coalesce((v_grade ->> 'points')::numeric, 0),
+      coalesce((v_grade ->> 'max_points')::numeric, 0),
+      v_timed_out
     );
-  ELSE
-    v_grade := public.exercise_grade_question(v_question, v_answer);
   END IF;
-
-  INSERT INTO public.exercise_answers(
-    attempt_id, question_id, answer, is_correct, points_awarded, max_points, timed_out
-  ) VALUES (
-    v_attempt.id,
-    p_question_id,
-    v_answer,
-    coalesce((v_grade ->> 'correct')::boolean, FALSE),
-    coalesce((v_grade ->> 'points')::numeric, 0),
-    coalesce((v_grade ->> 'max_points')::numeric, 0),
-    v_timed_out
-  )
-  ON CONFLICT (attempt_id, question_id) DO UPDATE SET
-    answer = EXCLUDED.answer,
-    is_correct = EXCLUDED.is_correct,
-    points_awarded = EXCLUDED.points_awarded,
-    max_points = EXCLUDED.max_points,
-    timed_out = EXCLUDED.timed_out,
-    answered_at = clock_timestamp();
 
   UPDATE public.exercise_attempts
   SET answers = coalesce(answers, '{}'::jsonb) || jsonb_build_object(p_question_id, v_answer),
@@ -418,9 +438,15 @@ BEGIN
         RAISE EXCEPTION 'La réponse d’une question précédente n’a pas été enregistrée.';
       END IF;
     ELSIF v_question_id = v_current_id THEN
-      v_answer := v_answers -> v_question_id;
-      v_timed_out := v_attempt.current_question_deadline_at IS NULL
-        OR clock_timestamp() >= v_attempt.current_question_deadline_at;
+      SELECT answer, timed_out INTO v_answer, v_timed_out
+      FROM public.exercise_answers
+      WHERE attempt_id = v_attempt.id AND question_id = v_question_id;
+
+      IF NOT FOUND THEN
+        v_answer := v_answers -> v_question_id;
+        v_timed_out := v_attempt.current_question_deadline_at IS NULL
+          OR clock_timestamp() >= v_attempt.current_question_deadline_at;
+      END IF;
     ELSE
       RAISE EXCEPTION 'Une question non commencée ne peut pas être remise.';
     END IF;
