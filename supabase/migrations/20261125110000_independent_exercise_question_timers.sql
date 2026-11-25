@@ -280,6 +280,7 @@ BEGIN
   WHERE attempt_id = v_attempt.id AND question_id = p_question_id;
 
   IF NOT FOUND THEN
+    v_answer := coalesce(p_answer, 'null'::jsonb);
     v_timed_out := v_attempt.current_question_deadline_at IS NULL
       OR clock_timestamp() >= v_attempt.current_question_deadline_at;
     IF v_timed_out THEN
