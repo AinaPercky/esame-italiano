@@ -191,7 +191,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     }
     const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
     const maximumTotal = questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0);
-    if (!window.confirm('Confirmer l’enregistrement de la correction ?\\n\\nPoints attribués : ' + total.toFixed(2) + ' / ' + maximumTotal.toFixed(2) + '.\\nChaque note respecte le barème de sa question.')) return;
+    if (!window.confirm('Confirmer l’enregistrement de la correction ?\n\nPoints attribués : ' + total.toFixed(2) + ' / ' + maximumTotal.toFixed(2) + '.\nChaque note respecte le barème de sa question.')) return;
     try {
       setSaving(true);
       const updated = await onSave(selectedSubmission.id, scores, questionComments, generalComment);
