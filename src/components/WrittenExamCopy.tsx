@@ -134,9 +134,8 @@ export const WrittenExamCopy:React.FC<Props>=({attempt,version,manualScores,onMa
  const sourceSections=[...(version?.written_exam_sections||[])];const sectionById=new Map(sourceSections.map((section:any)=>[section.id,section]));const manifestSections=attempt.order_manifest?.sections;const sectionIds=Array.isArray(manifestSections)&&manifestSections.length?manifestSections:sourceSections.sort((a:any,b:any)=>a.position-b.position).map((section:any)=>section.id);const sections=sectionIds.map((id:string)=>sectionById.get(id)).filter(Boolean).map((section:any)=>{const questions=[...(section.written_exam_questions||[])];const questionById=new Map(questions.map((question:any)=>[question.id,question]));const manifestQuestions=attempt.order_manifest?.questions?.[section.id];const ids=Array.isArray(manifestQuestions)&&manifestQuestions.length?manifestQuestions:questions.sort((a:any,b:any)=>a.position-b.position).map((question:any)=>question.id);return {...section,written_exam_questions:ids.map((id:string)=>questionById.get(id)).filter(Boolean)};});
  const questionStatus=(q:any):'missing'|'correct'|'review'=>{
   const answer=answerOf(attempt,q);if(!hasResponse(answer))return 'missing';
-  const score=autoScore(q,answer);const savedManualScore=attempt.manual_scores?.[q.id];
-  if(q.manual_review&&savedManualScore===undefined)return 'review';
-  const awarded=Number(savedManualScore??score??0);
+  const score=autoScore(q,answer);
+  const awarded=Number(manualScores[q.id]??attempt.manual_scores?.[q.id]??score??0);
   return awarded>=Number(q.points||0)&&Number(q.points||0)>0?'correct':'review';
  };
  const allQuestions=sections.flatMap((section:any)=>(section.written_exam_questions||[]));
