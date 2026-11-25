@@ -180,9 +180,10 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
     setError(null);
     const scores: Record<string, number> = {};
     for (const question of questions) {
-      const value = Number(points[question.id] ?? selectedSubmission.feedback?.[question.id]?.points ?? 0);
+      const rawValue = points[question.id] ?? String(selectedSubmission.manual_review?.question_scores?.[question.id] ?? selectedSubmission.feedback?.[question.id]?.points ?? 0);
+      const value = Number(rawValue);
       const maximum = Number(question.points) || 0;
-      if (!Number.isFinite(value) || value < 0 || value > maximum) {
+      if (String(rawValue).trim() === '' || !Number.isFinite(value) || value < 0 || value > maximum) {
         setError('La note de la question « ' + question.question + ' » doit être comprise entre 0 et ' + maximum + ' points.');
         return;
       }
