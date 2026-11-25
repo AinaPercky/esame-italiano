@@ -172,6 +172,7 @@ export const QuizManualCorrectionPanel: React.FC<QuizManualCorrectionPanelProps>
   const selectSubmission = (submission: QuizSubmission) => {
     if (saving) return;
     setSelectedId(submission.id);
+    setQuestionFilter('all');
     setMobileDetailOpen(true);
   };
 
