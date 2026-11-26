@@ -239,6 +239,18 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
     });
   });
 
+  it('décompose une ancienne réponse multi-trous stockée comme une seule chaîne séparée par slash', () => {
+    const question: any = {
+      id: 'legacy-six-blanks-delimited', type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6, answers: ['o / i / e / iamo / ite / ono']
+    };
+    const result = calculateQuestionPointsEarned(question, JSON.stringify(['O', 'i', 'e', 'iamo', 'ite', 'ono']));
+    assert.equal(result.isFullyCorrect, true);
+    assert.equal(result.awardedPoints, 6);
+    assert.equal(result.totalBlanks, 6);
+  });
+
   it('ne transforme pas une liste de variantes en cases lorsque l’énoncé ne contient qu’un trou', () => {
     const question: any = {
       id: 'one-blank-two-variants', type: 'text',
