@@ -224,4 +224,29 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
     assert.equal(calculateQuestionPointsEarned(byLabel, 'Quarantacinque').awardedPoints, 2);
     assert.equal(calculateQuestionPointsEarned(byLabel, 'Cinquantacinque').awardedPoints, 0);
   });
+  it('déduit six cases indépendantes depuis l’énoncé lorsque blank_count manque', () => {
+    const question: any = {
+      id: 'legacy-six-blanks',
+      type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6,
+      answers: ['o', 'i', 'e', 'iamo', 'ite', 'ono']
+    };
+    const result = calculateQuestionPointsEarned(question, JSON.stringify(['O', 'i', 'e', 'iamo', 'ite', 'sbagliato']));
+    assert.deepEqual(result, {
+      awardedPoints: 5, maxPoints: 6, isFullyCorrect: false,
+      partialCorrectCount: 5, totalBlanks: 6
+    });
+  });
+
+  it('ne transforme pas une liste de variantes en cases lorsque l’énoncé ne contient qu’un trou', () => {
+    const question: any = {
+      id: 'one-blank-two-variants', type: 'text',
+      question: 'Scrivi la forma: Io ___', points: 2,
+      answers: ['parlo', 'io parlo']
+    };
+    assert.equal(calculateQuestionPointsEarned(question, 'io parlo').awardedPoints, 2);
+    assert.equal(calculateQuestionPointsEarned(question, 'io parlo').totalBlanks, 1);
+  });
+
 });

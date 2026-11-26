@@ -96,22 +96,38 @@ export const CLOZE_BLANK_REGEX = /(?:_{2,}|…{2,}|\.{3,}|\[\s*\]|\(\s*\)|\{\{\s
 
 export type QuizExpectedAnswerSource = Pick<QuizQuestion, 'question'> & Partial<Pick<QuizQuestion, 'correct_answer' | 'answers' | 'blank_count'>> & { acceptedAnswers?: string[]; accepted_answers?: string[] };
 
+function inferPromptBlankCount(prompt: string): number {
+  return Array.from(String(prompt || '').matchAll(new RegExp(CLOZE_BLANK_REGEX.source, 'g'))).length;
+}
+
 export function getQuestionExpectedAnswers(question: QuizExpectedAnswerSource): string[] {
   const explicitBlankCount = Math.max(0, Number((question as any).blank_count) || 0);
+  // Old quiz/exercise records sometimes omitted blank_count. The prompt itself is
+  // authoritative when it visibly contains several independent blanks.
+  const promptBlankCount = inferPromptBlankCount(question.question);
+  const inferredBlankCount = promptBlankCount > 1 ? promptBlankCount : explicitBlankCount;
+
   const normalizeEntries = (entries: unknown[]): string[] => {
     const values = entries.map((entry) => Array.isArray(entry)
       ? entry.map(String).map(value => value.trim()).filter(Boolean).join(' / ')
       : String(entry ?? '').trim()).filter(Boolean);
-
-    // A flat list is a list of accepted variants for ONE answer.
-    // Multiple blanks must be represented by nested arrays, or explicitly by blank_count.
     const hasNestedBlanks = entries.some(Array.isArray);
+
+    // A flat list matching the number of visible blanks represents independent
+    // answer slots, even when legacy data did not persist blank_count.
+    if (!hasNestedBlanks && promptBlankCount > 1 && values.length === promptBlankCount) {
+      return values;
+    }
+
     // Legacy sanitizer could persist duplicate variants as blank_count=2.
-    // Identical flat answers cannot represent two distinct expected slots.
+    // Keep this compatibility rule for questions without multiple visible blanks.
     const allFlatEntriesIdentical = !hasNestedBlanks && values.length > 1
       && values.every(value => normalizeAnswerText(value) === normalizeAnswerText(values[0]));
     if (allFlatEntriesIdentical) return [values[0]];
-    if (!hasNestedBlanks && explicitBlankCount <= 1 && values.length > 1) {
+
+    // Without evidence of multiple blanks, a flat list remains alternatives
+    // for one answer. Explicit blank_count preserves older multi-blank records.
+    if (!hasNestedBlanks && inferredBlankCount <= 1 && values.length > 1) {
       return [values.join(' / ')];
     }
     return values;
@@ -134,16 +150,13 @@ export function getQuestionExpectedAnswers(question: QuizExpectedAnswerSource): 
     } catch {}
   }
 
-  // The pipe delimiter remains the legacy explicit notation for multiple blanks.
-  if (raw.includes('|')) {
-    const parts = raw.split(/\s*\|\s*/).filter(Boolean);
-    if (parts.length > 1) return parts;
-  }
-
-  if (raw.includes(' // ')) {
-    const parts = raw.split(/\s*\/\/\s*/).filter(Boolean);
-    if (parts.length > 1) return parts;
-  }
+  // Split legacy text only when the number of segments matches visible/declared blanks.
+  const splitLegacySlots = (value: string): string[] => {
+    const parts = value.split(/\s*(?:\||\/\/|\/)\s*/).map(part => part.trim()).filter(Boolean);
+    return inferredBlankCount > 1 && parts.length === inferredBlankCount ? parts : [];
+  };
+  const delimitedSlots = splitLegacySlots(raw);
+  if (delimitedSlots.length > 1) return delimitedSlots;
 
   return [raw];
 }
@@ -300,7 +313,7 @@ export function isQuestionAnswerCorrect(question: QuizQuestion, studentAnswer: s
 }
 
 
-function getWrittenExamExpectedSlots(answerKey: any, blankCount?: number): string[] {
+function getWrittenExamExpectedSlots(answerKey: any, blankCount?: number, prompt = ''): string[] {
   const source = Array.isArray(answerKey?.answers) && answerKey.answers.length
     ? answerKey.answers
     : Array.isArray(answerKey?.acceptedAnswers) && answerKey.acceptedAnswers.length
@@ -309,18 +322,16 @@ function getWrittenExamExpectedSlots(answerKey: any, blankCount?: number): strin
         ? answerKey.accepted_answers
         : answerKey?.correct_answer != null ? [answerKey.correct_answer] : [];
   if (!source.length) return [];
-  if (source.some(Array.isArray)) {
-    return source.map((entry: unknown) => Array.isArray(entry)
-      ? entry.map(String).map(value => value.trim()).filter(Boolean).join(' / ')
-      : String(entry ?? '').trim()).filter(Boolean);
-  }
-  const values = source.map(String).map((value: string) => value.trim()).filter(Boolean);
-  if (Number(blankCount) > 1 && values.length > 1) return values;
-  return values.length ? [values.join(' / ')] : [];
+  return getQuestionExpectedAnswers({
+    question: String(prompt || ''),
+    blank_count: blankCount,
+    answers: source,
+    correct_answer: answerKey?.correct_answer != null ? String(answerKey.correct_answer) : ''
+  } as QuizExpectedAnswerSource);
 }
 
 export function formatWrittenExamTextExpected(prompt: string, answerKey: any, blankCount?: number): string {
-  const slots = getWrittenExamExpectedSlots(answerKey, blankCount);
+  const slots = getWrittenExamExpectedSlots(answerKey, blankCount, prompt);
   if (!slots.length) return 'Corrigé indisponible';
   if (slots.length === 1) return slots[0];
   return slots.map((value, index) => 'Case ' + (index + 1) + ': ' + value).join(' · ');
