@@ -676,7 +676,14 @@ export const ExercisesStudentView: React.FC<ExercisesStudentViewProps> = ({ onFu
               }
               if (q.type === 'text') {
                 const rawStr = typeof rawStudent === 'string' ? rawStudent : JSON.stringify(rawStudent ?? '');
-                return formatTextAnswerForDisplay(q, rawStr);
+                // Le paquet étudiant peut masquer answers/correct_answer pour éviter
+                // d'exposer le corrigé. La réponse attendue renvoyée par l'API de correction
+                // fournit alors le nombre réel de cases pour afficher toute la saisie.
+                const displayQuestion = {
+                  ...q,
+                  ...(Array.isArray(correction?.expected) ? { answers: correction.expected as string[] } : {})
+                };
+                return formatTextAnswerForDisplay(displayQuestion, rawStr);
               }
               if (q.type === 'reorder') {
                 const rawStr = typeof rawStudent === 'string' ? rawStudent : JSON.stringify(rawStudent ?? '');

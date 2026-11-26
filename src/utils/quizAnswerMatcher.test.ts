@@ -259,6 +259,21 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
     );
   });
 
+  it('affiche les six réponses quand le paquet étudiant masque les réponses attendues', () => {
+    const studentQuestion: any = {
+      id: 'student-six-blanks-with-hidden-key', type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6
+    };
+    const correctionExpected = ['o', 'i', 'e', 'iamo', 'ite', 'ono'];
+    const displayQuestion = { ...studentQuestion, answers: correctionExpected };
+    const submitted = JSON.stringify(['O', 'i', 'e', 'iamo', 'ite', 'sbagliato']);
+    assert.equal(
+      formatTextAnswerForDisplay(displayQuestion, submitted),
+      'Case 1: O · Case 2: i · Case 3: e · Case 4: iamo · Case 5: ite · Case 6: sbagliato'
+    );
+  });
+
   it('décompose une ancienne réponse multi-trous stockée comme une seule chaîne séparée par slash', () => {
     const question: any = {
       id: 'legacy-six-blanks-delimited', type: 'text',
