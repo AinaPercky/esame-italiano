@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   isTextAnswerCorrect,
   calculateQuestionPointsEarned,
+  formatTextAnswerForDisplay,
+  formatCorrectTextAnswerForDisplay,
   normalizeAnswerText,
   parseStudentAnswers
 } from './quizAnswerMatcher';
@@ -237,6 +239,22 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
       awardedPoints: 5, maxPoints: 6, isFullyCorrect: false,
       partialCorrectCount: 5, totalBlanks: 6
     });
+  });
+
+  it('affiche séparément chaque réponse saisie et chaque terminaison attendue', () => {
+    const question: any = {
+      id: 'legacy-six-blanks-display', type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6, answers: ['o / i / e / iamo / ite / ono']
+    };
+    assert.equal(
+      formatTextAnswerForDisplay(question, JSON.stringify(['O', '', '', '', '', ''])),
+      'Case 1: O · Case 2: — · Case 3: — · Case 4: — · Case 5: — · Case 6: —'
+    );
+    assert.equal(
+      formatCorrectTextAnswerForDisplay(question),
+      'Case 1: o · Case 2: i · Case 3: e · Case 4: iamo · Case 5: ite · Case 6: ono'
+    );
   });
 
   it('décompose une ancienne réponse multi-trous stockée comme une seule chaîne séparée par slash', () => {
