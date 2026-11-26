@@ -5,6 +5,8 @@ import {
   calculateQuestionPointsEarned,
   formatTextAnswerForDisplay,
   formatCorrectTextAnswerForDisplay,
+  formatWrittenExamTextExpected,
+  gradeWrittenExamTextQuestion,
   normalizeAnswerText,
   parseStudentAnswers
 } from './quizAnswerMatcher';
@@ -267,6 +269,13 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
     assert.equal(result.isFullyCorrect, true);
     assert.equal(result.awardedPoints, 6);
     assert.equal(result.totalBlanks, 6);
+  });
+
+  it('applique la même identification des cases au barème automatique des examens écrits', () => {
+    const prompt = 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.';
+    const answerKey = { answers: ['o / i / e / iamo / ite / ono'] };
+    assert.equal(formatWrittenExamTextExpected(prompt, answerKey), 'Case 1: o · Case 2: i · Case 3: e · Case 4: iamo · Case 5: ite · Case 6: ono');
+    assert.equal(gradeWrittenExamTextQuestion(prompt, answerKey, undefined, ['O', 'i', 'e', 'iamo', 'ite', 'sbagliato'], 6), 5);
   });
 
   it('ne transforme pas une liste de variantes en cases lorsque l’énoncé ne contient qu’un trou', () => {
