@@ -348,7 +348,7 @@ export function gradeWrittenExamTextQuestion(
   studentAnswer: unknown,
   maxPoints: number
 ): number {
-  const expected = getWrittenExamExpectedSlots(answerKey, blankCount);
+  const expected = getWrittenExamExpectedSlots(answerKey, blankCount, prompt);
   const max = Number(maxPoints);
   if (!expected.length || !Number.isFinite(max) || max <= 0) return 0;
   let submitted: string[] = [];
