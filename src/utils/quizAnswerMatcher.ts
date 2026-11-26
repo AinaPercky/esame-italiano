@@ -119,7 +119,7 @@ export function getQuestionExpectedAnswers(question: QuizExpectedAnswerSource): 
       return values;
     }
     if (!hasNestedBlanks && promptBlankCount > 1 && values.length === 1) {
-      const parts = values[0].split(/\\s*(?:\\||\\/\\/|\\/)\\s*/).map(part => part.trim()).filter(Boolean);
+      const parts = values[0].split(/\s*(?:\||\/\/|\/)\s*/).map(part => part.trim()).filter(Boolean);
       if (parts.length === promptBlankCount) return parts;
     }
 
