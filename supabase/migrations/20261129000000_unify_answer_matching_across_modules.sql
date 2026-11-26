@@ -153,6 +153,11 @@ DECLARE
   v_parts JSONB;
   v_collapsed TEXT;
 BEGIN
+  IF (p_question ->> 'blank_count') ~ '^[0-9]+$' THEN
+    v_explicit_blank_count := (p_question ->> 'blank_count')::integer;
+  END IF;
+  v_prompt_blanks := public.quiz_prompt_blank_count(v_prompt_text);
+
   IF jsonb_typeof(p_question -> 'answers') = 'array' AND jsonb_array_length(p_question -> 'answers') > 0 THEN
     v_raw_items := p_question -> 'answers';
   ELSIF jsonb_typeof(p_question -> 'acceptedAnswers') = 'array' AND jsonb_array_length(p_question -> 'acceptedAnswers') > 0 THEN
@@ -178,12 +183,22 @@ BEGIN
     IF jsonb_array_length(v_parts) > 1 THEN
       v_raw_items := v_parts;
     END IF;
-  ELSIF position(' // ' IN v_raw) > 0 THEN
+  ELSIF position('//' IN v_raw) > 0 THEN
     SELECT coalesce(jsonb_agg(to_jsonb(btrim(part)) ORDER BY ord), '[]'::jsonb)
     INTO v_parts
     FROM regexp_split_to_table(v_raw, '\s*//\s*') WITH ORDINALITY AS t(part, ord)
     WHERE btrim(part) <> '';
     IF jsonb_array_length(v_parts) > 1 THEN
+      v_raw_items := v_parts;
+    END IF;
+  ELSIF (v_prompt_blanks >= 2 OR coalesce(v_explicit_blank_count, 0) > 1)
+        AND position('/' IN v_raw) > 0 THEN
+    SELECT coalesce(jsonb_agg(to_jsonb(btrim(part)) ORDER BY ord), '[]'::jsonb)
+    INTO v_parts
+    FROM regexp_split_to_table(v_raw, '\s*/\s*') WITH ORDINALITY AS t(part, ord)
+    WHERE btrim(part) <> '';
+    IF jsonb_array_length(v_parts) =
+       greatest(1, coalesce(nullif(v_explicit_blank_count, 0), nullif(v_prompt_blanks, 0), 1)) THEN
       v_raw_items := v_parts;
     END IF;
   END IF;
@@ -218,13 +233,23 @@ BEGIN
   IF jsonb_array_length(v_cleaned) = 0 THEN
     RETURN jsonb_build_array('');
   ELSIF jsonb_array_length(v_cleaned) = 1 THEN
+    -- Split a legacy compacted answer only when the delimiter count matches
+    -- the number of independent blanks. Never split accepted variants.
+    IF NOT v_has_nested
+       AND NOT v_from_accepted_variants
+       AND greatest(1, coalesce(nullif(v_explicit_blank_count, 0), nullif(v_prompt_blanks, 0), 1)) > 1 THEN
+      SELECT coalesce(jsonb_agg(to_jsonb(btrim(part)) ORDER BY ord), '[]'::jsonb)
+      INTO v_parts
+      FROM regexp_split_to_table(v_cleaned ->> 0, '\s*(//|[|/])\s*')
+        WITH ORDINALITY AS split(part, ord)
+      WHERE btrim(part) <> '';
+      IF jsonb_array_length(v_parts) =
+         greatest(1, coalesce(nullif(v_explicit_blank_count, 0), nullif(v_prompt_blanks, 0), 1)) THEN
+        RETURN v_parts;
+      END IF;
+    END IF;
     RETURN v_cleaned;
   END IF;
-
-  IF (p_question ->> 'blank_count') ~ '^[0-9]+$' THEN
-    v_explicit_blank_count := (p_question ->> 'blank_count')::integer;
-  END IF;
-  v_prompt_blanks := public.quiz_prompt_blank_count(v_prompt_text);
 
   v_is_multi_blank :=
     v_has_nested
