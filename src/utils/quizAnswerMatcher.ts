@@ -118,6 +118,10 @@ export function getQuestionExpectedAnswers(question: QuizExpectedAnswerSource): 
     if (!hasNestedBlanks && promptBlankCount > 1 && values.length === promptBlankCount) {
       return values;
     }
+    if (!hasNestedBlanks && promptBlankCount > 1 && values.length === 1) {
+      const parts = values[0].split(/\\s*(?:\\||\\/\\/|\\/)\\s*/).map(part => part.trim()).filter(Boolean);
+      if (parts.length === promptBlankCount) return parts;
+    }
 
     // Legacy sanitizer could persist duplicate variants as blank_count=2.
     // Keep this compatibility rule for questions without multiple visible blanks.
