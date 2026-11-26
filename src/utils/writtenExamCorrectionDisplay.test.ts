@@ -162,4 +162,24 @@ describe('writtenExamCorrectionDisplay', () => {
       'reviewed'
     );
   });
+  it('identifies flat answer-key entries as independent slots from the six visible blanks', () => {
+    const breakdown = buildWrittenQuestionCorrectionBreakdown(
+      {
+        id: 'w-six-blanks', question_type: 'text',
+        prompt: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+        points: 6, public_data: {},
+        written_exam_answer_keys: [{ answer_key: { answers: ['o', 'i', 'e', 'iamo', 'ite', 'ono'] } }]
+      },
+      ['O', 'i', 'e', 'iamo', 'ite', 'sbagliato']
+    );
+    assert.equal(breakdown.type, 'text');
+    if (breakdown.type === 'text') {
+      assert.equal(breakdown.isMultiBlank, true);
+      assert.equal(breakdown.slots.length, 6);
+      assert.equal(breakdown.slots[0].isCorrect, true);
+      assert.equal(breakdown.slots[5].isCorrect, false);
+      assert.equal(breakdown.slots[5].expectedValue, 'ono');
+    }
+  });
+
 });

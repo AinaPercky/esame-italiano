@@ -3,6 +3,10 @@ import { describe, it } from 'node:test';
 import {
   isTextAnswerCorrect,
   calculateQuestionPointsEarned,
+  formatTextAnswerForDisplay,
+  formatCorrectTextAnswerForDisplay,
+  formatWrittenExamTextExpected,
+  gradeWrittenExamTextQuestion,
   normalizeAnswerText,
   parseStudentAnswers
 } from './quizAnswerMatcher';
@@ -224,4 +228,64 @@ describe('régression QCM et anciennes réponses dupliquées', () => {
     assert.equal(calculateQuestionPointsEarned(byLabel, 'Quarantacinque').awardedPoints, 2);
     assert.equal(calculateQuestionPointsEarned(byLabel, 'Cinquantacinque').awardedPoints, 0);
   });
+  it('déduit six cases indépendantes depuis l’énoncé lorsque blank_count manque', () => {
+    const question: any = {
+      id: 'legacy-six-blanks',
+      type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6,
+      answers: ['o', 'i', 'e', 'iamo', 'ite', 'ono']
+    };
+    const result = calculateQuestionPointsEarned(question, JSON.stringify(['O', 'i', 'e', 'iamo', 'ite', 'sbagliato']));
+    assert.deepEqual(result, {
+      awardedPoints: 5, maxPoints: 6, isFullyCorrect: false,
+      partialCorrectCount: 5, totalBlanks: 6
+    });
+  });
+
+  it('affiche séparément chaque réponse saisie et chaque terminaison attendue', () => {
+    const question: any = {
+      id: 'legacy-six-blanks-display', type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6, answers: ['o / i / e / iamo / ite / ono']
+    };
+    assert.equal(
+      formatTextAnswerForDisplay(question, JSON.stringify(['O', '', '', '', '', ''])),
+      'Case 1: O · Case 2: — · Case 3: — · Case 4: — · Case 5: — · Case 6: —'
+    );
+    assert.equal(
+      formatCorrectTextAnswerForDisplay(question),
+      'Case 1: o · Case 2: i · Case 3: e · Case 4: iamo · Case 5: ite · Case 6: ono'
+    );
+  });
+
+  it('décompose une ancienne réponse multi-trous stockée comme une seule chaîne séparée par slash', () => {
+    const question: any = {
+      id: 'legacy-six-blanks-delimited', type: 'text',
+      question: 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.',
+      points: 6, answers: ['o / i / e / iamo / ite / ono']
+    };
+    const result = calculateQuestionPointsEarned(question, JSON.stringify(['O', 'i', 'e', 'iamo', 'ite', 'ono']));
+    assert.equal(result.isFullyCorrect, true);
+    assert.equal(result.awardedPoints, 6);
+    assert.equal(result.totalBlanks, 6);
+  });
+
+  it('applique la même identification des cases au barème automatique des examens écrits', () => {
+    const prompt = 'Io dorm___ otto ore. Tu part___ domani. Luca apr___ la porta. Noi sent___ la musica. Voi segu___ il corso. Loro copr___ il tavolo.';
+    const answerKey = { answers: ['o / i / e / iamo / ite / ono'] };
+    assert.equal(formatWrittenExamTextExpected(prompt, answerKey), 'Case 1: o · Case 2: i · Case 3: e · Case 4: iamo · Case 5: ite · Case 6: ono');
+    assert.equal(gradeWrittenExamTextQuestion(prompt, answerKey, undefined, ['O', 'i', 'e', 'iamo', 'ite', 'sbagliato'], 6), 5);
+  });
+
+  it('ne transforme pas une liste de variantes en cases lorsque l’énoncé ne contient qu’un trou', () => {
+    const question: any = {
+      id: 'one-blank-two-variants', type: 'text',
+      question: 'Scrivi la forma: Io ___', points: 2,
+      answers: ['parlo', 'io parlo']
+    };
+    assert.equal(calculateQuestionPointsEarned(question, 'io parlo').awardedPoints, 2);
+    assert.equal(calculateQuestionPointsEarned(question, 'io parlo').totalBlanks, 1);
+  });
+
 });
